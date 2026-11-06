@@ -42,9 +42,11 @@ describe('BillingUserController', () => {
         capabilities: ['reports', 'data-export'],
         limits: { sessions: 10 }
       };
+
       capabilitiesFor.mockResolvedValue(resolved);
 
       const req = mockJwtRequest() as JwtAuthRequest;
+
       await expect(controller.getEntitlements(req)).resolves.toEqual(resolved);
     });
 
@@ -56,6 +58,7 @@ describe('BillingUserController', () => {
       });
 
       const req = mockJwtRequest('caller-9') as JwtAuthRequest;
+
       // A body/query id must have no way in: the route takes none.
       req.body = { userId: 'victim-1' };
       req.query = { userId: 'victim-2' };
@@ -74,6 +77,7 @@ describe('BillingUserController', () => {
       });
 
       const req = mockJwtRequest() as JwtAuthRequest;
+
       await expect(controller.getEntitlements(req)).resolves.toEqual({
         planKey: 'free',
         capabilities: [],

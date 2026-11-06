@@ -50,14 +50,17 @@ describe('RoleFormDialogComponent', () => {
       ]
     }).compileComponents();
     const fixture = TestBed.createComponent(RoleFormDialogComponent);
+
     fixture.detectChanges();
     await fixture.whenStable();
+
     return fixture;
   }
 
   it('creates the role and closes with the saved role', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.roleModel.set({ name: ' auditor ', description: '' });
     await fixture.whenStable();
 
@@ -74,6 +77,7 @@ describe('RoleFormDialogComponent', () => {
 
   it('keeps the dialog open with the input and shows the error when the save fails', async () => {
     const fixture = await setup({ role });
+
     storeMock.updateRole.mockReturnValue(
       throwError(
         () =>
@@ -87,6 +91,7 @@ describe('RoleFormDialogComponent', () => {
       )
     );
     const cmp = fixture.componentInstance;
+
     cmp.roleModel.set({ name: 'moderator', description: 'edits content' });
     await fixture.whenStable();
 
@@ -103,18 +108,21 @@ describe('RoleFormDialogComponent', () => {
       description: 'edits content'
     });
     const host = fixture.nativeElement as HTMLElement;
+
     expect(host.querySelector('.form-error')?.textContent?.trim()).toBe(
       'Role with this name already exists'
     );
     const save = host.querySelector<HTMLButtonElement>(
       'mat-dialog-actions button[matButton="filled"]'
     );
+
     expect(save?.disabled).toBe(false);
   });
 
   it('refuses a name of spaces only and sends nothing', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.roleModel.set({ name: '   ', description: '' });
     await fixture.whenStable();
 

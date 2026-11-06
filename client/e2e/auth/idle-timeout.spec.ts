@@ -45,6 +45,7 @@ test.describe('Idle timeout', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     const otherTab = await page.context().newPage();
+
     await routeApiToMockServer(otherTab, _mockServer.url);
     await otherTab.goto('/profile');
     await expect(
@@ -79,6 +80,7 @@ test.describe('Idle timeout', () => {
     await page.clock.setSystemTime(Date.now() + 31 * 60 * 1000);
 
     const logout = page.waitForRequest(/\/api\/v1\/auth\/logout$/);
+
     await page.evaluate(() =>
       document.dispatchEvent(new Event('visibilitychange'))
     );

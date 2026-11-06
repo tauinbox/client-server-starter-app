@@ -18,6 +18,7 @@ const ASCII_128 = 'A1' + 'a'.repeat(126);
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -73,6 +74,7 @@ describe('POST /api/v1/auth/profile/email/initiate', () => {
         password: 'Password1'
       })
     });
+
     expect(login.status).toBe(200);
     const tokens = (await login.json()) as {
       tokens: { access_token: string };
@@ -93,6 +95,7 @@ describe('POST /api/v1/auth/profile/email/initiate', () => {
 
     // A wrong password, not a length rejection: the value passed validation.
     const body = (await res.json()) as { errorKey?: string };
+
     expect(body.errorKey).toBe(ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD);
   });
 });

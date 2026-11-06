@@ -20,5 +20,6 @@ export class ThemeToggleComponent {
   protected readonly toggleTheme = this.#themeService.toggleTheme.bind(
     this.#themeService
   );
+
   protected readonly theme: Signal<ThemeMode> = this.#themeService.theme;
 }

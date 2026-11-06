@@ -53,7 +53,9 @@ export class PermissionService {
     const version = await this.#version.read(userId);
     const cacheKey = `${CACHE_PREFIX}${userId}:v${version}`;
     const cached = await this.cacheManager.get<ResolvedPermission[]>(cacheKey);
+
     this.metrics.recordCacheAccess('permissions', cached ? 'hit' : 'miss');
+
     if (cached) {
       return cached;
     }
@@ -85,7 +87,9 @@ export class PermissionService {
         }))
       )
     );
+
     await this.cacheManager.set(cacheKey, permissions, CACHE_TTL);
+
     return permissions;
   }
 
@@ -99,7 +103,9 @@ export class PermissionService {
     const version = await this.#version.read(userId);
     const cacheKey = `${ROLES_CACHE_PREFIX}${userId}:v${version}`;
     const cached = await this.cacheManager.get<RoleInfo[]>(cacheKey);
+
     this.metrics.recordCacheAccess('roles', cached ? 'hit' : 'miss');
+
     if (cached) {
       return cached;
     }
@@ -111,12 +117,15 @@ export class PermissionService {
 
     const roles: RoleInfo[] =
       user?.roles?.map((r) => ({ name: r.name, isSuper: r.isSuper })) ?? [];
+
     await this.cacheManager.set(cacheKey, roles, CACHE_TTL);
+
     return roles;
   }
 
   async getRoleNamesForUser(userId: string): Promise<string[]> {
     const roles = await this.getRolesForUser(userId);
+
     return roles.map((r) => r.name);
   }
 
@@ -134,6 +143,7 @@ export class PermissionService {
     if (userIds.length === 0) {
       return [];
     }
+
     const rows = await this.userRepository
       .createQueryBuilder('user')
       .select('user.id', 'id')
@@ -156,6 +166,7 @@ export class PermissionService {
         )
       )
       .getRawMany<{ id: string }>();
+
     return rows.map((row) => row.id);
   }
 

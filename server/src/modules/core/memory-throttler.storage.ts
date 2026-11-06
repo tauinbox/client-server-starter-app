@@ -31,6 +31,7 @@ export class MemoryThrottlerStorage
     _throttlerName: string
   ): Promise<ThrottlerStorageRecord> {
     const now = Date.now();
+
     this.ensureSweep();
 
     const entry = this.entries.get(key) ?? {
@@ -38,12 +39,15 @@ export class MemoryThrottlerStorage
       expiresAt: 0,
       blockExpiresAt: null
     };
+
     entry.hits = entry.hits.filter((at) => at > now - ttl);
     entry.hits.push(now);
     entry.expiresAt = now + ttl;
+
     if (entry.blockExpiresAt !== null && entry.blockExpiresAt <= now) {
       entry.blockExpiresAt = null;
     }
+
     this.entries.set(key, entry);
 
     const totalHits = entry.hits.length;
@@ -68,6 +72,7 @@ export class MemoryThrottlerStorage
 
   decrement(key: string): Promise<void> {
     this.entries.get(key)?.hits.pop();
+
     return Promise.resolve();
   }
 
@@ -81,6 +86,7 @@ export class MemoryThrottlerStorage
     if (this.sweepTimer) {
       return;
     }
+
     this.sweepTimer = setInterval(() => this.sweep(), SWEEP_INTERVAL_MS);
     this.sweepTimer.unref();
   }

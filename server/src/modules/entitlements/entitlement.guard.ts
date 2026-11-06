@@ -24,16 +24,19 @@ export class EntitlementGuard implements CanActivate {
     const capability = this.reflector.getAllAndOverride<
       EntitlementCapability | undefined
     >(ENTITLEMENT_KEY, [context.getHandler(), context.getClass()]);
+
     if (!capability) return true;
 
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
     const userId = req.user?.userId;
+
     if (!userId || !(await this.entitlements.has(userId, capability))) {
       throw new ApiError(
         ErrorKeys.BILLING.ENTITLEMENT_REQUIRED,
         `This action requires the "${capability}" entitlement`
       );
     }
+
     return true;
   }
 }

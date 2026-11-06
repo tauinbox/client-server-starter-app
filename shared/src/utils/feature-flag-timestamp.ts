@@ -5,10 +5,14 @@
  */
 export function toTimestamp(value: unknown): number | null {
   if (value instanceof Date) return value.getTime();
+
   if (typeof value === 'string') {
     const parsed = Date.parse(value);
+
     return Number.isNaN(parsed) ? null : parsed;
   }
+
   if (typeof value === 'number' && Number.isFinite(value)) return value;
+
   return null;
 }

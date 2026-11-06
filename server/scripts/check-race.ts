@@ -72,7 +72,9 @@ type KeyIndex = Map<string, Set<string>>;
 function listFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const full = path.join(dir, e.name);
+
     if (e.isDirectory()) return listFiles(full);
+
     return e.name.endsWith('.ts') && !e.name.endsWith('.spec.ts') ? [full] : [];
   });
 }
@@ -89,21 +91,27 @@ function walk(node: ts.Node, visit: (n: ts.Node) => void): void {
 /** The name of the called method or function: `a.b.name(` and `name(`. */
 function calleeName(call: ts.CallExpression): string {
   const callee = call.expression;
+
   if (ts.isPropertyAccessExpression(callee)) return callee.name.text;
+
   if (ts.isIdentifier(callee)) return callee.text;
+
   return '';
 }
 
 function calls(node: ts.Node): ts.CallExpression[] {
   const found: ts.CallExpression[] = [];
+
   walk(node, (n) => {
     if (ts.isCallExpression(n)) found.push(n);
   });
+
   return found;
 }
 
 function hasIdentifier(node: ts.Node, names: Set<string>): boolean {
   let found = false;
+
   walk(node, (n) => {
     if (
       (ts.isIdentifier(n) || ts.isPrivateIdentifier(n)) &&
@@ -112,12 +120,14 @@ function hasIdentifier(node: ts.Node, names: Set<string>): boolean {
       found = true;
     }
   });
+
   return found;
 }
 
 /** Every `ErrorKeys.GROUP.NAME` in the node, as `GROUP.NAME`. */
 function keysIn(node: ts.Node): Set<string> {
   const keys = new Set<string>();
+
   walk(node, (n) => {
     if (
       ts.isPropertyAccessExpression(n) &&
@@ -128,12 +138,14 @@ function keysIn(node: ts.Node): Set<string> {
       keys.add(`${n.expression.name.text}.${n.name.text}`);
     }
   });
+
   return keys;
 }
 
 /** The functions and methods of a file, by name. */
 function bodiesOf(sf: ts.SourceFile): Map<string, Body> {
   const bodies = new Map<string, Body>();
+
   walk(sf, (n) => {
     if (
       (ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) &&
@@ -143,14 +155,17 @@ function bodiesOf(sf: ts.SourceFile): Map<string, Body> {
       bodies.set(n.name.text, n);
     }
   });
+
   return bodies;
 }
 
 /** The exported functions of every file under src, with their error keys. */
 function exportedKeyIndex(): KeyIndex {
   const index: KeyIndex = new Map();
+
   for (const file of listFiles(SRC_DIR)) {
     const sf = parse(file, fs.readFileSync(file, 'utf-8'));
+
     for (const statement of sf.statements) {
       if (
         ts.isFunctionDeclaration(statement) &&
@@ -161,6 +176,7 @@ function exportedKeyIndex(): KeyIndex {
       }
     }
   }
+
   return index;
 }
 
@@ -168,16 +184,20 @@ function exportedKeyIndex(): KeyIndex {
 function reachable(method: Body, local: Map<string, Body>): Body[] {
   const seen = new Set<Body>([method]);
   const queue = [method];
+
   while (queue.length > 0) {
     const current = queue.pop()!;
+
     for (const call of calls(current)) {
       const callee = local.get(calleeName(call));
+
       if (callee && !seen.has(callee)) {
         seen.add(callee);
         queue.push(callee);
       }
     }
   }
+
   return [...seen];
 }
 
@@ -195,9 +215,11 @@ class MethodScan {
       checkOutsideTransaction(this.method, this.local, this.label())
     ];
     const read = this.firstRead();
+
     if (read !== undefined) {
       found.push(this.unguardedDelete(read), this.duplicateRead(read));
     }
+
     return found.filter((p): p is string => p !== undefined);
   }
 
@@ -210,7 +232,9 @@ class MethodScan {
         seen: new Set()
       })
     );
+
     if (!stale) return undefined;
+
     return `${this.label()}: a loaded entity is written back with save; write only the changed columns with a keyed update`;
   }
 
@@ -218,17 +242,22 @@ class MethodScan {
     const name = this.method.name?.getText(this.sf) ?? '<anonymous>';
     const start = this.method.getStart(this.sf);
     const line = this.sf.getLineAndCharacterOfPosition(start).line + 1;
+
     return `${this.sf.fileName}:${line} ${name}`;
   }
 
   private firstRead(): number | undefined {
     const readsDirectly = (body: Body) =>
       calls(body).some((c) => READ.test(calleeName(c)));
+
     return calls(this.method)
       .filter((c) => {
         const name = calleeName(c);
+
         if (READ.test(name)) return true;
+
         const callee = this.local.get(name);
+
         return (
           callee !== undefined &&
           callee !== this.method &&
@@ -247,6 +276,7 @@ class MethodScan {
         ts.isPropertyAccessExpression(c.expression) &&
         !deleteHasWhere(c)
     );
+
     if (
       !unguarded ||
       hasIdentifier(this.method, new Set(['affected'])) ||
@@ -256,19 +286,25 @@ class MethodScan {
     ) {
       return undefined;
     }
+
     return `${this.label()}: a read, then a delete that reads no "affected" and takes no lock`;
   }
 
   private duplicateRead(read: number): string | undefined {
     const refusals: { pos: number; keys: string[] }[] = [];
+
     walk(this.method, (n) => {
       if (!ts.isThrowStatement(n) || n.getStart() < read) return;
+
       const keys = [...this.thrownKeys(n.expression)].filter((k) =>
         DUPLICATE_KEY.test(k.split('.')[1])
       );
+
       if (keys.length > 0) refusals.push({ pos: n.getStart(), keys });
     });
+
     if (refusals.length === 0) return undefined;
+
     const first = Math.min(...refusals.map((r) => r.pos));
     const writes = calls(this.method).some(
       (c) => c.getStart() > first && WRITES.has(calleeName(c))
@@ -276,20 +312,26 @@ class MethodScan {
     const handled = reachable(this.method, this.local).some((body) =>
       hasIdentifier(body, UNIQUE_HANDLING)
     );
+
     if (!writes || handled) return undefined;
+
     const keys = [...new Set(refusals.flatMap((r) => r.keys))].join(', ');
+
     return `${this.label()}: a read refuses with ${keys}, then a write; map the unique violation to the same key`;
   }
 
   /** The keys that a throw raises: its own, or those of the helper it calls. */
   private thrownKeys(thrown: ts.Expression): Set<string> {
     const keys = keysIn(thrown);
+
     if (ts.isCallExpression(thrown)) {
       const name = calleeName(thrown);
       const helper = this.local.get(name);
       const helperKeys = helper ? keysIn(helper) : this.exported.get(name);
+
       helperKeys?.forEach((k) => keys.add(k));
     }
+
     return keys;
   }
 }
@@ -297,11 +339,13 @@ class MethodScan {
 /** A query builder delete, `.delete().from(X).where(...)`, with a condition. */
 function deleteHasWhere(call: ts.CallExpression): boolean {
   let node: ts.Node = call;
+
   while (
     ts.isPropertyAccessExpression(node.parent) ||
     ts.isCallExpression(node.parent)
   ) {
     node = node.parent;
+
     if (
       ts.isCallExpression(node) &&
       ['where', 'andWhere'].includes(calleeName(node))
@@ -309,6 +353,7 @@ function deleteHasWhere(call: ts.CallExpression): boolean {
       return true;
     }
   }
+
   return false;
 }
 
@@ -322,11 +367,13 @@ function localCallee(
     ts.isIdentifier(callee) ||
     (ts.isPropertyAccessExpression(callee) &&
       callee.expression.kind === ts.SyntaxKind.ThisKeyword);
+
   return own ? local.get(calleeName(call)) : undefined;
 }
 
 function unwrap(expr: ts.Expression): ts.Expression {
   let e = expr;
+
   while (
     ts.isAwaitExpression(e) ||
     ts.isParenthesizedExpression(e) ||
@@ -334,6 +381,7 @@ function unwrap(expr: ts.Expression): ts.Expression {
   ) {
     e = e.expression;
   }
+
   return e;
 }
 
@@ -350,18 +398,27 @@ function isUnlockedRead(
   }: { loaded: Set<string>; local: Map<string, Body>; memo: ReadMemo }
 ): boolean {
   const e = unwrap(expr);
+
   if (ts.isIdentifier(e)) return loaded.has(e.text);
+
   if (!ts.isCallExpression(e)) return false;
+
   const helper = localCallee(e, local);
+
   if (helper) {
     const known = memo.get(helper);
+
     if (known !== undefined) return known;
+
     // A recursive call reads as no read until the helper is resolved.
     memo.set(helper, false);
     const result = returnsUnlockedRead(helper, local, memo);
+
     memo.set(helper, result);
+
     return result;
   }
+
   return ENTITY_READ.test(calleeName(e)) && !hasIdentifier(e, LOCKS);
 }
 
@@ -374,6 +431,7 @@ function returnsUnlockedRead(
     [...loadedEntities(body, local, memo)].map((d) => d.name.getText())
   );
   let found = false;
+
   walk(body, (n) => {
     if (
       ts.isReturnStatement(n) &&
@@ -383,6 +441,7 @@ function returnsUnlockedRead(
       found = true;
     }
   });
+
   return found;
 }
 
@@ -394,21 +453,26 @@ function loadedEntities(
 ): Set<ts.VariableDeclaration> {
   const loaded = new Set<ts.VariableDeclaration>();
   const names = new Set<string>();
+
   walk(body, (n) => {
     if (!ts.isVariableDeclaration(n) || !ts.isIdentifier(n.name)) return;
+
     const loop = n.parent.parent;
     const source = ts.isForOfStatement(loop) ? loop.expression : n.initializer;
+
     if (source && isUnlockedRead(source, { loaded: names, local, memo })) {
       loaded.add(n);
       names.add(n.name.text);
     }
   });
+
   return loaded;
 }
 
 /** The block of a `const`, or the loop of a `for...of` variable. */
 function scopeOf(decl: ts.VariableDeclaration): ts.Node {
   const holder = decl.parent.parent;
+
   return ts.isVariableStatement(holder) ? holder.parent : holder;
 }
 
@@ -432,19 +496,28 @@ function reachesSave(
 ): boolean {
   return calls(scope).some((c) => {
     if (c.getStart() <= after) return false;
+
     const indexes = c.arguments
       .map((a, i) => (ts.isIdentifier(a) && a.text === name ? i : -1))
       .filter((i) => i >= 0);
+
     if (indexes.length === 0) return false;
+
     if (calleeName(c) === 'save') return true;
+
     const helper = localCallee(c, local);
     const body = helper?.body;
+
     if (!helper || !body) return false;
+
     return indexes.some((i) => {
       const param = helper.parameters[i]?.name;
       const key = `${calleeName(c)}#${i}`;
+
       if (!param || !ts.isIdentifier(param) || seen.has(key)) return false;
+
       seen.add(key);
+
       return reachesSave(body, { name: param.text, after: -1, local, seen });
     });
   });
@@ -455,6 +528,7 @@ type FunctionNode = ts.ArrowFunction | ts.FunctionExpression;
 /** The `const name = () => ...` functions declared in a method, by name. */
 function closuresOf(method: Body): Map<string, FunctionNode> {
   const closures = new Map<string, FunctionNode>();
+
   walk(method, (n) => {
     if (
       ts.isVariableDeclaration(n) &&
@@ -466,6 +540,7 @@ function closuresOf(method: Body): Map<string, FunctionNode> {
       closures.set(n.name.text, n.initializer);
     }
   });
+
   return closures;
 }
 
@@ -482,7 +557,9 @@ function isTransactionRunner(
   local: Map<string, Body>
 ): boolean {
   if (TRANSACTIONS.has(calleeName(call))) return true;
+
   const helper = localCallee(call, local);
+
   return helper !== undefined && runsTransaction(helper, local);
 }
 
@@ -495,6 +572,7 @@ function closureRef(
   closures: Map<string, FunctionNode>
 ): FunctionNode | undefined {
   const { parent } = id;
+
   if (
     (ts.isVariableDeclaration(parent) && parent.name === id) ||
     (ts.isPropertyAccessExpression(parent) && parent.name === id) ||
@@ -502,6 +580,7 @@ function closureRef(
   ) {
     return undefined;
   }
+
   return closures.get(id.text);
 }
 
@@ -512,6 +591,7 @@ function walkUnless(
   visit: (n: ts.Node) => void
 ): void {
   if (skip(node)) return;
+
   visit(node);
   ts.forEachChild(node, (child) => walkUnless(child, skip, visit));
 }
@@ -538,24 +618,31 @@ function checksFrom(
   const queue: { node: ts.Node; skip: (n: ts.Node) => boolean }[] = nodes.map(
     (node) => ({ node, skip })
   );
+
   while (queue.length > 0) {
     const current = queue.pop()!;
+
     walkUnless(current.node, current.skip, (n) => {
       if (ts.isCallExpression(n)) {
         if (INSTANCE_CHECKS.has(calleeName(n))) found.add(calleeName(n));
+
         const helper = localCallee(n, local);
+
         if (helper && !seen.has(helper)) {
           seen.add(helper);
           queue.push({ node: helper, skip: () => false });
         }
       }
+
       const closure = ts.isIdentifier(n) && closureRef(n, closures);
+
       if (closure && !seen.has(closure)) {
         seen.add(closure);
         queue.push({ node: closure, skip: () => false });
       }
     });
   }
+
   return found;
 }
 
@@ -565,7 +652,9 @@ function checkOutsideTransaction(
   label: string
 ): string | undefined {
   const runners = calls(method).filter((c) => isTransactionRunner(c, local));
+
   if (runners.length === 0) return undefined;
+
   const closures = closuresOf(method);
   const runnerArgs = new Set<ts.Node>(runners.flatMap((r) => [...r.arguments]));
   const closureBodies = new Set<ts.Node>(closures.values());
@@ -576,12 +665,15 @@ function checkOutsideTransaction(
   });
   const inside = checksFrom([...runnerArgs], { local, closures });
   const missing = [...outside].filter((name) => !inside.has(name));
+
   if (missing.length === 0) return undefined;
+
   return `${label}: ${missing.join(', ')} runs before the transaction of the write and not inside it; run it again on the row locked in the transaction`;
 }
 
 function isMarked(method: Body, sf: ts.SourceFile): boolean {
   const ranges = ts.getLeadingCommentRanges(sf.text, method.getFullStart());
+
   return (ranges ?? []).some((r) => MARKER.test(sf.text.slice(r.pos, r.end)));
 }
 
@@ -593,10 +685,13 @@ export function scanSource(
   const sf = parse(fileName, source);
   const local = bodiesOf(sf);
   const problems: string[] = [];
+
   walk(sf, (n) => {
     if (!ts.isMethodDeclaration(n) || !n.body || isMarked(n, sf)) return;
+
     problems.push(...new MethodScan(n, sf, local, exported).problems());
   });
+
   return problems;
 }
 
@@ -871,12 +966,15 @@ const SELF_TEST_CASES: { label: string; source: string; fails: boolean }[] = [
 
 function selfTest(): void {
   let failed = false;
+
   for (const c of SELF_TEST_CASES) {
     const problems = scanSource('self-test.ts', c.source, new Map());
     const ok = problems.length > 0 === c.fails;
+
     console.log(`${ok ? 'ok' : 'FAIL'}: ${c.label}`);
     failed ||= !ok;
   }
+
   if (failed) process.exit(1);
 }
 
@@ -892,11 +990,15 @@ function main(): void {
       exported
     )
   );
+
   if (problems.length > 0) {
     console.error(`${problems.length} read-then-write race(s):`);
+
     for (const p of problems) console.error(`  - ${p}`);
+
     process.exit(1);
   }
+
   console.log(`No read-then-write race in ${files.length} files.`);
 }
 

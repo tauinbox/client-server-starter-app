@@ -64,6 +64,7 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
     const naive = rows.filter(
       (r) => r.data_type !== 'timestamp with time zone'
     );
+
     expect(
       naive.map((r) => `${r.table_name}.${r.column_name} (${r.data_type})`)
     ).toEqual([]);
@@ -99,6 +100,7 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
 
       for (const property of sortColumns) {
         const column = metadata.findColumnWithPropertyName(property);
+
         expect(column).toBeDefined();
 
         const key = `${metadata.tableName}.${column?.databaseName}`;
@@ -109,6 +111,7 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
         if (precision === undefined) continue;
 
         checked++;
+
         if (precision === null || precision > 3) {
           offenders.push(`${key} (precision ${precision ?? 'unbounded'})`);
         }
@@ -124,8 +127,10 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
 
   it('preserves an instant across a non-UTC session timezone', async () => {
     const runner = ds.createQueryRunner();
+
     await runner.connect();
     await runner.startTransaction();
+
     try {
       await runner.query("SET LOCAL TIME ZONE 'America/Los_Angeles'");
 
@@ -136,6 +141,7 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
       )) as Array<{ id: string }>;
 
       const instant = new Date('2026-07-01T05:30:00.000Z');
+
       await runner.query(
         `INSERT INTO refresh_tokens (token, user_id, expires_at, session_id, session_started_at)
          VALUES ($1, $2, $3, gen_random_uuid(), now())`,

@@ -58,11 +58,13 @@ class AbilityHolder {
 class TestJwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
+
     req.user = {
       userId: 'test-actor',
       email: 'actor@example.com',
       sessionId: 'session-1'
     };
+
     return true;
   }
 }
@@ -73,9 +75,11 @@ class TestPermissionsGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
+
     if (this.holder.current) {
       req.ability = this.holder.current;
     }
+
     return true;
   }
 }
@@ -99,6 +103,7 @@ function repositoryOf(rows: Rows, write: jest.Mock) {
             set: Record<string, unknown>
           ) => {
             write({ ...where, ...set });
+
             return Promise.resolve({ affected: rows.has(where.id) ? 1 : 0 });
           },
           findOneByOrFail: (_target: unknown, where: { id: string }) =>
@@ -106,6 +111,7 @@ function repositoryOf(rows: Rows, write: jest.Mock) {
           // The row lock of the instance check is not modelled.
           findOne: (_target: unknown, { where }: { where: { id: string } }) => {
             const row = rows.get(where.id);
+
             return Promise.resolve(row ? { ...row } : null);
           }
         })
@@ -246,7 +252,9 @@ describe('Instance-level @Authorize re-check', () => {
     conditions?: Record<string, unknown>
   ): AppAbility {
     const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     builder.can(action, subjectName as Extract<Subjects, string>, conditions);
+
     return builder.build();
   }
 

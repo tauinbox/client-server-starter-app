@@ -63,6 +63,7 @@ export class ConditionBuilderComponent implements OnInit {
   readonly previewJson = computed(() => {
     const group = this.rootGroup();
     const json = modelToJson(group);
+
     return JSON.stringify(json, null, 2);
   });
 
@@ -85,15 +86,19 @@ export class ConditionBuilderComponent implements OnInit {
     } else {
       // Try to parse raw text back into model
       const text = this.rawText().trim();
+
       if (!text || text === '{}') {
         this.rootGroup.set(createGroup('$and', []));
         this.parseError.set(false);
         this.mode.set('visual');
+
         return;
       }
+
       try {
         const parsed = JSON.parse(text) as Record<string, unknown>;
         const group = jsonToModel(parsed);
+
         if (group) {
           this.rootGroup.set(group);
           this.parseError.set(false);
@@ -111,16 +116,20 @@ export class ConditionBuilderComponent implements OnInit {
 
   onRawInput(event: Event): void {
     const text = (event.target as HTMLTextAreaElement).value;
+
     this.rawText.set(text);
     this.parseError.set(false);
   }
 
   applyRaw(): void {
     const text = this.rawText().trim();
+
     if (!text) {
       this.#emitValue('');
+
       return;
     }
+
     try {
       JSON.parse(text);
       this.#emitValue(text);
@@ -144,6 +153,7 @@ export class ConditionBuilderComponent implements OnInit {
 
   addGroup(parent: ConditionGroup): void {
     const child = createGroup('$and', [{ type: 'rule', rule: createRule() }]);
+
     this.#patchGroup(parent, (target) => ({
       ...target,
       children: [...target.children, { type: 'group', group: child }]
@@ -188,16 +198,19 @@ export class ConditionBuilderComponent implements OnInit {
 
   #loadFromInput(): void {
     const text = this.value().trim();
+
     this.rawText.set(text || '{\n  \n}');
 
     if (!text || text === '{}') {
       this.rootGroup.set(createGroup('$and', []));
+
       return;
     }
 
     try {
       const parsed = JSON.parse(text) as Record<string, unknown>;
       const group = jsonToModel(parsed);
+
       if (group) {
         this.rootGroup.set(group);
       } else {
@@ -224,7 +237,9 @@ export class ConditionBuilderComponent implements OnInit {
     patch: Partial<Omit<ConditionRule, 'id'>>
   ): void {
     if (node.type !== 'rule') return;
+
     const target = node.rule;
+
     this.rootGroup.update((root) => updateRule(root, target, patch));
     this.#emitFromModel();
   }
@@ -233,6 +248,7 @@ export class ConditionBuilderComponent implements OnInit {
     const json = modelToJson(this.rootGroup());
     const text =
       Object.keys(json).length > 0 ? JSON.stringify(json, null, 2) : '';
+
     this.#emitValue(text);
   }
 

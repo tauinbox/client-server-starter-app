@@ -36,15 +36,19 @@ export function readRedisUrl(
 
 export function readE2eRedisDb(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env['E2E_REDIS_DB'];
+
   if (raw === undefined || raw === '') {
     return DEFAULT_E2E_REDIS_DB;
   }
+
   return assertIsolatedDb(Number(raw));
 }
 
 export function withRedisDatabase(url: string, db: number): string {
   const parsed = new URL(url);
+
   parsed.pathname = `/${assertIsolatedDb(db)}`;
+
   return parsed.toString();
 }
 
@@ -77,5 +81,6 @@ function assertIsolatedDb(db: number): number {
       `E2E_REDIS_DB must be an integer >= 1, received "${db}". Database 0 holds the shared dev state and is never flushed by tests.`
     );
   }
+
   return db;
 }

@@ -9,6 +9,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -23,7 +24,9 @@ beforeEach(() => {
 
 async function getConfig(): Promise<unknown> {
   const res = await fetch(`${baseUrl}/api/v1/billing/paddle-config`);
+
   expect(res.status).toBe(200);
+
   return res.json();
 }
 
@@ -33,6 +36,7 @@ async function setToken(clientToken: unknown): Promise<number> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ clientToken })
   });
+
   return res.status;
 }
 

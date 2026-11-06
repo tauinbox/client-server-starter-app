@@ -12,6 +12,7 @@ export function safeReturnUrl(
   if (typeof url !== 'string' || !url || !baseOrigin) return null;
 
   let parsed: URL;
+
   try {
     parsed = new URL(url, baseOrigin);
   } catch {

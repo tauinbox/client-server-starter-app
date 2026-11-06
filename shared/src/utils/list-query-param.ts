@@ -14,7 +14,9 @@ type ParamParser<K extends ListFilterKind> = (
 
 function parseBoolean(raw: string): boolean | undefined {
   if (raw === 'true') return true;
+
   if (raw === 'false') return false;
+
   return undefined;
 }
 
@@ -31,6 +33,7 @@ const PARAM_PARSERS: { [K in ListFilterKind]: ParamParser<K> } = {
     values.includes(raw) ? raw : undefined,
   uuidList: (raw) => {
     const ids = raw.split(',');
+
     return ids.length <= MAX_PAGE_SIZE &&
       ids.every((id) => UUID_PATTERN.test(id))
       ? ids

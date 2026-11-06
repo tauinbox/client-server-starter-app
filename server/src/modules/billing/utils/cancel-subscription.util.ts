@@ -35,21 +35,25 @@ function cancelRefusal(
   if (!isOpenStatus(subscription.status)) {
     return alreadyCanceled();
   }
+
   if (mode === 'immediate') {
     return null;
   }
+
   if (subscription.status === 'incomplete') {
     return new ApiError(
       ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED,
       'This subscription has no paid period to end.'
     );
   }
+
   if (subscription.cancelAtPeriodEnd) {
     return new ApiError(
       ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED,
       'A cancellation is already scheduled for the end of the period.'
     );
   }
+
   return null;
 }
 
@@ -91,6 +95,7 @@ export async function cancelOpenSubscription(
   }
 ): Promise<Subscription> {
   const refusal = cancelRefusal(subscription, mode);
+
   if (refusal) {
     throw refusal;
   }
@@ -125,19 +130,23 @@ export async function cancelOpenSubscription(
       const update = await manager
         .withRepository(deps.subscriptions)
         .update(predicate, fields);
+
       if (update.affected === 1 && mode === 'immediate') {
         await deps.credits.releaseHolds(manager, {
           subscriptionId: subscription.id
         });
       }
+
       return update;
     }
   );
+
   if (applied.affected !== 1) {
     // A concurrent writer won: name what it did, not what this call wanted.
     const current = await deps.subscriptions.findOne({
       where: { id: subscription.id }
     });
+
     throw (current && cancelRefusal(current, mode)) ?? alreadyCanceled();
   }
 
@@ -150,6 +159,7 @@ export async function cancelOpenSubscription(
   // be invalidated; a period-end cancel keeps access until the period closes.
   if (mode === 'immediate') {
     const userId = await resolveUserId(saved);
+
     if (userId) {
       deps.events.emit(
         SubscriptionCanceledEvent.name,
@@ -157,5 +167,6 @@ export async function cancelOpenSubscription(
       );
     }
   }
+
   return saved;
 }

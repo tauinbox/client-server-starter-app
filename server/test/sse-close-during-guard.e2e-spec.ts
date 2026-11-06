@@ -60,11 +60,13 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
         userAgent: 'sse-e2e',
         ipAddress: '203.0.113.9'
       });
+
     token = tokens.access_token;
   }, 60000);
 
   afterAll(async () => {
     for (const req of requests) req.destroy();
+
     await dataSource?.getRepository(User).delete({ email });
     await app?.close();
   });
@@ -82,8 +84,10 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
         onStatus?.(res.statusCode ?? 0);
       }
     );
+
     req.on('error', () => undefined);
     requests.push(req);
+
     return req;
   }
 
@@ -93,11 +97,13 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
     const { promise: gate, resolve: release } = Promise.withResolvers<void>();
     const { promise: guardReached, resolve: reached } =
       Promise.withResolvers<void>();
+
     jest
       .spyOn(sessionCheck, 'hasLiveSession')
       .mockImplementationOnce(async (sessionId) => {
         reached();
         await gate;
+
         return original(sessionId);
       });
 
@@ -105,11 +111,13 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
       server.once('connection', resolve)
     );
     const left = openRequest();
+
     await guardReached;
     const socket = await serverSocket;
     const socketClosed = new Promise((resolve) =>
       socket.once('close', resolve)
     );
+
     left.destroy();
     await socketClosed;
     release();
@@ -123,6 +131,7 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
         () => new Promise<number>((resolve) => openRequest(resolve))
       )
     );
+
     expect(statuses).toEqual(Array<number>(MAX_SSE_STREAMS_PER_USER).fill(200));
   }, 30000);
 });

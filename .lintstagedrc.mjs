@@ -17,10 +17,23 @@ const stylelintConfig = path.join(clientDir, '.stylelintrc.json');
 
 export default {
   'client/{src,e2e}/**/*.ts': (files) => {
-    return `${clientBin('eslint')} --fix -c ${clientEslintConfig} ${files.join(' ')}`;
+    return [
+      `${clientBin('prettier')} --write ${files.join(' ')}`,
+      `${clientBin('eslint')} --fix -c ${clientEslintConfig} ${files.join(' ')}`
+    ];
+  },
+  // The client config ignores src/index.html.
+  'client/src/**/*.html': (files) => {
+    return [
+      `${clientBin('prettier')} --write ${files.join(' ')}`,
+      `${clientBin('eslint')} --fix --no-warn-ignored -c ${clientEslintConfig} ${files.join(' ')}`
+    ];
   },
   'client/src/**/*.scss': (files) => {
-    return `${clientBin('stylelint')} --fix --config ${stylelintConfig} ${files.join(' ')}`;
+    return [
+      `${clientBin('prettier')} --write ${files.join(' ')}`,
+      `${clientBin('stylelint')} --fix --config ${stylelintConfig} ${files.join(' ')}`
+    ];
   },
   'server/src/**/*.ts': (files) => {
     return [

@@ -124,6 +124,7 @@ describe('Admin user update DTO validation (e2e)', () => {
       .expect(422);
 
     const body = res.body as { message: string[] };
+
     expect(body.message).toEqual(
       expect.arrayContaining([`${field} must be a boolean value`])
     );

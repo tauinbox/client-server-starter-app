@@ -42,6 +42,7 @@ const PROVIDER_ID = 'google-id-of-the-signer';
 const signProof = jest.fn(
   (payload: { purpose?: string; operation?: string; jti?: string }) => {
     void payload;
+
     return SIGNED_PROOF;
   }
 );
@@ -59,8 +60,10 @@ function startProviderStub(): Promise<{ server: Server; url: string }> {
         res.end(JSON.stringify({ access_token: 'at', token_type: 'Bearer' }));
       });
     });
+
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address() as AddressInfo;
+
       resolve({ server, url: `http://127.0.0.1:${port}` });
     });
   });
@@ -87,9 +90,11 @@ class CookieJar {
 
   absorb(setCookie: string | string[]): void {
     const raws = Array.isArray(setCookie) ? setCookie : [setCookie];
+
     for (const raw of raws) {
       const [name, ...rest] = raw.split(';')[0].split('=');
       const value = rest.join('=');
+
       if (value === '') {
         this.entries.delete(name);
       } else {
@@ -116,6 +121,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 
     const stub = await startProviderStub();
+
     providerStub = stub.server;
 
     passport.use(
@@ -204,9 +210,11 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
                   iat: Math.floor(Date.now() / 1000)
                 };
               }
+
               if (token !== REAUTH_TOKEN) {
                 throw new Error('invalid token');
               }
+
               return {
                 sub: OWNER_ID,
                 purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
@@ -268,6 +276,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
     // A proof that carries no operation would satisfy every consumer, which is
     // the binding this flow exists to create.
     const jar = new CookieJar();
+
     jar.set('__Host-oauth_reauth', UNBOUND_REAUTH_TOKEN);
 
     const state = await authorize(jar);
@@ -280,6 +289,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
 
   it('reaches the re-auth branch on a real round trip and mints a proof', async () => {
     const jar = new CookieJar();
+
     jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 
     const state = await authorize(jar);
@@ -297,9 +307,11 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
 
   it('gives the proof a token id, so the ledger can record it as spent', async () => {
     const jar = new CookieJar();
+
     jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 
     const state = await authorize(jar);
+
     await callback(jar, state);
 
     const [payload] = signProof.mock.calls[0] ?? [];
@@ -313,6 +325,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
 
   it('mints nothing when a second flow presents its own state', async () => {
     const jar = new CookieJar();
+
     jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 
     const abandonedState = await authorize(jar);
@@ -332,6 +345,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
     assertReauthenticated.mockRejectedValue(new Error('not this account'));
 
     const jar = new CookieJar();
+
     jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 
     const state = await authorize(jar);
@@ -344,6 +358,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
 
   it('takes the re-auth branch ahead of a link intent left by an earlier flow', async () => {
     const jar = new CookieJar();
+
     jar.set('__Host-oauth_link', 'some-link-token');
     jar.set('__Host-oauth_reauth', REAUTH_TOKEN);
 

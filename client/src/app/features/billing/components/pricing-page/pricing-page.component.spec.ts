@@ -130,6 +130,7 @@ describe('PricingPageComponent', () => {
     await setup(true);
     expect(storeMock.loadPricing).toHaveBeenCalledWith(true);
     const cards = fixture.nativeElement.querySelectorAll('nxs-plan-card');
+
     expect(cards.length).toBe(3);
   });
 
@@ -141,6 +142,7 @@ describe('PricingPageComponent', () => {
     const cards: HTMLElement[] = Array.from(
       fixture.nativeElement.querySelectorAll('nxs-plan-card')
     );
+
     return cards.map((card) => ({
       name: card.querySelector('.plan-name')?.textContent?.trim() ?? '',
       current: card.querySelector('.current-badge') !== null,
@@ -260,11 +262,13 @@ describe('PricingPageComponent', () => {
 
     const host = fixture.nativeElement as HTMLElement;
     const notice = host.querySelector('.payments-unavailable');
+
     expect(notice?.getAttribute('role')).toBe('status');
     expect(notice?.textContent).toContain(
       'Payments are temporarily unavailable in your billing region.'
     );
     const buttons = actionButtons();
+
     expect(buttons.length).toBe(3);
     expect(buttons.every((button) => button.disabled)).toBe(true);
     expect(donationPresets().length).toBeGreaterThan(0);
@@ -279,8 +283,10 @@ describe('PricingPageComponent', () => {
     await setup(true, [reportPack, donation]);
 
     const host = fixture.nativeElement as HTMLElement;
+
     expect(host.querySelector('.payments-unavailable')).toBeNull();
     const buttons = actionButtons();
+
     expect(buttons.length).toBe(3);
     expect(buttons.some((button) => button.disabled)).toBe(false);
     expect(donationPresets().some((button) => button.disabled)).toBe(false);
@@ -323,6 +329,7 @@ describe('PricingPageComponent', () => {
     const navigateByUrl = vi
       .spyOn(router, 'navigateByUrl')
       .mockResolvedValue(true);
+
     showSubscription('active', true);
 
     fixture.componentInstance.onChoose('business');
@@ -371,6 +378,7 @@ describe('PricingPageComponent', () => {
   it('renders the one-time section with product and donation cards for authed users', async () => {
     await setup(true, [reportPack, donation]);
     const host = fixture.nativeElement as HTMLElement;
+
     expect(host.querySelector('.one-time')).not.toBeNull();
     expect(host.querySelectorAll('nxs-product-card').length).toBe(1);
     expect(host.querySelectorAll('nxs-donation-card').length).toBe(1);

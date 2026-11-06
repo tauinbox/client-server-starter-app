@@ -26,6 +26,7 @@ describe('BillingPlansController', () => {
 
   it('delegates to PlanService.findActive', async () => {
     const plans = [{ key: 'free' } as Plan];
+
     planService.findActive.mockResolvedValue(plans);
 
     await expect(controller.findPlans()).resolves.toBe(plans);
@@ -34,6 +35,7 @@ describe('BillingPlansController', () => {
 
   it('returns the Paddle.js configuration of the provider', () => {
     const config = { clientToken: 'test_abc', environment: 'sandbox' };
+
     paddleProvider.clientConfig.mockReturnValue(config);
 
     expect(controller.getPaddleConfig()).toBe(config);

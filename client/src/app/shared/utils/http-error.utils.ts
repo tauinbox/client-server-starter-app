@@ -39,6 +39,7 @@ export function parseHttpErrorMessage(
     // the result against the key and falls through when nothing translated it.
     // eslint-disable-next-line no-restricted-syntax -- the funnel itself
     const translated = transloco.translate(body.errorKey);
+
     if (translated !== body.errorKey) {
       return translated;
     }

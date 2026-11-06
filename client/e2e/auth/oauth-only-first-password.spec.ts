@@ -84,6 +84,7 @@ test.describe('OAuth-only account sets its first password', () => {
       userId,
       STEP_UP_OPERATION.PASSWORD_SET
     );
+
     await page.context().addCookies([
       {
         name: 'reauth_proof',
@@ -123,6 +124,7 @@ test.describe('OAuth-only account sets its first password', () => {
         res.status() === 200,
       { timeout: 15_000 }
     );
+
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await saved;
     await expect(page).toHaveURL(/\/login\?password_changed=1$/);
@@ -143,6 +145,7 @@ test.describe('OAuth-only account sets its first password', () => {
       userId,
       STEP_UP_OPERATION.EMAIL_CHANGE
     );
+
     await page.context().addCookies([
       {
         name: 'reauth_proof',
@@ -177,6 +180,7 @@ test.describe('OAuth-only account sets its first password', () => {
         res.status() === 403,
       { timeout: 15_000 }
     );
+
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await refused;
   });

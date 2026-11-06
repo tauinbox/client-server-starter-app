@@ -133,7 +133,9 @@ export function verdictFor(
     ],
     { actorId, logger: silent }
   );
+
   if (!refusal) return { rejected: false };
+
   return {
     rejected: true,
     // eslint-disable-next-line no-restricted-syntax -- a row of the grant-scope report script, not an HTTP answer
@@ -165,8 +167,10 @@ export function analyzeGrants(input: {
     grantableActions: {},
     conditionalActions: {}
   };
+
   for (const g of grants) {
     const map = g.is_orphaned ? subjectMaps.orphaned : subjectMaps.active;
+
     map[g.resource_name] = g.resource_subject;
     subjectMaps.grantableActions[g.resource_name] = grantableActionNames({
       actionNames: g.action_names,
@@ -177,25 +181,31 @@ export function analyzeGrants(input: {
   }
 
   const rolesByUser = new Map<string, UserRoleRow[]>();
+
   for (const ur of userRoles) {
     const list = rolesByUser.get(ur.user_id) ?? [];
+
     list.push(ur);
     rolesByUser.set(ur.user_id, list);
   }
 
   const grantsByRole = new Map<string, GrantRow[]>();
+
   for (const g of grants) {
     const list = grantsByRole.get(g.role_id) ?? [];
+
     list.push(g);
     grantsByRole.set(g.role_id, list);
   }
 
   // Rows arrive oldest first, so a later write overwrites the attribution.
   const authorOf = new Map<string, AuditRow>();
+
   for (const row of auditRows) {
     const ids = Array.isArray(row.details?.permissionIds)
       ? (row.details.permissionIds as unknown[])
       : [];
+
     for (const pid of ids) {
       if (typeof pid === 'string') {
         authorOf.set(`${row.role_id}:${pid}`, row);
@@ -204,8 +214,10 @@ export function analyzeGrants(input: {
   }
 
   const inert: GrantRow[] = [];
+
   for (const g of grants) {
     const isDeny = isDenyCondition(g.conditions);
+
     if (
       (!isDeny &&
         !subjectMaps.grantableActions[g.resource_name]?.includes(
@@ -221,7 +233,9 @@ export function analyzeGrants(input: {
       inert.push(g);
       continue;
     }
+
     if (!g.conditions) continue;
+
     const resolved = resolveConditions(g.conditions, {
       // The veto outcome does not depend on the id's value, only on the shape
       // of the condition, so any placeholder resolves it identically.
@@ -229,15 +243,20 @@ export function analyzeGrants(input: {
       permissionLabel: `${g.action_name}:${g.resource_subject}`,
       logger: silent
     });
+
     if (resolved.skipPermission) inert.push(g);
   }
 
   const abilityCache = new Map<string, AppAbility>();
   const abilityFor = (userId: string): AppAbility | null => {
     const cached = abilityCache.get(userId);
+
     if (cached) return cached;
+
     const roles = rolesByUser.get(userId);
+
     if (!roles) return null;
+
     const permissions: ResolvedPermission[] = roles.flatMap((r) =>
       (grantsByRole.get(r.role_id) ?? []).map((g) => ({
         resource: g.resource_name,
@@ -251,7 +270,9 @@ export function analyzeGrants(input: {
       subjectMaps,
       silent
     );
+
     abilityCache.set(userId, ability);
+
     return ability;
   };
 
@@ -263,29 +284,38 @@ export function analyzeGrants(input: {
 
   for (const g of grants) {
     const author = authorOf.get(`${g.role_id}:${g.permission_id}`);
+
     if (!author?.actor_id) {
       unattributed++;
       continue;
     }
+
     const roles = rolesByUser.get(author.actor_id);
+
     if (!roles) {
       authorGone++;
       continue;
     }
+
     if (roles.some((r) => r.is_super)) {
       authorSuper++;
       continue;
     }
+
     const ability = abilityFor(author.actor_id);
+
     if (!ability) {
       authorGone++;
       continue;
     }
+
     const verdict = verdictFor(ability, author.actor_id, g);
+
     if (!verdict.rejected) {
       accepted++;
       continue;
     }
+
     findings.push({
       row: g,
       author,

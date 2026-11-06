@@ -37,12 +37,14 @@ runWithInfra('Grant condition fields (e2e)', () => {
 
   const canReadTarget = async (): Promise<boolean> => {
     const userId = users.actor.id;
+
     await permissionService.invalidateUserCache(userId);
     const ability = await abilityFactory.createForUser(
       userId,
       await permissionService.getRolesForUser(userId),
       await permissionService.getPermissionsForUser(userId)
     );
+
     return ability.can('read', subject('User', users.target));
   };
 
@@ -50,6 +52,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
     conditions: RolePermission['conditions'][]
   ): Promise<void> => {
     const repository = dataSource.getRepository(RolePermission);
+
     await repository.delete({ roleId: role.id });
     await repository.save(
       conditions.map((c) =>
@@ -84,10 +87,13 @@ runWithInfra('Grant condition fields (e2e)', () => {
     const found = permissions.find(
       (p) => p.action.name === 'read' && p.resource.subject === 'User'
     );
+
     if (!found) throw new Error('Permission read:User missing');
+
     readUser = found;
 
     const userRepository = dataSource.getRepository(User);
+
     for (const key of Object.keys(emails) as (keyof typeof emails)[]) {
       users[key] = await userRepository.save(
         userRepository.create({
@@ -115,6 +121,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });
     }
+
     await app?.close();
   });
 
@@ -134,7 +141,9 @@ runWithInfra('Grant condition fields (e2e)', () => {
         () => 'RESOLVED',
         (error: unknown) => {
           if (!(error instanceof HttpException)) throw error;
+
           const body = error.getResponse() as { errorKey?: string };
+
           return `${error.getStatus()} ${body.errorKey}`;
         }
       );
@@ -159,6 +168,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
       { name: `${tag}-allow` },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.setPermissionsForRole(
       allowRole.id,
       [{ permissionId: readUser.id }],

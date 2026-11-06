@@ -48,7 +48,9 @@ export class SignInCompletionService {
     this.metricsService.recordAuthEvent('login_success');
 
     const { refresh_token, ...publicTokens } = result.tokens;
+
     this.cookies.setRefresh(res, refresh_token);
+
     return { tokens: publicTokens, user: result.user };
   }
 }

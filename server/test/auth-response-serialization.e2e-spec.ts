@@ -144,11 +144,13 @@ const oauthProfile: OAuthUserProfile = {
 
 function expectPublicUserShape(user: Record<string, unknown>): void {
   expect(Object.keys(user).toSorted()).toEqual(PUBLIC_USER_FIELDS.toSorted());
+
   for (const field of HIDDEN_USER_FIELDS) {
     expect(user).not.toHaveProperty(field);
   }
 
   const roles = user['roles'] as Record<string, unknown>[];
+
   expect(roles).toHaveLength(1);
   expect(Object.keys(roles[0]).toSorted()).toEqual(
     PUBLIC_ROLE_FIELDS.toSorted()
@@ -290,9 +292,11 @@ describe('Auth response serialization (e2e)', () => {
             get: jest.fn((key: string) => configValues[key]),
             getOrThrow: jest.fn((key: string) => {
               const value = configValues[key];
+
               if (value === undefined) {
                 throw new Error(`unexpected config key ${key}`);
               }
+
               return value;
             })
           }
@@ -310,6 +314,7 @@ describe('Auth response serialization (e2e)', () => {
           switchToHttp: () => { getRequest: () => { user: OAuthUserProfile } };
         }) => {
           context.switchToHttp().getRequest().user = oauthProfile;
+
           return true;
         }
       })
@@ -336,6 +341,7 @@ describe('Auth response serialization (e2e)', () => {
       .expect(200);
 
     const body = res.body as { user: Record<string, unknown> };
+
     expectPublicUserShape(body.user);
   });
 
@@ -343,11 +349,13 @@ describe('Auth response serialization (e2e)', () => {
     // The agent carries the oauth_data cookie set by the callback redirect
     // through to the exchange call, exercising the real sign -> verify path.
     const agent = request.agent(server);
+
     await agent.get('/api/v1/auth/oauth/google/callback').expect(302);
 
     const res = await agent.post('/api/v1/auth/oauth/exchange').expect(201);
 
     const body = res.body as { user: Record<string, unknown> };
+
     expectPublicUserShape(body.user);
   });
 });

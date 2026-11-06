@@ -34,6 +34,7 @@ export class CaptchaWidgetComponent implements OnInit {
 
   protected readonly container =
     viewChild.required<ElementRef<HTMLDivElement>>('container');
+
   private widgetId: string | null = null;
 
   ngOnInit(): void {
@@ -42,8 +43,10 @@ export class CaptchaWidgetComponent implements OnInit {
         switchMap((cfg) => {
           if (!cfg.enabled || !cfg.siteKey) {
             this.status.set('unavailable');
+
             return of(null);
           }
+
           return from(this.#captchaService.loadScript()).pipe(
             switchMap((api) => {
               this.widgetId = api.render(this.container().nativeElement, {
@@ -57,12 +60,14 @@ export class CaptchaWidgetComponent implements OnInit {
                 'timeout-callback': () => this.tokenChange.emit(null)
               });
               this.status.set('ready');
+
               return of(api);
             })
           );
         }),
         catchError(() => {
           this.status.set('error');
+
           return of(null);
         }),
         takeUntilDestroyed(this.#destroyRef)

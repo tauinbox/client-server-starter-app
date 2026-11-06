@@ -44,16 +44,20 @@ function startProvider(): Promise<{ server: Server; url: string }> {
 
       if (url.pathname === '/authorize') {
         const code = randomBytes(8).toString('hex');
+
         challenges.set(code, url.searchParams.get('code_challenge'));
         const back = new URL(url.searchParams.get('redirect_uri')!);
+
         back.searchParams.set('code', code);
         back.searchParams.set('state', url.searchParams.get('state')!);
         res.writeHead(302, { Location: back.toString() });
         res.end();
+
         return;
       }
 
       let body = '';
+
       req.on('data', (chunk: Buffer) => (body += chunk.toString()));
       req.on('end', () => {
         const form = new URLSearchParams(body);
@@ -78,8 +82,10 @@ function startProvider(): Promise<{ server: Server; url: string }> {
         );
       });
     });
+
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address() as AddressInfo;
+
       resolve({ server, url: `http://127.0.0.1:${port}` });
     });
   });
@@ -110,8 +116,10 @@ class Browser {
 
   absorb(setCookie: string | string[] | undefined): void {
     const raws = Array.isArray(setCookie) ? setCookie : [setCookie ?? ''];
+
     for (const raw of raws.filter(Boolean)) {
       const [name, ...rest] = raw.split(';')[0].split('=');
+
       this.cookies.set(name, rest.join('='));
     }
   }
@@ -189,6 +197,7 @@ describe('OAuth PKCE (real passport-oauth2 against an enforcing provider)', () =
     const start = await request(server)
       .get('/oauth/start')
       .set('Cookie', browser.header());
+
     expect(start.status).toBe(302);
     browser.absorb(start.headers['set-cookie']);
 

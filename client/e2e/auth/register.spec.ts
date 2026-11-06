@@ -8,6 +8,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('Full name')).toBeVisible();
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
@@ -21,6 +22,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await expect(main.getByRole('button', { name: 'Register' })).toBeDisabled();
   });
 
@@ -31,6 +33,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('not-an-email');
     await page.getByLabel('Full name').fill('John Doe');
     await page
@@ -47,6 +50,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Full name').fill('John Doe');
     await page.getByLabel('Password', { exact: true }).fill('short');
@@ -61,6 +65,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Full name').fill('John Doe');
@@ -94,6 +99,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Full name').fill('   ');
     await page
@@ -139,6 +145,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('newuser@example.com');
     await page.getByLabel('Full name').fill('Jane Smith');
     await page.getByLabel('Password', { exact: true }).fill('passwordonly');
@@ -160,6 +167,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const passwordInput = page.getByLabel('Password', { exact: true });
+
     await passwordInput.fill('passwordonly');
     await expect(page.getByText(/Longer is stronger/i)).toBeVisible();
 
@@ -174,6 +182,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('newuser@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Full name').fill('Jane Smith');
@@ -196,6 +205,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     // admin@example.com exists in seed data
     await page.getByLabel('Email').fill('admin@example.com');
     await page.getByLabel('Email').blur();
@@ -229,6 +239,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Full name').fill('John Doe');
@@ -248,6 +259,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const meter = page.locator('[role="progressbar"][aria-valuemax="4"]');
+
     await page.getByLabel('Password', { exact: true }).fill('abc');
 
     await expect(meter).toHaveAttribute('data-strength', '1');
@@ -261,6 +273,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const meter = page.locator('[role="progressbar"][aria-valuemax="4"]');
+
     await page
       .getByLabel('Password', { exact: true })
       .fill('correcthorsebatterystaple');
@@ -276,10 +289,12 @@ test.describe('Register page', () => {
     // Passes the local common-password check, so only the breach corpus can
     // refuse it once the test seeds it there.
     const breached = 'Copper-Meadow-83';
+
     await _mockServer.seedBreachedPasswords([breached]);
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('breached@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Full name').fill('Jane Smith');
@@ -302,6 +317,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('common@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Full name').fill('Jane Smith');
@@ -321,6 +337,7 @@ test.describe('Register page', () => {
     await page.goto('/register');
 
     const loginLink = page.getByRole('link', { name: 'Login' });
+
     await expect(loginLink).toBeVisible();
     await loginLink.click();
 

@@ -39,6 +39,7 @@ async function tokenOf(caller: Exclude<Caller, 'anonymous'>): Promise<string> {
     body: JSON.stringify({ email: EMAILS[caller], password: 'Password1' })
   });
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -50,15 +51,19 @@ async function errorsOf(
   const headers: Record<string, string> = {
     'content-type': 'application/json'
   };
+
   if (caller !== 'anonymous') {
     headers['authorization'] = `Bearer ${await tokenOf(caller)}`;
   }
+
   const res = await fetch(`${baseUrl}/api/v1${path}`, {
     method,
     headers,
     body: JSON.stringify(body)
   });
+
   expect(res.status).toBe(422);
+
   return ((await res.json()) as { errors: string[] }).errors;
 }
 

@@ -12,8 +12,11 @@ const minorUnitScaleCache = new Map<string, number>();
 export function minorUnitScale(currency: string): number {
   const code = currency.toUpperCase();
   const cached = minorUnitScaleCache.get(code);
+
   if (cached !== undefined) return cached;
+
   let scale = DEFAULT_MINOR_UNIT_SCALE;
+
   try {
     scale =
       new Intl.NumberFormat('en', {
@@ -23,7 +26,9 @@ export function minorUnitScale(currency: string): number {
   } catch {
     scale = DEFAULT_MINOR_UNIT_SCALE;
   }
+
   minorUnitScaleCache.set(code, scale);
+
   return scale;
 }
 
@@ -52,8 +57,10 @@ export class Money {
       if (!Number.isInteger(value)) {
         throw new TypeError(`Money.fromMinor expects an integer, got ${value}`);
       }
+
       return new Money(BigInt(value));
     }
+
     return new Money(value);
   }
 
@@ -68,18 +75,24 @@ export class Money {
         `Money decimals must be a non-negative integer, got ${decimals}`
       );
     }
+
     const match = /^(-)?(\d+)(?:\.(\d+))?$/.exec(value.trim());
+
     if (!match) {
       throw new TypeError(`Money.fromMajorString cannot parse "${value}"`);
     }
+
     const [, sign, whole, fraction = ''] = match;
+
     if (fraction.length > decimals) {
       throw new RangeError(
         `Money.fromMajorString: "${value}" has more than ${decimals} fraction digits`
       );
     }
+
     const scaled = whole + fraction.padEnd(decimals, '0');
     const magnitude = BigInt(scaled);
+
     return new Money(sign ? -magnitude : magnitude);
   }
 
@@ -95,15 +108,19 @@ export class Money {
         `Money decimals must be a non-negative integer, got ${decimals}`
       );
     }
+
     const negative = this.minorUnits < 0n;
     const magnitude = negative ? -this.minorUnits : this.minorUnits;
     const sign = negative ? '-' : '';
+
     if (decimals === 0) {
       return sign + magnitude.toString();
     }
+
     const divisor = 10n ** BigInt(decimals);
     const whole = magnitude / divisor;
     const fraction = (magnitude % divisor).toString().padStart(decimals, '0');
+
     return `${sign}${whole.toString()}.${fraction}`;
   }
 
@@ -122,6 +139,7 @@ export class Money {
         `Money.mulInt expects an integer factor, got ${factor}`
       );
     }
+
     return new Money(this.minorUnits * BigInt(factor));
   }
 
@@ -135,21 +153,28 @@ export class Money {
         `Money.divFloor expects an integer divisor, got ${divisor}`
       );
     }
+
     const d = BigInt(divisor);
+
     if (d === 0n) {
       throw new RangeError('Money.divFloor: division by zero');
     }
+
     const quotient = this.minorUnits / d;
     const remainder = this.minorUnits % d;
+
     if (remainder !== 0n && remainder < 0n !== d < 0n) {
       return new Money(quotient - 1n);
     }
+
     return new Money(quotient);
   }
 
   compare(other: Money): -1 | 0 | 1 {
     if (this.minorUnits < other.minorUnits) return -1;
+
     if (this.minorUnits > other.minorUnits) return 1;
+
     return 0;
   }
 
@@ -164,11 +189,13 @@ export class Money {
    */
   toNumber(): number {
     const max = BigInt(Number.MAX_SAFE_INTEGER);
+
     if (this.minorUnits > max || this.minorUnits < -max) {
       throw new RangeError(
         `Money.toNumber: ${this.minorUnits.toString()} exceeds Number.MAX_SAFE_INTEGER`
       );
     }
+
     return Number(this.minorUnits);
   }
 }

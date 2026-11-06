@@ -116,6 +116,7 @@ export class RoleListComponent {
   loadMore(): void {
     this.#rolesStore.loadMore();
   }
+
   readonly roles = this.#rolesStore.entities;
   readonly filters = this.#rolesStore.filters;
   readonly hasActiveFilters = this.#rolesStore.hasActiveFilters;
@@ -163,6 +164,7 @@ export class RoleListComponent {
   readonly canCreate = computed(() =>
     this.authStore.hasPermissions({ action: 'create', subject: 'Role' })
   );
+
   canUpdate(role: RoleAdminResponse): boolean {
     return this.authStore.hasPermissions({
       action: 'update',
@@ -206,6 +208,7 @@ export class RoleListComponent {
       role,
       readonly: !this.canUpdate(role)
     };
+
     this.#dialog
       .open(RolePermissionsDialogComponent, {
         ...dialogSizeConfig(DialogSize.Wide),

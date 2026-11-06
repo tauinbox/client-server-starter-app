@@ -99,6 +99,7 @@ test.describe('User Detail page', () => {
     const roleChip = page
       .locator('.chips mat-chip')
       .filter({ hasText: 'admin' });
+
     await expect(roleChip).toBeVisible();
     await expect(roleChip.locator('mat-icon')).toHaveText(
       'admin_panel_settings'
@@ -115,6 +116,7 @@ test.describe('User Detail page', () => {
     const roleChip = page
       .locator('.chips mat-chip')
       .filter({ hasText: 'user' });
+
     await expect(roleChip).toBeVisible();
     await expect(roleChip.locator('mat-icon')).toHaveText('person');
   });
@@ -223,6 +225,7 @@ test.describe('User Detail page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     let failures = 1;
+
     await page.route(`**/api/v1/users/${mockId('user-3')}`, (route) => {
       if (route.request().method() === 'GET' && failures-- > 0) {
         return route.fulfill({
@@ -231,6 +234,7 @@ test.describe('User Detail page', () => {
           body: JSON.stringify({ message: 'Internal error', statusCode: 500 })
         });
       }
+
       return route.fallback();
     });
     await page.goto(`/users/${mockId('user-3')}`);

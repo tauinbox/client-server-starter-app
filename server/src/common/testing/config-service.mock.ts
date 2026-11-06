@@ -14,9 +14,11 @@ export function createMockConfigService(
     get: jest.fn((key: string) => env[key] ?? 'development'),
     getOrThrow: jest.fn((key: string) => {
       const value = env[key];
+
       if (value === undefined) {
         throw new Error(`Configuration key "${key}" is not defined`);
       }
+
       return value;
     })
   };

@@ -104,7 +104,9 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(RoleListComponent);
+
     fixture.detectChanges();
+
     return fixture.componentInstance;
   }
 
@@ -112,6 +114,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     authStoreMock.hasPermissions.mockReturnValue(true);
 
     const component = await setupComponent();
+
     component.openPermissionsDialog(mockRole);
 
     expect(dialogMock.open).toHaveBeenCalledWith(
@@ -126,6 +129,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     authStoreMock.hasPermissions.mockReturnValue(true);
 
     const component = await setupComponent();
+
     component.openPermissionsDialog(mockRole);
 
     expect(dialogMock.open).toHaveBeenCalledWith(
@@ -138,6 +142,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     authStoreMock.hasPermissions.mockReturnValue(false);
 
     const component = await setupComponent();
+
     component.openPermissionsDialog(mockRole);
 
     expect(dialogMock.open).toHaveBeenCalledWith(
@@ -152,6 +157,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     dialogMock.open.mockReturnValue({ afterClosed: () => of(mockRole) });
 
     const component = await setupComponent();
+
     component.openEditDialog(mockRole);
     component.openCreateDialog();
 
@@ -176,11 +182,13 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     authStoreMock.hasPermissions.mockReturnValue(true);
     await setupComponent();
     const fixture = TestBed.createComponent(RoleListComponent);
+
     fixture.detectChanges();
 
     const button = (fixture.nativeElement as HTMLElement).querySelector(
       'nxs-create-button button'
     ) as HTMLButtonElement;
+
     expect(button.textContent?.trim()).toBe('add New role');
     button.click();
 
@@ -194,6 +202,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     authStoreMock.hasPermissions.mockReturnValue(false);
     await setupComponent();
     const fixture = TestBed.createComponent(RoleListComponent);
+
     fixture.detectChanges();
 
     expect(
@@ -203,6 +212,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
 
   it('reports nothing when the form dialog is cancelled', async () => {
     const component = await setupComponent();
+
     component.openEditDialog(mockRole);
 
     expect(notifyMock.success).not.toHaveBeenCalled();
@@ -226,7 +236,9 @@ describe('RoleListComponent — openPermissionsDialog', () => {
 
     function rowButtons(name: string): (string | undefined)[] {
       const fixture = TestBed.createComponent(RoleListComponent);
+
       fixture.detectChanges();
+
       return Array.from(
         (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
           `td.mat-column-actions button[aria-label$=" ${name}"]`
@@ -243,6 +255,7 @@ describe('RoleListComponent — openPermissionsDialog', () => {
 
     it('opens the permissions read-only only outside the grant', async () => {
       const component = await setupComponent();
+
       component.openPermissionsDialog(mockRole);
       component.openPermissionsDialog(otherRole);
 
@@ -272,19 +285,23 @@ describe('RoleListComponent — openPermissionsDialog', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(RoleListComponent);
+
     fixture.detectChanges();
     await fixture.whenStable();
 
     const host = fixture.nativeElement as HTMLElement;
     const marker = host.querySelector('.actions-locked-marker');
+
     expect(marker).not.toBeNull();
     const markerButton = marker?.querySelector('button');
+
     expect(markerButton?.hasAttribute('disabled')).toBe(true);
     expect(marker?.querySelector('mat-icon')?.textContent?.trim()).toBe('lock');
 
     const actionsCellButtons = host.querySelectorAll(
       'td.mat-column-actions button'
     );
+
     expect(actionsCellButtons.length).toBe(1);
     expect(
       actionsCellButtons[0].closest('.actions-locked-marker')

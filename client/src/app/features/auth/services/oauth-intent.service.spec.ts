@@ -16,6 +16,7 @@ describe('OAuthIntentService', () => {
   // Each call is a new page load: the service is created once per bootstrap.
   function bootstrap(): OAuthIntentService {
     TestBed.resetTestingModule();
+
     return TestBed.inject(OAuthIntentService);
   }
 

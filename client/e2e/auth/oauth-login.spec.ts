@@ -42,6 +42,7 @@ test.describe('OAuth login — auto-link disabled', () => {
 
     // No session is created — submit button stays for the credentials form.
     const main = page.getByRole('main');
+
     await expect(main.getByRole('button', { name: 'Login' })).toBeVisible();
   });
 
@@ -67,6 +68,7 @@ test.describe('OAuth login — cancelled consent screen', () => {
     await page.goto('/login?oauth_error=oauth_cancelled');
 
     const banner = page.locator('.error-message');
+
     await expect(banner).toContainText('cancelled');
     await expect(banner).not.toContainText('OAuth authentication failed');
   });

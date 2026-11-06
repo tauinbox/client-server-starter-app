@@ -60,6 +60,7 @@ describe('BillingConfigService', () => {
 
     it('warns once when the YooKassa keys are set without REDIS_URL', () => {
       const warn = warnSpy();
+
       service(yookassaKeys).onModuleInit();
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('REDIS_URL'));
@@ -67,6 +68,7 @@ describe('BillingConfigService', () => {
 
     it('does not warn when REDIS_URL is set', () => {
       const warn = warnSpy();
+
       service({
         ...yookassaKeys,
         REDIS_URL: 'redis://localhost:6379'
@@ -76,6 +78,7 @@ describe('BillingConfigService', () => {
 
     it('does not warn when YooKassa is not set up', () => {
       const warn = warnSpy();
+
       service({}).onModuleInit();
       expect(warn).not.toHaveBeenCalled();
     });

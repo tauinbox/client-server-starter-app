@@ -24,12 +24,14 @@ export class AuditCleanupService {
       DEFAULT_RETENTION_DAYS;
 
     const cutoffDate = new Date();
+
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
     try {
       const result = await this.auditLogRepository.delete({
         createdAt: LessThan(cutoffDate)
       });
+
       this.logger.log(
         `Audit log cleanup: removed ${result.affected ?? 0} entries older than ${retentionDays} days`
       );

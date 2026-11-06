@@ -100,14 +100,18 @@ export function validateMongoQueryKeys(
       if (DENIED_MONGO_OPERATORS.has(key)) {
         return `Operator "${key}" is not allowed at ${path}`;
       }
+
       if (!ALLOWED_MONGO_OPERATORS.has(key)) {
         return `Unknown operator "${key}" at ${path}`;
       }
+
       if (LIST_OPERATOR_KEYS.has(key)) {
         const opPath = path ? `${path}.${key}` : key;
+
         if (!Array.isArray(value)) {
           return `Operator "${key}" at ${opPath} must be an array`;
         }
+
         if (!value.every(isJsonScalar)) {
           return `Operator "${key}" at ${opPath} must be an array of strings, numbers, booleans or null`;
         }
@@ -116,6 +120,7 @@ export function validateMongoQueryKeys(
 
     const childPath = path ? `${path}.${key}` : key;
     const childError = validateMongoQueryKeys(value, childPath, depth + 1);
+
     if (childError) return childError;
   }
 
@@ -132,14 +137,18 @@ export function findCustomQueryError(value: unknown): string | null {
   if (typeof value !== 'string') {
     return 'custom must be a JSON string';
   }
+
   let parsed: unknown;
+
   try {
     parsed = JSON.parse(value);
   } catch {
     return 'custom must be valid JSON';
   }
+
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return 'custom must be a JSON object';
   }
+
   return validateMongoQueryKeys(parsed, '');
 }

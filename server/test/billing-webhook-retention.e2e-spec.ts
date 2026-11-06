@@ -103,6 +103,7 @@ runWithInfra('billing webhook ledger retention (e2e)', () => {
     await service.sweep(NOW);
 
     const redacted = await read('redact');
+
     expect(redacted).not.toBeNull();
     expect(redacted?.payload).toBeNull();
     expect((await read('keep'))?.payload).not.toBeNull();
@@ -113,6 +114,7 @@ runWithInfra('billing webhook ledger retention (e2e)', () => {
 
   it('works through a backlog larger than one batch', async () => {
     const backlog = WEBHOOK_RETENTION_BATCH_SIZE + 25;
+
     await seed(
       Array.from({ length: backlog }, (_, i) => ({
         key: `bulk-${i}`,
@@ -128,6 +130,7 @@ runWithInfra('billing webhook ledger retention (e2e)', () => {
         Array.from({ length: backlog }, (_, i) => `${PREFIX}bulk-${i}`)
       )
     });
+
     expect(remaining).toBe(0);
   });
 

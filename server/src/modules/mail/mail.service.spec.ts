@@ -17,6 +17,7 @@ describe('MailService', () => {
           CLIENT_URL: 'http://localhost:4200',
           SMTP_FROM: 'test@example.com'
         };
+
         return config[key];
       })
     };
@@ -44,6 +45,7 @@ describe('MailService', () => {
     const loggerError = jest
       .spyOn(Logger.prototype, 'error')
       .mockImplementation();
+
     jest
       .spyOn(service, 'deliver')
       .mockRejectedValueOnce(new Error('smtp down'));
@@ -74,6 +76,7 @@ describe('MailService', () => {
             CLIENT_URL: 'http://localhost:4200',
             SMTP_FROM: 'test@example.com'
           };
+
           return config[key];
         })
       };
@@ -84,6 +87,7 @@ describe('MailService', () => {
         ]
       }).compile();
       const smtpService = smtpModule.get<MailService>(MailService);
+
       expect(smtpService.isSmtpConfigured()).toBe(true);
     });
   });
@@ -98,6 +102,7 @@ describe('MailService', () => {
       const moduleRef: TestingModule = await Test.createTestingModule({
         providers: [MailService, { provide: ConfigService, useValue: config }]
       }).compile();
+
       moduleRef.get<MailService>(MailService);
     };
 
@@ -122,6 +127,7 @@ describe('MailService', () => {
       const [options] = createTransportSpy.mock.calls[0] as [
         nodemailer.TransportOptions
       ];
+
       expect(options).toMatchObject({
         host: 'smtp.example.com',
         port: 587,
@@ -140,6 +146,7 @@ describe('MailService', () => {
       const [options] = createTransportSpy.mock.calls[0] as [
         nodemailer.TransportOptions
       ];
+
       expect(options).toMatchObject({
         port: 1025,
         secure: false,
@@ -156,6 +163,7 @@ describe('MailService', () => {
       const [options] = createTransportSpy.mock.calls[0] as [
         nodemailer.TransportOptions
       ];
+
       expect(options).toMatchObject({
         port: 465,
         secure: true,
@@ -173,6 +181,7 @@ describe('MailService', () => {
       const [options] = createTransportSpy.mock.calls[0] as [
         nodemailer.TransportOptions
       ];
+
       expect(options).toMatchObject({
         port: 587,
         secure: true,
@@ -186,6 +195,7 @@ describe('MailService', () => {
       const [options] = createTransportSpy.mock.calls[0] as [
         nodemailer.TransportOptions
       ];
+
       expect(options).toMatchObject({
         connectionTimeout: 3000,
         greetingTimeout: 3000,
@@ -266,6 +276,7 @@ describe('MailService', () => {
           { provide: getQueueToken(MAIL_QUEUE), useValue: { add } }
         ]
       }).compile();
+
       queuedService = moduleRef.get<MailService>(MailService);
     });
 
@@ -282,6 +293,7 @@ describe('MailService', () => {
       const loggerError = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
+
       add.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
       await queuedService.sendPasswordReset(
@@ -308,6 +320,7 @@ describe('MailService', () => {
       );
 
       const [, data] = add.mock.calls[0] as [string, MailJobData];
+
       expect(data.to).toBe('user@example.com');
       expect(data.subject).toBe(
         'A sign-in provider was linked to your account'
@@ -328,6 +341,7 @@ describe('MailService', () => {
 
       expect(add).toHaveBeenCalledTimes(1);
       const [jobName, data] = add.mock.calls[0] as [string, MailJobData];
+
       expect(jobName).toBe(MAIL_SEND_JOB);
       expect(data.to).toBe('user@example.com');
       expect(data.subject).toBe('Verify your email address');

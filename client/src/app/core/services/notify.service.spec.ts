@@ -43,6 +43,7 @@ describe('NotifyService', () => {
       service.warn('common.cancel');
 
       const [[, , config]] = snackBarMock.open.mock.calls;
+
       expect(config).toBeUndefined();
     });
   });
@@ -102,6 +103,7 @@ describe('NotifyService', () => {
       service.error(httpError);
 
       const [[message]] = snackBarMock.open.mock.calls;
+
       expect(message).toBe(
         'Some of the submitted values are invalid. Please check the form and try again.'
       );
@@ -118,6 +120,7 @@ describe('NotifyService', () => {
       service.error(httpError);
 
       const [[message]] = snackBarMock.open.mock.calls;
+
       expect(message).toContain('500');
     });
 

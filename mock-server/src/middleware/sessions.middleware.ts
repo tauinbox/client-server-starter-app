@@ -38,15 +38,19 @@ function passesStepUp(req: Request, res: Response): boolean {
     code,
     operation: STEP_UP_OPERATION.SESSION_REVOKE
   });
+
   if (refusal) {
     sendWithRetryAfter(res, refusal);
+
     return false;
   }
+
   return true;
 }
 
 function logRevoke(req: Request, scope: 'one' | 'others', count: number) {
   const { user } = req as AuthenticatedRequest;
+
   logAudit('SESSION_REVOKE', {
     actorId: user.id,
     actorEmail: user.email,
@@ -75,6 +79,7 @@ router.get('/', authGuard, (req, res) => {
       lastActiveAt: new Date(state.sessionLastActive.get(id) ?? 0).toISOString()
     })
   );
+
   res.json(sessions);
 });
 
@@ -94,6 +99,7 @@ router.delete(
         ErrorKeys.AUTH.SESSION_IS_CURRENT,
         'Use sign out to end the session of this device'
       );
+
       return;
     }
 
@@ -101,6 +107,7 @@ router.delete(
 
     if (!endUserSession(user.id, target)) {
       sendError(res, ErrorKeys.AUTH.SESSION_NOT_FOUND, 'Session not found');
+
       return;
     }
 
@@ -117,6 +124,7 @@ router.delete('/', authGuard, requireStepUpBody(), (req, res) => {
   if (!passesStepUp(req, res)) return;
 
   const count = endOtherUserSessions(user.id, sessionId);
+
   clearReauthProofCookie(res);
   logRevoke(req, 'others', count);
   res.json({ message: 'Other sessions have ended', count });

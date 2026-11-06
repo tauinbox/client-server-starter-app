@@ -19,6 +19,7 @@ const NEW_PASSWORD = 'Sunrise-Kettle-19';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -53,6 +54,7 @@ function post(
 async function accessToken(): Promise<string> {
   const res = await post('/auth/login', CREDENTIALS);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -84,6 +86,7 @@ async function oauthOnlyToken(): Promise<string> {
   const body = (await exchange.json()) as {
     tokens: { access_token: string };
   };
+
   return body.tokens.access_token;
 }
 
@@ -112,6 +115,7 @@ describe('a refused step-up is audited', () => {
 
   it('audits a wrong code on the two-factor disable, and records no value', async () => {
     const token = await accessToken();
+
     await post(
       '/auth/mfa/setup',
       { currentPassword: CREDENTIALS.password },
@@ -136,12 +140,15 @@ describe('a refused step-up is audited', () => {
     const user = getState()
       .users.values()
       .find((u) => u.email === CREDENTIALS.email) as MockUser;
+
     user.totpEnabledAt = '2025-01-01T00:00:00.000Z';
 
     const statuses: number[] = [];
     let last: { errorKey?: string } = {};
+
     for (let i = 0; i < MAX_FAILED_ATTEMPTS; i += 1) {
       const res = await post('/auth/mfa/disable', { code: '000000' }, token);
+
       statuses.push(res.status);
       last = (await res.json()) as { errorKey?: string };
     }
@@ -149,6 +156,7 @@ describe('a refused step-up is audited', () => {
     expect(statuses.at(-1)).toBe(423);
     expect(last.errorKey).toBe(ErrorKeys.AUTH.MFA_STEP_UP_LOCKED);
     expect(failureRows()).toHaveLength(MAX_FAILED_ATTEMPTS);
+
     for (const row of failureRows()) {
       expect(row).toMatchObject({
         actorEmail: CREDENTIALS.email,

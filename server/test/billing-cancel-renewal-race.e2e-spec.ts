@@ -94,6 +94,7 @@ runWithInfra(
         await ds.getRepository(PaymentMethod).delete({ customerId });
         customerId = undefined;
       }
+
       if (userId) {
         await ds.getRepository(User).delete({ id: userId });
         userId = undefined;
@@ -119,6 +120,7 @@ runWithInfra(
           password: 'hashed'
         })
       );
+
       userId = user.id;
 
       const customer = await ds.getRepository(Customer).save(
@@ -132,9 +134,11 @@ runWithInfra(
           defaultPaymentMethodId: null
         })
       );
+
       customerId = customer.id;
 
       const periodStart = new Date(Date.now() - 31 * DAY_MS);
+
       subscription = await ds.getRepository(Subscription).save(
         ds.getRepository(Subscription).create({
           customerId: customer.id,
@@ -185,6 +189,7 @@ runWithInfra(
           receiptRef: null
         })
       );
+
       await ds.transaction((m) =>
         new CreditService(ds.getRepository(CreditBalance)).addPurchase(
           m,
@@ -214,10 +219,12 @@ runWithInfra(
             { idempotencyKey: key = '' }: OffSessionCharge
           ) => {
             keys.push(key);
+
             if (keys.length === 1) {
               entered();
               await released;
             }
+
             return {
               providerInvoiceRef: `pay_${keys.length}`,
               status: 'captured'
@@ -228,6 +235,7 @@ runWithInfra(
         getOffSessionCharge: jest.fn(() => Promise.resolve(null)),
         cancel: jest.fn(() => Promise.resolve(undefined))
       };
+
       return { provider, keys, release, firstChargeEntered };
     }
 
@@ -237,12 +245,15 @@ runWithInfra(
      */
     function scopedSubscriptions() {
       const subscriptions = ds.getRepository(Subscription);
+
       return subscriptions.extend({
         createQueryBuilder(alias: string) {
           const qb = subscriptions.createQueryBuilder(alias);
           const getMany = qb.getMany.bind(qb);
+
           qb.getMany = async () =>
             (await getMany()).filter((s) => s.id === subscription.id);
+
           return qb;
         }
       });
@@ -300,6 +311,7 @@ runWithInfra(
           { provide: EventEmitter2, useValue: events }
         ]
       }).compile();
+
       return {
         renewals: module.get(RenewalService),
         admin: module.get(BillingAdminService)
@@ -313,11 +325,13 @@ runWithInfra(
       const renewalKey = `renewal:${subscription.id}:${anchorMs}`;
 
       const scan = renewals.runDueRenewals(new Date());
+
       await gate.firstChargeEntered;
       const canceled = await admin.cancelSubscription(
         subscription.id,
         'immediate'
       );
+
       gate.release();
       await scan;
 
@@ -331,9 +345,11 @@ runWithInfra(
         order: { periodStart: 'ASC' }
       });
       const due = invoices.find((i) => i.providerEventId === renewalKey);
+
       expect(due).toMatchObject({ status: 'paid', creditUnitsApplied: 50 });
       expect(due?.amountMinor.toNumber()).toBe(50 * 200);
       expect(due?.periodEnd.getTime()).toBe(anchorMs);
+
       // Anything else on the books is the tail after the due moment, which
       // metered nothing here.
       for (const other of invoices.filter((i) => i !== due)) {
@@ -346,10 +362,12 @@ runWithInfra(
       const balance = await ds
         .getRepository(CreditBalance)
         .findOneOrFail({ where: { customerId } });
+
       expect(balance.balanceUnits.toNumber()).toBe(0);
       const spends = await ds
         .getRepository(CreditLedger)
         .find({ where: { customerId, reason: 'usage' } });
+
       expect(spends.map((s) => s.delta.toNumber())).toEqual([-50]);
     }, 30000);
   }

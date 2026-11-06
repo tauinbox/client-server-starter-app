@@ -32,6 +32,7 @@ describe('FeatureFlagsAdminService', () => {
     service.update('flag-1', { enabled: true }, 7).subscribe();
 
     const req = httpMock.expectOne(`${ADMIN_API_V1}/flag-1`);
+
     expect(req.request.method).toBe('PATCH');
     expect(req.request.headers.get('If-Match')).toBe('"7"');
     req.flush({});

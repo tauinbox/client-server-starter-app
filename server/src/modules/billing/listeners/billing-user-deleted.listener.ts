@@ -42,6 +42,7 @@ export class BillingUserDeletedListener {
     const customer = await this.customers.findOne({
       where: { userId: event.userId }
     });
+
     if (!customer) return;
 
     const subscriptions = await this.subscriptions.find({
@@ -55,9 +56,11 @@ export class BillingUserDeletedListener {
         await this.cancelLocally(subscription, event.userId);
         continue;
       }
+
       const provider = this.providers.find(
         (p) => p.id === subscription.provider
       );
+
       if (!provider) continue;
 
       try {
@@ -89,15 +92,19 @@ export class BillingUserDeletedListener {
               },
               { ...cancelFields('immediate'), nextRenewalAttemptAt: null }
             );
+
           if (update.affected === 1) {
             await this.credits.releaseHolds(manager, {
               subscriptionId: subscription.id
             });
           }
+
           return update;
         }
       );
+
       if (applied.affected !== 1) return;
+
       this.events.emit(
         SubscriptionCanceledEvent.name,
         new SubscriptionCanceledEvent(userId, subscription.id)

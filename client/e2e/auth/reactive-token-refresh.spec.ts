@@ -18,6 +18,7 @@ test.describe('Reactive access-token refresh', () => {
     page
   }) => {
     const userId = '100';
+
     await loginViaUi(page, _mockServer.url, {
       id: userId,
       roles: ['admin']
@@ -26,6 +27,7 @@ test.describe('Reactive access-token refresh', () => {
     // Capture every refresh-token response status — proves the interceptor
     // actually refreshed rather than the original call somehow succeeding.
     const refreshStatuses: number[] = [];
+
     page.on('response', (resp) => {
       if (resp.url().includes('/api/v1/auth/refresh-token')) {
         refreshStatuses.push(resp.status());

@@ -102,25 +102,31 @@ export class UserPermissionsComponent implements OnInit {
 
   readonly groups = computed<ResourceGroup[]>(() => {
     const data = this.#data();
+
     if (!data) return [];
+
     const resources = this.#resources();
     const displayNameByName = new Map(
       resources.map((r) => [r.name, r.displayName])
     );
 
     const byResource = new Map<string, ResolvedPermission[]>();
+
     for (const p of data.permissions) {
       const list = byResource.get(p.resource) ?? [];
+
       list.push(p);
       byResource.set(p.resource, list);
     }
 
     const groups: ResourceGroup[] = [];
+
     for (const [name, perms] of byResource) {
       const allowCount = perms.filter(
         (p) => p.conditions?.effect !== 'deny'
       ).length;
       const denyCount = perms.length - allowCount;
+
       groups.push({
         name,
         displayName: displayNameByName.get(name) ?? name,
@@ -130,6 +136,7 @@ export class UserPermissionsComponent implements OnInit {
         permissions: perms.toSorted((a, b) => a.action.localeCompare(b.action))
       });
     }
+
     return groups.toSorted((a, b) =>
       a.displayName.localeCompare(b.displayName)
     );
@@ -140,15 +147,20 @@ export class UserPermissionsComponent implements OnInit {
     let allow = 0;
     let deny = 0;
     let conditional = 0;
+
     for (const p of perms) {
       const isDeny = p.conditions?.effect === 'deny';
+
       if (isDeny) deny++;
       else allow++;
+
       if (p.conditions) {
         const { effect: _e, ...rest } = p.conditions;
+
         if (Object.keys(rest).length > 0) conditional++;
       }
     }
+
     return { allow, deny, conditional };
   });
 
@@ -163,12 +175,15 @@ export class UserPermissionsComponent implements OnInit {
 
   formatConditions(conditions: PermissionCondition): string {
     const { effect: _e, ...rest } = conditions;
+
     return JSON.stringify(rest, null, 2);
   }
 
   hasRenderableConditions(conditions: PermissionCondition | null): boolean {
     if (!conditions) return false;
+
     const { effect: _e, ...rest } = conditions;
+
     return Object.keys(rest).length > 0;
   }
 
@@ -198,6 +213,7 @@ export class UserPermissionsComponent implements OnInit {
     ) {
       return;
     }
+
     this.#rbacAdminService
       .getResources()
       .pipe(takeUntilDestroyed(this.#destroyRef))

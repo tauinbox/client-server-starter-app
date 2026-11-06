@@ -36,8 +36,11 @@ export class RegionControlComponent {
 
   protected readonly visible = computed(() => {
     const region = this.store.region();
+
     if (!this.#authStore.isAuthenticated() || !region) return false;
+
     const available = region.availableProviders;
+
     return (
       available.length > 1 ||
       (available.length === 1 && !available.includes(region.effectiveProvider))
@@ -55,6 +58,7 @@ export class RegionControlComponent {
   onRegionChange(region: BillingRegion): void {
     void this.store.setRegion(region).then((updated) => {
       const toggle = this.regionToggle();
+
       if (!updated && toggle) {
         toggle.value = this.store.region()?.region;
       }

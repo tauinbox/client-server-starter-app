@@ -13,6 +13,7 @@ export async function restoreSession(): Promise<void> {
   const authService = inject(AuthService);
   const authStore = inject(AuthStore);
   const featureFlagsStore = inject(FeatureFlagsStore);
+
   if (authStore.hasPersistedUser()) {
     try {
       await firstValueFrom(authService.refreshTokens());

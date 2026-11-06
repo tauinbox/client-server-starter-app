@@ -51,6 +51,7 @@ runWithInfra(
         moduleRef.createNestApplication<NestExpressApplication>(
           HTTP_BODY_APP_OPTIONS
         );
+
       applyBodyParsers(expressApp);
       app = expressApp;
       app.useGlobalPipes(new ApiValidationPipe());
@@ -81,6 +82,7 @@ runWithInfra(
 
       // A row of its own, so the grant scope touches no shared resource.
       const resourceRepository = dataSource.getRepository(Resource);
+
       resource = await resourceRepository.save(
         resourceRepository.create({
           name: `post-image-${stamp}`,
@@ -98,7 +100,9 @@ runWithInfra(
         const found = permissions.find(
           (p) => p.action.name === 'update' && p.resource.subject === subject
         );
+
         if (!found) throw new Error(`Permission update:${subject} missing`);
+
         return found.id;
       };
 
@@ -107,6 +111,7 @@ runWithInfra(
         { name: actorRoleName },
         { ability: SYSTEM_ABILITY }
       );
+
       await roleService.setPermissionsForRole(
         actorRole.id,
         [
@@ -136,6 +141,7 @@ runWithInfra(
       if (resource) {
         await dataSource?.getRepository(Resource).delete({ id: resource.id });
       }
+
       await dataSource
         ?.getRepository(Role)
         .delete({ name: In([actorRoleName, teamA, teamB]) });
@@ -153,6 +159,7 @@ runWithInfra(
       const found = await dataSource
         .getRepository(User)
         .findOneOrFail({ where: { email } });
+
       return found.id;
     }
 
@@ -165,6 +172,7 @@ runWithInfra(
         userAgent: 'post-image-e2e',
         ipAddress: null
       });
+
       return tokens.access_token;
     }
 
@@ -179,6 +187,7 @@ runWithInfra(
       const found = await dataSource
         .getRepository(Role)
         .findOneOrFail({ where: { name } });
+
       return found.id;
     }
 
@@ -192,6 +201,7 @@ runWithInfra(
         const row = await dataSource
           .getRepository(User)
           .findOneOrFail({ where: { id } });
+
         expect(row.name).toBe('Alpha');
       }, 30000);
 
@@ -215,6 +225,7 @@ runWithInfra(
         const row = await dataSource
           .getRepository(Role)
           .findOneOrFail({ where: { id } });
+
         expect(row.name).toBe(teamA);
       }, 30000);
 
@@ -237,6 +248,7 @@ runWithInfra(
         const row = await dataSource
           .getRepository(Resource)
           .findOneOrFail({ where: { id: resource.id } });
+
         expect(row.displayName).toBe(resourceLabel);
       }, 30000);
 

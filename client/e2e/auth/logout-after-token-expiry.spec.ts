@@ -12,12 +12,15 @@ test.describe('Logout after the access token has gone stale', () => {
     await page.clock.install();
 
     const userId = '100';
+
     await loginViaUi(page, _mockServer.url, { id: userId, roles: ['admin'] });
 
     const loggedIn = await _mockServer.getState();
+
     expect(loggedIn.refreshTokens).toBe(1);
 
     const logoutStatuses: number[] = [];
+
     page.on('response', (resp) => {
       if (resp.url().endsWith('/api/v1/auth/logout')) {
         logoutStatuses.push(resp.status());
@@ -38,6 +41,7 @@ test.describe('Logout after the access token has gone stale', () => {
 
     // Gone as an active token and as a rotated one kept for reuse detection.
     const loggedOut = await _mockServer.getState();
+
     expect(loggedOut.refreshTokens).toBe(0);
     expect(loggedOut.revokedRefreshTokens).toBe(0);
   });

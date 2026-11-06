@@ -34,6 +34,7 @@ class TestHostComponent {
     required(path.email, { message: 'forms.errors.required' });
     email(path.email, { message: 'forms.errors.email' });
   });
+
   label = 'forms.errors.email';
   readonly type = signal<'text' | 'email' | 'password' | 'textarea'>('email');
   readonly errors = signal<Record<string, string>>({});
@@ -83,6 +84,7 @@ describe('NxsFormFieldComponent', () => {
       fixture.detectChanges();
 
       const errorEl = fixture.nativeElement.querySelector('mat-error');
+
       expect(errorEl).toBeTruthy();
       expect(errorEl.textContent).toContain('This field is required');
     });
@@ -94,6 +96,7 @@ describe('NxsFormFieldComponent', () => {
       fixture.detectChanges();
 
       const errorEl = fixture.nativeElement.querySelector('mat-error');
+
       expect(errorEl).toBeTruthy();
       expect(errorEl.textContent).toContain('valid email');
     });
@@ -104,6 +107,7 @@ describe('NxsFormFieldComponent', () => {
       fixture.detectChanges();
 
       const errorEl = fixture.nativeElement.querySelector('mat-error');
+
       expect(errorEl).toBeNull();
     });
   });
@@ -115,6 +119,7 @@ describe('NxsFormFieldComponent', () => {
       fixture.detectChanges();
 
       const errorEl = fixture.nativeElement.querySelector('mat-error');
+
       expect(errorEl).toBeTruthy();
       // Schema message takes priority over overrides; override is fallback
       // Since schema sets message 'forms.errors.required', it wins.
@@ -131,6 +136,7 @@ describe('NxsFormFieldComponent', () => {
 
       const input = fixture.nativeElement.querySelector('input');
       const errorEl = fixture.nativeElement.querySelector('mat-error');
+
       expect(input.getAttribute('aria-describedby')).toContain(errorEl.id);
     });
 
@@ -141,6 +147,7 @@ describe('NxsFormFieldComponent', () => {
 
       const input = fixture.nativeElement.querySelector('input');
       const describedBy = input.getAttribute('aria-describedby') ?? '';
+
       expect(describedBy).not.toContain('nxs-ff-err-');
     });
   });
@@ -150,6 +157,7 @@ describe('NxsFormFieldComponent', () => {
       const icon = fixture.nativeElement.querySelector(
         'mat-icon[aria-hidden="true"]'
       );
+
       expect(icon).toBeTruthy();
       expect(icon.textContent.trim()).toBe('email');
     });
@@ -161,6 +169,7 @@ describe('NxsFormFieldComponent', () => {
       const icons = fixture.nativeElement.querySelectorAll(
         'mat-icon[matprefix]'
       );
+
       expect(icons.length).toBe(0);
     });
   });
@@ -168,6 +177,7 @@ describe('NxsFormFieldComponent', () => {
   describe('autocomplete pass-through', () => {
     it('should set autocomplete attribute on input', () => {
       const input = fixture.nativeElement.querySelector('input');
+
       expect(input.getAttribute('autocomplete')).toBe('on');
     });
   });
@@ -175,6 +185,7 @@ describe('NxsFormFieldComponent', () => {
   describe('suffix projection', () => {
     it('should project suffix content', () => {
       const suffix = fixture.nativeElement.querySelector('.test-suffix');
+
       expect(suffix).toBeTruthy();
       expect(suffix.textContent).toBe('Toggle');
     });
@@ -186,8 +197,10 @@ describe('NxsFormFieldComponent', () => {
       fixture.detectChanges();
 
       const textarea = fixture.nativeElement.querySelector('textarea');
+
       expect(textarea).toBeTruthy();
       const input = fixture.nativeElement.querySelector('input');
+
       expect(input).toBeNull();
     });
   });
@@ -215,6 +228,7 @@ describe('NxsFormFieldComponent length errors without a schema message', () => {
     fixture.detectChanges();
 
     const errorEl = fixture.nativeElement.querySelector('mat-error');
+
     expect(errorEl).toBeTruthy();
     expect(errorEl.textContent).toContain('at least 8 characters');
     expect(errorEl.textContent).not.toContain('This field is invalid');
@@ -227,6 +241,7 @@ describe('NxsFormFieldComponent length errors without a schema message', () => {
     fixture.detectChanges();
 
     const errorEl = fixture.nativeElement.querySelector('mat-error');
+
     expect(errorEl).toBeTruthy();
     expect(errorEl.textContent).toContain('no more than 10 characters');
     expect(errorEl.textContent).not.toContain('This field is invalid');

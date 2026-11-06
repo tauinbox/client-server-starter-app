@@ -21,6 +21,7 @@ const I18N_DIR = path.resolve(__dirname, '../../client/src/assets/i18n');
 /** Recursively extract all leaf string values from an object */
 function extractLeafValues(obj: unknown, prefix = ''): string[] {
   const values: string[] = [];
+
   if (typeof obj === 'string') {
     values.push(obj);
   } else if (typeof obj === 'object' && obj !== null) {
@@ -30,6 +31,7 @@ function extractLeafValues(obj: unknown, prefix = ''): string[] {
       );
     }
   }
+
   return values;
 }
 
@@ -37,10 +39,13 @@ function extractLeafValues(obj: unknown, prefix = ''): string[] {
 function resolvePath(obj: Record<string, unknown>, dotPath: string): unknown {
   const parts = dotPath.split('.');
   let current: unknown = obj;
+
   for (const part of parts) {
     if (typeof current !== 'object' || current === null) return undefined;
+
     current = (current as Record<string, unknown>)[part];
   }
+
   return current;
 }
 
@@ -73,6 +78,7 @@ for (const file of i18nFiles) {
 
   for (const key of errorKeyValues) {
     const value = resolvePath(content, key);
+
     if (value === undefined || typeof value !== 'string') {
       missing.push(key);
     }
@@ -81,6 +87,7 @@ for (const file of i18nFiles) {
   if (missing.length > 0) {
     hasErrors = true;
     console.error(`\n❌ ${file.name}: ${missing.length} missing key(s):`);
+
     for (const key of missing) {
       console.error(`   - ${key}`);
     }

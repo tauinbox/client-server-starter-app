@@ -5,5 +5,6 @@ export function thrownBy(fn: () => unknown): unknown {
   } catch (error) {
     return error;
   }
+
   throw new Error('Expected the function to throw');
 }

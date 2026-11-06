@@ -89,6 +89,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
 
     const loggedPath = redactSensitiveQuery(path);
+
     if (statusCode >= 500) {
       this.logger.error(
         `${loggedPath} ${statusCode} — ${message}`,
@@ -135,6 +136,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     const clientError = this.exposedClientError(exception);
+
     if (clientError) {
       return clientError;
     }
@@ -174,6 +176,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (Array.isArray(rawMessage)) {
       const stringMessages = rawMessage.map(String);
+
       return {
         statusCode,
         message: stringMessages.join('. '),
@@ -203,6 +206,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const code = 'code' in driverError ? String(driverError.code) : undefined;
 
     const mapped = code ? PG_ERROR_MAP[code] : undefined;
+
     if (mapped) {
       return keyed(mapped.key, mapped.message);
     }
@@ -221,10 +225,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (!(exception instanceof Error)) {
       return null;
     }
+
     const { status, expose } = exception as Error & {
       status?: unknown;
       expose?: unknown;
     };
+
     if (
       expose !== true ||
       typeof status !== 'number' ||
@@ -233,6 +239,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     ) {
       return null;
     }
+
     return { statusCode: status, message: exception.message };
   }
 }

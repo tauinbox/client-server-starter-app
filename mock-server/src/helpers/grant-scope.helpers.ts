@@ -40,12 +40,17 @@ function scopeOf(ability: MockAbility): GrantScopeAbility {
 /** Resolves the action and subject names, as `RoleService` does. */
 function toGrantItems(items: ScopeItem[]): GrantScopeItem[] {
   const state = getState();
+
   return items.flatMap((item) => {
     const permission = state.permissions.get(item.permissionId);
+
     if (!permission) return [];
+
     const actionName = state.actions.get(permission.actionId)?.name;
     const subject = state.resources.get(permission.resourceId)?.subject;
+
     if (!actionName || !subject) return [];
+
     return [
       {
         permissionId: item.permissionId,
@@ -83,6 +88,7 @@ export function assertGrantScope(
           logger: SILENT_RESOLVER_LOGGER
         })
       : findLiftRefusal(ability, grantItems);
+
   if (!refused) return true;
 
   logRefusal(req, user.id, {
@@ -94,6 +100,7 @@ export function assertGrantScope(
     details: refused.details
   });
   sendError(res, refused.errorKey, refused.message);
+
   return false;
 }
 
@@ -115,8 +122,11 @@ export function assertCanWiden(
   }
 ): boolean {
   if (reEnabled.length === 0) return true;
+
   const { user } = req as AuthenticatedRequest;
+
   if (buildAbilityForUser(user).can('manage', 'all')) return true;
+
   logRefusal(req, user.id, {
     action: 'PERMISSION_GRANT_DENIED',
     targetId: resource.id,
@@ -132,6 +142,7 @@ export function assertCanWiden(
     ErrorKeys.RESOURCES.CANNOT_WIDEN,
     `Only a super administrator can offer the actions ${reEnabled.join(', ')} of resource "${resource.name}" again`
   );
+
   return false;
 }
 

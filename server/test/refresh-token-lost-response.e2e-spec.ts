@@ -51,6 +51,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
         password: null
       })
     );
+
     userId = user.id;
   }, 60000);
 
@@ -70,6 +71,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
   async function seedSession(): Promise<{ raw: string; sessionId: string }> {
     const raw = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const sessionId = randomUUID();
+
     await refreshTokenService.createRefreshToken(userId, {
       token: raw,
       sessionId,
@@ -78,6 +80,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
         ipAddress: null
       }
     });
+
     return { raw, sessionId };
   }
 
@@ -87,6 +90,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     } catch (err) {
       return (err as HttpException).getResponse();
     }
+
     return 'RESOLVED';
   }
 
@@ -100,6 +104,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     const user = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: userId });
+
     return user.tokenRevokedAt;
   }
 
@@ -136,6 +141,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     expect(auditActions()).not.toContain(AuditAction.TOKEN_REUSE_DETECTED);
 
     const { tokens } = await authService.refreshTokens(deviceB.raw, null);
+
     expect(tokens.refresh_token).toBeTruthy();
   }, 30000);
 
@@ -164,18 +170,21 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
       (call) => call[0].action === AuditAction.TOKEN_REFRESH_FAILURE
     );
     const details = failure?.[0].details;
+
     expect(details).toMatchObject({
       reason: 'lost_response_replay',
       sessionId: deviceA.sessionId,
       sameIp: false
     });
     const dayMs = 24 * 60 * 60 * 1000;
+
     expect(details?.['replayAgeMs']).toBeGreaterThanOrEqual(dayMs);
     expect(details?.['replayAgeMs']).toBeLessThan(dayMs + 60_000);
   }, 30000);
 
   it('ends only the evicted session when its lost response is replayed after a prune', async () => {
     const deviceA = await seedSession();
+
     await authService.refreshTokens(deviceA.raw, null);
     const deviceB = await seedSession();
     const deviceC = await seedSession();
@@ -200,6 +209,7 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     const deviceB = await seedSession();
 
     const first = await authService.refreshTokens(deviceA.raw, null);
+
     await authService.refreshTokens(first.tokens.refresh_token, null);
 
     await errorKeyOf(authService.refreshTokens(deviceA.raw, null));

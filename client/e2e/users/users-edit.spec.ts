@@ -62,6 +62,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     const selfId = mockId('user-100');
+
     await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
     await page.goto(`/users/${selfId}/edit`);
 
@@ -79,6 +80,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     const selfId = mockId('user-100');
+
     await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
     await page.goto(`/users/${selfId}/edit`);
 
@@ -106,11 +108,13 @@ test.describe('User Edit page', () => {
     page
   }) => {
     const ownership = { ownership: { userField: 'id' } };
+
     await seedUserRole(_mockServer, 'self-editor', {
       read: ownership,
       update: ownership
     });
     const ownId = mockId('user-owner');
+
     await loginViaUi(page, _mockServer.url, {
       id: ownId,
       email: 'owner@example.com',
@@ -216,6 +220,7 @@ test.describe('User Edit page', () => {
           })
         });
       }
+
       return route.fallback();
     });
     await page.goto(`/users/${mockId('user-1')}/edit`);
@@ -233,6 +238,7 @@ test.describe('User Edit page', () => {
   }) => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     let failures = 1;
+
     await page.route(`**/api/v1/users/${mockId('user-3')}`, (route) => {
       if (route.request().method() === 'GET' && failures-- > 0) {
         return route.fulfill({
@@ -241,6 +247,7 @@ test.describe('User Edit page', () => {
           body: JSON.stringify({ message: 'Internal error', statusCode: 500 })
         });
       }
+
       return route.fallback();
     });
     await page.goto(`/users/${mockId('user-3')}/edit`);
@@ -282,10 +289,12 @@ test.describe('User Edit page', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     let patchCalled = false;
+
     await page.route('**/api/v1/users/*', (route) => {
       if (route.request().method() === 'PATCH') {
         patchCalled = true;
       }
+
       return route.fallback();
     });
 
@@ -365,6 +374,7 @@ test.describe('User Edit page', () => {
     ).toBeVisible();
     await page.getByRole('combobox', { name: 'Roles', exact: true }).click();
     const listbox = page.getByRole('listbox', { name: 'Roles', exact: true });
+
     await expect(
       listbox.getByRole('option', { name: 'admin', exact: true })
     ).toBeDisabled();
@@ -381,6 +391,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     const selfId = mockId('user-100');
+
     await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
     await page.evaluate(() =>
       window.localStorage.setItem('preferred-language', 'ru')
@@ -396,6 +407,7 @@ test.describe('User Edit page', () => {
         response.url().includes(`/users/${mockId('user-3')}`) &&
         response.request().method() === 'PATCH'
     );
+
     await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
     expect((await refused).status()).toBe(403);
 
@@ -456,12 +468,16 @@ test.describe('User Edit page', () => {
 
     const layout = await page.evaluate(() => {
       const fa = document.querySelector('.form-actions');
+
       if (!fa) throw new Error('.form-actions not found');
+
       const buttons = Array.from(fa.querySelectorAll('button'));
       const rects = buttons.map((b) => {
         const r = b.getBoundingClientRect();
+
         return { top: r.top, left: r.left, right: r.right };
       });
+
       return { rects, viewportWidth: window.innerWidth };
     });
 
@@ -479,8 +495,10 @@ test.describe('User Edit page', () => {
         const a = layout.rects[i];
         const b = layout.rects[j];
         const sameRow = Math.abs(a.top - b.top) < 1;
+
         if (sameRow) {
           const gap = Math.max(b.left - a.right, a.left - b.right);
+
           expect(gap).toBeGreaterThan(0);
         }
       }

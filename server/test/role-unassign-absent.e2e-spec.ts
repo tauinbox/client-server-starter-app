@@ -52,6 +52,7 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -74,6 +75,7 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
+
     await roleService.assignRoleToUser(await userId(adminEmail), superRole.id, {
       ability: SYSTEM_ABILITY
     });
@@ -81,7 +83,9 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
     const readUser = (await dataSource.getRepository(Permission).find()).find(
       (p) => p.action.name === 'read' && p.resource.subject === 'User'
     );
+
     if (!readUser) throw new Error('Permission read:User missing');
+
     readUserId = readUser.id;
     customRoleId = (
       await roleService.create(
@@ -109,6 +113,7 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
     const found = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     return found.id;
   }
 
@@ -125,18 +130,22 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
       userAgent: 'unassign-absent-e2e',
       ipAddress: null
     });
+
     return { access: tokens.access_token, refresh: tokens.refresh_token };
   }
 
   async function refreshErrorKey(raw: string): Promise<string> {
     try {
       await authService.refreshTokens(raw, null);
+
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {
         const body = error.getResponse() as { errorKey?: string };
+
         return body.errorKey ?? `STATUS_${error.getStatus()}`;
       }
+
       throw error;
     }
   }
@@ -166,6 +175,7 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
 
   it('removes a role the user holds, audits and ends the sessions of the user', async () => {
     const id = await userId(targetEmail);
+
     await roleService.assignRoleToUser(id, customRoleId, {
       ability: SYSTEM_ABILITY
     });

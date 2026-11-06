@@ -133,12 +133,16 @@ describe('UsersController', () => {
       ...usersServiceMock,
       create: async (...args: [CreateUserDto, UserWriteOptions]) => {
         const created: unknown = await usersServiceMock.create(...args);
+
         await writeRows(created, args[1].audit);
+
         return created;
       },
       update: async (...args: [string, unknown, UserUpdateOptions]) => {
         const updated: unknown = await usersServiceMock.update(...args);
+
         await writeRows(updated, args[2].audit);
+
         return updated;
       },
       remove: async (...args: [string, UserWriteOptions]) => {
@@ -147,7 +151,9 @@ describe('UsersController', () => {
       },
       restore: async (...args: [string, UserWriteOptions]) => {
         const restored: unknown = await usersServiceMock.restore(...args);
+
         await writeRows(restored, args[1].audit);
+
         return restored;
       }
     };
@@ -195,6 +201,7 @@ describe('UsersController', () => {
         password: 'Password1'
       };
       const createdUser = { id: 'user-99', email: 'new@example.com' };
+
       usersServiceMock.create.mockResolvedValue(createdUser);
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -215,6 +222,7 @@ describe('UsersController', () => {
         password: 'Password1'
       };
       const createdUser = { id: 'user-99', email: 'new@example.com' };
+
       usersServiceMock.create.mockResolvedValue(createdUser);
       const req = mockJwtRequest(
         'actor-1',
@@ -244,6 +252,7 @@ describe('UsersController', () => {
         data: [],
         meta: { nextCursor: null, hasMore: false, limit: 20 }
       };
+
       usersServiceMock.findCursorPaginated.mockReturnValue(cursorResult);
 
       const result = controller.findAllCursor(query, mockAbility);
@@ -261,11 +270,13 @@ describe('UsersController', () => {
   describe('searchUsersCursor', () => {
     it('should call usersService.findCursorPaginated with the query', () => {
       const query = new SearchUsersCursorQueryDto();
+
       query.email = 'partial@example.com';
       const cursorResult = {
         data: [{ id: 'u1' }],
         meta: { nextCursor: 'abc', hasMore: true, limit: 20 }
       };
+
       usersServiceMock.findCursorPaginated.mockReturnValue(cursorResult);
 
       const result = controller.searchUsersCursor(query, mockAbility);
@@ -283,6 +294,7 @@ describe('UsersController', () => {
   describe('findOne', () => {
     it('passes the ability and the actor to usersService.findOne', async () => {
       const user = { id: 'user-5', email: 'user5@example.com' };
+
       usersServiceMock.findOne.mockResolvedValue(user);
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -310,6 +322,7 @@ describe('UsersController', () => {
     describe('credential step-up', () => {
       it('demands the step-up of the caller for a password change', async () => {
         const actor = { id: 'user-1', email: 'admin@example.com' };
+
         usersServiceMock.findOne.mockImplementation((id: string) =>
           Promise.resolve(
             id === 'user-1' ? actor : { id, email: 'target@example.com' }
@@ -360,6 +373,7 @@ describe('UsersController', () => {
         const updateOnly: AppAbility = {
           can: jest.fn((action: string) => action === 'update')
         };
+
         usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
 
         await controller.update(
@@ -498,6 +512,7 @@ describe('UsersController', () => {
     it('should call usersService.update with id, dto, ability and actor, and return the updated user', async () => {
       const dto: UpdateUserDto = { name: 'Updated', isActive: false };
       const updatedUser = { id: 'user-5', name: 'Updated' };
+
       usersServiceMock.update.mockResolvedValue(updatedUser);
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -516,6 +531,7 @@ describe('UsersController', () => {
         name: 'Updated Name',
         isActive: true
       };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest(
         'actor-2',
@@ -540,6 +556,7 @@ describe('UsersController', () => {
 
     it('should notify the target account when an administrator sets a password', async () => {
       const dto: UpdateUserDto = { password: 'NewPassword1' };
+
       usersServiceMock.update.mockResolvedValue({
         id: 'user-5',
         email: 'target@example.com',
@@ -559,6 +576,7 @@ describe('UsersController', () => {
 
     it('should NOT notify the target account when dto does not contain password', async () => {
       const dto: UpdateUserDto = { name: 'Updated' };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -573,10 +591,12 @@ describe('UsersController', () => {
       const loggerError = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
+
       mailServiceMock.sendPasswordChangedNotification.mockRejectedValueOnce(
         new Error('smtp down')
       );
       const dto: UpdateUserDto = { password: 'NewPassword1' };
+
       usersServiceMock.update.mockResolvedValue({
         id: 'user-5',
         email: 'target@example.com',
@@ -585,6 +605,7 @@ describe('UsersController', () => {
       const req = mockJwtRequest() as JwtAuthRequest;
 
       const result = await controller.update('user-5', dto, req, mockAbility);
+
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(result).toBeDefined();
@@ -616,6 +637,7 @@ describe('UsersController', () => {
 
     it('should NOT log PASSWORD_CHANGE when dto does not contain password', async () => {
       const dto: UpdateUserDto = { name: 'Updated' };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -628,6 +650,7 @@ describe('UsersController', () => {
 
     it('should await session revocation when dto contains password', async () => {
       const dto: UpdateUserDto = { name: 'Updated', password: 'NewPass1' };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -641,6 +664,7 @@ describe('UsersController', () => {
 
     it('should NOT request session revocation when dto does not contain password', async () => {
       const dto: UpdateUserDto = { name: 'Updated' };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -651,6 +675,7 @@ describe('UsersController', () => {
 
     it('should await session revocation when the admin deactivates the account', async () => {
       const dto: UpdateUserDto = { isActive: false };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -665,6 +690,7 @@ describe('UsersController', () => {
 
     it('should NOT request session revocation when the admin activates the account', async () => {
       const dto: UpdateUserDto = { isActive: true };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -675,6 +701,7 @@ describe('UsersController', () => {
 
     it('should fail the request when session revocation fails', async () => {
       const dto: UpdateUserDto = { name: 'Updated', password: 'NewPass1' };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       eventEmitterMock.emitAsync.mockRejectedValue(new Error('db down'));
       const req = mockJwtRequest() as JwtAuthRequest;
@@ -686,6 +713,7 @@ describe('UsersController', () => {
 
     it('should await session revocation when the admin changes the email', async () => {
       const dto: UpdateUserDto = { email: 'new@example.com' };
+
       usersServiceMock.findOne.mockResolvedValue({
         id: 'user-5',
         email: 'old@example.com'
@@ -709,6 +737,7 @@ describe('UsersController', () => {
         email: 'same@example.com',
         name: 'Updated'
       };
+
       usersServiceMock.findOne.mockResolvedValue({
         id: 'user-5',
         email: 'same@example.com'
@@ -729,6 +758,7 @@ describe('UsersController', () => {
         email: 'new@example.com',
         password: 'NewPass1'
       };
+
       usersServiceMock.findOne.mockResolvedValue({
         id: 'user-5',
         email: 'old@example.com'
@@ -750,6 +780,7 @@ describe('UsersController', () => {
     it('removes the linked providers of the target after a password change', async () => {
       const dto: UpdateUserDto = { password: 'NewPass1' };
       const updated = { id: 'user-5', email: 'u@example.com', locale: 'en' };
+
       usersServiceMock.update.mockResolvedValue(updated);
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -885,6 +916,7 @@ describe('UsersController', () => {
 
     it('should log USER_UPDATE and PASSWORD_CHANGE when dto contains password', async () => {
       const dto: UpdateUserDto = { name: 'Updated', password: 'NewPass1' };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest(
         'actor-3',
@@ -911,6 +943,7 @@ describe('UsersController', () => {
 
     it('should not include password in changedFields when dto contains password', async () => {
       const dto: UpdateUserDto = { name: 'Updated', password: 'NewPass1' };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -936,6 +969,7 @@ describe('UsersController', () => {
 
     it('should log USER_EMAIL_CHANGE_COMPLETE with both addresses when the admin changes the email', async () => {
       const dto: UpdateUserDto = { email: 'new@example.com' };
+
       usersServiceMock.findOne.mockResolvedValue({
         id: 'user-5',
         email: 'old@example.com'
@@ -997,6 +1031,7 @@ describe('UsersController', () => {
       const loggerError = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
+
       mailServiceMock.sendEmailChangeCompletedNotification.mockRejectedValueOnce(
         new Error('smtp down')
       );
@@ -1015,6 +1050,7 @@ describe('UsersController', () => {
         mockJwtRequest() as JwtAuthRequest,
         mockAbility
       );
+
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(result).toBeDefined();
@@ -1048,6 +1084,7 @@ describe('UsersController', () => {
         email: 'same@example.com',
         name: 'Updated'
       };
+
       usersServiceMock.findOne.mockResolvedValue({
         id: 'user-5',
         email: 'same@example.com'
@@ -1069,6 +1106,7 @@ describe('UsersController', () => {
 
     it('should NOT log USER_EMAIL_CHANGE_COMPLETE when the dto carries no email', async () => {
       const dto: UpdateUserDto = { name: 'Updated' };
+
       usersServiceMock.update.mockResolvedValue({ id: 'user-5' });
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -1104,6 +1142,7 @@ describe('UsersController', () => {
           getStatus(): number;
           getResponse(): { errorKey?: string };
         };
+
         expect(httpErr.getStatus()).toBe(403);
         expect(httpErr.getResponse().errorKey).toBe(
           ErrorKeys.USERS.CREDENTIAL_SELF
@@ -1155,6 +1194,7 @@ describe('UsersController', () => {
             getStatus(): number;
             getResponse(): { errorKey?: string };
           };
+
           expect(httpErr.getStatus()).toBe(403);
           expect(httpErr.getResponse().errorKey).toBe(
             ErrorKeys.USERS.MODERATION_SELF
@@ -1209,6 +1249,7 @@ describe('UsersController', () => {
   describe('remove', () => {
     it('should call usersService.remove with the id, ability, actor and audit rows', async () => {
       const user = { id: 'user-7', email: 'del@example.com' };
+
       usersServiceMock.findOne.mockResolvedValue(user);
       usersServiceMock.remove.mockResolvedValue(undefined);
       const req = mockJwtRequest() as JwtAuthRequest;
@@ -1240,6 +1281,7 @@ describe('UsersController', () => {
 
     it('should emit UserDeletedEvent with the correct user id', async () => {
       const user = { id: 'user-7', email: 'del@example.com' };
+
       usersServiceMock.findOne.mockResolvedValue(user);
       usersServiceMock.remove.mockResolvedValue(undefined);
       const req = mockJwtRequest() as JwtAuthRequest;
@@ -1253,6 +1295,7 @@ describe('UsersController', () => {
       const [[, emittedEvent]] = eventEmitterMock.emit.mock.calls as [
         [string, UserDeletedEvent]
       ];
+
       expect(emittedEvent.userId).toBe('user-7');
     });
 
@@ -1288,6 +1331,7 @@ describe('UsersController', () => {
 
     it('should log USER_DELETE with targetEmail from the found user', async () => {
       const user = { id: 'user-7', email: 'del@example.com' };
+
       usersServiceMock.findOne.mockResolvedValue(user);
       usersServiceMock.remove.mockResolvedValue(undefined);
       const req = mockJwtRequest(
@@ -1328,6 +1372,7 @@ describe('UsersController', () => {
   describe('restore', () => {
     it('should call usersService.restore with the id, ability and actor, and return the restored user', async () => {
       const restoredUser = { id: 'user-8', email: 'restored@example.com' };
+
       usersServiceMock.restore.mockResolvedValue(restoredUser);
       const req = mockJwtRequest() as JwtAuthRequest;
 
@@ -1343,6 +1388,7 @@ describe('UsersController', () => {
 
     it('should log USER_RESTORE with targetEmail from the restored user', async () => {
       const restoredUser = { id: 'user-8', email: 'restored@example.com' };
+
       usersServiceMock.restore.mockResolvedValue(restoredUser);
       const req = mockJwtRequest(
         'actor-5',
@@ -1376,6 +1422,7 @@ describe('UsersController', () => {
 
     function statusAndKey(err: unknown): [number, unknown] {
       const httpErr = err as { getStatus(): number; getResponse(): unknown };
+
       return [
         httpErr.getStatus(),
         (httpErr.getResponse() as { errorKey?: string }).errorKey
@@ -1384,6 +1431,7 @@ describe('UsersController', () => {
 
     it('resets the factor of another user after the caller step-up, ends the sessions and returns the fresh record', async () => {
       const fresh = { ...enrolled, mfaEnabled: false };
+
       usersServiceMock.findOne
         .mockResolvedValueOnce(enrolled)
         .mockResolvedValueOnce({ id: actor.id })
@@ -1415,6 +1463,7 @@ describe('UsersController', () => {
         [unknown, { check: (locked: unknown) => void }]
       ];
       const locked = { ...enrolled, name: 'Locked' };
+
       usersServiceMock.assertCanWrite.mockClear();
       check(locked);
       expect(usersServiceMock.assertCanWrite).toHaveBeenCalledWith(
@@ -1528,6 +1577,7 @@ describe('UsersController', () => {
         .catch((e: unknown) => e);
 
       const httpErr = err as { getStatus(): number; getResponse(): unknown };
+
       expect(httpErr.getStatus()).toBe(403);
       expect((httpErr.getResponse() as { errorKey?: string }).errorKey).toBe(
         ErrorKeys.USERS.SESSION_REVOKE_SELF

@@ -61,6 +61,7 @@ runWithInfra('Refresh for a deleted account (e2e)', () => {
     const refreshCookie = cookies.find((c) =>
       /^(__Host-)?refresh_token=[^;]/.test(c)
     );
+
     expect(refreshCookie).toBeDefined();
 
     // The window between the soft-delete and the revocation that follows it.

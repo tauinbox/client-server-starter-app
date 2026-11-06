@@ -22,11 +22,13 @@ export class HttpMetricsInterceptor implements NestInterceptor {
       tap({
         next: () => {
           const res = context.switchToHttp().getResponse<Response>();
+
           this.record(req, res.statusCode, Date.now() - start);
         },
         error: (err: unknown) => {
           const statusCode =
             err instanceof HttpException ? err.getStatus() : 500;
+
           this.record(req, statusCode, Date.now() - start);
         }
       })
@@ -35,6 +37,7 @@ export class HttpMetricsInterceptor implements NestInterceptor {
 
   private record(req: Request, statusCode: number, durationMs: number): void {
     const route = this.normalizeRoute(req.path);
+
     this.metricsService.recordHttpRequest(
       { method: req.method, route, statusCode },
       durationMs

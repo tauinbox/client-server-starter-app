@@ -28,6 +28,7 @@ import {
       inject: [ConfigService],
       useFactory: (config: ConfigService): NotificationsBus => {
         const redisUrl = config.get<string>('REDIS_URL');
+
         // The parallel Jest apps share one Redis, so a shared bus would mix
         // the pushes of different suites. A suite that tests the bus sets it.
         return redisUrl && process.env['NODE_ENV'] !== 'test'

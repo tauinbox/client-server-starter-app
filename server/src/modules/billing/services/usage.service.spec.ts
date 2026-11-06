@@ -146,6 +146,7 @@ describe('UsageService', () => {
     });
     // Without an ORDER BY, Postgres is free to return the older row first.
     const rows = [older, newer];
+
     subscriptions.findOne.mockImplementation(
       (options: FindOneOptions<Subscription>) =>
         Promise.resolve(
@@ -167,8 +168,10 @@ describe('UsageService', () => {
   it('defaults occurredAt to now when omitted', async () => {
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     let captured: Partial<UsageRecord> | undefined;
+
     usageRecords.create.mockImplementation((entity: Partial<UsageRecord>) => {
       captured = entity;
+
       return entity;
     });
 
@@ -180,8 +183,10 @@ describe('UsageService', () => {
   it('parses an ISO occurredAt coming straight off the HTTP payload', async () => {
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     let captured: Partial<UsageRecord> | undefined;
+
     usageRecords.create.mockImplementation((entity: Partial<UsageRecord>) => {
       captured = entity;
+
       return entity;
     });
 
@@ -197,6 +202,7 @@ describe('UsageService', () => {
       meterKey: 'api_calls',
       idempotencyKey: 'evt-1'
     } as UsageRecord;
+
     usageRecords.findOne.mockResolvedValue(existing);
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     plans.findOne.mockResolvedValue(makePlan());
@@ -217,6 +223,7 @@ describe('UsageService', () => {
       meterKey: 'api_calls',
       idempotencyKey: 'evt-1'
     } as UsageRecord;
+
     usageRecords.findOne.mockResolvedValue(existing);
     subscriptions.findOne.mockResolvedValue(
       makeSubscription({ planKey: 'pro' })
@@ -234,6 +241,7 @@ describe('UsageService', () => {
       customerId: 'cust-2',
       idempotencyKey: 'evt-1'
     } as UsageRecord;
+
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     // Emulates the unique constraint's lookup semantics: a column absent from
     // `where` is unconstrained, so an unscoped query matches the foreign row.
@@ -261,6 +269,7 @@ describe('UsageService', () => {
 
   it('returns the winner when an insert loses the unique-key race (23505)', async () => {
     const winner = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     // First lookup: no record yet → proceed to insert. Insert hits the unique
     // constraint, so the post-violation lookup returns the concurrent winner.
@@ -280,6 +289,7 @@ describe('UsageService', () => {
 
   it('recognises the unique violation when TypeORM wraps the driver error', async () => {
     const winner = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     usageRecords.findOne
       .mockResolvedValueOnce(null)
@@ -375,6 +385,7 @@ describe('UsageService', () => {
 
   it('still answers a replayed key while blocked (idempotency wins)', async () => {
     const existing = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+
     usageRecords.findOne.mockResolvedValue(existing);
     credits.isBlocked.mockResolvedValue(true);
 
@@ -417,6 +428,7 @@ describe('UsageService', () => {
 
     it('measures the window from meteredFrom when a billing-mode switch moved it', async () => {
       const meteredFrom = new Date('2026-01-10T00:00:00.000Z');
+
       subscriptions.findOne.mockResolvedValue(
         makeSubscription({ meteredFrom })
       );
@@ -435,6 +447,7 @@ describe('UsageService', () => {
 
     it('refuses a record before the seal of a window a close already rates', async () => {
       const usageSealedUntil = new Date('2026-01-15T00:00:00.000Z');
+
       subscriptions.findOne.mockResolvedValue(
         makeSubscription({ usageSealedUntil })
       );
@@ -505,6 +518,7 @@ describe('UsageService', () => {
         id: 'usage-1',
         idempotencyKey: 'evt-1'
       } as UsageRecord;
+
       usageRecords.findOne.mockResolvedValue(existing);
 
       await expect(

@@ -82,12 +82,15 @@ async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     throw new Error(`${res.url} answered ${res.status}: ${await res.text()}`);
   }
+
   return (await res.json()) as T;
 }
 
 function cookieOf(res: Response, name: string): string {
   const line = res.headers.getSetCookie().find((l) => l.startsWith(`${name}=`));
+
   if (!line) throw new Error(`the response set no ${name} cookie`);
+
   return line.split(';')[0];
 }
 
@@ -124,8 +127,10 @@ const ACTORS: Record<ActorFixture, (user: MockUser) => void> = {
 };
 
 let sequence = 0;
+
 function freshEmail(): string {
   sequence += 1;
+
   return `scenario-${sequence}@example.com`;
 }
 
@@ -154,18 +159,22 @@ function createAccount(fixture: ActorFixture): MockUser {
     updatedAt: now,
     deletedAt: null
   };
+
   getState().users.set(user.id, user);
   ACTORS[fixture](user);
+
   return user;
 }
 
 /** A session of the account, through the sign-in route it would use. */
 async function signIn(user: MockUser) {
   let res: Response;
+
   if (user.password === null) {
     const { token } = await json<{ token: string }>(
       await call('POST', '/__control/oauth-data', { body: { userId: user.id } })
     );
+
     res = await call('POST', '/api/v1/auth/oauth/exchange', {
       cookies: [`oauth_data=${token}`]
     });
@@ -173,27 +182,34 @@ async function signIn(user: MockUser) {
     res = await call('POST', '/api/v1/auth/login', {
       body: { email: user.email, password: SCENARIO_PASSWORD }
     });
+
     if (user.totpEnabledAt) {
       const { mfaToken } = await json<{ mfaToken: string }>(res);
+
       res = await call('POST', '/api/v1/auth/mfa/verify', {
         body: { mfaToken, code: MOCK_TOTP_CODE }
       });
     }
   }
+
   const cookie = cookieOf(res, 'refresh_token');
   const { tokens } = await json<{ tokens: { access_token: string } }>(res);
+
   return { bearer: tokens.access_token, cookie };
 }
 
 function tokenOf(tokens: Map<string, MockIssuedToken>, userId: string) {
   const found = tokens.entries().find(([, t]) => t.userId === userId);
+
   if (!found) throw new Error(`no mailed token for ${userId}`);
+
   return found[0];
 }
 
 function addFixedPlan(key: string): Promise<void> {
   const now = new Date().toISOString();
   const id = randomUUID();
+
   getState().plans.set(id, {
     id,
     key,
@@ -210,12 +226,14 @@ function addFixedPlan(key: string): Promise<void> {
     createdAt: now,
     updatedAt: now
   });
+
   return Promise.resolve();
 }
 
 const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
   'refresh-cookie': async (ctx) => {
     const session = await signIn(ctx.actor!);
+
     ctx.bearer = session.bearer;
     ctx.cookies.push(session.cookie);
   },
@@ -224,6 +242,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     const sessions = await json<Array<{ id: string; current: boolean }>>(
       await call('GET', '/api/v1/auth/sessions', { bearer: ctx.bearer })
     );
+
     ctx.values.$otherSessionId = sessions.find((s) => !s.current)!.id;
     ctx.values.$currentSessionId = sessions.find((s) => s.current)!.id;
   },
@@ -251,6 +270,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
   },
   'email-change-token': async (ctx) => {
     const { bearer } = await signIn(ctx.actor!);
+
     await json(
       await call('POST', '/api/v1/auth/profile/email/initiate', {
         bearer,
@@ -263,6 +283,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     const found = getState()
       .pendingEmailTokens.entries()
       .find(([, userId]) => userId === ctx.actor!.id);
+
     ctx.values.$emailChangeToken = found![0];
   },
   'mfa-setup': async (ctx) => {
@@ -280,6 +301,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
         body: { email: ctx.actor!.email, password: SCENARIO_PASSWORD }
       })
     );
+
     ctx.values.$mfaToken = mfaToken;
   },
   'oauth-data': async (ctx) => {
@@ -288,12 +310,14 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
         body: { userId: ctx.actor!.id }
       })
     );
+
     ctx.cookies.push(`oauth_data=${token}`);
   },
   'step-up-code-failures': (ctx) => {
     for (let i = 1; i < MAX_FAILED_ATTEMPTS; i++) {
       recordFailure(getState().mfaStepUpFailures, ctx.actor!.id);
     }
+
     return Promise.resolve();
   },
   'vk-linked': (ctx) => {
@@ -304,6 +328,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
         createdAt: new Date().toISOString()
       }
     ]);
+
     return Promise.resolve();
   },
   'custom-role': (ctx) => {
@@ -317,8 +342,10 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       createdAt: now,
       updatedAt: now
     };
+
     getState().roles.set(role.id, role);
     ctx.values.$roleId = role.id;
+
     return Promise.resolve();
   },
   'role-permission': (ctx) => {
@@ -328,15 +355,18 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       permissionId: ctx.values.$permissionId!,
       conditions: null
     });
+
     return Promise.resolve();
   },
   'target-role': (ctx) => {
     ctx.target!.roles.push(getState().roles.get(ctx.values.$roleId!)!.name);
+
     return Promise.resolve();
   },
   resource: (ctx) => {
     const now = new Date().toISOString();
     const id = randomUUID();
+
     getState().resources.set(id, {
       id,
       name: `scenario-resource-${sequence}`,
@@ -353,23 +383,28 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       createdAt: now
     });
     ctx.values.$resourceId = id;
+
     return Promise.resolve();
   },
   'orphaned-resource': (ctx) => {
     getState().resources.get(ctx.values.$resourceId!)!.isOrphaned = true;
+
     return Promise.resolve();
   },
   'unregistered-resource': (ctx) => {
     getState().resources.get(ctx.values.$resourceId!)!.isRegistered = false;
+
     return Promise.resolve();
   },
   'deleted-target': (ctx) => {
     ctx.target!.deletedAt = new Date().toISOString();
+
     return Promise.resolve();
   },
   'feature-flag': (ctx) => {
     const now = new Date().toISOString();
     const id = randomUUID();
+
     getState().featureFlags.set(id, {
       id,
       key: ctx.values.$flagKey!,
@@ -383,11 +418,13 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       updatedAt: now
     });
     ctx.values.$flagId = id;
+
     return Promise.resolve();
   },
   customer: (ctx) => {
     const now = new Date().toISOString();
     const id = randomUUID();
+
     getState().billingCustomers.set(id, {
       id,
       userId: ctx.actor!.id,
@@ -401,13 +438,16 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       updatedAt: now
     });
     ctx.values.$customerId = id;
+
     return Promise.resolve();
   },
   subscription: async (ctx) => {
     if (!ctx.values.$customerId) await STATES.customer(ctx);
+
     const nowMs = Date.now();
     const now = new Date(nowMs).toISOString();
     const subscriptionId = randomUUID();
+
     getState().billingSubscriptions.set(subscriptionId, {
       id: subscriptionId,
       customerId: ctx.values.$customerId!,
@@ -431,6 +471,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     const nowMs = Date.now();
     const now = new Date(nowMs).toISOString();
     const id = randomUUID();
+
     getState().billingInvoices.set(id, {
       id,
       customerId: ctx.values.$customerId!,
@@ -452,11 +493,13 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       updatedAt: now
     });
     ctx.values.$invoiceId = id;
+
     return Promise.resolve();
   },
   'metered-plan': (ctx) => {
     const now = new Date().toISOString();
     const id = randomUUID();
+
     getState().plans.set(id, {
       id,
       key: ctx.values.$meterKey!,
@@ -473,6 +516,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       createdAt: now,
       updatedAt: now
     });
+
     return Promise.resolve();
   },
   'fixed-plan': (ctx) => addFixedPlan(ctx.values.$meterKey!),
@@ -480,6 +524,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
   product: (ctx) => {
     const now = new Date().toISOString();
     const id = randomUUID();
+
     getState().billingProducts.set(id, {
       id,
       key: ctx.values.$productKey!,
@@ -492,17 +537,21 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       createdAt: now,
       updatedAt: now
     });
+
     return Promise.resolve();
   },
   'providers-disabled': () => {
     const keys: string[] = BILLING_PROVIDER_FLAGS.map((p) => p.enabledFlagKey);
+
     for (const flag of getState().featureFlags.values()) {
       if (keys.includes(flag.key)) flag.enabled = false;
     }
+
     return Promise.resolve();
   },
   'dead-letter-webhook-event': (ctx) => {
     const id = randomUUID();
+
     getState().billingWebhookEvents.set(id, {
       id,
       provider: 'yookassa',
@@ -514,6 +563,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       receivedAt: new Date().toISOString()
     });
     ctx.values.$webhookEventId = id;
+
     return Promise.resolve();
   }
 };
@@ -528,7 +578,9 @@ function readRolePermissionId(): string {
         state.resources.get(p.resourceId)?.name === 'roles' &&
         state.actions.get(p.actionId)?.name === 'read'
     );
+
   if (!found) throw new Error('the seed has no read:Role permission');
+
   return found.id;
 }
 
@@ -548,6 +600,7 @@ function auditActions(ids: string[], emails: string[], from: number) {
 async function run(scenario: RequestScenario) {
   resetState();
   const ctx: Context = { cookies: [], values: {} };
+
   ctx.values.$password = SCENARIO_PASSWORD;
   ctx.values.$newPassword = SCENARIO_NEW_PASSWORD;
   ctx.values.$recoveryCode = SCENARIO_RECOVERY_CODE;
@@ -566,18 +619,23 @@ async function run(scenario: RequestScenario) {
     ctx.values.$actorId = ctx.actor.id;
     accounts.push(ctx.actor);
   }
+
   if (scenario.target) {
     ctx.target = createAccount(scenario.target);
     ctx.values.$targetId = ctx.target.id;
     accounts.push(ctx.target);
   }
+
   const states = scenario.state ?? [];
+
   if (scenario.auth === 'bearer' && !states.includes('refresh-cookie')) {
     ctx.bearer = (await signIn(ctx.actor!)).bearer;
   }
+
   for (const state of states) {
     await STATES[state](ctx);
   }
+
   if (ctx.actor && scenario.actor === 'user-mfa') {
     // A code is single use: the fixtures above may have spent this step.
     ctx.actor.totpLastUsedStep = null;
@@ -589,6 +647,7 @@ async function run(scenario: RequestScenario) {
   const body = resolvePlaceholders(scenario.body ?? {}, ctx.values);
   const headers = resolvePlaceholders(scenario.headers ?? {}, ctx.values);
   const answers: Answer[] = [];
+
   for (let i = 0; i < (scenario.repeat ?? 1); i++) {
     const res = await call(scenarioMethod(scenario), path, {
       body,
@@ -599,6 +658,7 @@ async function run(scenario: RequestScenario) {
     const parsed = (await res.json().catch(() => ({}))) as {
       errorKey?: string;
     };
+
     answers.push({ status: res.status, errorKey: parsed.errorKey ?? null });
   }
 
@@ -607,6 +667,7 @@ async function run(scenario: RequestScenario) {
   const ids = [...getState().users.values()]
     .filter((u) => emails.includes(u.email))
     .map((u) => u.id);
+
   return { answers, audit: auditActions(ids, emails, from) };
 }
 
@@ -620,6 +681,7 @@ for (const { file, scenarios } of loadScenarioFiles()) {
       '%s',
       async (_name, scenario) => {
         const { answers, audit } = await run(scenario);
+
         // The server writes some rows fire-and-forget, so the order is free.
         expect({ answers, audit: audit.toSorted() }).toEqual({
           answers: expectedAnswers(scenario),

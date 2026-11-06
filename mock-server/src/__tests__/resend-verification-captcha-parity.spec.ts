@@ -13,6 +13,7 @@ const email = 'user@example.com';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -24,6 +25,7 @@ afterAll((done) => {
 beforeEach(() => {
   resetState();
   const user = findUserByEmail(email);
+
   expect(user).toBeDefined();
   user!.isEmailVerified = false;
 });
@@ -56,9 +58,11 @@ describe('resend-verification captcha gate', () => {
     enableCaptcha();
 
     const first = await resend({ email });
+
     expect(first.status).toBe(200);
 
     const second = await resend({ email });
+
     expect(second.status).toBe(422);
     expect(await readErrorBody(second)).toEqual({
       message: 'Captcha verification is required',
@@ -81,9 +85,11 @@ describe('resend-verification captcha gate', () => {
 
     await resend({ email });
     const issued = [...getState().emailVerificationTokens.keys()];
+
     expect(issued).toHaveLength(1);
 
     const refused = await resend({ email });
+
     expect(refused.status).toBe(422);
     expect([...getState().emailVerificationTokens.keys()]).toEqual(issued);
   });
@@ -91,6 +97,7 @@ describe('resend-verification captcha gate', () => {
   it('demands nothing while captcha is disabled', async () => {
     for (let i = 0; i < 4; i++) {
       const res = await resend({ email });
+
       expect(res.status).toBe(200);
     }
   });

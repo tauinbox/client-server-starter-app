@@ -26,11 +26,15 @@ export function storePendingPurchase(purchase: PendingPurchase): void {
 export function readPendingPurchase(): PendingPurchase | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
+
     if (!raw) return null;
+
     const parsed = JSON.parse(raw) as Partial<PendingPurchase>;
+
     if (typeof parsed.sessionRef !== 'string' || !parsed.sessionRef) {
       return null;
     }
+
     return {
       sessionRef: parsed.sessionRef,
       productName:

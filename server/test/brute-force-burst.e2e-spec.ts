@@ -54,9 +54,11 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
   afterAll(async () => {
     if (previousKey === undefined) delete process.env['MFA_ENCRYPTION_KEY'];
     else process.env['MFA_ENCRYPTION_KEY'] = previousKey;
+
     for (const email of emails) {
       await dataSource?.getRepository(User).delete({ email });
     }
+
     await app?.close();
   });
 
@@ -72,8 +74,10 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
    */
   async function createAccount(tag: string): Promise<User> {
     const email = `burst-${tag}-${stamp}@example.com`;
+
     emails.push(email);
     const repository = dataSource.getRepository(User);
+
     return repository.save(
       repository.create({
         email,
@@ -94,6 +98,7 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
     const results = await Promise.allSettled(
       Array.from({ length: BURST }, attempt)
     );
+
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(0);
   }
 
@@ -111,11 +116,13 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
           String(entry.details?.['reason'])
         )
     );
+
     expect(checked).toHaveLength(MAX_FAILED_ATTEMPTS);
 
     const row = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     expect(row.lockedUntil).toBeInstanceOf(Date);
   }, 60000);
 
@@ -169,6 +176,7 @@ runWithInfra('Brute-force brakes under a concurrent burst (e2e)', () => {
         entry.action === AuditAction.STEP_UP_FAILURE &&
         entry.targetId === user.id
     );
+
     expect(rows).toHaveLength(BURST);
   }, 60000);
 

@@ -35,13 +35,17 @@ function permissionId(resource: string, action: string): string {
         p.resourceId === mockId(`res-${resource}`) &&
         p.actionId === mockId(`act-${action}`)
     );
+
   if (!permission) throw new Error(`Seed permission ${resource}/${action}`);
+
   return permission.id;
 }
 
 const usersResource = () => {
   const resource = getState().resources.get(USERS_RESOURCE_ID);
+
   if (!resource) throw new Error('Seed resource users');
+
   return resource;
 };
 
@@ -49,7 +53,9 @@ const actor = () => {
   const user = getState()
     .users.values()
     .find((u) => u.email === ACTOR_EMAIL);
+
   if (!user) throw new Error(`Seed user ${ACTOR_EMAIL}`);
+
   return user;
 };
 
@@ -60,6 +66,7 @@ beforeEach(() => {
   resetState();
   const state = getState();
   const now = '2025-01-01T00:00:00.000Z';
+
   state.roles.set(DELEGATED_ROLE_ID, {
     id: DELEGATED_ROLE_ID,
     name: 'delegated',
@@ -69,6 +76,7 @@ beforeEach(() => {
     createdAt: now,
     updatedAt: now
   });
+
   for (const [resource, action] of [
     ['permissions', 'update'],
     ['users', 'delete']
@@ -80,6 +88,7 @@ beforeEach(() => {
       conditions: null
     });
   }
+
   actor().roles = ['user', 'delegated'];
   usersResource().allowedActionNames = ['create', 'read', 'update', 'search'];
 });
@@ -90,8 +99,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -108,6 +119,7 @@ async function call(
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const parsed = (await res.json()) as { errorKey?: string };
+
   return { status: res.status, errorKey: parsed.errorKey };
 }
 
@@ -175,6 +187,7 @@ describe('resource widen parity with server', () => {
     expect(actorCanDelete()).toBe(false);
 
     const actorToken = await login(ACTOR_EMAIL);
+
     expect(
       await call(actorToken, {
         method: 'POST',
@@ -184,6 +197,7 @@ describe('resource widen parity with server', () => {
     expect(actorCanDelete()).toBe(false);
 
     const superToken = await login(SUPER_EMAIL);
+
     expect(
       await call(superToken, {
         method: 'POST',

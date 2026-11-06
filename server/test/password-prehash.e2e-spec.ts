@@ -34,18 +34,22 @@ runWithInfra('Password pre-hash (e2e)', () => {
   const statusOf = async (run: Promise<unknown>): Promise<number> => {
     try {
       await run;
+
       return HttpStatus.OK;
     } catch (error) {
       if (error instanceof HttpException) {
         return error.getStatus();
       }
+
       throw error;
     }
   };
 
   const nextEmail = (label: string): string => {
     const email = `password-prehash-${label}-${Date.now()}@example.com`;
+
     emails.push(email);
+
     return email;
   };
 
@@ -61,9 +65,11 @@ runWithInfra('Password pre-hash (e2e)', () => {
       },
       { ability: SYSTEM_ABILITY }
     );
+
     await dataSource
       .getRepository(User)
       .update(user.id, { isEmailVerified: true });
+
     return user;
   };
 
@@ -92,6 +98,7 @@ runWithInfra('Password pre-hash (e2e)', () => {
         ?.getRepository(User)
         .delete(emails.map((e) => ({ email: e })));
     }
+
     await app?.close();
   });
 
@@ -99,6 +106,7 @@ runWithInfra('Password pre-hash (e2e)', () => {
     const user = await createVerifiedUser('cyrillic', CYRILLIC_64);
 
     const row = await rowOf(user.id);
+
     expect(row.passwordHashVersion).toBe(PasswordHashVersion.PREHASHED);
 
     await expect(
@@ -133,6 +141,7 @@ runWithInfra('Password pre-hash (e2e)', () => {
         isEmailVerified: true
       })
     );
+
     expect((await rowOf(legacy.id)).passwordHashVersion).toBe(
       PasswordHashVersion.LEGACY
     );
@@ -142,6 +151,7 @@ runWithInfra('Password pre-hash (e2e)', () => {
     ).resolves.toMatchObject({ id: legacy.id });
 
     const upgraded = await rowOf(legacy.id);
+
     expect(upgraded.passwordHashVersion).toBe(PasswordHashVersion.PREHASHED);
     expect(upgraded.password).not.toBe(legacy.password);
     expect(
@@ -176,6 +186,7 @@ runWithInfra('Password pre-hash (e2e)', () => {
     ).toBe(HttpStatus.UNAUTHORIZED);
 
     const row = await rowOf(legacy.id);
+
     expect(row.passwordHashVersion).toBe(PasswordHashVersion.LEGACY);
     expect(row.password).toBe(legacy.password);
   }, 60000);

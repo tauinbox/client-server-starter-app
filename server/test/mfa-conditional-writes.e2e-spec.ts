@@ -41,9 +41,11 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
   afterAll(async () => {
     if (previousKey === undefined) delete process.env['MFA_ENCRYPTION_KEY'];
     else process.env['MFA_ENCRYPTION_KEY'] = previousKey;
+
     for (const email of emails) {
       await dataSource?.getRepository(User).delete({ email });
     }
+
     await app?.close();
   });
 
@@ -53,8 +55,10 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
 
   async function createAccount(tag: string, enrolled: boolean): Promise<User> {
     const email = `mfa-writes-${tag}-${stamp}@example.com`;
+
     emails.push(email);
     const repository = dataSource.getRepository(User);
+
     return repository.save(
       repository.create({
         email,
@@ -88,6 +92,7 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
     // lock of the code check it waits; with no lock it lands first.
     let racing: Promise<unknown> | undefined;
     const { update } = EntityManager.prototype;
+
     jest
       .spyOn(EntityManager.prototype, 'update')
       .mockImplementation(async function (
@@ -95,6 +100,7 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
         ...args: Parameters<EntityManager['update']>
       ) {
         const changes = args[2] as { totpEnabledAt?: unknown };
+
         if (racing === undefined && changes.totpEnabledAt instanceof Date) {
           racing = mfaService.beginEnrolment(user);
           await Promise.race([
@@ -102,6 +108,7 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
             new Promise((resolve) => setTimeout(resolve, 500))
           ]);
         }
+
         return update.apply(this, args);
       });
 
@@ -112,12 +119,14 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
       response: { errorKey: ErrorKeys.AUTH.MFA_ALREADY_ENABLED }
     });
     const after = await reload(user.id);
+
     expect(after.totpEnabledAt).not.toBeNull();
     expect(after.totpSecret).toBe(pending.totpSecret);
   }, 30000);
 
   it('refuses a setup read before the factor was turned on, and leaves the factor on', async () => {
     const stale = await createAccount('begin-stale', false);
+
     await dataSource.getRepository(User).update(stale.id, {
       totpSecret: app.get(SecretEncryptionService).encrypt(SECRET),
       totpEnabledAt: new Date()
@@ -132,6 +141,7 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
 
   it('refuses a disable that an administrator reset overtook', async () => {
     const stale = await createAccount('disable-stale', true);
+
     await mfaService.resetByAdmin(stale, {
       actor: { id: stale.id, email: stale.email },
       check: () => undefined
@@ -142,6 +152,7 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
 
   it('refuses to store recovery codes on an account whose factor was turned off', async () => {
     const stale = await createAccount('regenerate-stale', true);
+
     await mfaService.disable(stale);
 
     await expect(

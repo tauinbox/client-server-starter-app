@@ -60,6 +60,7 @@ describe('userToChip', () => {
 
   it('falls back to the email when the user has no name', () => {
     const chip = userToChip(makeUser({ name: '' }));
+
     expect(chip.label).toBe('ada@example.com');
   });
 });

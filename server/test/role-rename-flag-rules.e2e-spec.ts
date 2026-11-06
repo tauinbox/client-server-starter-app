@@ -39,7 +39,9 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
   let req: JwtAuthRequest;
   const ability = (() => {
     const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     builder.can('manage', 'all');
+
     return builder.build();
   })();
   const fakeReq = {} as Parameters<typeof resolver.evaluateForUser>[1];
@@ -64,6 +66,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
       .mockImplementation(() => undefined);
 
     const userRepository = dataSource.getRepository(User);
+
     holder = await userRepository.save(
       userRepository.create({
         email,
@@ -77,6 +80,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
 
   afterAll(async () => {
     jest.restoreAllMocks();
+
     if (dataSource) {
       await dataSource
         .getRepository(FeatureFlag)
@@ -92,6 +96,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
         .execute();
       await dataSource.getRepository(User).delete({ email });
     }
+
     await app?.close();
   });
 
@@ -99,6 +104,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
     const rules = await dataSource
       .getRepository(FeatureFlagRule)
       .find({ where: { flagId }, order: { createdAt: 'ASC' } });
+
     return rules.map((r) =>
       r.payload.type === 'role' ? r.payload.roleNames : []
     );
@@ -106,6 +112,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
 
   async function holderSees(key: string): Promise<boolean> {
     const user = await resolver.buildResolverUser(holder.id);
+
     return (await resolver.evaluateForUser(user, fakeReq)).flags[key] === true;
   }
 
@@ -114,6 +121,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
       { name: roleName },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.assignRoleToUser(holder.id, role.id, {
       ability: SYSTEM_ABILITY
     });
@@ -141,11 +149,13 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
       SYSTEM_ABILITY,
       flagAuditActor()
     );
+
     // The admin controller announces a new flag and the service does not, so a
     // flag set cached by another suite would not hold this flag.
     await resolver.invalidateAll();
     const versionBefore = (await flagService.findOne(flag.id, SYSTEM_ABILITY))
       .version;
+
     expect(await holderSees(key)).toBe(true);
 
     await controller.update(role.id, { name: renamed }, req, ability);

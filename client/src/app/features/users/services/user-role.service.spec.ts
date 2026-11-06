@@ -31,6 +31,7 @@ describe('UserRoleService', () => {
     service.assignRole('user-1', 'role-1').subscribe();
 
     const req = httpMock.expectOne(`${ROLES_API_V1}/assign/user-1`);
+
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ roleId: 'role-1' });
     req.flush(null);
@@ -40,6 +41,7 @@ describe('UserRoleService', () => {
     service.removeRole('user-1', 'role-1').subscribe();
 
     const req = httpMock.expectOne(`${ROLES_API_V1}/assign/user-1/role-1`);
+
     expect(req.request.method).toBe('DELETE');
     req.flush(null);
   });
@@ -54,6 +56,7 @@ describe('UserRoleService', () => {
       `${ROLES_API_V1}/assign/user-1/role-2`
     ]) {
       const req = httpMock.expectOne(url);
+
       expect(
         req.request.context.get(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN)
       ).toBe(true);

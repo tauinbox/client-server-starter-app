@@ -42,7 +42,9 @@ function onlySearchChanged(
   next: Readonly<Record<string, unknown>>
 ): boolean {
   const names = new Set([...Object.keys(previous), ...Object.keys(next)]);
+
   names.delete('q');
+
   return [...names].every((name) => previous[name] === next[name]);
 }
 
@@ -72,6 +74,7 @@ export function bindListToUrl<S extends ListQuerySpec>(
     const stale = route.snapshot.queryParamMap.keys
       .filter((name) => name.startsWith(listUrlParam(key, '')))
       .map((name) => [name, null]);
+
     void router.navigate([], {
       relativeTo: route,
       queryParams: {
@@ -86,11 +89,15 @@ export function bindListToUrl<S extends ListQuerySpec>(
   route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
     const state = readListUrl(params, key, spec);
     const canonical = listUrlParams(key, spec, state);
+
     if (!isListUrlCanonical(params, key, canonical)) {
       navigate(state, true);
     }
+
     const signature = JSON.stringify(canonical);
+
     if (signature === loaded) return;
+
     loaded = signature;
     store.setFilters(state.filters);
     store.setSorting(state.sortBy, state.sortOrder);
@@ -108,6 +115,7 @@ export function bindListToUrl<S extends ListQuerySpec>(
 
     setSort(sortBy, direction) {
       const isDefault = sortBy === '' || direction === '';
+
       navigate(
         {
           filters: store.filters(),

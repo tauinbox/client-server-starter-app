@@ -46,6 +46,7 @@ function loadManifestRoutes(): RouteEntry[] {
       const { routes } = JSON.parse(
         fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')
       ) as { routes: RouteEntry[] };
+
       return routes;
     });
 }
@@ -81,6 +82,7 @@ function main(): void {
     console.log(
       `✓ contracts/routes.json is in sync (${serverRoutes.length} routes)`
     );
+
     return;
   }
 

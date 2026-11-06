@@ -14,6 +14,7 @@ import {
 
 export function createApp() {
   const app = express();
+
   app.use(errorEnvelope);
   app.use(cors({ origin: true, credentials: true }));
   app.use(cookieParser());
@@ -30,12 +31,14 @@ export function createApp() {
 
   // Request ID middleware (mirrors server's RequestIdMiddleware)
   const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
   app.use((req, res, next) => {
     const incoming = req.headers['x-request-id'];
     const candidate = typeof incoming === 'string' ? incoming : '';
     const requestId = REQUEST_ID_PATTERN.test(candidate)
       ? candidate
       : randomUUID();
+
     res.setHeader('X-Request-Id', requestId);
     next();
   });
@@ -44,6 +47,7 @@ export function createApp() {
   app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/api/health/')) {
       next();
+
       return;
     }
 
@@ -54,6 +58,7 @@ export function createApp() {
       const { statusCode } = res;
 
       if (logLevel === 'error' && statusCode < 500) return;
+
       if (logLevel === 'warn' && statusCode < 400) return;
 
       const duration = Date.now() - start;
@@ -61,6 +66,7 @@ export function createApp() {
       const level =
         statusCode >= 500 ? 'ERROR' : statusCode >= 400 ? 'WARN' : 'LOG';
       const reqIdSuffix = reqId ? ` [req-id: ${reqId}]` : '';
+
       console.log(
         `[HTTP] [${level}] ${req.method} ${redactSensitiveQuery(req.originalUrl)} ${statusCode} ${duration}ms${reqIdSuffix}`
       );

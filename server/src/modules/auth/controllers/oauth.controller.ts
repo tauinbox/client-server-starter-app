@@ -94,9 +94,11 @@ function oauthFailureReason(error: unknown): string {
   if (error instanceof OAuthAuthenticationFailedException) {
     return error.oauthError;
   }
+
   if (error instanceof ApiError) {
     return error.errorKey;
   }
+
   return 'unexpected_error';
 }
 
@@ -298,6 +300,7 @@ export class OAuthController {
     const accounts = await this.oauthAccountService.findByUserId(
       req.user.userId
     );
+
     return accounts.map((account) => ({
       provider: account.provider,
       createdAt: account.createdAt
@@ -399,20 +402,24 @@ export class OAuthController {
 
     let data: OAuthSignInData | MfaRequiredResponseDto;
     let issuedAt: number;
+
     try {
       const payload = this.purposeTokens.verify<{
         jti?: string;
         data: typeof data;
       }>(cookie, TOKEN_PURPOSE.OAUTH_DATA);
+
       if (!payload) {
         throw new Error('Invalid OAuth data token');
       }
+
       // Clearing the cookie only spends the credential in the caller's own
       // browser. A value captured before the exchange stays valid for the rest
       // of its 60 seconds unless the server records that it was already spent.
       if (!payload.jti) {
         throw new Error('Missing token id');
       }
+
       if (
         !(await this.oauthDataLedger.claim(
           payload.jti,
@@ -421,6 +428,7 @@ export class OAuthController {
       ) {
         throw new Error('OAuth data already exchanged');
       }
+
       data = payload.data;
       issuedAt = payload.iat;
     } catch {
@@ -432,6 +440,7 @@ export class OAuthController {
     if ('mfaRequired' in data) {
       return data;
     }
+
     // The session is issued here and not at the callback: only this request
     // carries the refresh cookie of the session it replaces, which must end
     // before the session limit counts the new one. The account can have been
@@ -439,12 +448,14 @@ export class OAuthController {
     // same refusal as a bad cookie so the exchange leaks no account state.
     // eslint-disable-next-line no-restricted-syntax -- the id comes from the signed, single-use oauth_data cookie that the callback minted
     const user = await this.usersService.findById(data.userId);
+
     if (
       !user?.isActive ||
       issuedBeforeRevocation(issuedAt, user.tokenRevokedAt)
     ) {
       throw invalidOAuthData();
     }
+
     return await this.signIn.complete(
       user,
       { req, res },
@@ -507,11 +518,14 @@ export class OAuthController {
         reason: oauthFailureReason(error),
         context: extractAuditContext(req)
       });
+
       if (error instanceof OAuthAuthenticationFailedException) {
         this.logger.warn(`${error.message} via ${profile.provider}`);
         res.redirect(`${this.clientUrl}/login?oauth_error=${error.oauthError}`);
+
         return;
       }
+
       this.logger.error('OAuth callback error', error);
       res.redirect(
         `${this.clientUrl}/login?oauth_error=${OAUTH_ERROR.AUTH_FAILED}`
@@ -544,15 +558,18 @@ export class OAuthController {
       operation?: string;
       iat: number;
     } | null = null;
+
     try {
       payload = this.purposeTokens.verify<{
         sub: string;
         email?: string;
         operation?: string;
       }>(reauthToken, TOKEN_PURPOSE.OAUTH_REAUTH);
+
       if (!payload) {
         throw new Error('Invalid re-authentication token');
       }
+
       if (!isStepUpOperation(payload.operation)) {
         throw new Error('Re-authentication token names no known operation');
       }
@@ -606,14 +623,17 @@ export class OAuthController {
     this.cookies.clear(res, OAUTH_LINK_COOKIE);
 
     let account: OAuthIntentAccount | undefined;
+
     try {
       const payload = this.purposeTokens.verify<{
         sub: string;
         email?: string;
       }>(linkToken, TOKEN_PURPOSE.OAUTH_LINK);
+
       if (!payload) {
         throw new Error('Invalid link token');
       }
+
       account = { sub: payload.sub, email: payload.email };
 
       await this.oauthService.linkOAuthToUser(

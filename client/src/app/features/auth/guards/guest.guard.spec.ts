@@ -56,6 +56,7 @@ describe('guestGuard', () => {
     authStoreMock.isAuthenticated.mockReturnValue(true);
     authStoreMock.isAccessTokenExpired.mockReturnValue(false);
     const router = TestBed.inject(Router);
+
     vi.spyOn(router, 'navigate');
 
     const result = TestBed.runInInjectionContext(() =>
@@ -78,6 +79,7 @@ describe('guestGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<GuardResult>);
+
     expect(String(value)).toBe('/profile');
   });
 
@@ -91,6 +93,7 @@ describe('guestGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<boolean>);
+
     expect(value).toBe(true);
     expect(authServiceMock.clearSession).toHaveBeenCalled();
   });
@@ -107,6 +110,7 @@ describe('guestGuard', () => {
     );
 
     const value = await firstValueFrom(result as Observable<boolean>);
+
     expect(value).toBe(true);
     expect(authServiceMock.clearSession).toHaveBeenCalled();
   });

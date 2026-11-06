@@ -58,11 +58,13 @@ class AbilityHolder {
 class TestJwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
+
     req.user = {
       userId: ACTOR_ID,
       email: 'delegated@example.com',
       sessionId: 'session-1'
     };
+
     return true;
   }
 }
@@ -73,9 +75,11 @@ class TestPermissionsGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<JwtAuthRequest>();
+
     if (this.holder.current) {
       req.ability = this.holder.current;
     }
+
     return true;
   }
 }
@@ -86,6 +90,7 @@ const logger = new Logger('rbac-grant-scope.e2e');
 function abilityWith(conditions: PermissionCondition | null): AppAbility {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
   const subject = 'User' as Extract<Subjects, string>;
+
   if (!conditions) {
     can('update', subject);
   } else {
@@ -94,11 +99,14 @@ function abilityWith(conditions: PermissionCondition | null): AppAbility {
       permissionLabel: 'update:User',
       logger
     });
+
     can('update', subject, query);
   }
+
   // Needed to get past the controller's own `update:Role` authorization and
   // the service's instance check on the target role.
   can('update', 'Role' as Extract<Subjects, string>);
+
   return build();
 }
 

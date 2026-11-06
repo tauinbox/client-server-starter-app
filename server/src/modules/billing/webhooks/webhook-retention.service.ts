@@ -109,6 +109,7 @@ export class WebhookRetentionService {
       'received_at < :cutoff',
       ...(extraCondition ? [extraCondition] : [])
     ];
+
     return (
       `SELECT id FROM ${this.webhookEvents.metadata.tableName} ` +
       `WHERE ${conditions.join(' AND ')} LIMIT :limit`
@@ -124,20 +125,25 @@ export class WebhookRetentionService {
     statement: (limit: number) => Promise<number>
   ): Promise<number> {
     let total = 0;
+
     for (;;) {
       const limit = Math.min(
         WEBHOOK_RETENTION_BATCH_SIZE,
         WEBHOOK_RETENTION_MAX_ROWS_PER_SWEEP - total
       );
+
       if (limit <= 0) {
         this.logger.warn(
           `Webhook ledger retention hit its per-sweep ceiling (${WEBHOOK_RETENTION_MAX_ROWS_PER_SWEEP} rows); the rest is left for the next sweep`
         );
+
         return total;
       }
 
       const affected = await statement(limit);
+
       total += affected;
+
       if (affected < limit) {
         return total;
       }

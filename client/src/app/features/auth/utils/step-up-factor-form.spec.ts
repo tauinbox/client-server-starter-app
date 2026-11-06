@@ -33,11 +33,13 @@ describe('createStepUpFactorForm', () => {
         codeRequired: 'test.codeRequired'
       })
     );
+
     return { factor, stepUp };
   }
 
   it('checks only the field of the current factor', () => {
     const { factor, stepUp } = create('password');
+
     expect(stepUp.invalid()).toBe(true);
 
     stepUp.passwordModel.set({ currentPassword: 'secret' });
@@ -52,6 +54,7 @@ describe('createStepUpFactorForm', () => {
 
   it('is always invalid for none', () => {
     const { stepUp } = create('none');
+
     stepUp.passwordModel.set({ currentPassword: 'secret' });
     stepUp.codeModel.set({ code: '123456' });
     expect(stepUp.invalid()).toBe(true);
@@ -59,6 +62,7 @@ describe('createStepUpFactorForm', () => {
 
   it('sends exactly one field, with the code trimmed', () => {
     const { factor, stepUp } = create('password');
+
     stepUp.passwordModel.set({ currentPassword: ' secret ' });
     stepUp.codeModel.set({ code: ' 123456 ' });
     expect(stepUp.request()).toEqual({ currentPassword: ' secret ' });
@@ -69,6 +73,7 @@ describe('createStepUpFactorForm', () => {
 
   it('clears both values and the touched state on reset', () => {
     const { stepUp } = create('password');
+
     stepUp.passwordModel.set({ currentPassword: 'secret' });
     stepUp.codeModel.set({ code: '123456' });
     stepUp.passwordForm.currentPassword().markAsTouched();

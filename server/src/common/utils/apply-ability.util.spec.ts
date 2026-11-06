@@ -43,6 +43,7 @@ function fakeQb(): {
         // top as a negation, so rendering everything with OR would hide the
         // difference between "subtracts the deny" and "ignores it".
         const sub = fakeQb();
+
         (arg as { whereFactory: (q: typeof sub.qb) => void }).whereFactory(
           sub.qb
         );
@@ -53,6 +54,7 @@ function fakeQb(): {
               : `${c.connector === 'orWhere' ? 'OR' : 'AND'} ${c.sql}`
           )
           .join(' ');
+
         calls.push({
           sql: `(${rendered})`,
           params: sub.calls.reduce(
@@ -62,17 +64,21 @@ function fakeQb(): {
           connector: 'andWhere'
         });
       }
+
       return qb;
     }),
     where: jest.fn((sql: string, params?: unknown) => {
       calls.push({ sql, params, connector: 'where' });
+
       return qb;
     }),
     orWhere: jest.fn((sql: string, params?: unknown) => {
       calls.push({ sql, params, connector: 'orWhere' });
+
       return qb;
     })
   };
+
   return { qb, calls };
 }
 
@@ -87,6 +93,7 @@ function ability(opts: {
     ),
     rulesFor: jest.fn(() => opts.rules ?? [])
   };
+
   // @ts-expect-error partial mock — only can/rulesFor exercised
   return partial as AppAbility;
 }
@@ -104,12 +111,14 @@ describe('applyAbilityToUserQuery', () => {
 
   it('returns qb unchanged when caller has manage:all', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability({ manageAll: true }), 'search');
     expect(calls).toHaveLength(0);
   });
 
   it('emits 1 = 0 when no allow rules match', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability({ rules: [] }), 'search');
     expect(calls).toHaveLength(1);
     expect(calls[0].sql).toBe('1 = 0');
@@ -117,6 +126,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('returns qb unchanged when at least one unconditional allow rule exists', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -129,6 +139,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates ownership condition {id: userId} to user.id = :param', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({ rules: [{ conditions: { id: 'caller-uuid' } }] }),
@@ -141,6 +152,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates fieldMatch {email: {$in: [...]}} to user.email IN (...)', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -156,6 +168,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('ORs multiple conditional rules together', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -173,6 +186,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('subtracts inverted rules instead of ignoring them', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -194,6 +208,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('applies a deny on top of an unconditional allow', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -210,6 +225,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('ORs multiple denies together before negating them', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -232,6 +248,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('emits 1 = 0 for an unconditional deny', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -248,6 +265,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('FAILS CLOSED to 1 = 0 when a deny is untranslatable', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -266,6 +284,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('keeps the deny when one of several denies is untranslatable', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -285,6 +304,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('denies by default when conditions reference unknown fields', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({ rules: [{ conditions: { unknownField: 'x' } }] }),
@@ -297,6 +317,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates $ne to <>', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({ rules: [{ conditions: { id: { $ne: 'banned' } } }] }),
@@ -313,6 +334,7 @@ describe('applyAbilityToUserQuery', () => {
     ['$lte', '<=']
   ])('translates %s to %s', (op, sqlOp) => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -326,6 +348,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates $nin to NOT IN', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -341,6 +364,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates top-level $or with two field equalities', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -360,6 +384,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates top-level $and with mixed field equalities', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -374,6 +399,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates nested $and inside $or', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -403,6 +429,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates $not by negating its inner translation', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -415,6 +442,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates $nor as NOT(a OR b)', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -429,6 +457,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('translates mix of equality + $ne in same rule with AND', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -449,6 +478,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('SKIPS THE WHOLE RULE on mixed translatable + unknown operator', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -465,6 +495,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('SKIPS THE WHOLE RULE on unknown field-level operator', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -478,6 +509,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('SKIPS THE WHOLE RULE on unknown logical operator at top level', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -491,6 +523,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('SKIPS THE RULE inside $or when one branch has unknown field', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -511,6 +544,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('keeps remaining translatable rules when one is skipped', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -530,6 +564,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('SKIPS THE RULE on empty $in array (no values means deny intent, not allow-all)', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -543,6 +578,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('SKIPS THE RULE on $or with empty array', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -556,6 +592,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('SKIPS THE RULE when comparison operator value is non-scalar', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -569,6 +606,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('SKIPS THE RULE when an $in element is not a scalar', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -585,6 +623,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('SKIPS THE RULE when a $nin element is a nested array', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -600,6 +639,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('restricts to no rows when a DENY rule carries a non-scalar $in element', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -618,6 +658,7 @@ describe('applyAbilityToUserQuery', () => {
 
   it('still binds an $in list of mixed scalar types', () => {
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(
       qb,
       ability({
@@ -641,18 +682,22 @@ describe('deny parity between in-memory can() and the SQL projection', () => {
     const { can, cannot, build } = new AbilityBuilder<AppAbility>(
       createMongoAbility
     );
+
     can('search', 'User');
     cannot('search', 'User', { isActive: false });
+
     return build();
   }
 
   it('rulesFor returns denies ahead of allows', () => {
     const rules = realAbility().rulesFor('search', 'User');
+
     expect(rules.map((r) => !!r.inverted)).toEqual([true, false]);
   });
 
   it('excludes from the query exactly the row can() rejects', () => {
     const ab = realAbility();
+
     expect(
       ab.can('search', subject('User', { id: 'u-1', isActive: true }))
     ).toBe(true);
@@ -661,6 +706,7 @@ describe('deny parity between in-memory can() and the SQL projection', () => {
     ).toBe(false);
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ab, 'search');
 
     expect(calls[0].sql).toBe('(NOT (user.isActive = :abFilter_0))');

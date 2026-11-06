@@ -40,6 +40,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
         });
       }).toPass({ timeout: 15_000 });
     };
+
     await addEnvironment('production');
     await addEnvironment('staging');
 
@@ -61,6 +62,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
 
     // Roles are loaded via RoleCatalogService.getAll() on init; wait for option to appear
     const roleInput = ruleRow.getByRole('combobox', { name: 'Role names' });
+
     await roleInput.click();
     await roleInput.fill('user');
     await page
@@ -74,6 +76,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     // focus steal dumped text; filling it last keeps the assertion below
     // authoritative.
     const keyInput = dialog.getByRole('textbox', { name: 'Key' });
+
     await keyInput.fill('chips-rollout');
     await expect(keyInput).toHaveValue('chips-rollout');
 
@@ -83,6 +86,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
         r.request().method() === 'POST' &&
         r.status() === 201
     );
+
     await dialog.getByRole('button', { name: /^Create$/ }).click();
 
     const response = await createResp;
@@ -91,6 +95,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
       key: string;
       rules: { payload: { type: string; roleNames?: string[] } }[];
     };
+
     expect(created.key).toBe('chips-rollout');
     expect(created.environments.toSorted()).toEqual(['production', 'staging']);
 
@@ -100,6 +105,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
         payload: { type: string; roleNames?: string[] };
       }[];
     };
+
     expect(createBody.rules).toHaveLength(1);
     expect(Object.keys(createBody.rules[0]).toSorted()).toEqual([
       'effect',

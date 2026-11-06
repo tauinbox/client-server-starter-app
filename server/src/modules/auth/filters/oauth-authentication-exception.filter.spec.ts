@@ -33,6 +33,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
     const configService = { get: jest.fn(() => environment) };
     // @ts-expect-error - partial mock: AuthCookies only reads ConfigService.get here
     const cookies = new AuthCookies(configService);
+
     logFireAndForget = jest.fn();
     recordAuthEvent = jest.fn();
     verify = jest.fn(() => null);
@@ -43,6 +44,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
       { verify },
       cookies
     );
+
     filter = new OAuthAuthenticationExceptionFilter(
       clientUrl,
       cookies,
@@ -56,6 +58,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
       query: { state: flowState },
       ip: '127.0.0.1'
     };
+
     host = {
       switchToHttp: () => ({
         // @ts-expect-error testing mock

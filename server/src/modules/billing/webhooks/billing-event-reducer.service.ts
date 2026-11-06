@@ -49,7 +49,9 @@ function parseDate(iso: string | null, fallback: Date): Date {
   if (!iso) {
     return fallback;
   }
+
   const date = new Date(iso);
+
   return Number.isNaN(date.getTime()) ? fallback : date;
 }
 
@@ -66,6 +68,7 @@ function findByPriceId<T>(
   return (
     rows.find((row) => {
       const priceId = priceIdOf(row);
+
       return priceId !== undefined && priceIds.includes(priceId);
     }) ?? null
   );
@@ -134,12 +137,15 @@ export class BillingEventReducer {
     if (ref.userId) {
       return ref.userId;
     }
+
     if (!ref.customerId) {
       return null;
     }
+
     const customer = await manager.findOne(Customer, {
       where: { id: ref.customerId }
     });
+
     return customer?.userId ?? null;
   }
 
@@ -158,11 +164,13 @@ export class BillingEventReducer {
       payload.providerPriceIds,
       (row) => row.prices[provider]?.providerPriceId
     );
+
     if (!plan) {
       this.logger.error(
         `Subscription ${payload.providerSubscriptionId}: no plan has the ${provider} price [${payload.providerPriceIds.join(', ')}]`
       );
     }
+
     return plan;
   }
 
@@ -182,11 +190,13 @@ export class BillingEventReducer {
           payload.providerPriceIds ?? [],
           (row) => row.prices[provider]?.paddlePriceId
         );
+
     if (!product) {
       this.logger.error(
         `One-time payment ${payload.providerInvoiceRef}: no product matches it, nothing is granted`
       );
     }
+
     return product;
   }
 
@@ -203,6 +213,7 @@ export class BillingEventReducer {
       this.logger.warn(
         `Skipping ${type} for ${payload.providerSubscriptionId}: no customer reference`
       );
+
       return;
     }
 
@@ -219,6 +230,7 @@ export class BillingEventReducer {
         if (!plan) {
           return null;
         }
+
         // 1:1 invariant (UQ_subscriptions_customer_open): a customer who already
         // has an open subscription must not get a second one. Skip + warn rather
         // than let the insert abort the whole webhook transaction.
@@ -228,12 +240,15 @@ export class BillingEventReducer {
             status: In([...OPEN_SUBSCRIPTION_STATUSES])
           }
         });
+
         if (openExisting) {
           this.logger.warn(
             `Skipping ${type} for ${payload.providerSubscriptionId}: customer ${payload.ref.customerId} already has open subscription ${openExisting.id}`
           );
+
           return null;
         }
+
         const lifecycleOwner = lifecycleOwnerFor(provider);
         const periodStart = parseDate(payload.currentPeriodStart, now);
         const created = await manager.save(
@@ -255,9 +270,11 @@ export class BillingEventReducer {
             paymentMethodId: null
           })
         );
+
         if (payload.status === 'trialing') {
           await this.markTrialUsed(manager, created.customerId, now);
         }
+
         return { subscriptionId: created.id, userId, closedPeriod: null };
       }
 
@@ -304,38 +321,49 @@ export class BillingEventReducer {
         cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
         trialEnd: payload.trialEnd ? new Date(payload.trialEnd) : null
       };
+
       if (toPlan) {
         snapshot.planKey = toPlan.key;
       }
+
       if (payload.currentPeriodStart) {
         snapshot.currentPeriodStart = new Date(payload.currentPeriodStart);
       }
+
       if (payload.currentPeriodEnd) {
         snapshot.currentPeriodEnd = new Date(payload.currentPeriodEnd);
       }
+
       if (switchesMode) {
         snapshot.billingMode = toPlan.billingMode;
         snapshot.meteredFrom = now;
       }
+
       if (rollsOver) {
         snapshot.meteredFrom = null;
       }
+
       await manager.update(Subscription, { id: subscription.id }, snapshot);
+
       if (payload.status === 'canceled') {
         await this.credits.releaseHolds(manager, {
           subscriptionId: subscription.id
         });
       }
+
       if (payload.status === 'trialing') {
         await this.markTrialUsed(manager, subscription.customerId, now);
       }
+
       return { subscriptionId: subscription.id, userId, closedPeriod };
     });
 
     if (!result?.userId) {
       return;
     }
+
     this.emitSubscriptionEvent(type, result.userId, result.subscriptionId);
+
     if (result.closedPeriod) {
       this.events.emit(
         UsagePeriodClosedEvent.name,
@@ -403,9 +431,11 @@ export class BillingEventReducer {
     const reported = payload.amountMinor;
     const sameCurrency =
       invoice.currency.toUpperCase() === payload.currency.toUpperCase();
+
     if (recorded === reported && sameCurrency) {
       return;
     }
+
     this.logger.error(
       `Invoice ${invoice.id} settled from ${payload.providerInvoiceRef} with a mismatched amount: ` +
         `recorded ${recorded} ${invoice.currency}, provider reported ${reported} ${payload.currency}`
@@ -439,6 +469,7 @@ export class BillingEventReducer {
     ) {
       return;
     }
+
     this.metrics.recordUnmatchedOffSessionCharge(provider);
     this.logger.error(
       `Off-session charge ${payload.providerInvoiceRef} (${chargeKey}) settled onto no pending invoice: ` +
@@ -455,8 +486,10 @@ export class BillingEventReducer {
       this.logger.warn(
         `Skipping invoice.paid ${payload.providerInvoiceRef}: no customer reference`
       );
+
       return;
     }
+
     const { customerId } = payload.ref;
     const selfManaged = lifecycleOwnerFor(provider) === 'self';
 
@@ -481,10 +514,12 @@ export class BillingEventReducer {
               paidAt: parseDate(payload.paidAt, new Date())
             }
           );
+
           if (!flip.affected) {
             const recorded = await manager.findOne(Invoice, {
               where: { providerEventId: chargeKey }
             });
+
             await manager.update(
               Invoice,
               { providerEventId: chargeKey },
@@ -495,15 +530,20 @@ export class BillingEventReducer {
               recorded,
               payload
             });
+
             return null;
           }
+
           const invoice = await manager.findOne(Invoice, {
             where: { providerEventId: chargeKey }
           });
+
           if (!invoice) {
             return null;
           }
+
           this.reconcileChargeAmount(invoice, payload);
+
           // The winning flip to paid spends the credits the charged amount
           // was rated against - exactly once, whichever side settles.
           if (invoice.creditUnitsApplied > 0) {
@@ -513,16 +553,20 @@ export class BillingEventReducer {
               invoice.creditUnitsApplied
             );
           }
+
           const userId = await this.resolveUserId(manager, payload.ref);
+
           return { invoiceId: invoice.id, userId };
         }
       );
+
       if (settled?.userId) {
         this.events.emit(
           InvoicePaidEvent.name,
           new InvoicePaidEvent(settled.userId, settled.invoiceId)
         );
       }
+
       return;
     }
 
@@ -549,6 +593,7 @@ export class BillingEventReducer {
         const invoice = await manager.findOne(Invoice, {
           where: { providerEventId: payload.usageChargeKey }
         });
+
         if (invoice) {
           if (reconciled.affected && invoice.creditUnitsApplied > 0) {
             await this.credits.spendOnUsage(
@@ -557,6 +602,7 @@ export class BillingEventReducer {
               invoice.creditUnitsApplied
             );
           }
+
           // No pending row matched but the invoice exists — an already-settled
           // replay; never insert a duplicate alongside it.
           return reconciled.affected
@@ -617,6 +663,7 @@ export class BillingEventReducer {
         paidAt: parseDate(payload.paidAt, now),
         receiptRef: null
       });
+
       if (!invoiceId) {
         return null;
       }
@@ -627,6 +674,7 @@ export class BillingEventReducer {
           { customerId, invoiceId },
           { product, now }
         );
+
         return {
           invoiceId,
           userId,
@@ -652,10 +700,12 @@ export class BillingEventReducer {
     if (!result?.userId) {
       return;
     }
+
     this.events.emit(
       InvoicePaidEvent.name,
       new InvoicePaidEvent(result.userId, result.invoiceId)
     );
+
     if (result.activatedSubscriptionId) {
       this.events.emit(
         SubscriptionActivatedEvent.name,
@@ -665,6 +715,7 @@ export class BillingEventReducer {
         )
       );
     }
+
     if (result.unclaimed) {
       this.events.emit(
         FirstPaymentUnclaimedEvent.name,
@@ -696,13 +747,16 @@ export class BillingEventReducer {
         { customerId, invoiceId },
         product.grant.credits
       );
+
       return;
     }
 
     if (product.type !== 'sku' || !product.grant.entitlement) {
       return;
     }
+
     const { entitlement, durationDays } = product.grant;
+
     await manager.save(
       manager.create(CustomerGrant, {
         customerId,
@@ -746,9 +800,11 @@ export class BillingEventReducer {
       },
       { status: trialing ? 'trialing' : 'active' }
     );
+
     if (!applied.affected) {
       return null;
     }
+
     if (trialing) {
       await this.markTrialUsed(manager, subscription.customerId, now);
     }
@@ -771,6 +827,7 @@ export class BillingEventReducer {
           isDefault: true
         })
       );
+
       await manager.update(
         Customer,
         { id: subscription.customerId },
@@ -782,6 +839,7 @@ export class BillingEventReducer {
         { paymentMethodId: method.id }
       );
     }
+
     return subscription.id;
   }
 
@@ -814,10 +872,12 @@ export class BillingEventReducer {
   ): Promise<void> {
     const { customerId } = payload.ref;
     const saved = payload.savedPaymentMethod;
+
     if (!customerId || !saved) {
       this.logger.warn(
         'Skipping payment_method.updated: no customer reference or saved method'
       );
+
       return;
     }
 
@@ -837,6 +897,7 @@ export class BillingEventReducer {
           isDefault: true
         })
       );
+
       await manager.update(
         Customer,
         { id: customerId },
@@ -847,6 +908,7 @@ export class BillingEventReducer {
         where: { customerId, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },
         order: { createdAt: 'DESC' }
       });
+
       if (subscription) {
         // Repeating the open-status predicate on the write is what keeps a
         // cancel that commits during this reduce from being rolled back: only
@@ -869,6 +931,7 @@ export class BillingEventReducer {
     // a second event here would double-notify.
     if (payload.offSessionChargeKey) {
       const chargeKey = payload.offSessionChargeKey;
+
       await withTransaction(this.dataSource, (manager) =>
         manager.update(
           Invoice,
@@ -876,6 +939,7 @@ export class BillingEventReducer {
           { status: 'failed' }
         )
       );
+
       return;
     }
 
@@ -894,6 +958,7 @@ export class BillingEventReducer {
           { providerEventId: payload.usageChargeKey, status: 'pending' },
           { status: 'failed' }
         );
+
         if (flip.affected && subscription?.status === 'canceled') {
           await this.credits.releaseHolds(manager, {
             providerEventId: payload.usageChargeKey
@@ -902,9 +967,11 @@ export class BillingEventReducer {
       }
 
       const userId = await this.resolveUserId(manager, payload.ref);
+
       if (!userId) {
         return null;
       }
+
       return { userId, subscriptionId: subscription?.id ?? null };
     });
 

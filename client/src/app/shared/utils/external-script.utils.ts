@@ -19,8 +19,10 @@ export function loadExternalScript<T>(
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const loaded = script.api();
+
     if (loaded) {
       resolve(loaded);
+
       return;
     }
 
@@ -31,10 +33,12 @@ export function loadExternalScript<T>(
         tag.remove();
         reject(new Error(message));
       };
+
       tag.addEventListener(
         'load',
         () => {
           const api = script.api();
+
           if (api) resolve(api);
           else fail(`${script.name} script loaded without exposing API`);
         },
@@ -50,12 +54,15 @@ export function loadExternalScript<T>(
     const existing = document.getElementById(
       script.id
     ) as HTMLScriptElement | null;
+
     if (existing) {
       attach(existing);
+
       return;
     }
 
     const tag = document.createElement('script');
+
     tag.id = script.id;
     tag.src = script.src;
     tag.async = true;

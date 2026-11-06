@@ -111,6 +111,7 @@ test.describe('Admin Resources page', () => {
     );
 
     const customToggle = page.getByRole('switch', { name: 'Custom' });
+
     await customToggle.click();
     await expect(customToggle).toBeChecked();
 
@@ -155,6 +156,7 @@ test.describe('Admin Resources page', () => {
     await openedDialog(page);
 
     const displayNameInput = page.getByLabel('Display name');
+
     await displayNameInput.clear();
     await displayNameInput.fill('Updated Resource Name');
 

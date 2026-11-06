@@ -26,6 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     const { algorithm, key, issuer, audience } =
       buildJwtVerification(configService);
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -59,6 +60,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const { iat } = payload;
+
     // Fail closed: without a trusted issue time the key-rotation and
     // token-revocation checks below cannot be enforced
     if (typeof iat !== 'number' || !Number.isFinite(iat)) {
@@ -85,6 +87,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new ApiError(ErrorKeys.AUTH.USER_NOT_FOUND, 'User not found');
     }
+
     if (issuedBeforeRevocation(iat, user.tokenRevokedAt)) {
       throw new ApiError(
         ErrorKeys.AUTH.TOKEN_REVOKED,
@@ -97,6 +100,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // claim existed lands here and the client exchanges it for a current one
     // through the refresh cookie.
     const sessionId = payload.sid;
+
     if (typeof sessionId !== 'string' || sessionId === '') {
       throw new ApiError(
         ErrorKeys.AUTH.INVALID_TOKEN,

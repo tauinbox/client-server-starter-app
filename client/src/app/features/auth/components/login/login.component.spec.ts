@@ -231,6 +231,7 @@ describe('LoginComponent', () => {
       const input: HTMLInputElement = fixture.nativeElement.querySelector(
         'input[autocomplete="one-time-code"]'
       );
+
       input.value = value;
       input.dispatchEvent(new Event('input'));
       await fixture.whenStable();
@@ -240,6 +241,7 @@ describe('LoginComponent', () => {
     async function submitChallenge(): Promise<void> {
       const challengeForm: HTMLFormElement =
         fixture.nativeElement.querySelector('nxs-mfa-challenge form');
+
       challengeForm.dispatchEvent(new Event('submit'));
       await fixture.whenStable();
       fixture.detectChanges();
@@ -266,11 +268,13 @@ describe('LoginComponent', () => {
         fixture.nativeElement.querySelector(
           'input[autocomplete="one-time-code"]'
         );
+
       expect(codeInput).toBeTruthy();
     });
 
     it('exchanges the code for a session and then navigates', async () => {
       const navigateSpy = vi.spyOn(router, 'navigateByUrl');
+
       await reachChallenge();
       authServiceMock.verifyMfa.mockReturnValue(of(mockAuthResponse));
 
@@ -306,6 +310,7 @@ describe('LoginComponent', () => {
         fixture.nativeElement.querySelector(
           'input[autocomplete="current-password"]'
         );
+
       expect(passwordInput).toBeTruthy();
     });
 
@@ -331,6 +336,7 @@ describe('LoginComponent', () => {
         fixture.nativeElement.querySelector(
           'input[autocomplete="one-time-code"]'
         );
+
       expect(codeInput).toBeTruthy();
     });
   });
@@ -347,7 +353,9 @@ describe('LoginComponent', () => {
     const renderWithOAuthError = (error: string) => {
       queryParams['oauth_error'] = error;
       const errorFixture = TestBed.createComponent(LoginComponent);
+
       errorFixture.detectChanges();
+
       return errorFixture.componentInstance['error']();
     };
 
@@ -373,8 +381,11 @@ describe('LoginComponent', () => {
   describe('password_changed query parameter', () => {
     const renderWith = (value?: string): HTMLElement => {
       if (value !== undefined) queryParams['password_changed'] = value;
+
       const bannerFixture = TestBed.createComponent(LoginComponent);
+
       bannerFixture.detectChanges();
+
       return bannerFixture.nativeElement as HTMLElement;
     };
 
@@ -401,7 +412,9 @@ describe('LoginComponent', () => {
     const renderWith = (value: string): HTMLElement => {
       queryParams['session_ended'] = value;
       const bannerFixture = TestBed.createComponent(LoginComponent);
+
       bannerFixture.detectChanges();
+
       return bannerFixture.nativeElement as HTMLElement;
     };
 
@@ -425,6 +438,7 @@ describe('LoginComponent', () => {
 
     it('should require email', () => {
       const emailErrors = component.loginForm.email().errors();
+
       expect(emailErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
@@ -432,6 +446,7 @@ describe('LoginComponent', () => {
       component.loginModel.set({ email: 'invalid', password: '' });
       await fixture.whenStable();
       const emailErrors = component.loginForm.email().errors();
+
       expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
 
       component.loginModel.set({ email: 'test@example.com', password: '' });
@@ -441,6 +456,7 @@ describe('LoginComponent', () => {
 
     it('should require password', () => {
       const passwordErrors = component.loginForm.password().errors();
+
       expect(passwordErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
@@ -530,6 +546,7 @@ describe('LoginComponent', () => {
       const newFixture = TestBed.createComponent(LoginComponent);
       const newComponent = newFixture.componentInstance;
       const newRouter = TestBed.inject(Router);
+
       vi.spyOn(newRouter, 'navigateByUrl');
       newFixture.detectChanges();
 
@@ -576,6 +593,7 @@ describe('LoginComponent', () => {
         error: { message: 'Invalid credentials' },
         status: 401
       });
+
       authServiceMock.login.mockReturnValue(throwError(() => httpError));
 
       component.loginModel.set({
@@ -599,6 +617,7 @@ describe('LoginComponent', () => {
         },
         status: 401
       });
+
       authServiceMock.login.mockReturnValue(throwError(() => httpError));
 
       component.loginModel.set({
@@ -620,6 +639,7 @@ describe('LoginComponent', () => {
         },
         status: 403
       });
+
       authServiceMock.login.mockReturnValue(throwError(() => httpError));
 
       component.loginModel.set({
@@ -640,6 +660,7 @@ describe('LoginComponent', () => {
         error: null,
         status: 500
       });
+
       authServiceMock.login.mockReturnValue(throwError(() => httpError));
 
       component.loginModel.set({
@@ -776,6 +797,7 @@ describe('LoginComponent', () => {
       expect(TestBed.inject(FeatureFlagsStore).flags()).toEqual({});
 
       const newFixture = TestBed.createComponent(LoginComponent);
+
       newFixture.detectChanges();
       await newFixture.whenStable();
       newFixture.detectChanges();

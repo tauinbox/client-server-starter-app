@@ -34,6 +34,7 @@ function setup(value = '', readonly = false) {
   });
 
   const fixture = TestBed.createComponent(TestHostComponent);
+
   fixture.componentInstance.value = value;
   fixture.componentInstance.readonly = readonly;
   fixture.detectChanges();
@@ -130,6 +131,7 @@ describe('ConditionBuilderComponent', () => {
         type: 'rule';
         rule: { field: string };
       };
+
       expect(rule.field).toBe('role');
     });
 
@@ -143,6 +145,7 @@ describe('ConditionBuilderComponent', () => {
         type: 'rule';
         rule: { operator: string };
       };
+
       expect(rule.operator).toBe('$gt');
     });
 
@@ -156,6 +159,7 @@ describe('ConditionBuilderComponent', () => {
         type: 'rule';
         rule: { value: string };
       };
+
       expect(rule.value).toBe('inactive');
     });
   });
@@ -261,6 +265,7 @@ describe('ConditionBuilderComponent', () => {
 
       expect(host.lastEmitted).toBeDefined();
       const parsed = JSON.parse(host.lastEmitted!);
+
       expect(parsed).toEqual({ status: 'active' });
     });
   });
@@ -285,6 +290,7 @@ describe('ConditionBuilderComponent', () => {
 
       const preview = component.previewJson();
       const parsed = JSON.parse(preview);
+
       expect(parsed).toEqual({ status: 'active' });
     });
 
@@ -295,6 +301,7 @@ describe('ConditionBuilderComponent', () => {
       component.setValue(child, 'inactive');
 
       const parsed = JSON.parse(component.previewJson());
+
       expect(parsed).toEqual({ status: 'inactive' });
     });
   });

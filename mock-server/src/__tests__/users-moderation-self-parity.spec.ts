@@ -12,6 +12,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -30,8 +31,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -70,6 +73,7 @@ describe('PATCH /api/v1/users/:id moderation of the own record', () => {
     const token = await login('user@example.com');
     const owner = findUserByEmail('user@example.com')!;
     const lockedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
     owner.failedLoginAttempts = 5;
     owner.lockedUntil = lockedUntil;
 

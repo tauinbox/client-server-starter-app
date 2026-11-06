@@ -28,6 +28,7 @@ export class CaptchaRequiredGuard implements CanActivate {
 
     const remainingHeader = res.getHeader('X-RateLimit-Remaining');
     const remaining = Number(remainingHeader);
+
     if (
       remainingHeader === undefined ||
       remainingHeader === null ||
@@ -58,6 +59,7 @@ export class CaptchaRequiredGuard implements CanActivate {
     }
 
     const verified = await this.captchaService.verify(token, req.ip);
+
     if (!verified) {
       throw new ApiError(
         ErrorKeys.AUTH.CAPTCHA_INVALID,

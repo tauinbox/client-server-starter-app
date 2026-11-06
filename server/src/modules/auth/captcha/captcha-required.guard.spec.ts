@@ -27,6 +27,7 @@ describe('CaptchaRequiredGuard', () => {
   it('passes through when captcha service is disabled', async () => {
     mockService.isEnabled.mockReturnValue(false);
     const ctx = buildContext({}, { getHeader: jest.fn() });
+
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(mockService.verify).not.toHaveBeenCalled();
   });
@@ -37,6 +38,7 @@ describe('CaptchaRequiredGuard', () => {
       {},
       { getHeader: jest.fn().mockReturnValue(undefined) }
     );
+
     await expect(guard.canActivate(ctx)).rejects.toMatchObject({
       response: {
         errorKey: ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE
@@ -52,6 +54,7 @@ describe('CaptchaRequiredGuard', () => {
       {},
       { getHeader: jest.fn().mockReturnValue(null) }
     );
+
     await expect(guard.canActivate(ctx)).rejects.toMatchObject({
       response: {
         errorKey: ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE
@@ -67,6 +70,7 @@ describe('CaptchaRequiredGuard', () => {
       {},
       { getHeader: jest.fn().mockReturnValue('abc') }
     );
+
     await expect(guard.canActivate(ctx)).rejects.toMatchObject({
       response: {
         errorKey: ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE
@@ -82,6 +86,7 @@ describe('CaptchaRequiredGuard', () => {
       {},
       { getHeader: jest.fn().mockReturnValue(['1', '2']) }
     );
+
     await expect(guard.canActivate(ctx)).rejects.toMatchObject({
       response: {
         errorKey: ErrorKeys.AUTH.CAPTCHA_GATE_FAILURE
@@ -94,6 +99,7 @@ describe('CaptchaRequiredGuard', () => {
   it('passes through when remaining > threshold', async () => {
     mockService.isEnabled.mockReturnValue(true);
     const ctx = buildContext({}, { getHeader: jest.fn().mockReturnValue(2) });
+
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(mockService.verify).not.toHaveBeenCalled();
   });
@@ -104,6 +110,7 @@ describe('CaptchaRequiredGuard', () => {
       { body: {} },
       { getHeader: jest.fn().mockReturnValue(1) }
     );
+
     await expect(guard.canActivate(ctx)).rejects.toMatchObject({
       response: {
         errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
@@ -118,6 +125,7 @@ describe('CaptchaRequiredGuard', () => {
       { body: { captchaToken: '   ' } },
       { getHeader: jest.fn().mockReturnValue(1) }
     );
+
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(HttpException);
   });
 
@@ -128,6 +136,7 @@ describe('CaptchaRequiredGuard', () => {
       { body: { captchaToken: 'bad-token' }, ip: '1.2.3.4' },
       { getHeader: jest.fn().mockReturnValue(1) }
     );
+
     await expect(guard.canActivate(ctx)).rejects.toMatchObject({
       response: {
         errorKey: ErrorKeys.AUTH.CAPTCHA_INVALID
@@ -143,6 +152,7 @@ describe('CaptchaRequiredGuard', () => {
       { body: { captchaToken: 'good-token' }, ip: '1.2.3.4' },
       { getHeader: jest.fn().mockReturnValue(0) }
     );
+
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(mockService.verify).toHaveBeenCalledWith('good-token', '1.2.3.4');
   });

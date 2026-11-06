@@ -34,6 +34,7 @@ afterAll((done) => {
   } else {
     process.env['MOCK_SSE_HEARTBEAT_MS'] = previousHeartbeat;
   }
+
   server.close(done);
 });
 
@@ -51,11 +52,13 @@ async function signIn(): Promise<Session> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: USER_EMAIL, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const match = /refresh_token=([^;]+)/.exec(
     res.headers.get('set-cookie') ?? ''
   );
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return {
     accessToken: body.tokens.access_token,
     refreshCookie: `refresh_token=${match?.[1] ?? ''}`
@@ -68,19 +71,24 @@ async function openStream(token: string): Promise<OpenStream> {
     headers: { authorization: `Bearer ${token}` },
     signal: controller.signal
   });
+
   expect(res.status).toBe(200);
 
   let body = '';
   let ended = false;
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
+
   void (async () => {
     try {
       for (;;) {
         const { done, value } = await reader.read();
+
         if (done) break;
+
         body += decoder.decode(value);
       }
+
       ended = true;
     } catch {
       // stream aborted by close() - expected
@@ -92,7 +100,9 @@ async function openStream(token: string): Promise<OpenStream> {
     ended: () => ended,
     close: () => controller.abort()
   };
+
   streams.push(stream);
+
   return stream;
 }
 
@@ -115,6 +125,7 @@ describe('an SSE stream ends with its session', () => {
         cookie: a.refreshCookie
       }
     });
+
     expect(logout.status).toBe(200);
 
     await wait(HEARTBEAT_MS * 4);
@@ -149,9 +160,12 @@ describe('an SSE stream ends with its session', () => {
 
   it('sends the heartbeat frame of the server at once, before the first interval', async () => {
     const a = await signIn();
+
     process.env['MOCK_SSE_HEARTBEAT_MS'] = '60000';
+
     try {
       const stream = await openStream(a.accessToken);
+
       for (let i = 0; i < 100 && !stream.body(); i++) await wait(10);
 
       expect(stream.body()).toBe(HEARTBEAT_FRAME);

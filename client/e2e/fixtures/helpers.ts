@@ -41,12 +41,14 @@ export async function markOAuthRoundTripStarted(
  */
 export async function openedDialog(page: Page): Promise<Locator> {
   const dialog = page.getByRole('dialog');
+
   await expect(dialog).toBeVisible();
   await expect
     .poll(() =>
       dialog.evaluate((el) => el.contains(el.ownerDocument.activeElement))
     )
     .toBe(true);
+
   return dialog;
 }
 
@@ -72,6 +74,7 @@ export function listResponse(
 ): Promise<Response> {
   return page.waitForResponse((response) => {
     const url = new URL(response.url());
+
     return (
       url.pathname.endsWith(path) &&
       Object.entries(params).every(
@@ -94,6 +97,7 @@ export async function chooseOption(
 ): Promise<void> {
   await page.getByRole('combobox', { name: select, exact: true }).click();
   const panel = page.getByRole('listbox', { name: select, exact: true });
+
   await panel.getByRole('option', { name: option, exact: true }).click();
   await expect(panel).toHaveCount(0);
 }
@@ -117,7 +121,9 @@ export async function routeApiToMockServer(
       .request()
       .url()
       .replace(/localhost:\d+/, `localhost:${port}`);
+
     trackRoutedRequest(page, route.request(), url);
+
     return route.continue({ url });
   });
 
@@ -178,11 +184,13 @@ export async function loginViaUi(
   // Post-login destination depends on permissions (admin → /admin/users via
   // root redirect → defaultRoute(); user → /profile fallback).
   await page.waitForURL((url) => !url.pathname.endsWith('/login'));
+
   // Tests written before the dynamic landing page rely on /profile being the
   // post-login URL; normalize so existing assertions keep working.
   if (!page.url().endsWith('/profile')) {
     await page.goto('/profile');
   }
+
   await expect(
     page.getByRole('heading', { level: 2, name: user.name })
   ).toBeVisible();
@@ -260,6 +268,7 @@ export async function loginViaUiKeepSse(
     (r) => r.url().includes('/api/v1/notifications/stream'),
     { timeout: 10_000 }
   );
+
   await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
   await page.waitForURL((url) => !url.pathname.endsWith('/login'));
   await permissionsResponse;

@@ -36,6 +36,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const openHelp = () => this.#openHelp();
+
     this.#cleanupQuestion = this.#shortcuts.register(
       {
         key: '?',
@@ -63,7 +64,9 @@ export class AppComponent implements OnInit, OnDestroy {
     const alreadyOpen = this.#dialog.openDialogs.some(
       (ref) => ref.componentInstance instanceof KeyboardShortcutsHelpComponent
     );
+
     if (alreadyOpen) return;
+
     this.#dialog.open(
       KeyboardShortcutsHelpComponent,
       dialogSizeConfig(DialogSize.Form)

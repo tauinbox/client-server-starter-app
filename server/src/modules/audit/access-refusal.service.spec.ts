@@ -214,6 +214,7 @@ describe('AccessRefusalService.assertCan', () => {
 
   it('writes the request context that the guard bound to the ability', () => {
     const ability = new AbilityBuilder<AppAbility>(createMongoAbility).build();
+
     bindAuditContext(ability, { ip: '203.0.113.7', requestId: 'req-1' });
 
     thrownBy(() =>

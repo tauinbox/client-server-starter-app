@@ -12,6 +12,7 @@ const newPassword = 'NewPassword1';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -34,16 +35,20 @@ function postJson(path: string, body: unknown): Promise<Response> {
 
 async function issueResetToken(): Promise<string> {
   const res = await postJson('forgot-password', { email });
+
   expect(res.status).toBe(200);
 
   const [token] = [...getState().passwordResetTokens.keys()];
+
   expect(token).toBeDefined();
+
   return token;
 }
 
 describe('password reset verifies the email', () => {
   beforeEach(() => {
     const user = findUserByEmail(email);
+
     expect(user).toBeDefined();
     user!.isEmailVerified = false;
   });
@@ -55,11 +60,13 @@ describe('password reset verifies the email', () => {
       token,
       password: newPassword
     });
+
     expect(reset.status).toBe(200);
     expect(findUserByEmail(email)?.isEmailVerified).toBe(true);
 
     // Pre-fix this was 403 EMAIL_NOT_VERIFIED.
     const login = await postJson('login', { email, password: newPassword });
+
     expect(login.status).toBe(200);
   });
 
@@ -67,6 +74,7 @@ describe('password reset verifies the email', () => {
     const pendingEmail = 'pending-parity@example.com';
     const pendingToken = 'pending-token-parity';
     const user = findUserByEmail(email);
+
     user!.pendingEmail = pendingEmail;
     user!.pendingEmailToken = pendingToken;
     user!.pendingEmailExpiresAt = new Date(Date.now() + 1800000).toISOString();
@@ -77,9 +85,11 @@ describe('password reset verifies the email', () => {
       token,
       password: newPassword
     });
+
     expect(reset.status).toBe(200);
 
     const after = findUserByEmail(email);
+
     expect(after?.email).toBe(email);
     expect(after?.isEmailVerified).toBe(true);
     expect(after?.pendingEmail).toBeNull();

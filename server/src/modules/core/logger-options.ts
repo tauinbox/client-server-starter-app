@@ -23,13 +23,16 @@ export function maskEmailsInText(text: string): string {
  */
 export function moveErrorArgToErrKey(args: unknown[]): unknown[] {
   const [bindings, message, ...rest] = args;
+
   if (typeof message !== 'string') return args;
 
   const errorIndex = rest.findIndex((arg) => arg instanceof Error);
+
   if (errorIndex === -1) return args;
 
   const base =
     typeof bindings === 'object' && bindings !== null ? bindings : {};
+
   if ('err' in base) return args;
 
   return [
@@ -60,21 +63,28 @@ interface SerializedError {
  */
 export function serializeLoggedError(value: unknown): unknown {
   if (typeof value === 'string') return maskEmailsInText(value);
+
   if (typeof value !== 'object' || value === null) return value;
 
   const source = (
     value instanceof Error ? stdSerializers.err(value) : value
   ) as Record<string, unknown>;
   const result: SerializedError = {};
+
   if (typeof source['type'] === 'string') result.type = source['type'];
+
   if (typeof source['message'] === 'string') {
     result.message = maskEmailsInText(source['message']);
   }
+
   if (typeof source['stack'] === 'string') {
     result.stack = maskEmailsInText(source['stack']);
   }
+
   const { code } = source;
+
   if (typeof code === 'string' || typeof code === 'number') result.code = code;
+
   return result;
 }
 
@@ -106,26 +116,35 @@ export function serializeLoggedRequest(value: unknown): unknown {
 
   const source = value as Record<string, unknown>;
   const result: SerializedRequest = { headers: {} };
+
   if (source['id'] !== undefined) result.id = source['id'];
+
   if (typeof source['method'] === 'string') result.method = source['method'];
+
   if (typeof source['url'] === 'string') {
     result.url = redactSensitiveQuery(source['url']);
   }
+
   if (typeof source['remoteAddress'] === 'string') {
     result.remoteAddress = source['remoteAddress'];
   }
+
   const { headers } = source;
+
   if (typeof headers === 'object' && headers !== null) {
     for (const name of LOGGED_REQUEST_HEADERS) {
       const header = (headers as Record<string, unknown>)[name];
+
       if (typeof header === 'string') result.headers[name] = header;
     }
   }
+
   return result;
 }
 
 export function buildLoggerOptions(environment: string | undefined): Params {
   const production = environment === 'production';
+
   return {
     pinoHttp: {
       // HTTP request logging is handled by RequestLoggingMiddleware

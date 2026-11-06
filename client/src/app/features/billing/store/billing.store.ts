@@ -65,7 +65,9 @@ export const BillingStore = signalStore(
     /** The plan the caller is currently subscribed to, if any. */
     currentPlan: computed(() => {
       const sub = store.subscription();
+
       if (!sub) return null;
+
       return store.plans().find((p) => p.key === sub.planKey) ?? null;
     }),
     /**
@@ -75,6 +77,7 @@ export const BillingStore = signalStore(
      */
     hasActiveSubscription: computed(() => {
       const sub = store.subscription();
+
       return (
         sub !== null && ENTITLED_SUBSCRIPTION_STATUSES.includes(sub.status)
       );
@@ -87,6 +90,7 @@ export const BillingStore = signalStore(
     async function loadPlans(): Promise<void> {
       try {
         const plans = await firstValueFrom(billing.getPlans());
+
         patchState(store, { plans });
       } catch (error) {
         notify.error(
@@ -99,6 +103,7 @@ export const BillingStore = signalStore(
     async function loadRegion(): Promise<void> {
       try {
         const region = await firstValueFrom(billing.getRegion());
+
         patchState(store, { region });
       } catch (error) {
         notify.error(
@@ -111,6 +116,7 @@ export const BillingStore = signalStore(
     async function loadProducts(): Promise<void> {
       try {
         const products = await firstValueFrom(billing.getProducts());
+
         patchState(store, { products });
       } catch (error) {
         notify.error(
@@ -157,19 +163,27 @@ export const BillingStore = signalStore(
       const [subscription, paymentMethod, usage, credits, plans, region] =
         results;
       const patch: Partial<BillingState> = { pageLoading: false };
+
       if (subscription.status === 'fulfilled')
         patch.subscription = subscription.value;
+
       if (paymentMethod.status === 'fulfilled')
         patch.paymentMethod = paymentMethod.value;
+
       if (usage.status === 'fulfilled') patch.usage = usage.value;
+
       if (credits.status === 'fulfilled') patch.credits = credits.value;
+
       if (plans.status === 'fulfilled') patch.plans = plans.value;
+
       if (region.status === 'fulfilled') patch.region = region.value;
+
       patchState(store, patch);
       const failed = results.find(
         (result): result is PromiseRejectedResult =>
           result.status === 'rejected'
       );
+
       if (failed) {
         notify.error(
           failed.reason as HttpErrorResponse,
@@ -182,13 +196,16 @@ export const BillingStore = signalStore(
     async function refreshSubscription(): Promise<SubscriptionResponse | null> {
       try {
         const subscription = await firstValueFrom(billing.getSubscription());
+
         patchState(store, { subscription });
+
         return subscription;
       } catch (error) {
         notify.error(
           error as HttpErrorResponse,
           'billing.store.errorLoadFailed'
         );
+
         return store.subscription();
       }
     }
@@ -201,6 +218,7 @@ export const BillingStore = signalStore(
       planKey: string
     ): Promise<CheckoutSessionResponse | null> {
       patchState(store, { working: true });
+
       try {
         return await firstValueFrom(billing.checkout(planKey));
       } catch (error) {
@@ -208,6 +226,7 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorCheckoutFailed'
         );
+
         return null;
       } finally {
         patchState(store, { working: false });
@@ -222,6 +241,7 @@ export const BillingStore = signalStore(
       request: PurchaseRequest
     ): Promise<PurchaseSessionResponse | null> {
       patchState(store, { working: true });
+
       try {
         return await firstValueFrom(billing.purchase(request));
       } catch (error) {
@@ -229,6 +249,7 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorPurchaseFailed'
         );
+
         return null;
       } finally {
         patchState(store, { working: false });
@@ -241,6 +262,7 @@ export const BillingStore = signalStore(
      */
     async function refreshInvoices(): Promise<InvoiceResponse[]> {
       await store.loadFirstPage((request) => billing.getInvoices(request));
+
       return store.entities();
     }
 
@@ -258,8 +280,10 @@ export const BillingStore = signalStore(
      */
     async function changePlan(planKey: string): Promise<boolean> {
       patchState(store, { working: true });
+
       try {
         const subscription = await firstValueFrom(billing.changePlan(planKey));
+
         patchState(store, { subscription });
         notify.success('billing.changePlan.successChanged');
       } catch (error) {
@@ -267,21 +291,25 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorChangeFailed'
         );
+
         return false;
       } finally {
         patchState(store, { working: false });
       }
+
       try {
         const [usage, credits] = await Promise.all([
           firstValueFrom(billing.getUsage()),
           firstValueFrom(billing.getCredits()),
           refreshInvoices()
         ]);
+
         patchState(store, { usage, credits });
       } catch {
         // The switch itself succeeded and was reported; a stale slice
         // self-heals on the next settings load.
       }
+
       return true;
     }
 
@@ -291,6 +319,7 @@ export const BillingStore = signalStore(
      */
     async function startPaymentMethodUpdate(): Promise<CheckoutSessionResponse | null> {
       patchState(store, { working: true });
+
       try {
         return await firstValueFrom(billing.updatePaymentMethod());
       } catch (error) {
@@ -298,6 +327,7 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorPaymentMethodFailed'
         );
+
         return null;
       } finally {
         patchState(store, { working: false });
@@ -306,16 +336,20 @@ export const BillingStore = signalStore(
 
     async function cancel(mode: CancelMode = 'period_end'): Promise<boolean> {
       patchState(store, { working: true });
+
       try {
         const subscription = await firstValueFrom(billing.cancel(mode));
+
         patchState(store, { subscription });
         notify.success('billing.settings.successCancelled');
+
         return true;
       } catch (error) {
         notify.error(
           error as HttpErrorResponse,
           'billing.store.errorCancelFailed'
         );
+
         return false;
       } finally {
         patchState(store, { working: false });
@@ -324,15 +358,19 @@ export const BillingStore = signalStore(
 
     async function setRegion(region: BillingRegion): Promise<boolean> {
       patchState(store, { working: true });
+
       try {
         const updated = await firstValueFrom(billing.setRegion(region));
+
         patchState(store, { region: updated });
+
         return true;
       } catch (error) {
         notify.error(
           error as HttpErrorResponse,
           'billing.store.errorRegionFailed'
         );
+
         return false;
       } finally {
         patchState(store, { working: false });

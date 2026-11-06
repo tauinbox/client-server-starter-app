@@ -11,6 +11,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -36,8 +37,10 @@ async function loginAsAdmin(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 

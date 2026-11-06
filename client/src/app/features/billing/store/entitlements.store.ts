@@ -43,6 +43,7 @@ export const EntitlementsStore = signalStore(
       const request = firstValueFrom(service.getEntitlements())
         .then((response) => {
           if (epoch !== fetchEpoch) return;
+
           patchState(store, {
             planKey: response.planKey,
             capabilities: response.capabilities,
@@ -58,14 +59,18 @@ export const EntitlementsStore = signalStore(
         .finally(() => {
           if (inFlight === request) inFlight = null;
         });
+
       inFlight = request;
+
       return request;
     }
 
     /** Joins an in-flight fetch instead of issuing a duplicate request. */
     function load(): Promise<void> {
       if (inFlight) return inFlight;
+
       if (store.loaded()) return Promise.resolve();
+
       return fetchEntitlements();
     }
 

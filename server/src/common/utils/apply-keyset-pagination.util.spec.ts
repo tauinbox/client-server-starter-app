@@ -22,6 +22,7 @@ function createMockQueryBuilder(
     take: jest.fn().mockReturnThis(),
     getMany: jest.fn().mockResolvedValue(results)
   };
+
   return qb as MockQb & SelectQueryBuilder<ObjectLiteral>;
 }
 

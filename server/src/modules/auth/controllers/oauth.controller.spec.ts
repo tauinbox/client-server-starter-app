@@ -96,6 +96,7 @@ function mockExpressRequest(
     headers: { 'user-agent': 'Mozilla/5.0 Test' },
     ip: '127.0.0.1'
   };
+
   return req;
 }
 
@@ -218,11 +219,13 @@ describe('OAuthController', () => {
             }),
             getOrThrow: jest.fn().mockImplementation((key: string) => {
               const value = configValues[key];
+
               if (value === undefined) {
                 throw new TypeError(
                   `Configuration key "${key}" does not exist`
                 );
               }
+
               return value;
             })
           }
@@ -252,6 +255,7 @@ describe('OAuthController', () => {
           createdAt: new Date('2024-01-01')
         }
       ];
+
       oauthAccountServiceMock.findByUserId.mockResolvedValue(mockAccounts);
 
       const result = await controller.getOAuthAccounts(
@@ -306,6 +310,7 @@ describe('OAuthController', () => {
       const loggerError = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
+
       mailServiceMock.sendOAuthUnlinkedNotification.mockRejectedValueOnce(
         new Error('smtp down')
       );
@@ -316,6 +321,7 @@ describe('OAuthController', () => {
         {},
         mockResponse()
       );
+
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(result.message).toContain('unlinked');
@@ -539,6 +545,7 @@ describe('OAuthController', () => {
     it('mints no intent when the step-up refuses the caller', async () => {
       const res = mockResponse();
       const req = mockJwtRequest('user-1');
+
       authServiceMock.assertStepUpForUser.mockRejectedValue(
         new ApiError(
           ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD,
@@ -595,6 +602,7 @@ describe('OAuthController', () => {
         { data: unknown; purpose: string; jti: string },
         { expiresIn: number }
       ];
+
       expect(signedPayload.data).toEqual(SIGN_IN_DATA);
       expect(authServiceMock.login).not.toHaveBeenCalled();
       expect(signedPayload.purpose).toBe(TOKEN_PURPOSE.OAUTH_DATA);
@@ -639,6 +647,7 @@ describe('OAuthController', () => {
       const [signedPayload] = jwtServiceMock.sign.mock.calls[0] as [
         { data: unknown; purpose: string }
       ];
+
       expect(signedPayload.data).toEqual({
         mfaRequired: true,
         mfaToken: 'pending-token',
@@ -1119,6 +1128,7 @@ describe('OAuthController', () => {
       };
 
       const abandonedState = 'b'.repeat(64);
+
       await controller.googleCallback(
         mockExpressRequest(
           profile,
@@ -1383,6 +1393,7 @@ describe('OAuthController', () => {
       });
 
       const first = mockResponse();
+
       await controller.exchangeOAuthData(req, first);
       expect(first.cookie).toHaveBeenCalledWith(
         '__Host-refresh_token',
@@ -1391,6 +1402,7 @@ describe('OAuthController', () => {
       );
 
       const replay = mockResponse();
+
       await expect(controller.exchangeOAuthData(req, replay)).rejects.toThrow(
         'Invalid or expired OAuth data'
       );

@@ -39,6 +39,7 @@ runWithInfra('The name of a provider sign-up (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -55,6 +56,7 @@ runWithInfra('The name of a provider sign-up (e2e)', () => {
         ?.getRepository(User)
         .delete(emails.map((email) => ({ email })));
     }
+
     await app?.close();
   });
 
@@ -69,6 +71,7 @@ runWithInfra('The name of a provider sign-up (e2e)', () => {
       })
     );
     let profile: OAuthUserProfile | undefined;
+
     strategy.validate(
       'access',
       'refresh',
@@ -81,13 +84,17 @@ runWithInfra('The name of a provider sign-up (e2e)', () => {
         profile = user as OAuthUserProfile;
       }
     );
+
     if (!profile) throw new Error('the strategy gave no profile');
+
     return profile;
   }
 
   async function signUp(profile: OAuthUserProfile): Promise<User> {
     const result = await app.get(OAuthService).loginWithOAuth(profile);
+
     if ('mfaRequired' in result) throw new Error('unexpected challenge');
+
     return dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email: profile.email } });
@@ -95,7 +102,9 @@ runWithInfra('The name of a provider sign-up (e2e)', () => {
 
   function uniqueEmail(label: string): string {
     const email = `oauth-name-${label}-${Date.now()}-${randomBytes(3).toString('hex')}@example.com`;
+
     emails.push(email);
+
     return email;
   }
 
@@ -103,6 +112,7 @@ runWithInfra('The name of a provider sign-up (e2e)', () => {
     const user = await signUp(
       googleProfile(uniqueEmail('given'), { givenName: 'Madonna' })
     );
+
     expect(user.name).toBe('Madonna');
 
     const { tokens } = await app

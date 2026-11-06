@@ -44,6 +44,7 @@ const hangs = (): Promise<never> => new Promise<never>(() => {});
 describe('withProviderDeadline', () => {
   it('rejects a call that outlives the deadline, naming provider and method', async () => {
     const inner = providerStub();
+
     inner.startCheckout.mockImplementation(hangs);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
@@ -75,6 +76,7 @@ describe('withProviderDeadline', () => {
   it('passes a call that settles in time through untouched', async () => {
     const inner = providerStub();
     const session = { url: 'https://pay.example/1', sessionRef: 'pay-1' };
+
     inner.startCheckout.mockResolvedValue(session);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
@@ -89,6 +91,7 @@ describe('withProviderDeadline', () => {
 
   it('forwards every argument, including optional ones', async () => {
     const inner = providerStub();
+
     inner.chargeOffSession.mockResolvedValue({
       providerInvoiceRef: 'pay-1',
       status: 'captured'
@@ -113,6 +116,7 @@ describe('withProviderDeadline', () => {
 
   it('bounds the single-payment charge lookup too', async () => {
     const inner = providerStub();
+
     inner.getOffSessionCharge.mockImplementation(hangs);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
@@ -130,6 +134,7 @@ describe('withProviderDeadline', () => {
   it('answers a provider failure as a bad gateway that keeps the cause', async () => {
     const inner = providerStub();
     const failure = new Error('socket hang up');
+
     inner.chargeOffSession.mockRejectedValue(failure);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
@@ -150,6 +155,7 @@ describe('withProviderDeadline', () => {
   it('passes an HTTP answer of ours through, so a decline stays a decline', async () => {
     const inner = providerStub();
     const declined = new ChargeDeclinedError();
+
     inner.chargeOffSession.mockRejectedValue(declined);
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
@@ -164,6 +170,7 @@ describe('withProviderDeadline', () => {
 
   it('answers a synchronous throw as a bad gateway too', async () => {
     const inner = providerStub();
+
     inner.cancel.mockImplementation(() => {
       throw new Error('not configured');
     });
@@ -178,8 +185,10 @@ describe('withProviderDeadline', () => {
 
   it('clears the deadline timer once the call settles', async () => {
     jest.useFakeTimers();
+
     try {
       const inner = providerStub();
+
       inner.cancel.mockResolvedValue(undefined);
       const provider = withProviderDeadline(inner, TIMEOUT_MS);
 
@@ -203,15 +212,19 @@ describe('withProviderDeadline', () => {
     'keeps the error mapping but sets no timer for the disabled deadline %p',
     async (timeoutMs) => {
       jest.useFakeTimers();
+
       try {
         const inner = providerStub();
+
         inner.cancel.mockRejectedValue(new Error('socket hang up'));
         const provider = withProviderDeadline(inner, timeoutMs);
+
         expect(provider).toBeInstanceOf(DeadlineBoundProvider);
 
         const pending = provider
           .cancel('sub-1', 'immediate')
           .catch((caught: unknown) => caught);
+
         expect(jest.getTimerCount()).toBe(0);
         expectApiError(await pending, ErrorKeys.BILLING.PROVIDER_ERROR);
       } finally {

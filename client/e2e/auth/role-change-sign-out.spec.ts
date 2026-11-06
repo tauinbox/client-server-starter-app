@@ -25,6 +25,7 @@ const assignEditorRole = async (
     },
     body: JSON.stringify({ roleId: mockId('role-editor') })
   });
+
   expect(assign.status).toBe(201);
 };
 
@@ -56,6 +57,7 @@ test.describe('Sign-out on a role change', () => {
     await page.unroute(/\/api\/.*\/notifications\/stream/);
 
     const userId = mockId('user-100');
+
     await loginViaUiKeepSse(page, _mockServer.url, { id: userId });
     await page.goto('/profile');
     // The address bar shows /profile before the router commits it.
@@ -73,19 +75,24 @@ test.describe('Sign-out on a role change', () => {
     await page.unroute(/\/api\/.*\/notifications\/stream/);
 
     const userId = mockId('user-100');
+
     await loginViaUiKeepSse(page, _mockServer.url, { id: userId });
 
     // Hold the profile chunk, so the first navigation of the reload stays
     // in progress while the stream delivers the sign-out.
     const { promise: held, resolve: release } = Promise.withResolvers<void>();
+
     await page.route(/\.js$/, async (route) => {
       const response = await route.fetch();
       const body = await response.text();
+
       if (body.includes('nxs-profile')) await held;
+
       await route.fulfill({ response, body });
     });
 
     const stream = streamOpened(page);
+
     await page.goto('/profile', { waitUntil: 'commit' });
     await stream;
 
@@ -102,17 +109,20 @@ test.describe('Sign-out on a role change', () => {
     await page.unroute(/\/api\/.*\/notifications\/stream/);
 
     const userId = mockId('user-100');
+
     await loginViaUiKeepSse(page, _mockServer.url, { id: userId });
 
     // Hold the permissions response, so the bootstrap initializer is still
     // running and the router has not started its first navigation.
     const { promise: held, resolve: release } = Promise.withResolvers<void>();
+
     await page.route(/\/api\/v1\/auth\/permissions$/, async (route) => {
       await held;
       await route.continue();
     });
 
     const stream = streamOpened(page);
+
     await page.goto('/profile', { waitUntil: 'commit' });
     await stream;
 

@@ -45,6 +45,7 @@ export class ThemeService {
 
   toggleTheme(): void {
     const newTheme = this.#themeSignal() === 'light' ? 'dark' : 'light';
+
     this.#themeSignal.set(newTheme);
     this.#storage.setItem(THEME_KEY, newTheme);
   }
@@ -58,6 +59,7 @@ export class ThemeService {
     const savedTheme = this.#storage.getItem(THEME_KEY, isThemeMode);
     const prefersDark =
       this.#window?.matchMedia('(prefers-color-scheme: dark)').matches ?? false;
+
     return savedTheme || (prefersDark ? 'dark' : 'light');
   }
 

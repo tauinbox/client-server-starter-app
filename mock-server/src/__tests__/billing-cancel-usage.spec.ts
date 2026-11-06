@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -28,11 +29,13 @@ async function login(email: string): Promise<{ token: string; id: string }> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
     tokens: { access_token: string };
     user: { id: string };
   };
+
   return { token: body.tokens.access_token, id: body.user.id };
 }
 
@@ -48,7 +51,9 @@ async function activate(
       body: JSON.stringify({ userId, planKey })
     }
   );
+
   expect(res.status).toBe(200);
+
   return (await res.json()) as { id: string; customerId: string };
 }
 
@@ -58,6 +63,7 @@ async function seedUsage(customerId: string, quantity: number): Promise<void> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ customerId, quantity })
   });
+
   expect(res.status).toBe(200);
 }
 
@@ -87,6 +93,7 @@ function invoicesAddedSince(
   before: MockInvoice[]
 ): MockInvoice[] {
   const seen = new Set(before.map((i) => i.id));
+
   return invoicesOf(subscriptionId).filter((i) => !seen.has(i.id));
 }
 
@@ -102,25 +109,33 @@ async function selfManagedUsageSub(): Promise<{
 }> {
   const { token, id } = await login('user@example.com');
   const user = getState().users.get(id);
+
   expect(user).toBeDefined();
+
   if (user) user.locale = 'ru';
+
   const sub = await activate(id, 'usage');
+
   expect(getState().billingSubscriptions.get(sub.id)?.lifecycleOwner).toBe(
     'self'
   );
+
   return { token, subscriptionId: sub.id, customerId: sub.customerId };
 }
 
 describe('cancelling a usage subscription bills the period it closes', () => {
   it('invoices the metered period on an immediate cancel', async () => {
     const { token, subscriptionId, customerId } = await selfManagedUsageSub();
+
     await seedUsage(customerId, 42);
     const before = invoicesOf(subscriptionId);
 
     const res = await cancel(token, 'immediate');
+
     expect(res.status).toBe(200);
 
     const invoices = invoicesAddedSince(subscriptionId, before);
+
     expect(invoices).toHaveLength(1);
     // 42 units × 200 minor (RUB usage price, no included units).
     expect(invoices[0]).toMatchObject({
@@ -136,6 +151,7 @@ describe('cancelling a usage subscription bills the period it closes', () => {
 
   it('spends prepaid credits against the closing period', async () => {
     const { token, subscriptionId, customerId } = await selfManagedUsageSub();
+
     await seedUsage(customerId, 42);
     getState().billingCreditBalances.set(customerId, {
       customerId,
@@ -147,6 +163,7 @@ describe('cancelling a usage subscription bills the period it closes', () => {
     await cancel(token, 'immediate');
 
     const [invoice] = invoicesAddedSince(subscriptionId, before);
+
     // 42 billable − 10 credits = 32 × 200 minor.
     expect(invoice?.amountMinor).toBe(6400);
     expect(getState().billingCreditBalances.get(customerId)?.balanceUnits).toBe(
@@ -156,10 +173,12 @@ describe('cancelling a usage subscription bills the period it closes', () => {
 
   it('leaves a period-end cancel to the boundary, which then invoices and cancels', async () => {
     const { token, subscriptionId, customerId } = await selfManagedUsageSub();
+
     await seedUsage(customerId, 42);
 
     const before = invoicesOf(subscriptionId);
     const res = await cancel(token);
+
     expect(res.status).toBe(200);
     expect(invoicesAddedSince(subscriptionId, before)).toHaveLength(0);
 
@@ -171,12 +190,15 @@ describe('cancelling a usage subscription bills the period it closes', () => {
         body: JSON.stringify({ subscriptionId, outcome: 'success' })
       }
     );
+
     expect(renewal.status).toBe(200);
 
     const invoices = invoicesAddedSince(subscriptionId, before);
+
     expect(invoices).toHaveLength(1);
     expect(invoices[0]).toMatchObject({ amountMinor: 8400, status: 'paid' });
     const sub = getState().billingSubscriptions.get(subscriptionId);
+
     expect(sub?.status).toBe('canceled');
     // The period must not advance past the one just billed.
     expect(sub?.currentPeriodStart).toBe(invoices[0].periodStart);
@@ -195,6 +217,7 @@ describe('cancelling a usage subscription bills the period it closes', () => {
   it('leaves a provider-managed subscription to its cancel webhook', async () => {
     const { token, id } = await login('user@example.com');
     const sub = await activate(id, 'usage');
+
     expect(getState().billingSubscriptions.get(sub.id)?.lifecycleOwner).toBe(
       'provider'
     );

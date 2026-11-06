@@ -21,6 +21,7 @@ test.describe('Post-login admin badge', () => {
     const roleChip = page
       .locator('.profile-badges mat-chip')
       .filter({ hasText: 'admin' });
+
     await expect(roleChip).toBeVisible();
     await expect(roleChip.locator('mat-icon')).toHaveText(
       'admin_panel_settings'
@@ -43,6 +44,7 @@ test.describe('Post-login admin badge', () => {
       .locator('.role-chips mat-chip')
       .filter({ hasText: 'admin' })
       .first();
+
     await expect(adminChip).toBeVisible();
     await expect(adminChip.locator('mat-icon')).toHaveText(
       'admin_panel_settings'
@@ -62,12 +64,14 @@ test.describe('Post-login admin badge', () => {
 
     const storedRoles = await page.evaluate(() => {
       const raw = localStorage.getItem('auth_user');
+
       return raw ? (JSON.parse(raw) as { roles: unknown[] }).roles : null;
     });
 
     expect(Array.isArray(storedRoles)).toBe(true);
     expect(storedRoles).not.toHaveLength(0);
     const [first] = storedRoles as Record<string, unknown>[];
+
     expect(typeof first).toBe('object');
     expect(first).not.toBeNull();
     expect(first).toHaveProperty('id');

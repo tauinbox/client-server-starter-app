@@ -144,6 +144,7 @@ export class UsersService {
     const existingUser = await this.userRepository.findOne({
       where: addressTakenWhere(email)
     });
+
     if (existingUser) throw emailExistsConflict();
 
     const { hash, version } = await hashPassword(password);
@@ -157,7 +158,9 @@ export class UsersService {
     try {
       return await withTransaction(this.dataSource, async (manager) => {
         const saved = await manager.save(user);
+
         await this.writeAudit(manager, audit, saved);
+
         return saved;
       });
     } catch (error: unknown) {
@@ -218,6 +221,7 @@ export class UsersService {
     actorId?: string
   ): Promise<User> {
     const user = await this.loadUser(id);
+
     if (ability !== SYSTEM_ABILITY) {
       this.accessRefusals.assertCan(ability, {
         action: 'read',
@@ -227,6 +231,7 @@ export class UsersService {
         targetType: 'User'
       });
     }
+
     return user;
   }
 
@@ -241,6 +246,7 @@ export class UsersService {
       where: { id },
       relations: { roles: true }
     });
+
     if (!user) throw userNotFound(id);
 
     return user;
@@ -281,6 +287,7 @@ export class UsersService {
    */
   assertCanWrite(ability: AppAbility, check: UserWriteCheck): void {
     const { action, target, actorId } = check;
+
     this.accessRefusals.assertCan(ability, {
       action,
       subject: subject('User', target),
@@ -302,12 +309,14 @@ export class UsersService {
     { changes, actorId }: { changes: Partial<UpdateUserDto>; actorId?: string }
   ): void {
     if (ability === SYSTEM_ABILITY) return;
+
     const after = withChanges(user, {
       ...changes,
       password: undefined,
       currentPassword: undefined,
       code: undefined
     });
+
     for (const target of [user, after]) {
       this.assertCanWrite(ability, { action: 'update', target, actorId });
     }
@@ -342,6 +351,7 @@ export class UsersService {
         name: rest.name ?? user.name
       });
       const { hash, version } = await hashPassword(rest.password);
+
       changes.password = hash;
       changes.passwordHashVersion = version;
       // A password change voids every mailed proof of ownership, the same rule
@@ -373,14 +383,18 @@ export class UsersService {
     }
 
     let pendingVerificationRawToken: string | null = null;
+
     if (rest.email !== undefined && rest.email !== user.email) {
       const conflicting = await this.userRepository.findOne({
         where: addressTakenWhere(rest.email)
       });
+
       if (conflicting && conflicting.id !== user.id) {
         throw emailExistsConflict();
       }
+
       const issued = issueMailedToken(VERIFICATION_TOKEN_EXPIRY_MS);
+
       pendingVerificationRawToken = issued.rawToken;
       changes.isEmailVerified = false;
       changes.emailVerificationToken = issued.hashedToken;
@@ -396,13 +410,17 @@ export class UsersService {
     }
 
     let saved: User;
+
     try {
       saved = await withTransaction(this.dataSource, async (manager) => {
         if (ability !== SYSTEM_ABILITY) {
           const locked = await lockUserWithRoles(manager, { id });
+
           if (!locked) throw userNotFound(id);
+
           this.assertCanUpdate(ability, locked, { changes: rest, actorId });
         }
+
         // Keyed on the live row: an edit that loses to a delete answers not
         // found, and a concurrent write to another column (a password reset)
         // is kept.
@@ -412,6 +430,7 @@ export class UsersService {
         const where = expected
           ? { ...live, password: expected.password ?? IsNull() }
           : live;
+
         if (!(await keyedUpdate(manager, User, { where, changes }))) {
           if (expected && (await manager.exists(User, { where: live }))) {
             throw new ApiError(
@@ -419,13 +438,17 @@ export class UsersService {
               'Token has been revoked'
             );
           }
+
           throw userNotFound(id);
         }
+
         const written = await manager.findOneOrFail(User, {
           where: { id: user.id },
           relations: { roles: true }
         });
+
         await this.writeAudit(manager, audit, written);
+
         return written;
       });
     } catch (error: unknown) {
@@ -502,11 +525,13 @@ export class UsersService {
     password: string
   ): Promise<Pick<User, 'password' | 'passwordHashVersion'> | null> {
     if (user.password === null) return null;
+
     const { hash, version } = await hashPassword(password);
     const { affected } = await this.userRepository.update(
       { id: user.id, password: user.password },
       { password: hash, passwordHashVersion: version }
     );
+
     return affected === 0
       ? null
       : { password: hash, passwordHashVersion: version };
@@ -535,6 +560,7 @@ export class UsersService {
         emailVerificationExpiresAt: expiresAt
       }
     );
+
     return affected !== 0;
   }
 
@@ -562,6 +588,7 @@ export class UsersService {
         emailVerificationExpiresAt: null
       }
     );
+
     return result.affected !== 0;
   }
 
@@ -581,6 +608,7 @@ export class UsersService {
         passwordResetExpiresAt: expiresAt
       }
     );
+
     return affected !== 0;
   }
 
@@ -626,7 +654,9 @@ export class UsersService {
     // not found.
     await withTransaction(this.dataSource, async (manager) => {
       const locked = await lockUserWithRoles(manager, { id });
+
       if (!locked) throw userNotFound(id);
+
       if (ability !== SYSTEM_ABILITY) {
         this.assertCanWrite(ability, {
           action: 'delete',
@@ -634,7 +664,9 @@ export class UsersService {
           actorId
         });
       }
+
       const live = { id, deletedAt: IsNull() };
+
       await manager.update(User, live, {
         pendingEmail: null,
         pendingEmailToken: null,
@@ -643,7 +675,9 @@ export class UsersService {
         passwordResetExpiresAt: null
       });
       const { affected } = await manager.softDelete(User, live);
+
       if (affected === 0) throw userNotFound(id);
+
       await this.writeAudit(manager, audit, locked);
     });
   }
@@ -657,6 +691,7 @@ export class UsersService {
       relations: { roles: true },
       withDeleted: true
     });
+
     if (!user) throw userNotFound(id);
 
     if (ability !== SYSTEM_ABILITY) {
@@ -668,6 +703,7 @@ export class UsersService {
     // principal holding just `delete` re-enable a deactivated account by
     // deleting and restoring it.
     if (!user.deletedAt) throw notDeleted(id);
+
     // Keyed on the deleted state, so of two concurrent restores one writes
     // and audits and the other is refused.
     await withTransaction(this.dataSource, async (manager) => {
@@ -675,7 +711,9 @@ export class UsersService {
         id,
         withDeleted: true
       });
+
       if (!locked) throw userNotFound(id);
+
       if (ability !== SYSTEM_ABILITY) {
         this.assertCanWrite(ability, {
           action: 'delete',
@@ -683,13 +721,17 @@ export class UsersService {
           actorId
         });
       }
+
       const { affected } = await manager.restore(User, {
         id,
         deletedAt: Not(IsNull())
       });
+
       if (affected === 0) throw notDeleted(id);
+
       await this.writeAudit(manager, audit, locked);
     });
+
     return this.loadUser(id);
   }
 }

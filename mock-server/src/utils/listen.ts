@@ -25,6 +25,7 @@ export function isBlockedPort(port: number): boolean {
 
 export function portOf(server: Server): number {
   const address = server.address();
+
   return typeof address === 'object' && address ? address.port : 0;
 }
 
@@ -45,6 +46,7 @@ export function listenOnUnblockedPort(
         if (!isBlockedPort(portOf(server))) {
           releaseHeld();
           resolve(server);
+
           return;
         }
 
@@ -59,6 +61,7 @@ export function listenOnUnblockedPort(
               `Could not bind an unblocked ephemeral port after ${maxAttempts} attempts`
             )
           );
+
           return;
         }
 

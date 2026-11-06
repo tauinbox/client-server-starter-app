@@ -6,11 +6,13 @@ function fkOnDelete(target: new () => object, propertyName: string): string {
   const fk = getMetadataArgsStorage().foreignKeys.find(
     (args) => args.target === target && args.propertyName === propertyName
   );
+
   if (!fk?.onDelete) {
     throw new Error(
       `No onDelete registered for ${target.name}.${propertyName}`
     );
   }
+
   return fk.onDelete;
 }
 

@@ -56,6 +56,7 @@ describe('addInterval', () => {
 
     it('preserves the time-of-day component', () => {
       const result = addInterval(new Date('2026-01-31T13:45:30Z'), 'month');
+
       expect([
         result.getUTCHours(),
         result.getUTCMinutes(),
@@ -83,6 +84,7 @@ describe('addInterval', () => {
   // non-UTC zone; these assertions fail against it.
   describe('time-zone independence', () => {
     const originalTz = process.env['TZ'];
+
     afterAll(() => {
       process.env['TZ'] = originalTz;
     });
@@ -94,6 +96,7 @@ describe('addInterval', () => {
       interval: 'month' | 'year'
     ): string {
       process.env['TZ'] = tz;
+
       return addInterval(from, interval).toISOString();
     }
 
@@ -135,6 +138,7 @@ describe('addInterval', () => {
       (_label, from, interval, expected) => {
         const inUtc = isoUnder('UTC', from, interval);
         const inNewYork = isoUnder('America/New_York', from, interval);
+
         expect(inUtc).toBe(expected);
         expect(inNewYork).toBe(expected);
       }
@@ -151,15 +155,18 @@ describe('nextPeriodEnd', () => {
   ): string[] {
     const ends: string[] = [];
     let cursor = from;
+
     for (let i = 0; i < periods; i++) {
       cursor = nextPeriodEnd(anchor, cursor, interval);
       ends.push(cursor.toISOString().slice(0, 10));
     }
+
     return ends;
   }
 
   it('restores a 31st billing day after February', () => {
     const anchor = utc(2025, 11, 31);
+
     expect(chain(anchor, anchor, { interval: 'month', periods: 6 })).toEqual([
       '2026-01-31',
       '2026-02-28',
@@ -172,6 +179,7 @@ describe('nextPeriodEnd', () => {
 
   it('restores a 30th billing day after February', () => {
     const anchor = utc(2026, 0, 30);
+
     expect(chain(anchor, anchor, { interval: 'month', periods: 3 })).toEqual([
       '2026-02-28',
       '2026-03-30',
@@ -181,6 +189,7 @@ describe('nextPeriodEnd', () => {
 
   it('leaves a mid-month billing day unchanged', () => {
     const anchor = utc(2026, 0, 15);
+
     expect(chain(anchor, anchor, { interval: 'month', periods: 3 })).toEqual([
       '2026-02-15',
       '2026-03-15',
@@ -190,6 +199,7 @@ describe('nextPeriodEnd', () => {
 
   it('restores a leap-day billing day on the next leap year', () => {
     const anchor = utc(2024, 1, 29);
+
     expect(chain(anchor, anchor, { interval: 'year', periods: 4 })).toEqual([
       '2025-02-28',
       '2026-02-28',
@@ -203,9 +213,12 @@ describe('nextPeriodEnd', () => {
     const chained = chain(anchor, anchor, { interval: 'month', periods: 14 });
     const derived = Array.from({ length: 14 }, (_, i) => {
       let d = anchor;
+
       for (let n = 0; n <= i; n++) d = addInterval(d, 'month');
+
       return d;
     });
+
     // Chaining addInterval is the ratchet the anchor exists to undo, so only
     // the first boundary (before any clamp) may agree.
     expect(chained[0]).toBe(derived[0].toISOString().slice(0, 10));
@@ -216,6 +229,7 @@ describe('nextPeriodEnd', () => {
   it('preserves the time-of-day component', () => {
     const anchor = new Date('2026-01-31T13:45:30Z');
     const result = nextPeriodEnd(anchor, anchor, 'month');
+
     expect(result.toISOString()).toBe('2026-02-28T13:45:30.000Z');
   });
 
@@ -223,11 +237,14 @@ describe('nextPeriodEnd', () => {
     const originalTz = process.env['TZ'];
     const anchor = utc(2025, 11, 31);
     const from = utc(2026, 1, 28);
+
     try {
       process.env['TZ'] = 'UTC';
       const inUtc = nextPeriodEnd(anchor, from, 'month').toISOString();
+
       process.env['TZ'] = 'America/New_York';
       const inNewYork = nextPeriodEnd(anchor, from, 'month').toISOString();
+
       expect(inUtc).toBe('2026-03-31T00:00:00.000Z');
       expect(inNewYork).toBe('2026-03-31T00:00:00.000Z');
     } finally {

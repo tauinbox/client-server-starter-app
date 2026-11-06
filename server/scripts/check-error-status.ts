@@ -217,20 +217,26 @@ export function findProblems(
   unpatterned: Readonly<Record<string, string>>
 ): string[] {
   const problems: string[] = [];
+
   for (const { name, value } of keys) {
     const status = statusOf(value);
+
     if (status === undefined) {
       problems.push(`${name}: no status in ERROR_STATUS`);
       continue;
     }
+
     if (name in unpatterned) {
       if (!unpatterned[name].trim()) {
         problems.push(`${name}: the UNPATTERNED entry gives no reason`);
       }
+
       continue;
     }
+
     const [, keyName] = name.split('.');
     const rule = RULES.find((r) => r.pattern.test(keyName));
+
     if (!rule) {
       problems.push(
         `${name}: the name follows no pattern; add it to UNPATTERNED with the reason for ${status}`
@@ -241,12 +247,15 @@ export function findProblems(
       );
     }
   }
+
   const known = new Set(keys.map((k) => k.name));
+
   for (const name of Object.keys(unpatterned)) {
     if (!known.has(name)) {
       problems.push(`${name}: in UNPATTERNED, but no such key exists`);
     }
   }
+
   return problems;
 }
 
@@ -288,12 +297,15 @@ function selfTest(): void {
     }
   ];
   let failed = false;
+
   for (const c of cases) {
     const problems = findProblems(c.keys, (v) => c.status[v], c.unpatterned);
     const ok = problems.length > 0 === c.fails;
+
     console.log(`${ok ? 'ok' : 'FAIL'}: ${c.label}`);
     failed ||= !ok;
   }
+
   if (failed) process.exit(1);
 }
 
@@ -306,10 +318,14 @@ if (process.argv.includes('--self-test')) {
     (value) => (ERROR_STATUS as Record<string, number>)[value],
     UNPATTERNED
   );
+
   if (problems.length > 0) {
     console.error(`${problems.length} problem(s) in ERROR_STATUS:`);
+
     for (const p of problems) console.error(`  - ${p}`);
+
     process.exit(1);
   }
+
   console.log(`All ${keys.length} error keys have the status of their name.`);
 }

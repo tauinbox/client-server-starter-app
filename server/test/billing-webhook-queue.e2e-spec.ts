@@ -68,6 +68,7 @@ runWithRedis('billing webhook queue (real Redis)', () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
     await ds.initialize();
     const plans = ds.getRepository(Plan);
+
     await plans.save(
       plans.create({
         key: PLAN_KEY,
@@ -154,6 +155,7 @@ runWithRedis('billing webhook queue (real Redis)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
     const customer = await ds.getRepository(Customer).save(
       ds.getRepository(Customer).create({
@@ -166,6 +168,7 @@ runWithRedis('billing webhook queue (real Redis)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
   });
 
@@ -174,6 +177,7 @@ runWithRedis('billing webhook queue (real Redis)', () => {
     await ds
       .getRepository(WebhookEvent)
       .delete({ providerEventId: Like(`${EVENT_PREFIX}%`) });
+
     // The customer and its subscription cascade from the user.
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
@@ -190,6 +194,7 @@ runWithRedis('billing webhook queue (real Redis)', () => {
 
   async function deliverActivation(): Promise<string> {
     const providerEventId = `${EVENT_PREFIX}${customerId}`;
+
     unmarshal.mockResolvedValueOnce({
       eventId: providerEventId,
       eventType: EventName.SubscriptionCreated,
@@ -205,6 +210,7 @@ runWithRedis('billing webhook queue (real Redis)', () => {
     await ingestion.ingest('paddle', Buffer.from('{}'), {
       'paddle-signature': 'sig'
     });
+
     return providerEventId;
   }
 
@@ -216,6 +222,7 @@ runWithRedis('billing webhook queue (real Redis)', () => {
       const row = await ds
         .getRepository(WebhookEvent)
         .findOneBy({ provider: 'paddle', providerEventId });
+
       return row?.status === 'processed' ? row.status : null;
     }, timeoutMs);
   }
@@ -230,6 +237,7 @@ runWithRedis('billing webhook queue (real Redis)', () => {
     const stored = await ds
       .getRepository(Subscription)
       .findOneByOrFail({ providerSubscriptionId: `sub_${customerId}` });
+
     expect(stored).toMatchObject({
       customerId,
       planKey: PLAN_KEY,
@@ -264,7 +272,9 @@ runWithRedis('billing webhook queue (real Redis)', () => {
     // The bootstrap returns at once under NODE_ENV=test; this case is the one
     // place where its upserts run.
     const nodeEnv = process.env['NODE_ENV'];
+
     process.env['NODE_ENV'] = 'e2e-scheduler';
+
     try {
       await processor.onApplicationBootstrap();
     } finally {
@@ -277,6 +287,7 @@ runWithRedis('billing webhook queue (real Redis)', () => {
     const retention = await queue.getJobScheduler(
       BILLING_WEBHOOK_RETENTION_SCHEDULER_ID
     );
+
     expect(reconcile).toMatchObject({
       name: BILLING_WEBHOOK_RECONCILE_JOB,
       every: WEBHOOK_RECONCILE_INTERVAL_MS

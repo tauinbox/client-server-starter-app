@@ -18,6 +18,7 @@ interface ClientRequest {
  */
 export function normalizeIpAddress(ip: string | undefined): string | null {
   if (!ip || !ipaddr.isValid(ip)) return null;
+
   return ipaddr.process(ip).toString();
 }
 

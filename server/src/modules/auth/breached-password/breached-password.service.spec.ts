@@ -73,12 +73,14 @@ describe('BreachedPasswordService', () => {
     await service.assertNotBreached('Sunrise-Kettle-19', NO_CONTEXT);
 
     const [url] = fetchMock.mock.calls[0] as [string];
+
     expect(url).toBe(`${RANGE_URL}/${prefixOf('Sunrise-Kettle-19')}`);
     expect(url).not.toContain(suffixOf('Sunrise-Kettle-19'));
   });
 
   it('refuses a listed password with the shared error key', async () => {
     const password = 'Sunrise-Kettle-19';
+
     fetchMock.mockResolvedValue(okResponse(`${suffixOf(password)}:42\r\n`));
 
     await expect(
@@ -105,6 +107,7 @@ describe('BreachedPasswordService', () => {
     // `Add-Padding` mixes in decoys with a count of zero. Matching one would
     // refuse an arbitrary clean password.
     const password = 'Sunrise-Kettle-19';
+
     fetchMock.mockResolvedValue(okResponse(`${suffixOf(password)}:0\r\n`));
 
     await expect(
@@ -130,6 +133,7 @@ describe('BreachedPasswordService', () => {
         statusText: 'Service Unavailable',
         text: () => Promise.resolve('')
       };
+
       fetchMock.mockResolvedValue(failed);
 
       await expect(
@@ -142,8 +146,10 @@ describe('BreachedPasswordService', () => {
       // The signal is read after the call, not inside the stub: an assertion
       // that throws inside `fetch` is swallowed by the fail-open catch.
       let init: RequestInit | undefined;
+
       fetchMock.mockImplementation((_url: string, options: RequestInit) => {
         init = options;
+
         return Promise.reject(new DOMException('timed out', 'TimeoutError'));
       });
 
@@ -166,6 +172,7 @@ describe('BreachedPasswordService', () => {
 
   it('throws an HttpException, so the exception filter shapes the body', async () => {
     const password = 'Sunrise-Kettle-19';
+
     fetchMock.mockResolvedValue(okResponse(`${suffixOf(password)}:1\r\n`));
 
     await expect(

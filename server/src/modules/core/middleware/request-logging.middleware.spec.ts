@@ -11,11 +11,13 @@ type MockedResponse = {
 
 function createMockResponse(statusCode = 200): MockedResponse & Response {
   const emitter = new EventEmitter();
+
   return {
     statusCode,
     getHeader: jest.fn().mockReturnValue('test-request-id'),
     on: jest.fn((event: string, listener: (...args: unknown[]) => void) => {
       emitter.on(event, listener);
+
       return emitter;
     }),
     emit: emitter.emit.bind(emitter)
@@ -79,6 +81,7 @@ describe('RequestLoggingMiddleware', () => {
     res.emit('finish');
 
     const [[line]] = logSpy.mock.calls as string[][];
+
     expect(line).toContain(
       '/api/v1/auth/oauth/google/callback?state=REDACTED&code=REDACTED 302'
     );

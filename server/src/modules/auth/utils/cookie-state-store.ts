@@ -120,6 +120,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
         : undefined;
 
     const { res } = req as Request & { res?: Response };
+
     if (!res) {
       // Without a response the state is never persisted and the callback would
       // fail verification later with nothing pointing back here.
@@ -129,6 +130,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
         ),
         undefined
       );
+
       return;
     }
 
@@ -174,6 +176,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
 
     if (typeof providedState !== 'string' || providedState.length === 0) {
       callback(null, false, providedState);
+
       return;
     }
 
@@ -186,11 +189,13 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
       // Leave the other tabs' states alone: an unmatched callback must not be
       // able to cancel flows it does not own.
       callback(null, false, providedState);
+
       return;
     }
 
     const remaining = pending.filter((candidate) => candidate !== matched);
     const res = req.res as Response | undefined;
+
     if (res && remaining.length > 0) {
       this.writePendingStates(res, remaining);
     } else if (res) {
@@ -198,6 +203,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     }
 
     const report = callback as PkceVerifyCallback;
+
     report(null, matched.verifier ?? true, providedState);
   }
 
@@ -220,6 +226,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
   private bindPendingIntents(req: Request, res: Response, state: string): void {
     for (const base of [OAUTH_LINK_COOKIE, OAUTH_REAUTH_COOKIE]) {
       const intent = readHostCookie(req, base, this.secureCookies);
+
       if (!intent || isIntentBound(intent)) {
         continue;
       }
@@ -234,6 +241,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
 
   private readPendingStates(req: Request): PendingState[] {
     const raw = readHostCookie(req, this.cookieBase, this.secureCookies);
+
     if (!raw) {
       return [];
     }
@@ -246,6 +254,7 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
         const [state, expiresAt, ...verifierParts] =
           entry.split(FIELD_SEPARATOR);
         const verifier = verifierParts.join(FIELD_SEPARATOR) || undefined;
+
         return { state, expiresAt: Number(expiresAt), verifier };
       })
       .filter(

@@ -113,12 +113,14 @@ export class SessionsController {
       req.user.userId,
       sessionId
     );
+
     if (!ended) {
       throw new ApiError(ErrorKeys.AUTH.SESSION_NOT_FOUND, 'Session not found');
     }
 
     this.cookies.clearReauthProof(res);
     this.logRevoke(req, 'one', 1);
+
     return { message: 'Session has ended' };
   }
 
@@ -144,6 +146,7 @@ export class SessionsController {
 
     this.cookies.clearReauthProof(res);
     this.logRevoke(req, 'others', count);
+
     return { message: 'Other sessions have ended', count };
   }
 
@@ -159,6 +162,7 @@ export class SessionsController {
       req.user.userId,
       SYSTEM_ABILITY
     );
+
     await this.authService.assertStepUp(user, {
       currentPassword: dto.currentPassword,
       reauthProof: this.cookies.readReauthProof(req),

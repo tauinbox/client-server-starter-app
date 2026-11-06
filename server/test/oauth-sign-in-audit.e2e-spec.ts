@@ -37,6 +37,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     canActivate: (context: ExecutionContext): boolean => {
       context.switchToHttp().getRequest<{ user: OAuthUserProfile }>().user =
         currentProfile;
+
       return true;
     }
   };
@@ -44,7 +45,9 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
   const newProfile = (): OAuthUserProfile => {
     const stamp = `${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
     const email = `oauth-audit-${stamp}@example.com`;
+
     emails.push(email);
+
     return {
       provider: 'google',
       providerId: `google-${stamp}`,
@@ -72,7 +75,9 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     const oauthData = lines
       .find((line) => line.startsWith(`${oauthDataCookieName}=`))
       ?.split(';')[0];
+
     if (!oauthData) throw new Error('the callback set no oauth_data cookie');
+
     await request(app.getHttpServer() as Server)
       .post('/api/v1/auth/oauth/exchange')
       .set('X-Request-Id', requestId)
@@ -93,9 +98,12 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
   ): Promise<AuditLog[]> => {
     for (let attempt = 0; attempt < 40; attempt++) {
       if ((await rowsFor(requestId)).length >= expected) break;
+
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+
     await new Promise((resolve) => setTimeout(resolve, 200));
+
     return rowsFor(requestId);
   };
 
@@ -112,11 +120,13 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
         ...fields
       })
     );
+
     await dataSource.getRepository(OAuthAccount).save({
       userId: user.id,
       provider: profile.provider,
       providerId: profile.providerId
     });
+
     return user;
   };
 
@@ -149,12 +159,14 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
         ?.getRepository(User)
         .find({ where: { email: In(emails) } });
       const ids = users?.map((u) => u.id) ?? [];
+
       if (ids.length) {
         await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
         // oauth_accounts.user_id and refresh_tokens.user_id cascade on delete.
         await dataSource.getRepository(User).delete({ id: In(ids) });
       }
     }
+
     await app?.close();
   });
 
@@ -164,6 +176,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     const exchangeId = `oauth-audit-new-exchange-${crypto.randomUUID()}`;
 
     const response = await callback(requestId);
+
     expect(response.headers['location']).toMatch(/\/oauth\/callback$/);
     await exchange(response, exchangeId);
 
@@ -171,17 +184,20 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
       .getRepository(User)
       .findOneByOrFail({ email: currentProfile.email });
     const callbackRows = await settledRows(requestId, 1);
+
     expect(callbackRows).toHaveLength(1);
     expect(callbackRows[0].action).toBe(AuditAction.USER_REGISTER);
     expect(callbackRows[0].details).toEqual({ provider: 'google' });
 
     const exchangeRows = await settledRows(exchangeId, 1);
+
     expect(exchangeRows).toHaveLength(1);
     expect(exchangeRows[0].action).toBe(AuditAction.USER_LOGIN_SUCCESS);
     expect(exchangeRows[0].details).toEqual({
       method: 'oauth',
       provider: 'google'
     });
+
     for (const row of [...callbackRows, ...exchangeRows]) {
       expect(row.actorId).toBe(user.id);
       expect(row.ipAddress).toBeTruthy();
@@ -198,6 +214,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
 
     expect(await settledRows(requestId, 0)).toEqual([]);
     const rows = await settledRows(exchangeId, 1);
+
     expect(rows).toHaveLength(1);
     expect(rows[0].action).toBe(AuditAction.USER_LOGIN_SUCCESS);
     expect(rows[0].actorId).toBe(user.id);
@@ -210,6 +227,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     const requestId = `oauth-audit-mfa-${crypto.randomUUID()}`;
 
     const response = await callback(requestId);
+
     expect(response.headers['location']).toMatch(/\/oauth\/callback$/);
 
     expect(await settledRows(requestId, 0)).toEqual([]);
@@ -221,11 +239,13 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     const requestId = `oauth-audit-inactive-${crypto.randomUUID()}`;
 
     const response = await callback(requestId);
+
     expect(response.headers['location']).toMatch(
       /\/login\?oauth_error=auth_failed$/
     );
 
     const rows = await settledRows(requestId, 1);
+
     expect(rows).toHaveLength(1);
     expect(rows[0].action).toBe(AuditAction.USER_LOGIN_FAILURE);
     expect(rows[0].actorEmail).toBeNull();

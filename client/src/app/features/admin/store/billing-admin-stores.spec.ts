@@ -86,6 +86,7 @@ describe('Admin billing requests through the error interceptor', () => {
     const done = TestBed.inject(BillingSubscriptionsStore).cancelSubscription(
       'sub-1'
     );
+
     refuse('POST', '/subscriptions/sub-1/cancel');
 
     expect(await done).toBe(false);
@@ -99,6 +100,7 @@ describe('Admin billing requests through the error interceptor', () => {
 
   it('a refused refund shows one notification', async () => {
     const done = TestBed.inject(BillingInvoicesStore).refundInvoice('inv-1');
+
     refuse('POST', '/invoices/inv-1/refund');
 
     expect(await done).toBe(false);

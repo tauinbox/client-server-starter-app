@@ -71,6 +71,7 @@ test.describe('User List page', () => {
 
     // Table should have at least one row
     const rowCount = await page.locator('table tbody tr').count();
+
     expect(rowCount).toBeGreaterThan(0);
   });
 
@@ -91,6 +92,7 @@ test.describe('User List page', () => {
           })
         });
       }
+
       return route.fallback();
     });
     await page.goto('/users');
@@ -118,6 +120,7 @@ test.describe('User List page', () => {
     // Content is inside mat-sidenav-content (overflow: auto) — body does not scroll.
     await page.evaluate(() => {
       const content = document.querySelector('mat-sidenav-content');
+
       if (content) {
         content.scrollTop = content.scrollHeight;
       } else {
@@ -128,6 +131,7 @@ test.describe('User List page', () => {
     // More rows should appear (seed data has 70 users, page size is 20)
     await expect(async () => {
       const count = await page.locator('table tbody tr').count();
+
       expect(count).toBeGreaterThan(initialCount);
     }).toPass({ timeout: 5000 });
   });
@@ -151,6 +155,7 @@ test.describe('User List page', () => {
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z'
     };
+
     await page.route('**/api/v1/users/cursor?*', (route) => {
       if (
         route.request().method() === 'GET' &&
@@ -165,11 +170,13 @@ test.describe('User List page', () => {
           })
         });
       }
+
       return route.fallback();
     });
     await page.goto('/users');
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
+
     await row
       .locator('button', {
         has: page.locator('mat-icon', { hasText: 'visibility' })
@@ -197,6 +204,7 @@ test.describe('User List page', () => {
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z'
     };
+
     await page.route('**/api/v1/users/cursor?*', (route) => {
       if (
         route.request().method() === 'GET' &&
@@ -211,11 +219,13 @@ test.describe('User List page', () => {
           })
         });
       }
+
       return route.fallback();
     });
     await page.goto('/users');
 
     const row = page.getByRole('row', { name: /admin@example\.com/ });
+
     await row
       .locator('button', { has: page.locator('mat-icon', { hasText: 'edit' }) })
       .click();
@@ -243,6 +253,7 @@ test.describe('User List page', () => {
       createdAt: '2025-02-01T00:00:00.000Z',
       updatedAt: '2025-02-01T00:00:00.000Z'
     };
+
     await page.route('**/api/v1/users/cursor?*', (route) => {
       if (
         route.request().method() === 'GET' &&
@@ -257,11 +268,13 @@ test.describe('User List page', () => {
           })
         });
       }
+
       return route.fallback();
     });
     await page.goto('/users');
 
     const row = page.getByRole('row', { name: /john@example\.com/ });
+
     await row
       .locator('button', {
         has: page.locator('mat-icon', { hasText: 'delete' })
@@ -284,9 +297,11 @@ test.describe('User List page', () => {
 
     // Find any user row with a delete button and click it
     const rows = page.locator('table tbody tr');
+
     await expect(rows.first()).toBeVisible();
 
     const firstRow = rows.first();
+
     await firstRow
       .locator('button', {
         has: page.locator('mat-icon', { hasText: 'delete' })
@@ -312,6 +327,7 @@ test.describe('User List page', () => {
     await expect(page.locator('table tbody tr').first()).toBeVisible();
 
     const rows = page.locator('table tbody tr');
+
     await expect(rows.first()).toBeVisible();
 
     const firstRow = rows.first();

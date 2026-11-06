@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -28,8 +29,10 @@ async function loginAsAdmin(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -39,6 +42,7 @@ async function send(
   body: unknown
 ): Promise<Response> {
   const token = await loginAsAdmin();
+
   return fetch(`${baseUrl}/api/v1${path}`, {
     method,
     headers: {
@@ -63,6 +67,7 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
+
       expect(body.errors).toEqual(['displayName should not be empty']);
     });
 
@@ -75,6 +80,7 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(200);
       const resource = (await res.json()) as { displayName: string };
+
       expect(resource.displayName).toBe('Members');
     });
 
@@ -89,6 +95,7 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
+
       expect(body.errors).toEqual([
         'displayName must be shorter than or equal to 100 characters',
         'displayName must be a string'
@@ -107,6 +114,7 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
+
       expect(body.errors).toEqual([
         'description must be shorter than or equal to 500 characters'
       ]);
@@ -117,6 +125,7 @@ describe('rbac validation parity with server', () => {
         {}
       );
       const resource = (await after.json()) as { displayName: string };
+
       expect(resource.displayName).not.toBe('Renamed');
     });
 
@@ -129,6 +138,7 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
+
       expect(body.errors).toEqual([
         'property bogus should not exist',
         'property other should not exist'
@@ -149,6 +159,7 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
+
       expect(body.errors).toEqual([
         'property bogus should not exist',
         'displayName must be shorter than or equal to 100 characters',
@@ -170,6 +181,7 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
+
       expect(body.errors).toEqual([
         'each value in allowedActionNames must be shorter than or equal to 50 characters',
         'each value in allowedActionNames must be a string'
@@ -185,6 +197,7 @@ describe('rbac validation parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errors?: string[] };
+
       expect(body.errors).toEqual([
         'displayName must be shorter than or equal to 100 characters',
         'displayName must be a string',

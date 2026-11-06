@@ -10,6 +10,7 @@ const ReaderMock = jest.mocked(Reader);
 
 function createService(path: string | undefined): GeoIpService {
   const config = { get: jest.fn().mockReturnValue(path) };
+
   // @ts-expect-error a partial ConfigService is enough for this service
   return new GeoIpService(config);
 }

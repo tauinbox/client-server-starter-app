@@ -45,6 +45,7 @@ runWithInfra('Session revoke race (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -91,7 +92,9 @@ runWithInfra('Session revoke race (e2e)', () => {
     const current = (list.body as ActiveSessionResponse[]).find(
       (s) => s.current
     );
+
     if (!current) throw new Error('the new session is not in the list');
+
     return { token: tokens.access_token, sessionId: current.id };
   }
 
@@ -106,6 +109,7 @@ runWithInfra('Session revoke race (e2e)', () => {
     const original: (
       this: DeleteQueryBuilder<RefreshToken>
     ) => Promise<DeleteResult> = DeleteQueryBuilder.prototype.execute;
+
     jest
       .spyOn(DeleteQueryBuilder.prototype, 'execute')
       .mockImplementation(async function (
@@ -116,11 +120,15 @@ runWithInfra('Session revoke race (e2e)', () => {
           this.expressionMap.mainAlias?.target === RefreshToken
         ) {
           held += 1;
+
           if (held === count) release();
+
           await gate;
         }
+
         return original.call(this);
       });
+
     return { held: () => held };
   }
 
@@ -140,6 +148,7 @@ runWithInfra('Session revoke race (e2e)', () => {
     expect(barrier.held()).toBe(2);
     expect(responses.map((r) => r.status).toSorted()).toEqual([200, 404]);
     const loser = responses.find((r) => r.status === 404);
+
     expect((loser?.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.AUTH.SESSION_NOT_FOUND
     );
@@ -152,8 +161,10 @@ runWithInfra('Session revoke race (e2e)', () => {
           createdAt: MoreThanOrEqual(since)
         }
       });
+
       return found.length > 0 ? found : null;
     });
+
     expect(rows).toHaveLength(1);
     expect(rows?.[0]?.details).toEqual({ scope: 'one', count: 1 });
   }, 30000);

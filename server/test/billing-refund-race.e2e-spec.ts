@@ -47,6 +47,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
       await ds.getRepository(Invoice).delete({ customerId });
       customerId = undefined;
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
@@ -63,6 +64,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
    */
   async function warmPool(): Promise<void> {
     const runners = [ds.createQueryRunner(), ds.createQueryRunner()];
+
     await Promise.all(runners.map((r) => r.connect()));
     await Promise.all(runners.map((r) => r.release()));
   }
@@ -76,6 +78,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
 
     const customer = await ds.getRepository(Customer).save(
@@ -89,9 +92,11 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
 
     const now = new Date();
+
     return ds.getRepository(Invoice).save(
       ds.getRepository(Invoice).create({
         customerId: customer.id,
@@ -121,12 +126,14 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
    */
   function providerStub(invoiceId: string, duringCall: ConcurrentLeg | null) {
     let first = true;
+
     refund = jest.fn(async () => {
       if (first && duringCall) {
         first = false;
         await duringCall(invoiceId);
       }
     });
+
     return { id: 'yookassa', refund, cancel: jest.fn() };
   }
 
@@ -165,6 +172,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();
+
     return module.get(BillingAdminService);
   }
 
@@ -172,8 +180,10 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
     duringCall: ConcurrentLeg | null
   ): Promise<{ invoice: Invoice }> {
     const invoice = await seedPaidInvoice();
+
     service = await buildService(providerStub(invoice.id, duringCall));
     await warmPool();
+
     return { invoice };
   }
 
@@ -196,6 +206,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
     expectApiError(secondLeg, ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE);
     expect(refund).toHaveBeenCalledTimes(1);
     const row = await reload(invoice.id);
+
     expect(row?.refundedMinor.toNumber()).toBe(60000);
     expect(row?.status).toBe('paid');
   }, 30000);
@@ -212,12 +223,14 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
     // The leg whose own cumulative reaches the total is the one that settles.
     expect((secondLeg as Invoice).status).toBe('refunded');
     const row = await reload(invoice.id);
+
     expect(row?.refundedMinor.toNumber()).toBe(INVOICE_MINOR);
     expect(row?.status).toBe('refunded');
   }, 30000);
 
   it('gives the reservation back when the provider call fails', async () => {
     const { invoice } = await setup(null);
+
     refund.mockRejectedValueOnce(new Error('provider down'));
 
     await expect(service.refundInvoice(invoice.id, 60000)).rejects.toThrow(
@@ -225,12 +238,14 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
     );
 
     const released = await reload(invoice.id);
+
     expect(released?.refundedMinor.toNumber()).toBe(0);
     expect(released?.status).toBe('paid');
 
     // The whole amount is refundable again once the reservation is released.
     await service.refundInvoice(invoice.id);
     const row = await reload(invoice.id);
+
     expect(row?.refundedMinor.toNumber()).toBe(INVOICE_MINOR);
     expect(row?.status).toBe('refunded');
   }, 30000);

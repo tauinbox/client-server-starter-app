@@ -34,8 +34,36 @@ const promiseResolverSyntax = {
     'Do not take the resolve function out of a Promise executor. Use Promise.withResolvers().'
 };
 
+// Prettier keeps blank lines but never adds one. These rules add the blank
+// lines that separate the steps of a function. The `@stylistic` plugin must be
+// registered in the config block that spreads these rules.
+const blankLineRules = {
+  '@stylistic/padding-line-between-statements': [
+    'error',
+    { blankLine: 'always', prev: '*', next: 'return' },
+    { blankLine: 'always', prev: ['const', 'let'], next: '*' },
+    { blankLine: 'any', prev: ['const', 'let'], next: ['const', 'let'] },
+    {
+      blankLine: 'always',
+      prev: '*',
+      next: ['if', 'for', 'while', 'do', 'try', 'switch']
+    },
+    {
+      blankLine: 'always',
+      prev: ['if', 'for', 'while', 'do', 'try', 'switch'],
+      next: '*'
+    }
+  ],
+  '@stylistic/lines-between-class-members': [
+    'error',
+    'always',
+    { exceptAfterSingleLine: true }
+  ]
+};
+
 export default {
   ...es2025Rules,
+  ...blankLineRules,
   'object-shorthand': ['error', 'always'],
   // Declarations only: the assignment form `({ x } = obj);` reads worse than
   // `x = obj.x`.

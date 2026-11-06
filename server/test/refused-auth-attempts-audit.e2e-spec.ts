@@ -53,6 +53,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
   afterAll(async () => {
     if (previousKey === undefined) delete process.env['MFA_ENCRYPTION_KEY'];
     else process.env['MFA_ENCRYPTION_KEY'] = previousKey;
+
     if (emails.length) {
       await dataSource
         ?.getRepository(AuditLog)
@@ -61,6 +62,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
         ?.getRepository(User)
         .delete(emails.map((email) => ({ email })));
     }
+
     await app?.close();
   });
 
@@ -69,9 +71,11 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
     { verified, enrolled }: { verified: boolean; enrolled: boolean }
   ): Promise<User> {
     const email = `refused-audit-${tag}-${stamp}@example.com`;
+
     emails.push(email);
     const { hash, version } = await hashPassword(PASSWORD);
     const repository = dataSource.getRepository(User);
+
     return repository.save(
       repository.create({
         email,
@@ -96,17 +100,22 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
   ): Promise<AuditLog[]> {
     const repository = dataSource.getRepository(AuditLog);
     let rows: AuditLog[] = [];
+
     for (let attempt = 0; attempt < 40; attempt++) {
       rows = await repository.find({ where: { targetId, action } });
+
       if (rows.length >= expected) break;
+
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+
     return rows;
   }
 
   function byAttempt(rows: AuditLog[]): unknown[] {
     const attemptOf = ({ details }: AuditLog): number =>
       (details as { attempt: number }).attempt;
+
     return rows
       .toSorted((a, b) => attemptOf(a) - attemptOf(b))
       .map(({ details }) => details);
@@ -115,6 +124,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
   async function errorKeyOf(run: Promise<unknown>): Promise<unknown> {
     try {
       await run;
+
       return null;
     } catch (error) {
       return (error as { response?: { errorKey?: unknown } }).response
@@ -130,6 +140,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
     const { mfaToken } = mfaService.issuePendingToken(user);
 
     const keys: unknown[] = [];
+
     for (let i = 0; i < ATTEMPTS; i += 1) {
       keys.push(
         await errorKeyOf(mfaService.verifyChallenge(mfaToken, WRONG_CODE))
@@ -142,6 +153,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
       AuditAction.MFA_CHALLENGE_FAILURE,
       ATTEMPTS
     );
+
     expect(byAttempt(rows)).toEqual(
       Array.from({ length: ATTEMPTS }, (_, i) => ({
         stage: 'challenge',
@@ -157,6 +169,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
     });
 
     const keys: unknown[] = [];
+
     for (let i = 0; i < ATTEMPTS; i += 1) {
       keys.push(
         await errorKeyOf(
@@ -174,6 +187,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
       AuditAction.STEP_UP_FAILURE,
       ATTEMPTS
     );
+
     expect(rows).toHaveLength(ATTEMPTS);
   }, 30000);
 
@@ -184,6 +198,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
     });
 
     const keys: unknown[] = [];
+
     for (let i = 0; i < ATTEMPTS; i += 1) {
       keys.push(
         await errorKeyOf(
@@ -201,12 +216,14 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
       AuditAction.STEP_UP_FAILURE,
       ATTEMPTS
     );
+
     expect(stepUpRows).toHaveLength(ATTEMPTS);
     const codeRows = await waitForRows(
       user.id,
       AuditAction.MFA_CHALLENGE_FAILURE,
       ATTEMPTS
     );
+
     expect(byAttempt(codeRows)).toEqual(
       Array.from({ length: ATTEMPTS }, (_, i) => ({
         stage: 'step_up',
@@ -225,6 +242,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
       await errorKeyOf(authService.validateUser(user.email, PASSWORD))
     ).toBe(ErrorKeys.AUTH.EMAIL_NOT_VERIFIED);
     const rows = await waitForRows(user.id, AuditAction.USER_LOGIN_FAILURE, 1);
+
     expect(rows.map(({ details }) => details)).toEqual([
       { reason: 'email_not_verified' }
     ]);

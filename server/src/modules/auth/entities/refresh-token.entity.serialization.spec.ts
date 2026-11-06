@@ -18,11 +18,13 @@ function createRefreshToken(
 describe('RefreshToken entity serialization', () => {
   it('hides the token hash', () => {
     const plain = instanceToPlain(createRefreshToken());
+
     expect(plain).not.toHaveProperty('token');
   });
 
   it('keeps the session bookkeeping fields', () => {
     const plain = instanceToPlain(createRefreshToken());
+
     expect(plain).toMatchObject({
       id: 'rt-1',
       userId: 'user-1',

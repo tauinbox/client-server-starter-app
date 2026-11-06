@@ -12,6 +12,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -30,11 +31,13 @@ async function loginAdmin(): Promise<{ token: string; userId: string }> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
     user: { id: string };
     tokens: { access_token: string };
   };
+
   return { token: body.tokens.access_token, userId: body.user.id };
 }
 
@@ -50,8 +53,10 @@ async function activateSubscription(
       body: JSON.stringify({ userId, planKey: 'pro', status })
     }
   );
+
   expect(res.status).toBe(200);
   const sub = (await res.json()) as { id: string; customerId: string };
+
   return { subscriptionId: sub.id, customerId: sub.customerId };
 }
 
@@ -80,9 +85,11 @@ describe('admin billing mutations write audit entries', () => {
       `/admin/billing/subscriptions/${subscriptionId}/cancel`,
       { mode: 'immediate' }
     );
+
     expect(res.status).toBe(200);
 
     const entries = entriesFor('BILLING_SUBSCRIPTION_CANCEL');
+
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
       actorId: userId,
@@ -116,10 +123,12 @@ describe('admin billing mutations write audit entries', () => {
     expect((await post(token, path, { mode: 'immediate' })).status).toBe(200);
 
     const repeat = await post(token, path, { mode: 'immediate' });
+
     expect(repeat.status).toBe(409);
 
     // A period-end repeat must not flag a canceled row either.
     const periodEnd = await post(token, path, { mode: 'period_end' });
+
     expect(periodEnd.status).toBe(409);
     expect(
       getState().billingSubscriptions.get(subscriptionId)?.cancelAtPeriodEnd
@@ -136,6 +145,7 @@ describe('admin billing mutations write audit entries', () => {
     expect((await post(token, path, { mode: 'period_end' })).status).toBe(200);
 
     const repeat = await post(token, path, { mode: 'period_end' });
+
     expect(repeat.status).toBe(409);
     expect(await repeat.json()).toMatchObject({
       errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
@@ -175,12 +185,14 @@ describe('admin billing mutations write audit entries', () => {
     const { subscriptionId } = await activateSubscription(userId);
 
     const push = jest.spyOn(sseHub, 'pushToUser');
+
     try {
       const res = await post(
         token,
         `/admin/billing/subscriptions/${subscriptionId}/cancel`,
         { mode: 'immediate' }
       );
+
       expect(res.status).toBe(200);
       expect(push).toHaveBeenCalledTimes(1);
       expect(push).toHaveBeenCalledWith(userId, {
@@ -197,6 +209,7 @@ describe('admin billing mutations write audit entries', () => {
     const invoice = getState()
       .billingInvoices.values()
       .find((i) => i.customerId === customerId);
+
     expect(invoice).toBeDefined();
 
     const res = await post(
@@ -204,9 +217,11 @@ describe('admin billing mutations write audit entries', () => {
       `/admin/billing/invoices/${invoice?.id}/refund`,
       { amountMinor: 100 }
     );
+
     expect(res.status).toBe(200);
 
     const entries = entriesFor('BILLING_INVOICE_REFUND');
+
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
       targetId: invoice?.id,
@@ -240,14 +255,18 @@ describe('admin billing mutations write audit entries', () => {
     };
 
     const first = await post(token, '/admin/billing/usage', payload);
+
     expect(first.status).toBe(201);
     const record = (await first.json()) as { id: string };
 
     const replay = await post(token, '/admin/billing/usage', payload);
+
     expect(replay.status).toBe(201);
 
     const entries = entriesFor('BILLING_USAGE_RECORD');
+
     expect(entries).toHaveLength(2);
+
     for (const entry of entries) {
       expect(entry).toMatchObject({
         targetId: record.id,
@@ -282,6 +301,7 @@ describe('admin billing mutations write audit entries', () => {
       `/admin/billing/subscriptions/${unknownId}/cancel`,
       {}
     );
+
     expect(cancel.status).toBe(404);
 
     const usage = await post(token, '/admin/billing/usage', {
@@ -290,6 +310,7 @@ describe('admin billing mutations write audit entries', () => {
       quantity: 1,
       idempotencyKey: 'evt-audit-3'
     });
+
     expect(usage.status).toBe(409);
 
     expect(entriesFor('BILLING_SUBSCRIPTION_CANCEL')).toHaveLength(0);

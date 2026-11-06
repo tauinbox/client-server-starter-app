@@ -55,6 +55,7 @@ describe('configValidationSchema', () => {
 
   it('rejects a missing JWT_REFRESH_EXPIRATION', () => {
     const env: Record<string, string> = { ...validEnv };
+
     delete env['JWT_REFRESH_EXPIRATION'];
 
     const { error } = configValidationSchema.validate(env, options);
@@ -139,6 +140,7 @@ describe('configValidationSchema', () => {
 
   it('rejects a missing JWT_SECRET when the algorithm is HS256', () => {
     const env: Record<string, string> = { ...validEnv };
+
     delete env['JWT_SECRET'];
 
     const { error } = configValidationSchema.validate(env, options);
@@ -148,6 +150,7 @@ describe('configValidationSchema', () => {
 
   it('refuses an HS256 JWT_SECRET below 32 characters', () => {
     const tooShort = 'a-jwt-secret-of-thirty-two-char';
+
     expect(tooShort).toHaveLength(31);
 
     const { error } = configValidationSchema.validate(
@@ -182,15 +185,18 @@ describe('configValidationSchema', () => {
 
   it('requires key material instead of JWT_SECRET when the algorithm is RS256', () => {
     const env: Record<string, string> = { ...validEnv, JWT_ALGORITHM: 'RS256' };
+
     delete env['JWT_SECRET'];
 
     const withoutKeys = configValidationSchema.validate(env, options);
+
     expect(withoutKeys.error?.message).toContain('JWT_PRIVATE_KEY');
 
     const withKeys = configValidationSchema.validate(
       { ...env, JWT_PRIVATE_KEY: 'private-key', JWT_PUBLIC_KEY: 'public-key' },
       options
     );
+
     expect(withKeys.error).toBeUndefined();
   });
 
@@ -200,6 +206,7 @@ describe('configValidationSchema', () => {
         { ...validEnv, YOOKASSA_VAT_CODE: vatCode },
         options
       );
+
       expect(error?.message).toContain('YOOKASSA_VAT_CODE');
     }
   });
@@ -212,6 +219,7 @@ describe('configValidationSchema', () => {
       },
       options
     );
+
     expect(atMax.error).toBeUndefined();
 
     const aboveMax = configValidationSchema.validate(
@@ -221,6 +229,7 @@ describe('configValidationSchema', () => {
       },
       options
     );
+
     expect(aboveMax.error?.message).toContain('BILLING_PROVIDER_TIMEOUT_MS');
     // Three sequential calls at the maximum still end inside the lease.
     expect(3 * MAX_BILLING_PROVIDER_TIMEOUT_MS).toBeLessThan(

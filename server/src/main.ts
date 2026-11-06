@@ -27,9 +27,11 @@ async function bootstrap() {
     CoreModule.forRoot(),
     { bufferLogs: true, ...HTTP_BODY_APP_OPTIONS }
   );
+
   app.useLogger(app.get(Logger));
 
   const trustProxy = applyTrustProxy(app, process.env['TRUSTED_PROXIES']);
+
   if (trustProxy !== undefined) {
     app
       .get(Logger)
@@ -93,6 +95,7 @@ async function bootstrap() {
   app.use(compression());
   app.use(cookieParser()); // this wil allow to get parsed cookie from req.cookies instead of req.get('Cookie')
   applyBodyParsers(app);
+
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
       .setTitle('Swagger')

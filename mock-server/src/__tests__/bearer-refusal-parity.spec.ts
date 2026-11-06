@@ -33,11 +33,13 @@ async function signIn(): Promise<Session> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: USER_EMAIL, password: SEED_PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const match = /refresh_token=([^;]+)/.exec(
     res.headers.get('set-cookie') ?? ''
   );
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return {
     accessToken: body.tokens.access_token,
     refreshCookie: `refresh_token=${match?.[1] ?? ''}`
@@ -57,6 +59,7 @@ function payloadOf(token: string): Record<string, unknown> {
 /** The token of a live session, with some claims changed. */
 function withClaims(token: string, claims: Record<string, unknown>): string {
   const [header, , signature] = token.split('.');
+
   return `${header}.${encode({ ...payloadOf(token), ...claims })}.${signature}`;
 }
 
@@ -95,6 +98,7 @@ describe('a refused bearer token (JwtStrategy parity)', () => {
         cookie: session.refreshCookie
       }
     });
+
     expect(logout.ok).toBe(true);
 
     await expectRefusal(await getProfile(session.accessToken), {
@@ -106,6 +110,7 @@ describe('a refused bearer token (JwtStrategy parity)', () => {
 
   it('names a token issued before the revocation of the account', async () => {
     const { accessToken } = await signIn();
+
     findUserByEmail(USER_EMAIL)!.tokenRevokedAt = new Date(
       Date.now() + 60_000
     ).toISOString();
@@ -154,6 +159,7 @@ describe('a refused bearer token (JwtStrategy parity)', () => {
 
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
+
     expect(body['message']).toBe('Unauthorized');
     expect(body).not.toHaveProperty('errorKey');
     expect(res.headers.get('www-authenticate')).toBe('Bearer');
@@ -161,6 +167,7 @@ describe('a refused bearer token (JwtStrategy parity)', () => {
 
   it('sends the key through a permission guard too', async () => {
     const { accessToken } = await signIn();
+
     findUserByEmail(USER_EMAIL)!.tokenRevokedAt = new Date(
       Date.now() + 60_000
     ).toISOString();

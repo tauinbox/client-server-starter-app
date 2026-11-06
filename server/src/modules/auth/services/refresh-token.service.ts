@@ -120,9 +120,12 @@ export class RefreshTokenService {
     });
 
     const seen = new Set<string>();
+
     return rows.filter((row) => {
       if (seen.has(row.sessionId)) return false;
+
       seen.add(row.sessionId);
+
       return true;
     });
   }
@@ -184,6 +187,7 @@ export class RefreshTokenService {
         .filter((row) => !row.revoked && row.expires_at.getTime() > now)
         .map((row) => row.session_id)
     );
+
     return ended.size;
   }
 
@@ -209,6 +213,7 @@ export class RefreshTokenService {
    */
   async deleteBySessionId(sessionId: string): Promise<number> {
     const result = await this.repository.delete({ sessionId });
+
     return result.affected ?? 0;
   }
 
@@ -250,6 +255,7 @@ export class RefreshTokenService {
       }>();
 
     if (result?.replay !== true) return null;
+
     return {
       ageMs: Math.round(Number(result.age_ms)),
       ipAddress: result.ip_address
@@ -294,6 +300,7 @@ export class RefreshTokenService {
       .from(RefreshToken)
       .where('expires_at < :now', { now: new Date() })
       .execute();
+
     return result.affected ?? 0;
   }
 }

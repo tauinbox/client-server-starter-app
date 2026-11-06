@@ -17,6 +17,7 @@ const CREDENTIALS = { email: 'user@example.com', password: 'Password1' };
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -46,6 +47,7 @@ function post(
 
 async function login(): Promise<Record<string, unknown>> {
   const res = await post('/auth/login', CREDENTIALS);
+
   return (await res.json()) as Record<string, unknown>;
 }
 
@@ -53,6 +55,7 @@ async function accessToken(): Promise<string> {
   const body = (await login()) as {
     tokens: { access_token: string };
   };
+
   return body.tokens.access_token;
 }
 
@@ -68,6 +71,7 @@ async function clearTotpLedger(): Promise<void> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId: user?.id })
   });
+
   expect(res.status).toBe(200);
 }
 
@@ -79,6 +83,7 @@ async function enrol(): Promise<string> {
     { currentPassword: CREDENTIALS.password },
     token
   );
+
   expect(setup.status).toBe(200);
 
   const enable = await post(
@@ -86,7 +91,9 @@ async function enrol(): Promise<string> {
     { code: MOCK_TOTP_CODE },
     token
   );
+
   expect(enable.status).toBe(200);
+
   return token;
 }
 
@@ -125,6 +132,7 @@ describe('two-factor enrolment', () => {
 
   it('does not turn the factor on for a wrong code', async () => {
     const token = await accessToken();
+
     await post(
       '/auth/mfa/setup',
       { currentPassword: CREDENTIALS.password },
@@ -138,6 +146,7 @@ describe('two-factor enrolment', () => {
     expect(body['errorKey']).toBe('errors.auth.mfaEnrolmentInvalidCode');
 
     const profile = await login();
+
     expect(profile).toHaveProperty('tokens');
   });
 
@@ -161,6 +170,7 @@ describe('two-factor enrolment', () => {
 
   it('hands back the recovery codes exactly once', async () => {
     const token = await accessToken();
+
     await post(
       '/auth/mfa/setup',
       { currentPassword: CREDENTIALS.password },
@@ -177,6 +187,7 @@ describe('two-factor enrolment', () => {
       { code: MOCK_TOTP_CODE },
       token
     );
+
     expect(again.status).toBe(409);
   });
 
@@ -264,6 +275,7 @@ describe('two-factor sign-in', () => {
       mfaToken,
       code: MOCK_TOTP_CODE
     });
+
     expect(first.status).toBe(200);
 
     const res = await post('/auth/mfa/verify', {
@@ -331,6 +343,7 @@ describe('the brake on the authenticator challenge', () => {
   it('carries the window across a new pending token', async () => {
     await enrol();
     const first = (await login()) as { mfaToken: string };
+
     await guessWrong(first.mfaToken, MAX_FAILED_ATTEMPTS);
 
     const second = (await login()) as { mfaToken: string };
@@ -345,6 +358,7 @@ describe('the brake on the authenticator challenge', () => {
   it('refuses a correct code while the account is barred', async () => {
     await enrol();
     const { mfaToken } = (await login()) as { mfaToken: string };
+
     await guessWrong(mfaToken, MAX_FAILED_ATTEMPTS);
     await clearTotpLedger();
 
@@ -361,6 +375,7 @@ describe('the brake on the authenticator challenge', () => {
   it('leaves the recovery route open while the account is barred', async () => {
     await enrol();
     const { mfaToken } = (await login()) as { mfaToken: string };
+
     await guessWrong(mfaToken, MAX_FAILED_ATTEMPTS);
 
     const res = await post('/auth/mfa/recovery', {
@@ -374,6 +389,7 @@ describe('the brake on the authenticator challenge', () => {
   it('closes the window on a correct code', async () => {
     await enrol();
     const { mfaToken } = (await login()) as { mfaToken: string };
+
     await guessWrong(mfaToken, MAX_FAILED_ATTEMPTS - 1);
     await clearTotpLedger();
 
@@ -381,6 +397,7 @@ describe('the brake on the authenticator challenge', () => {
       mfaToken,
       code: MOCK_TOTP_CODE
     });
+
     expect(accepted.status).toBe(200);
 
     const next = (await login()) as { mfaToken: string };
@@ -402,6 +419,7 @@ describe('the brake on the authenticator challenge', () => {
     const failures = getState().auditLogs.filter(
       (entry) => entry.action === 'MFA_CHALLENGE_FAILURE'
     );
+
     expect(failures.map((entry) => entry.details)).toEqual([
       { stage: 'challenge', attempt: 1 },
       { stage: 'challenge', attempt: 2 }
@@ -417,6 +435,7 @@ describe('the brake on the authenticator challenge', () => {
     const failures = getState().auditLogs.filter(
       ({ action }) => action === 'MFA_CHALLENGE_FAILURE'
     );
+
     expect(failures.map(({ details }) => details)).toEqual(
       Array.from({ length: MAX_FAILED_ATTEMPTS + 2 }, (_, i) => ({
         stage: 'challenge',
@@ -442,6 +461,7 @@ describe('recovery codes', () => {
   it('refuses the same recovery code a second time', async () => {
     await enrol();
     const first = (await login()) as { mfaToken: string };
+
     await post('/auth/mfa/recovery', {
       mfaToken: first.mfaToken,
       recoveryCode: MOCK_RECOVERY_CODES[0]
@@ -475,7 +495,9 @@ describe('recovery codes', () => {
   it('accepts a legacy two-group code beside the three-group set', async () => {
     await enrol();
     const user = findUserByEmail(CREDENTIALS.email);
+
     if (!user) throw new Error('seed user missing');
+
     user.totpRecoveryCodes = [...MOCK_RECOVERY_CODES, 'VVVVVVVV-VVVVVVVV'];
 
     const { mfaToken } = (await login()) as { mfaToken: string };
@@ -522,6 +544,7 @@ describe('replacing the recovery codes', () => {
 
   it('retires every code the enrolment issued', async () => {
     const token = await enrol();
+
     await post(
       '/auth/mfa/recovery-codes',
       { currentPassword: CREDENTIALS.password },
@@ -541,6 +564,7 @@ describe('replacing the recovery codes', () => {
 
   it('signs the account in with a code of the new set', async () => {
     const token = await enrol();
+
     await post(
       '/auth/mfa/recovery-codes',
       { currentPassword: CREDENTIALS.password },
@@ -558,6 +582,7 @@ describe('replacing the recovery codes', () => {
 
   it('accepts an authenticator code in place of the password', async () => {
     const token = await enrol();
+
     await clearTotpLedger();
 
     const res = await post(
@@ -613,6 +638,7 @@ describe('replacing the recovery codes', () => {
 describe('turning the factor off', () => {
   it('accepts an authenticator code in place of the password', async () => {
     const token = await enrol();
+
     await clearTotpLedger();
 
     const res = await post(
@@ -688,6 +714,7 @@ describe('the brake on the step-up code', () => {
   async function guessWrong(token: string, times: number): Promise<void> {
     for (let i = 0; i < times; i += 1) {
       const res = await post('/auth/mfa/disable', { code: '000000' }, token);
+
       expect(res.status).toBe(403);
     }
   }
@@ -708,6 +735,7 @@ describe('the brake on the step-up code', () => {
 
   it('refuses a correct code while the account is barred', async () => {
     const token = await enrol();
+
     await clearTotpLedger();
 
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
@@ -727,7 +755,9 @@ describe('the brake on the step-up code', () => {
 
   it('audits each attempt on a barred account', async () => {
     const token = await enrol();
+
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);
+
     for (let i = 0; i < 3; i += 1) {
       expect(
         (await post('/auth/mfa/disable', { code: '000000' }, token)).status
@@ -738,6 +768,7 @@ describe('the brake on the step-up code', () => {
       getState()
         .auditLogs.filter(({ action }) => action === wanted)
         .map(({ details }) => details);
+
     expect(rows('MFA_CHALLENGE_FAILURE')).toEqual(
       Array.from({ length: MAX_FAILED_ATTEMPTS + 2 }, (_, i) => ({
         stage: 'step_up',
@@ -765,10 +796,12 @@ describe('the brake on the step-up code', () => {
 
   it('does not count a step-up that offers no code', async () => {
     const token = await enrol();
+
     await clearTotpLedger();
 
     for (let i = 0; i < MAX_FAILED_ATTEMPTS * 2; i += 1) {
       const res = await post('/auth/mfa/disable', {}, token);
+
       expect(res.status).toBe(403);
     }
 
@@ -783,6 +816,7 @@ describe('the brake on the step-up code', () => {
 
   it('closes the window on a correct code', async () => {
     const token = await enrol();
+
     await clearTotpLedger();
 
     await guessWrong(token, MAX_FAILED_ATTEMPTS - 1);

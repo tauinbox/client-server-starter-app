@@ -38,7 +38,8 @@
   --mat-button-filled-state-layer-color: var(--mat-sys-on-error);
   --mat-button-filled-ripple-color: color-mix(
     in srgb,
-    var(--mat-sys-on-error) calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
+    var(--mat-sys-on-error)
+      calc(var(--mat-sys-pressed-state-layer-opacity) * 100%),
     transparent
   );
 

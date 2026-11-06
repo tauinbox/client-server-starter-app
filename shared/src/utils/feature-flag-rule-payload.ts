@@ -48,6 +48,7 @@ export function parseFeatureFlagRulePayload(
   if (payload === null || typeof payload !== 'object') {
     return fail('Rule payload must be an object');
   }
+
   const p = payload as Record<string, unknown>;
   const { type } = p;
 
@@ -60,15 +61,18 @@ export function parseFeatureFlagRulePayload(
   switch (type as FeatureFlagRuleType) {
     case 'user': {
       const { userIds } = p;
+
       if (!isBoundedArray(userIds, FEATURE_FLAG_USER_IDS_MAX_ITEMS, isUserId)) {
         return fail(
           `user rule requires userIds: an array of up to ${FEATURE_FLAG_USER_IDS_MAX_ITEMS} UUIDs`
         );
       }
+
       return { ok: true, payload: { type: 'user', userIds } };
     }
     case 'role': {
       const { roleNames } = p;
+
       if (
         !isBoundedArray(
           roleNames,
@@ -80,10 +84,12 @@ export function parseFeatureFlagRulePayload(
           `role rule requires roleNames: an array of up to ${FEATURE_FLAG_ROLE_NAMES_MAX_ITEMS} names of 1-${ROLE_NAME_MAX_LENGTH} characters`
         );
       }
+
       return { ok: true, payload: { type: 'role', roleNames } };
     }
     case 'percentage': {
       const { percent } = p;
+
       // The bucket is an integer 0-99, so a fraction rounds the share up.
       if (
         typeof percent !== 'number' ||
@@ -93,7 +99,9 @@ export function parseFeatureFlagRulePayload(
       ) {
         return fail('percentage rule requires percent: an integer in [0, 100]');
       }
+
       const { bucketBy } = p;
+
       if (
         bucketBy !== undefined &&
         !FEATURE_FLAG_BUCKET_BY.includes(bucketBy as FeatureFlagBucketBy)
@@ -102,6 +110,7 @@ export function parseFeatureFlagRulePayload(
           `percentage rule bucketBy must be one of ${FEATURE_FLAG_BUCKET_BY.join(', ')}`
         );
       }
+
       return {
         ok: true,
         payload: {
@@ -115,6 +124,7 @@ export function parseFeatureFlagRulePayload(
     }
     case 'attribute': {
       const { field, op, value, customKey } = p;
+
       if (
         typeof field !== 'string' ||
         !FEATURE_FLAG_ATTRIBUTE_FIELDS.includes(
@@ -125,6 +135,7 @@ export function parseFeatureFlagRulePayload(
           `attribute rule requires field ∈ ${FEATURE_FLAG_ATTRIBUTE_FIELDS.join(', ')}`
         );
       }
+
       if (
         typeof op !== 'string' ||
         !FEATURE_FLAG_ATTRIBUTE_OPS.includes(op as FeatureFlagAttributeOp)
@@ -133,6 +144,7 @@ export function parseFeatureFlagRulePayload(
           `attribute rule requires op ∈ ${FEATURE_FLAG_ATTRIBUTE_OPS.join(', ')}`
         );
       }
+
       if (
         !FEATURE_FLAG_ATTRIBUTE_FIELD_OPS[
           field as FeatureFlagAttributeField
@@ -142,23 +154,28 @@ export function parseFeatureFlagRulePayload(
           `attribute rule with field=${field} does not support op=${op}`
         );
       }
+
       if (field === 'custom') {
         if (typeof customKey !== 'string' || customKey === '') {
           return fail(
             'attribute rule with field=custom requires customKey: string'
           );
         }
+
         if (!knownCustomKeys.has(customKey)) {
           return fail(
             `customKey "${customKey}" is not registered in the attribute registry`
           );
         }
       }
+
       const valueError = attributeValueError(
         op as FeatureFlagAttributeOp,
         value
       );
+
       if (valueError) return fail(valueError);
+
       return {
         ok: true,
         payload: {

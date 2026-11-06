@@ -204,6 +204,7 @@ describe('BillingStore', () => {
 
   it('loadSettings populates state and derives the current plan', async () => {
     const store = createStore();
+
     await store.loadSettings();
 
     expect(store.plans()).toHaveLength(1);
@@ -227,6 +228,7 @@ describe('BillingStore', () => {
       of({ ...activeSub, status } satisfies SubscriptionResponse)
     );
     const store = createStore();
+
     await store.loadSettings();
 
     expect(store.hasActiveSubscription()).toBe(expected);
@@ -235,6 +237,7 @@ describe('BillingStore', () => {
   it('hasActiveSubscription is false without a subscription', async () => {
     billingMock.getSubscription.mockReturnValue(of(null));
     const store = createStore();
+
     await store.loadSettings();
 
     expect(store.hasActiveSubscription()).toBe(false);
@@ -243,6 +246,7 @@ describe('BillingStore', () => {
   it('loadSettings keeps the slices that loaded when one request fails', async () => {
     billingMock.getCredits.mockReturnValue(throwError(() => new Error('503')));
     const store = createStore();
+
     await store.loadSettings();
 
     expect(store.credits()).toBeNull();
@@ -262,6 +266,7 @@ describe('BillingStore', () => {
     billingMock.getCredits.mockReturnValue(throwError(() => new Error('503')));
     billingMock.getUsage.mockReturnValue(throwError(() => new Error('503')));
     const store = createStore();
+
     await store.loadSettings();
 
     expect(store.plans()).toHaveLength(1);
@@ -270,6 +275,7 @@ describe('BillingStore', () => {
 
   it('loadPricing skips authed-only calls for anonymous visitors', async () => {
     const store = createStore();
+
     await store.loadPricing(false);
 
     expect(billingMock.getPlans).toHaveBeenCalled();
@@ -280,6 +286,7 @@ describe('BillingStore', () => {
 
   it('loadPricing loads the one-time catalog for authenticated callers', async () => {
     const store = createStore();
+
     await store.loadPricing(true);
 
     expect(billingMock.getProducts).toHaveBeenCalled();
@@ -288,6 +295,7 @@ describe('BillingStore', () => {
   it('purchase returns the provider session', async () => {
     const store = createStore();
     const session = await store.purchase({ productKey: 'report-pack' });
+
     expect(session?.sessionRef).toBe('ot-1');
     expect(billingMock.purchase).toHaveBeenCalledWith({
       productKey: 'report-pack'
@@ -299,6 +307,7 @@ describe('BillingStore', () => {
     billingMock.purchase.mockReturnValue(throwError(() => new Error('boom')));
     const store = createStore();
     const session = await store.purchase({ productKey: 'report-pack' });
+
     expect(session).toBeNull();
     expect(notifyMock.error).toHaveBeenCalledWith(
       expect.anything(),
@@ -309,6 +318,7 @@ describe('BillingStore', () => {
   it('refreshInvoices patches the invoice list', async () => {
     const store = createStore();
     const invoices = await store.refreshInvoices();
+
     expect(invoices).toHaveLength(1);
     expect(store.entities()).toHaveLength(1);
   });
@@ -316,6 +326,7 @@ describe('BillingStore', () => {
   it('loadSettings asks for the first page of invoices', async () => {
     billingMock.getInvoices.mockReturnValue(of(page([invoice], 'cur-1')));
     const store = createStore();
+
     await store.loadSettings();
 
     expect(billingMock.getInvoices).toHaveBeenCalledWith(
@@ -329,9 +340,11 @@ describe('BillingStore', () => {
   it('loadMoreInvoices appends the next page behind the cursor', async () => {
     billingMock.getInvoices.mockReturnValue(of(page([invoice], 'cur-1')));
     const store = createStore();
+
     await store.loadSettings();
 
     const second = { ...invoice, id: 'inv-2' };
+
     billingMock.getInvoices.mockReturnValue(of(page([second])));
     store.loadMoreInvoices();
     await Promise.resolve();
@@ -348,6 +361,7 @@ describe('BillingStore', () => {
   it('ignores loadMoreInvoices once the server reports no more rows', async () => {
     billingMock.getInvoices.mockReturnValue(of(page([invoice])));
     const store = createStore();
+
     await store.loadSettings();
     const callsAfterLoad = billingMock.getInvoices.mock.calls.length;
 
@@ -359,8 +373,10 @@ describe('BillingStore', () => {
 
   it('refreshInvoices leaves the page flag alone', async () => {
     const store = createStore();
+
     await store.loadSettings();
     const pending = new Subject<CursorPaginatedResponse<InvoiceResponse>>();
+
     billingMock.getInvoices.mockReturnValue(pending);
 
     const done = store.refreshInvoices();
@@ -379,6 +395,7 @@ describe('BillingStore', () => {
   it('refreshInvoices restarts from the first page', async () => {
     billingMock.getInvoices.mockReturnValue(of(page([invoice], 'cur-1')));
     const store = createStore();
+
     await store.loadSettings();
 
     await store.refreshInvoices();
@@ -391,6 +408,7 @@ describe('BillingStore', () => {
   it('checkout returns the provider session', async () => {
     const store = createStore();
     const session = await store.checkout('pro');
+
     expect(session?.url).toBe('https://x');
     expect(store.working()).toBe(false);
   });
@@ -398,6 +416,7 @@ describe('BillingStore', () => {
   it('cancel updates the subscription and notifies success', async () => {
     const store = createStore();
     const ok = await store.cancel('period_end');
+
     expect(ok).toBe(true);
     expect(store.subscription()?.cancelAtPeriodEnd).toBe(true);
     expect(notifyMock.success).toHaveBeenCalled();
@@ -405,6 +424,7 @@ describe('BillingStore', () => {
 
   it('changePlan patches the subscription and refreshes invoices, usage and credits', async () => {
     const changeInvoice = { ...invoice, id: 'inv-2', status: 'refunded' };
+
     billingMock.getInvoices.mockReturnValue(of(page([invoice, changeInvoice])));
     const store = createStore();
 
@@ -435,6 +455,7 @@ describe('BillingStore', () => {
   it('startPaymentMethodUpdate returns the provider session', async () => {
     const store = createStore();
     const session = await store.startPaymentMethodUpdate();
+
     expect(session?.url).toBe('https://pm');
     expect(store.working()).toBe(false);
   });
@@ -445,6 +466,7 @@ describe('BillingStore', () => {
     );
     const store = createStore();
     const session = await store.startPaymentMethodUpdate();
+
     expect(session).toBeNull();
     expect(notifyMock.error).toHaveBeenCalled();
   });
@@ -453,12 +475,14 @@ describe('BillingStore', () => {
     billingMock.checkout.mockReturnValue(throwError(() => new Error('boom')));
     const store = createStore();
     const session = await store.checkout('pro');
+
     expect(session).toBeNull();
     expect(notifyMock.error).toHaveBeenCalled();
   });
 
   it('setRegion stores the updated region', async () => {
     const store = createStore();
+
     await store.setRegion('ru');
     expect(store.region()?.effectiveProvider).toBe('yookassa');
   });
@@ -574,6 +598,7 @@ describe('Billing requests through the error interceptor', () => {
     });
     httpMock = TestBed.inject(HttpTestingController);
     const notify = TestBed.inject(NotifyService);
+
     notifyError = vi.spyOn(notify, 'error');
     notifyWarn = vi.spyOn(notify, 'warn');
   });
@@ -664,6 +689,7 @@ describe('Billing requests through the error interceptor', () => {
     'a refused %s shows one notification',
     async (_name, run, method, path, fallbackKey) => {
       const done = run(TestBed.inject(BillingStore));
+
       refuse(method, path);
       await done;
       await settle();
@@ -679,9 +705,11 @@ describe('Billing requests through the error interceptor', () => {
 
   it('a settings load with every read refused shows one notification', async () => {
     const done = TestBed.inject(BillingStore).loadSettings();
+
     httpMock
       .expectOne((request) => request.url === `${BILLING_API_V1}/invoices`)
       .flush(page([invoice]));
+
     for (const path of [
       '/subscription',
       '/payment-method',
@@ -692,6 +720,7 @@ describe('Billing requests through the error interceptor', () => {
     ]) {
       refuse('GET', path);
     }
+
     await done;
     await settle();
 
@@ -701,6 +730,7 @@ describe('Billing requests through the error interceptor', () => {
   it('a settings load keeps the page flag on until every read lands', async () => {
     const store = TestBed.inject(BillingStore);
     const done = store.loadSettings();
+
     httpMock
       .expectOne((request) => request.url === `${BILLING_API_V1}/invoices`)
       .flush(page([invoice]));
@@ -722,6 +752,7 @@ describe('Billing requests through the error interceptor', () => {
         .expectOne((request) => request.url === `${BILLING_API_V1}${path}`)
         .flush(body);
     }
+
     await done;
 
     expect(store.pageLoading()).toBe(false);
@@ -730,6 +761,7 @@ describe('Billing requests through the error interceptor', () => {
   it('a refused next page of invoices shows one notification', async () => {
     const store = TestBed.inject(BillingStore);
     const firstPage = store.refreshInvoices();
+
     httpMock
       .expectOne((request) => request.url === `${BILLING_API_V1}/invoices`)
       .flush(page([invoice], 'cur-1'));

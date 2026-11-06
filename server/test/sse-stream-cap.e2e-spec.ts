@@ -60,11 +60,13 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
         userAgent: 'sse-e2e',
         ipAddress: '203.0.113.9'
       });
+
     token = tokens.access_token;
   }, 60000);
 
   afterAll(async () => {
     for (const req of requests) req.destroy();
+
     await dataSource?.getRepository(User).delete({ email });
     await app?.close();
   });
@@ -87,18 +89,23 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
             body: () => body,
             close: () => req.destroy()
           };
+
           res.on('error', () => undefined);
           res.setEncoding('utf8');
           res.on('data', (chunk: string) => {
             body += chunk;
           });
+
           if (status === 200) {
             resolve(response);
+
             return;
           }
+
           res.on('end', () => resolve(response));
         }
       );
+
       req.on('error', reject);
       requests.push(req);
     });
@@ -106,14 +113,17 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
 
   it('accepts the streams up to the limit, refuses the next with 429 and accepts one again after a stream closes', async () => {
     const open: StreamResponse[] = [];
+
     for (let i = 0; i < MAX_SSE_STREAMS_PER_USER; i++) {
       open.push(await requestStream());
     }
+
     expect(open.map((stream) => stream.status)).toEqual(
       Array<number>(MAX_SSE_STREAMS_PER_USER).fill(200)
     );
 
     const refused = await requestStream();
+
     expect(refused.status).toBe(429);
     expect(JSON.parse(refused.body())).toMatchObject({
       statusCode: 429,
@@ -123,10 +133,14 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
     open[0].close();
     const reopened = await eventually(async () => {
       const stream = await requestStream();
+
       if (stream.status === 200) return stream;
+
       return null;
     });
+
     expect(reopened?.status).toBe(200);
+
     for (const stream of [...open.slice(1), reopened]) stream?.close();
   }, 30000);
 
@@ -135,8 +149,10 @@ runWithInfra('The open SSE streams of one user are limited (e2e)', () => {
   it('sends a frame when the stream opens', async () => {
     const stream = await eventually(async () => {
       const candidate = await requestStream();
+
       return candidate.status === 200 ? candidate : null;
     });
+
     expect(stream?.status).toBe(200);
 
     const opened = await eventually(() =>

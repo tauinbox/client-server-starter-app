@@ -64,22 +64,26 @@ export class WebhookIngestionService {
     }
 
     const provider = this.providers.find((p) => p.id === providerId);
+
     if (!provider) {
       // eslint-disable-next-line no-restricted-syntax -- the caller is a payment provider, not a user
       throw new BadRequestException('Unknown billing provider');
     }
 
     const event = await provider.verifyAndParseWebhook(rawBody, headers);
+
     if (event === null) {
       // Signature invalid, or a payload the provider cannot confirm.
       // eslint-disable-next-line no-restricted-syntax -- the caller is a payment provider, not a user
       throw new BadRequestException('Webhook verification failed');
     }
+
     if (event === WEBHOOK_IGNORED) {
       // Ack: a Bad Request would retry a delivery that can never do anything,
       // and would make routine traffic indistinguishable from a forged
       // signature.
       this.logger.debug(`Ignored ${providerId} webhook with nothing to reduce`);
+
       return;
     }
 
@@ -99,8 +103,10 @@ export class WebhookIngestionService {
       .execute();
 
     const inserted = result.raw as Array<{ id: string }>;
+
     if (inserted.length > 0) {
       await this.dispatch({ webhookEventId: inserted[0].id, event });
+
       return;
     }
 
@@ -111,10 +117,12 @@ export class WebhookIngestionService {
       where: { provider: providerId, providerEventId: event.providerEventId },
       select: { id: true, status: true }
     });
+
     if (!existing || existing.status === 'processed') {
       this.logger.debug(
         `Duplicate ${providerId} webhook ${event.providerEventId} ignored`
       );
+
       return;
     }
 
@@ -138,8 +146,10 @@ export class WebhookIngestionService {
         removeOnComplete: true,
         removeOnFail: 100
       });
+
       return;
     }
+
     await this.processEvent(data);
   }
 

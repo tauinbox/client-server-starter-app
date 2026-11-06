@@ -34,6 +34,7 @@ describe('FacebookStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.emailVerified).toBe(false);
     expect(profile.provider).toBe(OAuthProvider.FACEBOOK);
   });
@@ -53,6 +54,7 @@ describe('FacebookStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.emailVerified).toBe(false);
   });
 
@@ -71,6 +73,7 @@ describe('FacebookStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.email).toBe('john@example.com');
   });
 });

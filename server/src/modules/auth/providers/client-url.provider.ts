@@ -12,17 +12,21 @@ export function validateClientUrl(url: string | undefined): string {
   if (!url) {
     throw new Error('CLIENT_URL environment variable is not configured');
   }
+
   let parsed: URL;
+
   try {
     parsed = new URL(url);
   } catch {
     throw new Error(`CLIENT_URL is not a valid URL: ${url}`);
   }
+
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     throw new Error(
       `CLIENT_URL must use http or https protocol, got: ${parsed.protocol}`
     );
   }
+
   return url;
 }
 

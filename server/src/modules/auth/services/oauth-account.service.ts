@@ -42,6 +42,7 @@ export class OAuthAccountService {
       .returning(['provider'])
       .execute();
     const rows = result.raw as Pick<OAuthAccount, 'provider'>[];
+
     return rows.map((row) => row.provider);
   }
 

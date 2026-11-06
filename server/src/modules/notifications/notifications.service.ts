@@ -75,6 +75,7 @@ export class NotificationsService {
         HttpStatus.TOO_MANY_REQUESTS
       );
     }
+
     const subject = this.createStream(userId, connectionId);
     const heartbeat$ = interval(this.heartbeatIntervalMs).pipe(
       exhaustMap(() => this.#isSessionLive(sessionId)),
@@ -91,6 +92,7 @@ export class NotificationsService {
       // The merge completes only when the subject completes too.
       finalize(() => this.closeStream(userId, connectionId))
     );
+
     // The first frame tells the client at once that the stream is live, so it
     // can reload what it missed while it was not connected.
     return merge(subject.asObservable(), heartbeat$).pipe(
@@ -110,6 +112,7 @@ export class NotificationsService {
           error instanceof Error ? error.message : String(error)
         }`
       );
+
       return true;
     }
   }
@@ -119,19 +122,26 @@ export class NotificationsService {
       this.#connections.set(userId, new Map());
       this.bus.userConnected(userId);
     }
+
     const subject = new Subject<MessageEvent>();
+
     this.#connections.get(userId)!.set(connectionId, subject);
+
     return subject;
   }
 
   closeStream(userId: string, connectionId: string): void {
     const userConnections = this.#connections.get(userId);
+
     if (!userConnections) return;
+
     const subject = userConnections.get(connectionId);
+
     if (subject) {
       subject.complete();
       userConnections.delete(connectionId);
     }
+
     if (userConnections.size === 0) {
       this.#connections.delete(userId);
       this.bus.userDisconnected(userId);
@@ -140,9 +150,11 @@ export class NotificationsService {
 
   #countConnections(): number {
     let count = 0;
+
     for (const userConns of this.#connections.values()) {
       count += userConns.size;
     }
+
     return count;
   }
 
@@ -161,6 +173,7 @@ export class NotificationsService {
   ): Promise<void> {
     const connected = await this.#connectedUserIds();
     const recipients = userIds.filter((userId) => connected.has(userId));
+
     if (recipients.length > 0) {
       this.#send({ userIds: recipients, event });
     }
@@ -183,6 +196,7 @@ export class NotificationsService {
   ): Promise<void> {
     const userIds = await this.#connectedUserIds();
     let holders: string[];
+
     try {
       holders = await this.permissionService.filterGrantHolders(
         Array.from(userIds),
@@ -196,9 +210,12 @@ export class NotificationsService {
           error instanceof Error ? error.message : String(error)
         }`
       );
+
       return;
     }
+
     const recipients: string[] = [];
+
     // A batch limit: on a cache miss each resolution reads the database.
     for (let i = 0; i < holders.length; i += ABILITY_BATCH_SIZE) {
       const allowed = await Promise.all(
@@ -208,8 +225,10 @@ export class NotificationsService {
             (await this.#can(userId, allows)) ? userId : null
           )
       );
+
       recipients.push(...allowed.filter((userId) => userId !== null));
     }
+
     if (recipients.length > 0) {
       this.#send({ userIds: recipients, event });
     }
@@ -232,6 +251,7 @@ export class NotificationsService {
     const targets = userIds
       ? userIds.map((userId) => this.#connections.get(userId))
       : this.#connections.values();
+
     for (const userConnections of targets) {
       for (const subject of userConnections?.values() ?? []) {
         subject.next(message);
@@ -245,6 +265,7 @@ export class NotificationsService {
   ): Promise<boolean> {
     try {
       const { ability } = await this.caslAbilityFactory.resolveForUser(userId);
+
       return allows(ability);
     } catch (error) {
       // Fail closed: an unresolvable ability must not widen the audience
@@ -253,6 +274,7 @@ export class NotificationsService {
           error instanceof Error ? error.message : String(error)
         }`
       );
+
       return false;
     }
   }

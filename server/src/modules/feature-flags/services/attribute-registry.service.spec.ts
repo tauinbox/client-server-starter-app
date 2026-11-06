@@ -14,6 +14,7 @@ describe('AttributeRegistryService', () => {
       { userId: 'u1', email: 'alice@acme.org', createdAt: new Date(0) },
       fakeReq
     );
+
     expect(out['email']).toBe('alice@acme.org');
     expect(out['emailDomain']).toBe('acme.org');
     expect(out['createdAt']).toEqual(new Date(0));
@@ -24,6 +25,7 @@ describe('AttributeRegistryService', () => {
       { userId: 'u1', email: null, createdAt: null },
       fakeReq
     );
+
     expect('email' in out).toBe(false);
     expect('createdAt' in out).toBe(false);
     expect('emailDomain' in out).toBe(false);
@@ -36,11 +38,13 @@ describe('AttributeRegistryService', () => {
       { userId: 'u1', email: null, createdAt: null },
       fakeReq
     );
+
     expect(out['tier']).toBe('gold');
   });
 
   it('built-in keys are excluded from getKnownCustomKeys', () => {
     const customs = service.getKnownCustomKeys();
+
     expect(customs.has('email')).toBe(false);
     expect(customs.has('emailDomain')).toBe(false);
     expect(customs.has('createdAt')).toBe(false);
@@ -63,6 +67,7 @@ describe('AttributeRegistryService', () => {
       { userId: 'u1', email: 'no-at-sign', createdAt: null },
       fakeReq
     );
+
     expect(out['email']).toBe('no-at-sign');
     expect('emailDomain' in out).toBe(false);
   });

@@ -30,6 +30,7 @@ export class SecretEncryptionService {
 
   constructor(configService: ConfigService) {
     const raw = configService.get<string>('MFA_ENCRYPTION_KEY');
+
     this.key = raw ? Buffer.from(raw, 'base64') : null;
 
     if (this.key !== null && this.key.length !== KEY_BYTES) {
@@ -81,6 +82,7 @@ export class SecretEncryptionService {
     }
 
     const decipher = createDecipheriv(ALGORITHM, key, iv);
+
     decipher.setAuthTag(authTag);
 
     return Buffer.concat([
@@ -93,6 +95,7 @@ export class SecretEncryptionService {
     if (this.key === null) {
       throw new Error('MFA_ENCRYPTION_KEY is not configured');
     }
+
     return this.key;
   }
 }
@@ -104,5 +107,6 @@ export class SecretEncryptionService {
 export function digestsMatch(left: string, right: string): boolean {
   const a = Buffer.from(left, 'hex');
   const b = Buffer.from(right, 'hex');
+
   return a.length === b.length && timingSafeEqual(a, b);
 }

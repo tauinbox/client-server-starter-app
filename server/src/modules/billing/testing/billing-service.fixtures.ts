@@ -9,6 +9,7 @@ export async function expectRefusal(
   errorKey: ErrorKey
 ): Promise<void> {
   const error: unknown = await action.catch((caught: unknown) => caught);
+
   expect(error).toBeInstanceOf(ApiError);
   expect((error as ApiError).errorKey).toBe(errorKey);
   expect((error as ApiError).getStatus()).toBe(ERROR_STATUS[errorKey]);
@@ -36,17 +37,20 @@ export type RepoMock = {
 /** Chainable query-builder stub; `getMany` is what each test drives. */
 function queryBuilder(): QueryBuilderMock {
   const qb: Partial<QueryBuilderMock> = {};
+
   qb.where = jest.fn().mockReturnValue(qb);
   qb.andWhere = jest.fn().mockReturnValue(qb);
   qb.orderBy = jest.fn().mockReturnValue(qb);
   qb.addOrderBy = jest.fn().mockReturnValue(qb);
   qb.take = jest.fn().mockReturnValue(qb);
   qb.getMany = jest.fn().mockResolvedValue([]);
+
   return qb as QueryBuilderMock;
 }
 
 export function repo(): RepoMock {
   const qb = queryBuilder();
+
   return {
     findOne: jest.fn().mockResolvedValue(null),
     find: jest.fn().mockResolvedValue([]),

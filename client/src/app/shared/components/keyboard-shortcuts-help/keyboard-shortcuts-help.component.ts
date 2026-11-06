@@ -22,18 +22,23 @@ const GROUP_ORDER: Record<string, number> = {
 
 function groupShortcuts(shortcuts: ShortcutDef[]): ShortcutGroup[] {
   const map = new Map<string, ShortcutDef[]>();
+
   for (const s of shortcuts) {
     if (!map.has(s.group)) {
       map.set(s.group, []);
     }
+
     map.get(s.group)!.push(s);
   }
+
   return Array.from(map.entries())
     .map(([group, items]) => ({ group, shortcuts: items }))
     .toSorted((a, b) => {
       const aOrder = GROUP_ORDER[a.group] ?? 99;
       const bOrder = GROUP_ORDER[b.group] ?? 99;
+
       if (aOrder !== bOrder) return aOrder - bOrder;
+
       return a.group.localeCompare(b.group);
     });
 }
@@ -74,12 +79,14 @@ export class KeyboardShortcutsHelpComponent {
     const labels = this.isMac ? MAC_SYMBOLS : WIN_LABELS;
     const mapped = parts.map((part) => {
       if (part in labels) return labels[part];
+
       return /^[a-z]$/.test(part) ? part.toUpperCase() : part;
     });
     // Mac: symbol modifiers join without separator (⌘S, ⌘/)
     // Windows: join with + (Ctrl+S, Ctrl+/)
     const hasMacSymbol =
       this.isMac && mapped.some((p) => ['⌘', '⇧', '⌥'].includes(p));
+
     return hasMacSymbol ? mapped.join('') : mapped.join('+');
   }
 }

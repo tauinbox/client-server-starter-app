@@ -32,6 +32,7 @@ function reducible(result: WebhookVerificationResult): NormalizedEvent {
   if (result === null || result === WEBHOOK_IGNORED) {
     throw new Error(`Expected a normalized event, got ${String(result)}`);
   }
+
   return result;
 }
 
@@ -81,6 +82,7 @@ async function build(
       }
     ]
   }).compile();
+
   return {
     provider: module.get(YooKassaProvider),
     client,
@@ -131,6 +133,7 @@ describe('YooKassaProvider', () => {
 
     it('accepts a valid YOOKASSA_VAT_CODE', async () => {
       const { provider } = await build({ vatCode: '6' });
+
       expect(provider).toBeDefined();
     });
   });
@@ -138,6 +141,7 @@ describe('YooKassaProvider', () => {
   describe('startCheckout', () => {
     it('creates a paid first payment with a 54-FZ receipt and returns the redirect url', async () => {
       const { provider, client, users } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-1',
         status: 'pending',
@@ -153,6 +157,7 @@ describe('YooKassaProvider', () => {
         ICreatePayment,
         string
       ];
+
       expect(payload).toMatchObject({
         amount: { value: '990.00', currency: 'RUB' },
         capture: true,
@@ -187,6 +192,7 @@ describe('YooKassaProvider', () => {
 
     it('binds the card with a zero-amount payment and no receipt for a trial plan', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-2',
         status: 'pending',
@@ -200,6 +206,7 @@ describe('YooKassaProvider', () => {
       );
 
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+
       expect(payload.amount).toEqual({ value: '0.00', currency: 'RUB' });
       expect(payload.save_payment_method).toBe(true);
       expect(payload.receipt).toBeUndefined();
@@ -207,6 +214,7 @@ describe('YooKassaProvider', () => {
 
     it('charges the full price with a receipt when the trial is not given', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-4',
         status: 'pending',
@@ -220,12 +228,14 @@ describe('YooKassaProvider', () => {
       );
 
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+
       expect(payload.amount).toEqual({ value: '990.00', currency: 'RUB' });
       expect(payload.receipt).toBeDefined();
     });
 
     it('throws when the plan has no YooKassa price', async () => {
       const { provider } = await build();
+
       await expectApiRejection(
         provider.startCheckout(
           customer,
@@ -238,6 +248,7 @@ describe('YooKassaProvider', () => {
 
     it('throws when YooKassa returns no confirmation url', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-3',
         confirmation: {}
@@ -250,6 +261,7 @@ describe('YooKassaProvider', () => {
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
+
       await expectApiRejection(
         provider.startCheckout(customer, paidPlan, { urls, trial: false }),
         ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
@@ -260,6 +272,7 @@ describe('YooKassaProvider', () => {
   describe('updatePaymentMethod', () => {
     it('re-binds the card with a zero-amount payment, no receipt, and the method-update marker', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-mu',
         status: 'pending',
@@ -275,6 +288,7 @@ describe('YooKassaProvider', () => {
         ICreatePayment,
         string
       ];
+
       expect(payload).toMatchObject({
         amount: { value: '0.00', currency: 'RUB' },
         capture: true,
@@ -297,6 +311,7 @@ describe('YooKassaProvider', () => {
 
     it('throws when YooKassa returns no confirmation url', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-mu',
         confirmation: {}
@@ -309,6 +324,7 @@ describe('YooKassaProvider', () => {
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
+
       await expectApiRejection(
         provider.updatePaymentMethod(null, customer, { currency: 'RUB', urls }),
         ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
@@ -330,6 +346,7 @@ describe('YooKassaProvider', () => {
 
     it('creates a plain payment with a receipt and the one-time marker, without saving the card', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-ot',
         status: 'pending',
@@ -342,6 +359,7 @@ describe('YooKassaProvider', () => {
         ICreatePayment,
         string
       ];
+
       expect(payload).toMatchObject({
         amount: { value: '500.00', currency: 'RUB' },
         capture: true,
@@ -371,6 +389,7 @@ describe('YooKassaProvider', () => {
 
     it('throws when YooKassa returns no confirmation url', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-ot',
         confirmation: {}
@@ -383,6 +402,7 @@ describe('YooKassaProvider', () => {
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
+
       await expectApiRejection(
         provider.createOneTimePayment(customer, params),
         ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
@@ -401,6 +421,7 @@ describe('YooKassaProvider', () => {
 
     it('gives up on a charge the SDK never settles', async () => {
       const { provider, client } = await build();
+
       // The SDK issues bare axios calls with no timeout, so a stalled socket
       // would otherwise block the whole sequential renewal scan.
       client!.createPayment.mockImplementation(
@@ -420,6 +441,7 @@ describe('YooKassaProvider', () => {
 
     it('charges the saved method with a receipt and forwards the idempotency key', async () => {
       const { provider, client, paymentMethods } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-4',
         status: 'succeeded'
@@ -439,6 +461,7 @@ describe('YooKassaProvider', () => {
         ICreatePayment,
         string
       ];
+
       expect(payload).toMatchObject({
         amount: { value: '990.00', currency: 'RUB' },
         capture: true,
@@ -460,6 +483,7 @@ describe('YooKassaProvider', () => {
 
     it('formats a large minor amount without float drift (bigint money path)', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-big',
         status: 'succeeded'
@@ -477,12 +501,14 @@ describe('YooKassaProvider', () => {
       });
 
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+
       expect(payload.amount.value).toBe('25000000.00');
       expect(payload.receipt!.items[0].amount.value).toBe('25000000.00');
     });
 
     it('formats the amount at the currency scale, not a fixed two decimals', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-jpy',
         status: 'succeeded'
@@ -500,6 +526,7 @@ describe('YooKassaProvider', () => {
       });
 
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+
       expect(payload.amount).toEqual({ value: '1500', currency: 'JPY' });
       expect(payload.receipt!.items[0].amount).toEqual({
         value: '1500',
@@ -509,6 +536,7 @@ describe('YooKassaProvider', () => {
 
     it('reports a pending (payment-after-receipt) charge as accepted but uncaptured', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-5',
         status: 'pending'
@@ -525,6 +553,7 @@ describe('YooKassaProvider', () => {
 
     it('throws a keyed decline that names no customer when the charge is declined (canceled)', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-6',
         status: 'canceled'
@@ -554,6 +583,7 @@ describe('YooKassaProvider', () => {
 
     it('generates an idempotency key when the caller omits one', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-7',
         status: 'succeeded'
@@ -569,12 +599,14 @@ describe('YooKassaProvider', () => {
         ICreatePayment,
         string
       ];
+
       expect(typeof idempotencyKey).toBe('string');
       expect(idempotencyKey.length).toBeGreaterThan(0);
     });
 
     it('throws when the customer has no saved payment method', async () => {
       const { provider } = await build();
+
       await expectApiRejection(
         provider.chargeOffSession(customer, {
           amountMinor: 99000,
@@ -587,6 +619,7 @@ describe('YooKassaProvider', () => {
 
     it('throws when the saved payment method row is missing', async () => {
       const { provider, paymentMethods } = await build();
+
       paymentMethods.findOne.mockResolvedValue(null);
       await expectApiRejection(
         provider.chargeOffSession(savedCustomer, {
@@ -600,6 +633,7 @@ describe('YooKassaProvider', () => {
 
     it('never charges a saved method that belongs to another customer', async () => {
       const { provider, client, paymentMethods } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-foreign',
         status: 'succeeded'
@@ -610,6 +644,7 @@ describe('YooKassaProvider', () => {
         provider: 'yookassa',
         providerMethodRef: 'foreign-token'
       };
+
       // Behaves like the real repository: the row is returned only when every
       // predicate matches, so an unscoped lookup would resolve the foreign card.
       paymentMethods.findOne.mockImplementation(
@@ -635,6 +670,7 @@ describe('YooKassaProvider', () => {
 
     it('stamps the off-session marker carrying the invoice key so the webhook is reconcilable', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-8',
         status: 'succeeded'
@@ -648,6 +684,7 @@ describe('YooKassaProvider', () => {
       });
 
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+
       expect(payload.metadata).toMatchObject({
         customerId: 'cust-1',
         userId: 'user-1',
@@ -658,6 +695,7 @@ describe('YooKassaProvider', () => {
 
     it('omits the off-session marker when no idempotency key is supplied', async () => {
       const { provider, client } = await build();
+
       client!.createPayment.mockResolvedValue({
         id: 'pay-9',
         status: 'succeeded'
@@ -670,6 +708,7 @@ describe('YooKassaProvider', () => {
       });
 
       const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+
       expect(payload.metadata).not.toHaveProperty('purpose');
       expect(payload.metadata).not.toHaveProperty('chargeKey');
     });
@@ -690,6 +729,7 @@ describe('YooKassaProvider', () => {
 
     it('returns the non-canceled payment matching the charge key', async () => {
       const { provider, client } = await build();
+
       client!.getPaymentList.mockResolvedValue({
         items: [
           offSession('pay-other', 'succeeded', 'renewal:sub-9:456'),
@@ -709,6 +749,7 @@ describe('YooKassaProvider', () => {
 
     it('ignores a canceled attempt (a hard decline legitimately re-charges)', async () => {
       const { provider, client } = await build();
+
       client!.getPaymentList.mockResolvedValue({
         items: [offSession('pay-declined', 'canceled')]
       });
@@ -720,6 +761,7 @@ describe('YooKassaProvider', () => {
 
     it('follows the cursor to a match on a later page', async () => {
       const { provider, client } = await build();
+
       client!.getPaymentList
         .mockResolvedValueOnce({ items: [], next_cursor: 'cur-2' })
         .mockResolvedValueOnce({
@@ -740,6 +782,7 @@ describe('YooKassaProvider', () => {
 
     it('returns null when the scan exhausts without a match', async () => {
       const { provider, client } = await build();
+
       client!.getPaymentList.mockResolvedValue({ items: [] });
 
       await expect(
@@ -749,6 +792,7 @@ describe('YooKassaProvider', () => {
 
     it('fails loudly instead of green-lighting a charge when the page cap is hit', async () => {
       const { provider, client } = await build();
+
       client!.getPaymentList.mockResolvedValue({
         items: [],
         next_cursor: 'more'
@@ -763,6 +807,7 @@ describe('YooKassaProvider', () => {
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
+
       await expectApiRejection(
         provider.findOffSessionCharge(CHARGE_KEY, CREATED_AFTER),
         ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
@@ -785,6 +830,7 @@ describe('YooKassaProvider', () => {
 
     it('reads the recorded payment without scanning the shop', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue(offSession('succeeded'));
 
       await expect(
@@ -796,6 +842,7 @@ describe('YooKassaProvider', () => {
 
     it('reports a charge still settling as pending', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue(offSession('waiting_for_capture'));
 
       await expect(
@@ -805,6 +852,7 @@ describe('YooKassaProvider', () => {
 
     it('reports a canceled payment as no charge (a hard decline re-charges)', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue(offSession('canceled'));
 
       await expect(
@@ -814,6 +862,7 @@ describe('YooKassaProvider', () => {
 
     it('fails loudly when the payment carries a different charge key', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue(
         offSession('succeeded', 'renewal:sub-9:456')
       );
@@ -826,6 +875,7 @@ describe('YooKassaProvider', () => {
 
     it('fails loudly when the payment carries no off-session marker', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue(offSession('succeeded', null));
 
       await expectApiRejection(
@@ -836,6 +886,7 @@ describe('YooKassaProvider', () => {
 
     it('throws when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
+
       await expectApiRejection(
         provider.getOffSessionCharge('pay-ref', CHARGE_KEY),
         ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
@@ -846,6 +897,7 @@ describe('YooKassaProvider', () => {
   describe('cancel', () => {
     it('is a no-op (self-managed lifecycle)', async () => {
       const { provider } = await build();
+
       await expect(
         provider.cancel('sub-x', 'period_end')
       ).resolves.toBeUndefined();
@@ -855,6 +907,7 @@ describe('YooKassaProvider', () => {
   describe('refund', () => {
     it('re-fetches the payment and refunds the given amount with a refund receipt', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-8',
         amount: { value: '990.00', currency: 'RUB' },
@@ -869,6 +922,7 @@ describe('YooKassaProvider', () => {
         ICreateRefund,
         string
       ];
+
       expect(payload).toMatchObject({
         payment_id: 'pay-8',
         amount: { value: '500.00', currency: 'RUB' }
@@ -884,6 +938,7 @@ describe('YooKassaProvider', () => {
 
     it('refunds the full payment amount when amount is zero', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-9',
         amount: { value: '990.00', currency: 'RUB' },
@@ -895,11 +950,13 @@ describe('YooKassaProvider', () => {
       await provider.refund('pay-9', 0);
 
       const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
+
       expect(payload.amount).toEqual({ value: '990.00', currency: 'RUB' });
     });
 
     it('parses a large refund amount exactly on the round-trip (bigint money path)', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-big',
         amount: { value: '25000000.00', currency: 'RUB' },
@@ -913,6 +970,7 @@ describe('YooKassaProvider', () => {
       await provider.refund('pay-big', 0);
 
       const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
+
       expect(payload.amount).toEqual({ value: '25000000.00', currency: 'RUB' });
     });
 
@@ -926,12 +984,14 @@ describe('YooKassaProvider', () => {
 
       it('carries the idempotency key in the refund description', async () => {
         const { provider, client } = await build();
+
         client!.getPayment.mockResolvedValue(paidPayment);
         client!.createRefund.mockResolvedValue({ id: 'ref-1' });
 
         await provider.refund('pay-idem', 50000, 'idem-refund-1');
 
         const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
+
         expect(payload.description).toBe('Refund idem-refund-1');
         expect(client!.getRefundList).toHaveBeenCalledWith({
           payment_id: 'pay-idem',
@@ -941,6 +1001,7 @@ describe('YooKassaProvider', () => {
 
       it('no-ops when a refund with the same key already exists (stale key window)', async () => {
         const { provider, client } = await build();
+
         client!.getPayment.mockResolvedValue(paidPayment);
         client!.getRefundList.mockResolvedValue({
           items: [
@@ -964,6 +1025,7 @@ describe('YooKassaProvider', () => {
 
       it('re-issues when the only matching refund was canceled (no money moved)', async () => {
         const { provider, client } = await build();
+
         client!.getPayment.mockResolvedValue(paidPayment);
         client!.createRefund.mockResolvedValue({ id: 'ref-2' });
         client!.getRefundList.mockResolvedValue({
@@ -983,6 +1045,7 @@ describe('YooKassaProvider', () => {
 
       it('follows the cursor to a match on a later page', async () => {
         const { provider, client } = await build();
+
         client!.getPayment.mockResolvedValue(paidPayment);
         client!.getRefundList
           .mockResolvedValueOnce({ items: [], next_cursor: 'cur-2' })
@@ -1007,6 +1070,7 @@ describe('YooKassaProvider', () => {
 
       it('fails loudly instead of refunding again when the page cap is hit', async () => {
         const { provider, client } = await build();
+
         client!.getPayment.mockResolvedValue(paidPayment);
         client!.getRefundList.mockResolvedValue({
           items: [],
@@ -1023,6 +1087,7 @@ describe('YooKassaProvider', () => {
 
       it('skips the scan when no idempotency key is supplied', async () => {
         const { provider, client } = await build();
+
         client!.getPayment.mockResolvedValue(paidPayment);
         client!.createRefund.mockResolvedValue({ id: 'ref-3' });
 
@@ -1030,6 +1095,7 @@ describe('YooKassaProvider', () => {
 
         expect(client!.getRefundList).not.toHaveBeenCalled();
         const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
+
         expect(payload.description).toBe('Refund');
       });
     });
@@ -1044,6 +1110,7 @@ describe('YooKassaProvider', () => {
 
     it('returns null when YooKassa is not configured', async () => {
       const { provider } = await build({ client: null });
+
       expect(
         await provider.verifyAndParseWebhook(notification('payment.succeeded'))
       ).toBeNull();
@@ -1051,6 +1118,7 @@ describe('YooKassaProvider', () => {
 
     it('returns null for an unparseable body', async () => {
       const { provider } = await build();
+
       expect(
         await provider.verifyAndParseWebhook(Buffer.from('not-json'))
       ).toBeNull();
@@ -1058,6 +1126,7 @@ describe('YooKassaProvider', () => {
 
     it('returns null when the event or object id is missing', async () => {
       const { provider } = await build();
+
       expect(
         await provider.verifyAndParseWebhook(
           Buffer.from(JSON.stringify({ event: 'payment.succeeded' }))
@@ -1067,6 +1136,7 @@ describe('YooKassaProvider', () => {
 
     it('rejects an event outside the payment pair (nothing re-fetched, so unverified)', async () => {
       const { provider, client } = await build();
+
       expect(
         await provider.verifyAndParseWebhook(notification('refund.succeeded'))
       ).toBeNull();
@@ -1075,6 +1145,7 @@ describe('YooKassaProvider', () => {
 
     it('re-fetches the payment and maps a succeeded payment to invoice.paid', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-w',
         status: 'succeeded',
@@ -1095,6 +1166,7 @@ describe('YooKassaProvider', () => {
         type: 'invoice.paid'
       });
       const payload = reducible(result).payload as NormalizedInvoicePayload;
+
       expect(payload).toMatchObject({
         ref: { customerId: 'cust-1', userId: 'user-1' },
         planKey: 'pro',
@@ -1108,6 +1180,7 @@ describe('YooKassaProvider', () => {
 
     it('parses the webhook amount at the currency scale', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-jpy',
         status: 'succeeded',
@@ -1124,11 +1197,13 @@ describe('YooKassaProvider', () => {
       // A fixed scale of 2 would reject '1500' as unparseable-with-decimals or
       // read it as 150000 minor; the currency scale keeps it 1500.
       const payload = reducible(result).payload as NormalizedInvoicePayload;
+
       expect(payload).toMatchObject({ amountMinor: 1500, currency: 'JPY' });
     });
 
     it('maps a succeeded method-update re-bind to payment_method.updated', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-mu',
         status: 'succeeded',
@@ -1166,6 +1241,7 @@ describe('YooKassaProvider', () => {
 
     it('ignores a canceled method-update re-bind (no payment.failed)', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-mu',
         status: 'canceled',
@@ -1182,6 +1258,7 @@ describe('YooKassaProvider', () => {
 
     it('maps a succeeded one-time purchase to invoice.paid with kind + product id and no saved method', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-ot',
         status: 'succeeded',
@@ -1206,6 +1283,7 @@ describe('YooKassaProvider', () => {
 
       expect(result).toMatchObject({ type: 'invoice.paid' });
       const payload = reducible(result).payload as NormalizedInvoicePayload;
+
       expect(payload).toMatchObject({
         kind: 'one_time',
         productId: 'prod-1',
@@ -1219,6 +1297,7 @@ describe('YooKassaProvider', () => {
 
     it('ignores a canceled one-time purchase (nothing pending to fail)', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-ot',
         status: 'canceled',
@@ -1235,6 +1314,7 @@ describe('YooKassaProvider', () => {
 
     it('maps a canceled payment to payment.failed', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-w',
         status: 'canceled',
@@ -1254,6 +1334,7 @@ describe('YooKassaProvider', () => {
 
     it('ignores a non-terminal re-fetched status (authentic, nothing to reduce)', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-w',
         status: 'pending',
@@ -1268,6 +1349,7 @@ describe('YooKassaProvider', () => {
 
     it('returns null when the re-fetch throws', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockRejectedValue(new Error('network'));
 
       expect(
@@ -1277,6 +1359,7 @@ describe('YooKassaProvider', () => {
 
     it('maps a succeeded off-session charge to invoice.paid with the reconcile key and no saved method', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-os',
         status: 'succeeded',
@@ -1301,6 +1384,7 @@ describe('YooKassaProvider', () => {
 
       expect(result).toMatchObject({ type: 'invoice.paid' });
       const payload = reducible(result).payload as NormalizedInvoicePayload;
+
       expect(payload.offSessionChargeKey).toBe('renewal:sub-1:123:0');
       expect(payload.providerInvoiceRef).toBe('pay-os');
       // The card is already saved from the first payment; a renewal must not
@@ -1310,6 +1394,7 @@ describe('YooKassaProvider', () => {
 
     it('maps a canceled off-session charge to payment.failed with the reconcile key', async () => {
       const { provider, client } = await build();
+
       client!.getPayment.mockResolvedValue({
         id: 'pay-os',
         status: 'canceled',

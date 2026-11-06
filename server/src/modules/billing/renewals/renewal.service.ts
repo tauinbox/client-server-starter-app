@@ -124,11 +124,13 @@ export class RenewalService {
   /** Processes every due self-managed subscription; one failure never aborts the rest. */
   async runDueRenewals(now: Date = new Date()): Promise<void> {
     const due = await this.findDue(now);
+
     if (due.length === RENEWAL_SCAN_MAX_PER_RUN) {
       this.logger.warn(
         `Renewal scan hit its per-run ceiling (${RENEWAL_SCAN_MAX_PER_RUN} subscriptions); any remaining due subscriptions are left for the next scan`
       );
     }
+
     for (const subscription of due) {
       try {
         await this.processSubscription(subscription.id, now);
@@ -168,6 +170,7 @@ export class RenewalService {
     ) {
       return;
     }
+
     try {
       await this.chargeClosingUsagePeriod(subscription, now, endsSubscription);
     } catch (error) {
@@ -200,10 +203,12 @@ export class RenewalService {
       endsSubscription &&
       now.getTime() >= dueAnchor.getTime() &&
       dueAnchor.getTime() > windowStart.getTime();
+
     if (booked && !splitsAtDueAnchor) {
       this.logger.log(
         `Skipping closing charge for subscription ${subscription.id}: the period is already invoiced (${booked.status})`
       );
+
       return;
     }
 
@@ -214,15 +219,18 @@ export class RenewalService {
       where: { key: subscription.planKey }
     });
     const provider = this.providers.find((p) => p.id === subscription.provider);
+
     if (!customer || !plan || !provider) {
       this.logger.warn(
         `Skipping closing charge for subscription ${subscription.id}: missing customer, plan or provider`
       );
+
       return;
     }
 
     await this.sealUsageWindow(subscription.id, now);
     const parties: ChargeParties = { subscription, customer, plan, provider };
+
     if (!splitsAtDueAnchor) {
       // Stable per (subscription, window) so two racing closes charge once,
       // while a later window of the same period gets a key of its own.
@@ -234,6 +242,7 @@ export class RenewalService {
           now
         }
       );
+
       return;
     }
 
@@ -248,6 +257,7 @@ export class RenewalService {
         { idempotencyKey: renewalKey, now }
       );
     }
+
     if (now.getTime() > dueAnchor.getTime()) {
       await this.chargeClosingWindow(
         parties,
@@ -293,14 +303,17 @@ export class RenewalService {
       idempotencyKey,
       closing: true
     });
+
     if (!due) {
       this.logger.log(
         `Skipping closing charge ${idempotencyKey} for subscription ${subscription.id}: the window is already invoiced`
       );
+
       return;
     }
 
     let charge: ChargeResult;
+
     if (due.rated.amountMinor === 0) {
       charge = { providerInvoiceRef: idempotencyKey, status: 'captured' };
     } else {
@@ -316,12 +329,14 @@ export class RenewalService {
           `Closing charge failed for subscription ${subscription.id}: ${(error as Error).message}`
         );
         await this.recordUnpaidCharge(due, error);
+
         return;
       }
     }
 
     if (charge.status === 'pending') {
       await this.recordPendingCharge(due, charge.providerInvoiceRef, 'pending');
+
       return;
     }
 
@@ -331,6 +346,7 @@ export class RenewalService {
         now
       })
     );
+
     if (paidInvoiceId) {
       this.events.emit(
         InvoicePaidEvent.name,
@@ -391,13 +407,16 @@ export class RenewalService {
 
   private async processSubscription(id: string, now: Date): Promise<void> {
     const subscription = await this.subscriptions.findOne({ where: { id } });
+
     if (!subscription) return;
 
     const dueAt = this.dueAt(subscription);
+
     if (!dueAt || dueAt.getTime() > now.getTime()) {
       // Another instance already advanced it, or it is no longer due.
       return;
     }
+
     if (
       subscription.planChangeStartedAt &&
       subscription.planChangeStartedAt.getTime() >
@@ -413,10 +432,12 @@ export class RenewalService {
     const plan = await this.plans.findOne({
       where: { key: subscription.planKey }
     });
+
     if (!customer || !plan) {
       this.logger.warn(
         `Skipping renewal for subscription ${id}: missing customer or plan`
       );
+
       return;
     }
 
@@ -425,20 +446,25 @@ export class RenewalService {
     // left to bill and the row closes straight away; a usage plan postpays it,
     // so the units consumed inside it are rated and charged first.
     const closing = subscription.cancelAtPeriodEnd;
+
     if (closing && subscription.billingMode !== 'usage') {
       await this.cancelAtPeriodEnd(subscription, customer.userId);
+
       return;
     }
 
     const provider = this.providers.find((p) => p.id === subscription.provider);
+
     if (!provider) {
       this.logger.error(
         `Subscription ${id} references unregistered provider ${subscription.provider}`
       );
+
       // A misconfigured provider must not hold a cancellation hostage.
       if (closing) {
         await this.cancelAtPeriodEnd(subscription, customer.userId);
       }
+
       return;
     }
 
@@ -446,9 +472,11 @@ export class RenewalService {
     // from trial_end, a renewal extends from the current period end — never from
     // wall-clock now, so periods stay contiguous even if a scan runs late.
     const anchor = renewalAnchor(subscription);
+
     if (subscription.billingMode === 'usage') {
       await this.sealUsageWindow(subscription.id, anchor);
     }
+
     const due: PeriodCharge = {
       subscription,
       customer,
@@ -465,6 +493,7 @@ export class RenewalService {
     // the stable key is inspected before any decision, so a re-rate that drops
     // to zero can never settle a charge an earlier scan left open.
     const charge = await this.resolveDueCharge(due, anchor, now);
+
     if (!charge) {
       // The closing period is on the books (pending, or unpaid): a declined
       // card must never trap the customer in a subscription they asked to
@@ -472,6 +501,7 @@ export class RenewalService {
       if (closing) {
         await this.cancelAtPeriodEnd(subscription, customer.userId);
       }
+
       return;
     }
 
@@ -523,7 +553,9 @@ export class RenewalService {
         // never reaches the provider.
         return { providerInvoiceRef: idempotencyKey, status: 'captured' };
       }
+
       let found: ChargeResult | null;
+
       try {
         // Every writer of a pending row records the provider's payment
         // reference, so the poll reads that one payment instead of walking the
@@ -538,15 +570,19 @@ export class RenewalService {
         this.logger.error(
           `Pending-charge poll failed for subscription ${subscription.id}: ${(error as Error).message}`
         );
+
         return null;
       }
+
       if (found?.status === 'captured') {
         return found;
       }
+
       if (found) {
         // Still settling at the provider; the next scan re-checks.
         return null;
       }
+
       // Canceled at capture. The gated flip runs fail-and-dun exactly once
       // against a concurrent scan or the webhook reducer's own flip.
       const flip = await this.dataSource.manager.update(
@@ -554,9 +590,11 @@ export class RenewalService {
         { providerEventId: idempotencyKey, status: 'pending' },
         { status: 'failed' }
       );
+
       if (flip.affected && !closing) {
         await this.handleFailure(subscription, customer.userId, now);
       }
+
       return null;
     }
 
@@ -567,6 +605,7 @@ export class RenewalService {
       if (!closing) {
         await this.handleFailure(subscription, customer.userId, now);
       }
+
       return null;
     }
 
@@ -575,6 +614,7 @@ export class RenewalService {
     // An attempt is recorded before it is charged, so with no row there is
     // no prior attempt.
     let prior: ChargeResult | null = null;
+
     if (existing && subscription.dunningAttempts > 0) {
       try {
         prior = existing.providerInvoiceRef
@@ -589,25 +629,32 @@ export class RenewalService {
         this.logger.error(
           `Renewal reconcile failed for subscription ${subscription.id}: ${(error as Error).message}`
         );
+
         return null;
       }
     }
+
     // A prior attempt's charge carries the amount that attempt was rated at,
     // which the recorded row already holds.
     if (prior?.status === 'captured') {
       return prior;
     }
+
     if (prior) {
       await this.recordPendingCharge(due, prior.providerInvoiceRef, 'failed');
+
       return null;
     }
 
     const planted = await this.plantCharge(due);
+
     if (!planted) {
       // Another scan recorded this period first and is charging it.
       return null;
     }
+
     const { rated } = planted;
+
     if (rated.amountMinor === 0) {
       // Zero-amount renewals (usage with no overage / fully credited, or a fixed
       // $0 plan like Free) aren't chargeable/fiscalizable: skip the provider and
@@ -617,6 +664,7 @@ export class RenewalService {
     }
 
     let result: ChargeResult;
+
     try {
       result = await provider.chargeOffSession(customer, {
         amountMinor: rated.amountMinor,
@@ -629,15 +677,20 @@ export class RenewalService {
         `Renewal charge failed for subscription ${subscription.id}: ${(error as Error).message}`
       );
       await this.recordUnpaidCharge(planted, error);
+
       if (!closing) {
         await this.handleFailure(subscription, customer.userId, now);
       }
+
       return null;
     }
+
     if (result.status === 'pending') {
       await this.recordPendingCharge(due, result.providerInvoiceRef, 'pending');
+
       return null;
     }
+
     return result;
   }
 
@@ -653,10 +706,12 @@ export class RenewalService {
    */
   private plantCharge(due: PeriodCharge): Promise<DueCharge | null> {
     const { subscription, plan, period, idempotencyKey } = due;
+
     return withTransaction(this.dataSource, async (manager) => {
       const existing = await manager.findOne(Invoice, {
         where: { providerEventId: idempotencyKey }
       });
+
       if (existing && existing.status !== 'failed') {
         return null;
       }
@@ -664,6 +719,7 @@ export class RenewalService {
       // Fixed prepays the upcoming period; usage postpays the metered window
       // ending at the anchor, with prepaid credits offsetting billable units.
       let planted: DueCharge;
+
       if (subscription.billingMode === 'usage') {
         const available = await this.credits.availableUnitsForUpdate(
           manager,
@@ -675,6 +731,7 @@ export class RenewalService {
           plan,
           { period, availableCreditUnits: available }
         );
+
         planted = {
           ...due,
           rated: summary,
@@ -687,6 +744,7 @@ export class RenewalService {
           creditUnitsApplied: 0
         };
       }
+
       const providerInvoiceRef =
         planted.rated.amountMinor === 0 ? idempotencyKey : '';
 
@@ -697,8 +755,10 @@ export class RenewalService {
           status: 'pending',
           paidAt: null
         });
+
         return invoiceId ? planted : null;
       }
+
       const flip = await manager.update(
         Invoice,
         { id: existing.id, status: 'failed' },
@@ -710,6 +770,7 @@ export class RenewalService {
           creditsReleasedAt: null
         }
       );
+
       return flip.affected ? planted : null;
     });
   }
@@ -717,9 +778,12 @@ export class RenewalService {
   /** The moment a subscription is due for its next self-managed charge. */
   private dueAt(subscription: Subscription): Date | null {
     if (subscription.status === 'trialing') return subscription.trialEnd;
+
     if (subscription.status === 'past_due')
       return subscription.nextRenewalAttemptAt;
+
     if (subscription.status === 'active') return subscription.currentPeriodEnd;
+
     return null;
   }
 
@@ -747,6 +811,7 @@ export class RenewalService {
   /** The invoice columns that do not depend on the charge outcome. */
   private invoiceValues(due: DueCharge): QueryDeepPartialEntity<Invoice> {
     const { subscription, rated, period } = due;
+
     return {
       customerId: subscription.customerId,
       subscriptionId: subscription.id,
@@ -809,12 +874,14 @@ export class RenewalService {
     error: unknown
   ): Promise<void> {
     const { subscription, idempotencyKey } = due;
+
     await withTransaction(this.dataSource, async (manager) => {
       await manager.update(
         Invoice,
         { providerEventId: idempotencyKey, status: 'pending' },
         { status: 'failed' }
       );
+
       if (error instanceof ChargeDeclinedError) {
         await this.credits.releaseHolds(manager, {
           providerEventId: idempotencyKey
@@ -874,10 +941,12 @@ export class RenewalService {
       // A concurrent scan winning the CAS is expected and silent; a charge
       // against a no-longer-chargeable row needs an operator.
       let blockedBy: SubscriptionStatus | null = null;
+
       if (transition.affected !== 1) {
         const current = await manager.findOne(Subscription, {
           where: { id: subscription.id }
         });
+
         if (
           current &&
           !ENTITLED_SUBSCRIPTION_STATUSES.includes(current.status)
@@ -898,12 +967,14 @@ export class RenewalService {
         `Renewal charge for subscription ${subscription.id} captured after it became ${result.blockedBy}; ${closing ? 'cancellation already applied' : 'period not advanced'}, invoice ${result.paidInvoiceId ?? idempotencyKey} left recorded and refundable`
       );
     }
+
     if (result.paidInvoiceId) {
       this.events.emit(
         InvoicePaidEvent.name,
         new InvoicePaidEvent(customer.userId, result.paidInvoiceId)
       );
     }
+
     if (result.applied) {
       this.events.emit(
         closing
@@ -937,15 +1008,19 @@ export class RenewalService {
       },
       { status: 'paid', paidAt: now, providerInvoiceRef }
     );
+
     if (!flip.affected) {
       return null;
     }
+
     const invoice = await manager.findOne(Invoice, {
       where: { providerEventId: idempotencyKey }
     });
+
     if (!invoice) {
       return null;
     }
+
     if (invoice.creditUnitsApplied > 0) {
       await this.credits.spendOnUsage(
         manager,
@@ -953,6 +1028,7 @@ export class RenewalService {
         invoice.creditUnitsApplied
       );
     }
+
     return invoice.id;
   }
 
@@ -991,19 +1067,23 @@ export class RenewalService {
               )
             }
       );
+
       if (update.affected === 1 && exhausted) {
         await this.credits.releaseHolds(manager, {
           subscriptionId: subscription.id
         });
       }
+
       return update;
     });
+
     if (applied.affected !== 1) return;
 
     this.events.emit(
       PaymentFailedEvent.name,
       new PaymentFailedEvent(userId, subscription.id)
     );
+
     if (exhausted) {
       this.events.emit(
         SubscriptionCanceledEvent.name,
@@ -1037,11 +1117,13 @@ export class RenewalService {
       },
       { status: 'canceled', nextRenewalAttemptAt: null }
     );
+
     if (applied.affected === 1) {
       await this.credits.releaseHolds(manager, {
         subscriptionId: subscription.id
       });
     }
+
     return applied;
   }
 
@@ -1052,6 +1134,7 @@ export class RenewalService {
     const applied = await withTransaction(this.dataSource, (manager) =>
       this.closeAtBoundary(manager, subscription)
     );
+
     if (applied.affected !== 1) return;
 
     this.events.emit(

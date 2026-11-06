@@ -38,7 +38,9 @@ function permissionId(resource: string, action: string): string {
         p.resourceId === mockId(`res-${resource}`) &&
         p.actionId === mockId(`act-${action}`)
     );
+
   if (!permission) throw new Error(`Seed permission ${resource}/${action}`);
+
   return permission.id;
 }
 
@@ -49,6 +51,7 @@ beforeEach(() => {
   resetState();
   const state = getState();
   const now = '2025-01-01T00:00:00.000Z';
+
   for (const [id, name] of [
     [GRANTOR_ROLE_ID, 'grantor'],
     [TARGET_ROLE_ID, 'target']
@@ -63,6 +66,7 @@ beforeEach(() => {
       updatedAt: now
     });
   }
+
   for (const action of ['update', 'assign']) {
     state.rolePermissions.push({
       id: `rp-grantor-${action}`,
@@ -71,6 +75,7 @@ beforeEach(() => {
       conditions: null
     });
   }
+
   for (const user of state.users.values()) {
     if (user.email === CALLER_EMAIL) user.roles = ['user', 'grantor'];
   }
@@ -82,8 +87,10 @@ async function login(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: CALLER_EMAIL, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -101,6 +108,7 @@ async function call(
   });
   const text = await res.text();
   const parsed = text ? (JSON.parse(text) as { errorKey?: string }) : {};
+
   return { status: res.status, errorKey: parsed.errorKey };
 }
 
@@ -108,7 +116,9 @@ const callerId = (): string => {
   const user = getState()
     .users.values()
     .find((u) => u.email === CALLER_EMAIL);
+
   if (!user) throw new Error(`Seed user ${CALLER_EMAIL}`);
+
   return user.id;
 };
 

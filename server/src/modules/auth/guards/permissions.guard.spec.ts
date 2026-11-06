@@ -31,6 +31,7 @@ describe('PermissionsGuard', () => {
         getRequest: () => req
       })
     };
+
     return { context, req };
   }
 
@@ -43,11 +44,13 @@ describe('PermissionsGuard', () => {
     };
     const rules: RawRuleOf<AppAbility>[] = permissionStrings.map((p) => {
       const [resource, action] = p.split(':');
+
       return {
         action,
         subject: (subjectMap[resource] ?? resource) as Extract<Subjects, string>
       };
     });
+
     return createMongoAbility<AppAbility>(rules);
   }
 
@@ -96,6 +99,7 @@ describe('PermissionsGuard', () => {
     });
 
     const result = await guard.canActivate(context);
+
     expect(result).toBe(true);
   });
 
@@ -109,6 +113,7 @@ describe('PermissionsGuard', () => {
     });
 
     const result = await guard.canActivate(context);
+
     expect(result).toBe(true);
     expect(caslAbilityFactory.resolveForUser).toHaveBeenCalledWith('user-1');
   });
@@ -123,6 +128,7 @@ describe('PermissionsGuard', () => {
     });
 
     const result = await guard.canActivate(context);
+
     expect(result).toBe(true);
   });
 
@@ -131,6 +137,7 @@ describe('PermissionsGuard', () => {
       .spyOn(reflector, 'getAllAndOverride')
       .mockReturnValue([['read', 'User']]);
     const ability = buildAbilityWith('users:read');
+
     resolveTo(ability);
     const { context, req } = createMockContext({
       userId: 'user-1'
@@ -168,8 +175,10 @@ describe('PermissionsGuard', () => {
       .spyOn(reflector, 'getAllAndOverride')
       .mockReturnValue([['read', 'User']]);
     const ability = buildAbilityWith('users:read');
+
     resolveTo(ability);
     const { context, req } = createMockContext({ userId: 'user-1' });
+
     req['requestId'] = 'req-1';
 
     await guard.canActivate(context);

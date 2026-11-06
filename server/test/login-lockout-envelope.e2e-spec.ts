@@ -52,6 +52,7 @@ runWithInfra('Login lockout envelope (e2e)', () => {
 
   async function lockAccount(): Promise<Date> {
     const lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+
     await dataSource.getRepository(User).update(
       { email },
       {
@@ -60,6 +61,7 @@ runWithInfra('Login lockout envelope (e2e)', () => {
         lockedUntil
       }
     );
+
     return lockedUntil;
   }
 
@@ -77,6 +79,7 @@ runWithInfra('Login lockout envelope (e2e)', () => {
       lockedUntil: string;
       retryAfter: number;
     };
+
     expect(body.retryAfter).toBeGreaterThan(0);
     expect(body.lockedUntil).toBe(lockedUntil.toISOString());
     expect(body.error).toBe('Locked');
@@ -95,6 +98,7 @@ runWithInfra('Login lockout envelope (e2e)', () => {
       .expect(423);
 
     const body = response.body as { errorKey: string; lockedUntil: string };
+
     expect(body.errorKey).toBe('errors.auth.accountLocked');
     expect(body.lockedUntil).toBe(lockedUntil.toISOString());
 
@@ -102,6 +106,7 @@ runWithInfra('Login lockout envelope (e2e)', () => {
     const after = await dataSource
       .getRepository(User)
       .findOneByOrFail({ email });
+
     expect(after.failedLoginAttempts).toBe(MAX_FAILED_ATTEMPTS);
   }, 30000);
 });

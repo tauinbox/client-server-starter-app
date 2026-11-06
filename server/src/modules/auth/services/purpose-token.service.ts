@@ -24,6 +24,7 @@ export class PurposeTokenService {
     purpose: TokenPurpose
   ): (T & { iat: number }) | null {
     let payload: T & { purpose?: unknown; iat?: unknown };
+
     try {
       payload = this.jwtService.verify<
         T & { purpose?: unknown; iat?: unknown }
@@ -33,6 +34,7 @@ export class PurposeTokenService {
     }
 
     const { iat } = payload;
+
     if (
       payload.purpose !== purpose ||
       typeof iat !== 'number' ||

@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -28,8 +29,10 @@ async function loginAsUser(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'user@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -40,7 +43,9 @@ async function permissionsOf(token: string): Promise<{
   const res = await fetch(`${baseUrl}/api/v1/auth/permissions`, {
     headers: { authorization: `Bearer ${token}` }
   });
+
   expect(res.status).toBe(200);
+
   return (await res.json()) as { roles: string[]; rules: unknown[][] };
 }
 

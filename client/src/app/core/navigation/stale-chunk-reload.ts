@@ -34,16 +34,20 @@ export function reloadOnStaleChunk(navigationError: NavigationError): void {
   if (!isChunkLoadFailure(navigationError.error)) return;
 
   const window = inject(DOCUMENT).defaultView;
+
   if (!window) return;
 
   // The router serializes an app path; anything else must not leave the origin.
   const { url } = navigationError;
+
   if (!url.startsWith('/') || url.startsWith('//')) return;
 
   const storage = inject(SessionStorageService);
   const mark = storage.getItem(RELOAD_MARK_KEY, isReloadMark);
+
   if (mark?.url === url && Date.now() - mark.at < RELOAD_LOOP_WINDOW_MS) {
     storage.removeItem(RELOAD_MARK_KEY);
+
     return;
   }
 

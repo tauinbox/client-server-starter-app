@@ -15,6 +15,7 @@ let token: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -31,6 +32,7 @@ beforeEach(async () => {
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   token = body.tokens.access_token;
 });
 
@@ -40,6 +42,7 @@ async function get(
   const res = await fetch(`${baseUrl}/api/v1${path}`, {
     headers: { authorization: `Bearer ${token}` }
   });
+
   return {
     status: res.status,
     body: (await res.json()) as Record<string, unknown>
@@ -48,7 +51,9 @@ async function get(
 
 async function rows<T>(path: string): Promise<T[]> {
   const { status, body } = await get(path);
+
   expect(status).toBe(200);
+
   return body['data'] as T[];
 }
 
@@ -56,15 +61,18 @@ async function rows<T>(path: string): Promise<T[]> {
 async function allPages<T>(path: string): Promise<T[]> {
   const out: T[] = [];
   let cursor: string | null = null;
+
   do {
     const sep = path.includes('?') ? '&' : '?';
     const { status, body } = await get(
       `${path}${sep}limit=1${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
     );
+
     expect(status).toBe(200);
     out.push(...(body['data'] as T[]));
     cursor = (body['meta'] as { nextCursor: string | null }).nextCursor;
   } while (cursor);
+
   return out;
 }
 
@@ -120,6 +128,7 @@ describe('list search and filters', () => {
 
     it('filters on environment: an empty list applies everywhere', async () => {
       const flags = Array.from(getState().featureFlags.values());
+
       flags[0].environments = [];
       flags[1].environments = ['production'];
       flags[2].environments = ['staging'];
@@ -182,6 +191,7 @@ describe('list search and filters', () => {
     it('filters on isOrphaned and isSystem and searches the subject', async () => {
       const resources = Array.from(getState().resources.values());
       const [target] = resources;
+
       target.isOrphaned = true;
       const orphaned = resources.filter((r) => r.isOrphaned).map((r) => r.id);
 
@@ -200,6 +210,7 @@ describe('list search and filters', () => {
 
     it('never matches q against a NULL description', async () => {
       const resources = Array.from(getState().resources.values());
+
       for (const r of resources) r.description = null;
 
       await expect(rows('/rbac/resources/cursor?q=null')).resolves.toEqual([]);
@@ -229,6 +240,7 @@ describe('list search and filters', () => {
     ])('%s returns the matching users', async (filter, predicate) => {
       const users = Array.from(getState().users.values());
       const [first, second, third] = users;
+
       first.totpEnabledAt = new Date().toISOString();
       second.password = null;
       second.isEmailVerified = false;

@@ -79,6 +79,7 @@ describe('errorInterceptor', () => {
     http.get('/api/test').subscribe({ error: vi.fn() });
 
     const req = httpMock.expectOne('/api/test');
+
     req.flush(
       { message: 'Server Error' },
       { status: 500, statusText: 'Internal Server Error' }
@@ -87,6 +88,7 @@ describe('errorInterceptor', () => {
     expect(notifyMock.reportLater).toHaveBeenCalledTimes(1);
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
     const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
+
     expect(arg.status).toBe(500);
     expect(notifyMock.reportLater.mock.calls[0][0]).toBe(arg);
   });
@@ -95,6 +97,7 @@ describe('errorInterceptor', () => {
     http.get('/api/test').subscribe({ error: vi.fn() });
 
     const req = httpMock.expectOne('/api/test');
+
     req.flush(
       { message: 'Unauthorized' },
       { status: 401, statusText: 'Unauthorized' }
@@ -112,6 +115,7 @@ describe('errorInterceptor', () => {
     http.get('/api/test', { context }).subscribe({ error: vi.fn() });
 
     const req = httpMock.expectOne('/api/test');
+
     req.flush(
       { message: 'Bad Request' },
       { status: 400, statusText: 'Bad Request' }
@@ -130,6 +134,7 @@ describe('errorInterceptor', () => {
     });
 
     const req = httpMock.expectOne('/api/test');
+
     req.flush(
       { message: 'Not Found' },
       { status: 404, statusText: 'Not Found' }
@@ -143,6 +148,7 @@ describe('errorInterceptor', () => {
     http.get('/api/test').subscribe({ error: vi.fn() });
 
     const req = httpMock.expectOne('/api/test');
+
     req.flush(null, { status: 500, statusText: 'Internal Server Error' });
 
     expect(notifyMock.error).toHaveBeenCalledTimes(1);
@@ -228,6 +234,7 @@ describe('errorInterceptor', () => {
     http.get('/api/test').subscribe({ error: vi.fn() });
 
     const req = httpMock.expectOne('/api/test');
+
     // ProgressEvent-based error (network error) — no error body
     req.error(new ProgressEvent('error'), {
       status: 0,
@@ -257,6 +264,7 @@ describe('errorInterceptor', () => {
 
     it('should return retried response on success', () => {
       let result: unknown;
+
       http
         .get('/api/test')
         .subscribe({ next: (v) => (result = v), error: vi.fn() });
@@ -295,6 +303,7 @@ describe('errorInterceptor', () => {
       // Notify is called with the retry error (not original), so caller knows the current state
       expect(notifyMock.error).toHaveBeenCalledTimes(1);
       const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
+
       expect((arg.error as { message: string }).message).toBe(
         'Still Forbidden'
       );
@@ -302,6 +311,7 @@ describe('errorInterceptor', () => {
 
     it('should rethrow retry error (not original) when retry fails', () => {
       let caughtError: HttpErrorResponse | null = null;
+
       http.get('/api/test').subscribe({ error: (err) => (caughtError = err) });
 
       httpMock
@@ -344,11 +354,13 @@ describe('errorInterceptor', () => {
       expect(authStoreMock.setRules).not.toHaveBeenCalled();
       expect(notifyMock.error).toHaveBeenCalledTimes(1);
       const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
+
       expect((arg.error as { message: string }).message).toBe('Forbidden');
     });
 
     it('should rethrow original error when permissions fetch fails', () => {
       let caughtError: HttpErrorResponse | null = null;
+
       http.get('/api/test').subscribe({ error: (err) => (caughtError = err) });
 
       httpMock
@@ -375,12 +387,14 @@ describe('errorInterceptor', () => {
 
       expect(notifyMock.error).toHaveBeenCalledTimes(1);
       const arg = notifyMock.error.mock.calls[0][0] as HttpErrorResponse;
+
       expect((arg.error as { message: string }).message).toBe('Forbidden');
     });
 
     it('should not fetch permissions for a signed-out 403', () => {
       authStoreMock.isAuthenticated.mockReturnValue(false);
       let caughtError: HttpErrorResponse | null = null;
+
       http.get('/api/test').subscribe({ error: (err) => (caughtError = err) });
 
       httpMock.expectOne('/api/test').flush(denied('Email not verified'), {
@@ -442,6 +456,7 @@ describe('errorInterceptor', () => {
       undefined
     ])('should not refresh permissions for a 403 with key %s', (errorKey) => {
       let caughtError: HttpErrorResponse | null = null;
+
       http.get('/api/test').subscribe({ error: (err) => (caughtError = err) });
 
       httpMock

@@ -60,10 +60,12 @@ test.describe('CAPTCHA soft-trigger', () => {
 
     // Widget appears
     const fake = page.getByTestId('fake-turnstile');
+
     await expect(fake).toBeVisible();
 
     // Submit button stays disabled until the callback fires
     const submit = page.getByRole('button', { name: /send link/i });
+
     await expect(submit).toBeDisabled();
 
     await fake.click();
@@ -116,6 +118,7 @@ test.describe('CAPTCHA soft-trigger', () => {
     await resend.click();
 
     const fake = page.getByTestId('fake-turnstile');
+
     await expect(fake).toBeVisible();
     await expect(resend).toBeDisabled();
     await expect(

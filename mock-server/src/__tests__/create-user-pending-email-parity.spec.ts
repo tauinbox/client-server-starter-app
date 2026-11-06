@@ -12,6 +12,7 @@ const CLAIMED_EMAIL = 'claimed@example.com';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -30,8 +31,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -48,6 +51,7 @@ async function send(
     },
     body: JSON.stringify(body)
   });
+
   return {
     status: res.status,
     body: (await res.json()) as { message: string; errorKey?: string }
@@ -61,6 +65,7 @@ async function claimAsPendingEmail(): Promise<void> {
     body: { newEmail: CLAIMED_EMAIL, currentPassword: 'Password1' },
     token
   });
+
   expect(status).toBe(200);
 }
 
@@ -106,6 +111,7 @@ describe('create-user pending-email conflict parity with server', () => {
         email: 'fresh-register@example.com'
       }
     });
+
     expect(registered.status).toBe(201);
 
     const adminToken = await login('admin@example.com');
@@ -113,6 +119,7 @@ describe('create-user pending-email conflict parity with server', () => {
       body: { ...createBody, email: 'fresh-admin@example.com' },
       token: adminToken
     });
+
     expect(created.status).toBe(201);
   });
 });

@@ -12,6 +12,7 @@ import type { PlanInterval } from '@app/shared/types';
  */
 export function addInterval(from: Date, interval: PlanInterval): Date {
   const end = utc(from).add(interval === 'year' ? { years: 1 } : { months: 1 });
+
   return new Date(end.epochMilliseconds);
 }
 
@@ -42,6 +43,7 @@ export function nextPeriodEnd(
     { day: utc(anchor).day },
     { overflow: 'constrain' }
   );
+
   return new Date(restored.epochMilliseconds);
 }
 

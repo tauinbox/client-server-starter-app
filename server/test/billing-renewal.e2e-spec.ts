@@ -68,6 +68,7 @@ function makeSub(overrides: Partial<Subscription> = {}): Subscription {
 
 function makeManager(store: Store) {
   let seq = 0;
+
   return {
     findOne: (
       entity: unknown,
@@ -78,6 +79,7 @@ function makeManager(store: Store) {
           store.subscriptions.find((s) => s.id === opts.where.id) ?? null
         );
       }
+
       if (entity === Invoice) {
         return Promise.resolve(
           store.invoices.find(
@@ -88,6 +90,7 @@ function makeManager(store: Store) {
           ) ?? null
         );
       }
+
       return Promise.resolve(null);
     },
     save: (entity: Subscription) => Promise.resolve(entity),
@@ -106,16 +109,22 @@ function makeManager(store: Store) {
               s.currentPeriodEnd.getTime() ===
                 (where['currentPeriodEnd'] as Date).getTime())
         );
+
         for (const s of matches) Object.assign(s, set);
+
         return Promise.resolve({ affected: matches.length });
       }
+
       if (entity === Invoice) {
         const matches = store.invoices.filter((i) =>
           Object.entries(where).every(([k, v]) => i[k] === v)
         );
+
         for (const i of matches) Object.assign(i, set);
+
         return Promise.resolve({ affected: matches.length });
       }
+
       return Promise.resolve({ affected: 0 });
     },
     createQueryBuilder: () => {
@@ -125,12 +134,14 @@ function makeManager(store: Store) {
         into: () => builder,
         values: (v: Record<string, unknown>) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
         returning: () => builder,
         execute: () => {
           const v = captured.values ?? {};
+
           if (
             store.invoices.some(
               (i) => i.providerEventId === v['providerEventId']
@@ -138,7 +149,9 @@ function makeManager(store: Store) {
           ) {
             return Promise.resolve({ raw: [] });
           }
+
           const id = `inv-${++seq}`;
+
           store.invoices.push({
             id,
             providerEventId: (v['providerEventId'] as string) ?? null,
@@ -146,9 +159,11 @@ function makeManager(store: Store) {
             providerInvoiceRef: v['providerInvoiceRef'] as string,
             creditUnitsApplied: (v['creditUnitsApplied'] as number) ?? 0
           });
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     }
   };
@@ -174,7 +189,9 @@ function subscriptionsRepo(store: Store) {
             s.cancelAtPeriodEnd === where['cancelAtPeriodEnd']) &&
           (statuses?.value === undefined || statuses.value.includes(s.status))
       );
+
       for (const s of matches) Object.assign(s, set);
+
       return Promise.resolve({ affected: matches.length });
     },
     createQueryBuilder: () => {
@@ -187,6 +204,7 @@ function subscriptionsRepo(store: Store) {
         orderBy: () => qb,
         limit: (n: number) => {
           take = n;
+
           return qb;
         },
         getMany: () =>
@@ -200,6 +218,7 @@ function subscriptionsRepo(store: Store) {
               .slice(0, take)
           )
       };
+
       return qb;
     }
   };
@@ -276,6 +295,7 @@ describe('Billing renewal scheduler (e2e)', () => {
                   total: String((await usageSum()) ?? 0)
                 })
               };
+
               return qb;
             }
           }

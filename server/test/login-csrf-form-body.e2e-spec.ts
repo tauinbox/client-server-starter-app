@@ -32,6 +32,7 @@ runWithInfra('Login CSRF through a form body (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -92,6 +93,7 @@ runWithInfra('Login CSRF through a form body (e2e)', () => {
       verify: { mfaToken: 'not-a-token', code: '123456' },
       recovery: { mfaToken: 'not-a-token', recoveryCode: 'ABCDEFGH-IJKLMNOP' }
     };
+
     for (const [route, body] of Object.entries(bodies)) {
       const res = await request(http())
         .post(`/api/v1/auth/mfa/${route}`)

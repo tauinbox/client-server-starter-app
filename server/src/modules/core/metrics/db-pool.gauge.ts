@@ -43,9 +43,11 @@ export function readDbPoolCounts(
     typeof driver === 'object' && driver !== null
       ? (driver as { master?: unknown }).master
       : undefined;
+
   if (!isPgPool(pool)) {
     return null;
   }
+
   return {
     total: pool.totalCount,
     idle: pool.idleCount,
@@ -57,18 +59,22 @@ export function createDbPoolGauge(source: PoolHost): Gauge<string> {
   // Re-use the existing metric if already registered (multiple module
   // initializations in the same process during E2E tests or hot-reload).
   const existing = register.getSingleMetric(DB_POOL_METRIC_NAME);
+
   if (existing) {
     return existing as Gauge<string>;
   }
+
   return new Gauge<string>({
     name: DB_POOL_METRIC_NAME,
     help: 'PostgreSQL connection-pool size by state',
     labelNames: ['state'],
     collect() {
       const counts = readDbPoolCounts(source);
+
       if (!counts) {
         return;
       }
+
       this.set({ state: 'total' }, counts.total);
       this.set({ state: 'idle' }, counts.idle);
       this.set({ state: 'waiting' }, counts.waiting);

@@ -56,9 +56,11 @@ export class CreditService {
       lock: { mode: 'pessimistic_write' }
     });
     const units = positiveUnits(balance);
+
     if (units === 0) {
       return 0;
     }
+
     const query = manager
       .createQueryBuilder(Invoice, 'i')
       .select('COALESCE(SUM(i.creditUnitsApplied), 0)', 'held')
@@ -67,10 +69,13 @@ export class CreditService {
         statuses: [...UNPAID_INVOICE_STATUSES]
       })
       .andWhere('i.creditsReleasedAt IS NULL');
+
     if (excludeInvoiceId) {
       query.andWhere('i.id <> :excludeInvoiceId', { excludeInvoiceId });
     }
+
     const held = await query.getRawOne<{ held: string }>();
+
     return Math.max(0, units - Number(held?.held ?? 0));
   }
 
@@ -98,6 +103,7 @@ export class CreditService {
   /** Negative balance (refund of already-spent credits) blocks usage. */
   async isBlocked(customerId: string): Promise<boolean> {
     const balance = await this.getBalance(customerId);
+
     return balance != null && balance.balanceUnits.compare(ZERO) < 0;
   }
 
@@ -173,5 +179,6 @@ export class CreditService {
 /** Spendable units: a positive balance's count, zero for none / a clawed-back debt. */
 function positiveUnits(balance: CreditBalance | null): number {
   const units = balance?.balanceUnits;
+
   return units && units.compare(ZERO) > 0 ? units.toNumber() : 0;
 }

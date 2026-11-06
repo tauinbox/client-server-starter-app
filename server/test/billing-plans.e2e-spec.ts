@@ -70,6 +70,7 @@ describe('Billing plan catalog (e2e)', () => {
           active === undefined
             ? store
             : store.filter((p) => p.active === active);
+
         return Promise.resolve(rows);
       }
     };
@@ -120,10 +121,12 @@ describe('Billing plan catalog (e2e)', () => {
     }>;
 
     const keys = body.map((p) => p.key);
+
     expect(keys).toEqual(['free', 'pro']);
     expect(keys).not.toContain('usage');
 
     const pro = body.find((p) => p.key === 'pro');
+
     expect(pro?.prices.yookassa).toEqual({
       currency: 'RUB',
       amountMinor: 99000

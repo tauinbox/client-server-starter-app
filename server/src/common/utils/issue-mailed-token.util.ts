@@ -15,5 +15,6 @@ export function issueMailedToken(expiryMs: number): IssuedMailedToken {
   const rawToken = crypto.randomBytes(32).toString('hex');
   const hashedToken = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + expiryMs);
+
   return { rawToken, hashedToken, expiresAt };
 }

@@ -49,6 +49,7 @@ function fakeQb(): { qb: SelectQueryBuilder<User>; calls: RecordedCall[] } {
         'whereFactory' in (arg as Record<string, unknown>)
       ) {
         const sub = fakeQb();
+
         (arg as { whereFactory: (q: typeof sub.qb) => void }).whereFactory(
           sub.qb
         );
@@ -70,6 +71,7 @@ function fakeQb(): { qb: SelectQueryBuilder<User>; calls: RecordedCall[] } {
           connector: 'andWhere'
         });
       }
+
       return qb;
     }),
     where: jest.fn((sql: string, params?: unknown) => {
@@ -78,6 +80,7 @@ function fakeQb(): { qb: SelectQueryBuilder<User>; calls: RecordedCall[] } {
         params: params as Record<string, unknown>,
         connector: 'where'
       });
+
       return qb;
     }),
     orWhere: jest.fn((sql: string, params?: unknown) => {
@@ -86,9 +89,11 @@ function fakeQb(): { qb: SelectQueryBuilder<User>; calls: RecordedCall[] } {
         params: params as Record<string, unknown>,
         connector: 'orWhere'
       });
+
       return qb;
     })
   };
+
   return { qb, calls };
 }
 
@@ -105,23 +110,33 @@ function matches(
   for (const [key, value] of Object.entries(conds)) {
     if (key === '$or') {
       if (!Array.isArray(value)) return false;
+
       if (!value.some((c) => matches(c as Record<string, unknown>, user))) {
         return false;
       }
+
       continue;
     }
+
     if (key === '$and') {
       if (!Array.isArray(value)) return false;
+
       if (!value.every((c) => matches(c as Record<string, unknown>, user))) {
         return false;
       }
+
       continue;
     }
+
     const userValue = user[key];
+
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       const op = value as Record<string, unknown>;
+
       if ('$ne' in op && userValue === op['$ne']) return false;
+
       if ('$eq' in op && userValue !== op['$eq']) return false;
+
       if (
         '$in' in op &&
         Array.isArray(op['$in']) &&
@@ -129,6 +144,7 @@ function matches(
       ) {
         return false;
       }
+
       if (
         '$nin' in op &&
         Array.isArray(op['$nin']) &&
@@ -136,10 +152,13 @@ function matches(
       ) {
         return false;
       }
+
       continue;
     }
+
     if (userValue !== value) return false;
   }
+
   return true;
 }
 
@@ -201,9 +220,11 @@ describe('CASL → SQL query translation (e2e)', () => {
     const expectedIds = SAMPLE_USERS.filter((u) => matches(customConds, u)).map(
       (u) => u.id
     );
+
     expect(expectedIds).toEqual(['u-1', 'u-3']);
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     expect(calls).toHaveLength(1);
@@ -230,6 +251,7 @@ describe('CASL → SQL query translation (e2e)', () => {
     const ability = await factory.createForUser('u-2', NON_SUPER, permissions);
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     expect(calls[0].sql).toContain('user.id = :abFilter_0');
@@ -259,6 +281,7 @@ describe('CASL → SQL query translation (e2e)', () => {
     );
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     // Unbracketed because the factory's operator allow-list vetoes the
@@ -290,6 +313,7 @@ describe('CASL → SQL query translation (e2e)', () => {
     const ability = await factory.createForUser('u-2', NON_SUPER, permissions);
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     expect(calls[0].sql).toContain('user.id = :abFilter_0');
@@ -329,6 +353,7 @@ describe('CASL → SQL query translation (e2e)', () => {
     expect(ability.can('search', subject('User', SAMPLE_USERS[2]))).toBe(false);
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     // Pre-fix the deny was filtered out before translation, the allow was
@@ -366,6 +391,7 @@ describe('CASL → SQL query translation (e2e)', () => {
     );
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     // Dropping an allow only narrows, but dropping a deny would widen, so the
@@ -400,6 +426,7 @@ describe('CASL → SQL query translation (e2e)', () => {
     // The factory turns a vetoed deny into an unconditional cannot(); the
     // translator has to honour that rather than treat it as absent.
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     expect(calls[0].sql).toBe('1 = 0');
@@ -425,6 +452,7 @@ describe('CASL → SQL query translation (e2e)', () => {
     );
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     expect(calls[0].sql).toContain('user.email IN (:...abFilter_0)');
@@ -453,6 +481,7 @@ describe('CASL → SQL query translation (e2e)', () => {
     );
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     // Only scalars can be bound into IN (:...p), so the condition is rejected
@@ -488,6 +517,7 @@ describe('CASL → SQL query translation (e2e)', () => {
     );
 
     const { qb, calls } = fakeQb();
+
     applyAbilityToUserQuery(qb, ability, 'search');
 
     expect(calls[0].sql).toBe('1 = 0');

@@ -31,6 +31,7 @@ function loadManifestRoutes(): RouteEntry[] {
       const { routes } = JSON.parse(
         fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')
       ) as { routes: RouteEntry[] };
+
       return routes;
     });
 }
@@ -90,6 +91,7 @@ describe('Auth coverage — every protected route rejects unauthenticated access
       const method = route.method.toLowerCase() as
         'get' | 'post' | 'patch' | 'put' | 'delete';
       const res = await request(server)[method](route.path);
+
       expect(res.status).toBe(401);
     }
   );

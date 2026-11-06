@@ -4,6 +4,7 @@ describe('normalizeUserAgent', () => {
   it('keeps an ordinary header as it is', () => {
     const ua =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0';
+
     expect(normalizeUserAgent(ua)).toBe(ua);
   });
 
@@ -19,6 +20,7 @@ describe('normalizeUserAgent', () => {
 
   it('cuts the value to the column width', () => {
     const result = normalizeUserAgent('a'.repeat(MAX_USER_AGENT_LENGTH + 50));
+
     expect(result).toHaveLength(MAX_USER_AGENT_LENGTH);
   });
 

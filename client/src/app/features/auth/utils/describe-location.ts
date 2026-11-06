@@ -9,6 +9,7 @@ export function describeLocation(
 ): string | null {
   const country = countryCode ? countryName(countryCode, lang) : null;
   const parts = [city, country].filter((part): part is string => !!part);
+
   return parts.length > 0 ? parts.join(', ') : null;
 }
 

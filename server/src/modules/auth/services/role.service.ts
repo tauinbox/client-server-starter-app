@@ -85,18 +85,22 @@ export class RoleService {
     items: GrantItem[]
   ): Promise<GrantScopeItem[]> {
     if (items.length === 0) return [];
+
     const permissions = await this.permissionRepository.find({
       where: items.map((i) => ({ id: i.permissionId }))
     });
     const byId = new Map(permissions.map((p) => [p.id, p]));
+
     return items.map((i) => {
       const p = byId.get(i.permissionId);
+
       if (!p) {
         throw new ApiError(
           ErrorKeys.ROLES.UNKNOWN_PERMISSION,
           `Permission ${i.permissionId} not found`
         );
       }
+
       return {
         permissionId: p.id,
         actionName: p.action.name,
@@ -112,14 +116,18 @@ export class RoleService {
     context: { actorId?: string; roleId: string }
   ): Promise<void> {
     if (ability === SYSTEM_ABILITY) return;
+
     // Resolve before the super bypass so unknown permission ids fail with a
     // clean `UNKNOWN_PERMISSION` for every caller, not a foreign-key error.
     const resolved = await this.resolveGrantItems(items);
+
     if (ability.can('manage', 'all')) return;
+
     const refusal = grantRefusalOf(ability, resolved, {
       actorId: context.actorId,
       logger: this.logger
     });
+
     if (refusal) this.refuseGrant(refusal, ability, context);
   }
 
@@ -134,10 +142,14 @@ export class RoleService {
     context: { actorId?: string; roleId: string }
   ): Promise<void> {
     if (!this.isScopeChecked(ability)) return;
+
     const denies = rows.filter((row) => isDenyCondition(row.conditions));
+
     if (denies.length === 0) return;
+
     const resolved = await this.resolveGrantItems(denies);
     const refusal = liftRefusalOf(ability, resolved);
+
     if (refusal) this.refuseGrant(refusal, ability, context);
   }
 
@@ -180,14 +192,20 @@ export class RoleService {
     }
   ): Promise<Role> {
     const locked = await this.lockRole(em, roleId);
+
     if (!locked) throw this.roleNotFound();
+
     check(locked);
+
     if (!this.isScopeChecked(ability)) return locked;
+
     const rows = await em.find(RolePermission, { where: { roleId } });
+
     await this.assertDenyLiftAllowed(ability, lifted(rows), {
       actorId,
       roleId
     });
+
     return locked;
   }
 
@@ -197,6 +215,7 @@ export class RoleService {
     context: { actorId?: string; roleId: string }
   ): never {
     const { details } = refusal;
+
     this.accessRefusals.refuse(
       {
         auditAction: AuditAction.PERMISSION_GRANT_DENIED,
@@ -265,7 +284,9 @@ export class RoleService {
 
     for (const item of items) {
       const permission = byId.get(item.permissionId);
+
       if (!permission) continue;
+
       const { action, resource } = permission;
       const label = `${action.name}:${resource.subject}`;
 
@@ -284,6 +305,7 @@ export class RoleService {
         resource.conditionalActionNames,
         item.conditions
       );
+
       if (supportError) {
         throw new ApiError(
           ErrorKeys.ROLES.CONDITION_NOT_SUPPORTED,
@@ -295,6 +317,7 @@ export class RoleService {
         action.name,
         item.conditions
       );
+
       if (actionError) {
         throw new ApiError(
           ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE,
@@ -306,6 +329,7 @@ export class RoleService {
         resource.subject,
         item.conditions
       );
+
       if (fieldError) {
         throw new ApiError(
           ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN,
@@ -329,6 +353,7 @@ export class RoleService {
     }: { action: string; record: Partial<Role>; actorId?: string }
   ): void {
     if (ability === SYSTEM_ABILITY) return;
+
     this.accessRefusals.assertCan(ability, {
       action,
       subject: subject('Role', record),
@@ -349,15 +374,19 @@ export class RoleService {
     actorId?: string
   ): void {
     if (!role.isSystem) return;
+
     const error = () =>
       new ApiError(
         ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM,
         'Cannot modify system roles'
       );
+
     if (ability === SYSTEM_ABILITY) {
       throw error();
     }
+
     if (ability.can('manage', 'all')) return;
+
     this.accessRefusals.refuse(
       {
         actorId,
@@ -385,6 +414,7 @@ export class RoleService {
     for (const record of [role, withChanges(role, data)]) {
       this.assertCanRole(ability, { action: 'update', record, actorId });
     }
+
     if (role.isSystem) {
       throw new ApiError(
         ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM,
@@ -399,6 +429,7 @@ export class RoleService {
     actorId?: string
   ): void {
     this.assertCanRole(ability, { action: 'delete', record: role, actorId });
+
     if (role.isSystem) {
       throw new ApiError(
         ErrorKeys.ROLES.CANNOT_DELETE_SYSTEM,
@@ -431,9 +462,11 @@ export class RoleService {
     }
   ): void {
     if (ability === SYSTEM_ABILITY) return;
+
     if (role.isSuper) {
       this.refuseSuperRole(ability, { action, roleId: role.id, actorId });
     }
+
     this.accessRefusals.assertCan(ability, {
       action: 'update',
       subject: subject('User', user),
@@ -484,13 +517,17 @@ export class RoleService {
     actorId?: string
   ): Promise<Role> {
     const role = await this.loadRole(id);
+
     this.assertCanRole(ability, { action: 'read', record: role, actorId });
+
     return role;
   }
 
   private async loadRole(id: string): Promise<Role> {
     const role = await this.roleRepository.findOne({ where: { id } });
+
     if (!role) throw this.roleNotFound();
+
     return role;
   }
 
@@ -514,11 +551,16 @@ export class RoleService {
     const existing = await this.roleRepository.findOne({
       where: { name: data.name }
     });
+
     if (existing) throw this.nameExists();
+
     const role = this.roleRepository.create({ ...data, isSuper: false });
+
     return this.roleRepository.manager.transaction(async (em) => {
       const saved = await this.saveRole(em, role);
+
       if (audit) await this.auditService.log(audit(saved), em);
+
       return saved;
     });
   }
@@ -536,22 +578,29 @@ export class RoleService {
     const role = await this.loadRole(id);
     const check = (record: Role) =>
       this.assertCanEditRole(ability, record, { data, actorId });
+
     // Checked here to answer early, and again on the locked row.
     check(role);
+
     if (data.name) {
       const existing = await this.roleRepository.findOne({
         where: { name: data.name }
       });
+
       if (existing && existing.id !== id) throw this.nameExists();
     }
+
     // The old name comes from the locked row: a rename that committed after
     // the read above changed it, and the listeners rewrite by that name.
     const { saved, renamed } = await this.writeWithRoleEvent(async (em) => {
       const before = await this.lockRole(em, id);
+
       if (!before) throw this.roleNotFound();
+
       check(before);
       const written = await this.updateRole(em, id, data);
       const nameChanged = written.name !== before.name;
+
       return {
         result: { saved: written, renamed: nameChanged },
         audit: audit?.({ ...before }),
@@ -564,8 +613,10 @@ export class RoleService {
           : undefined
       };
     });
+
     // Holders have the old name in the cached role names that flag rules use.
     if (renamed) await this.invalidateUsersWithRole(id);
+
     return saved;
   }
 
@@ -580,19 +631,23 @@ export class RoleService {
     const role = await this.loadRole(id);
     const check = (record: Role) =>
       this.assertCanDeleteRole(ability, record, actorId);
+
     // Checked here to answer early, and again on the locked row.
     check(role);
     // Invalidate after the commit, or a holder read in between re-caches the
     // deleted grants for the TTL. Holders are read before the delete cascades.
     let holderIds: string[] = [];
+
     await this.writeWithRoleEvent(async (em) => {
       const locked = await this.lockRoleForLift(em, ability, {
         roleId: id,
         actorId,
         check
       });
+
       holderIds = await this.findHolderIds(em, id);
       await em.delete(Role, { id });
+
       return {
         result: undefined,
         audit: audit?.(locked),
@@ -630,12 +685,15 @@ export class RoleService {
     data: { name?: string; description?: string }
   ): Promise<Role> {
     let found: boolean;
+
     try {
       found = await keyedUpdate(em, Role, { where: { id }, changes: data });
     } catch (error) {
       throw isUniqueViolation(error) ? this.nameExists() : error;
     }
+
     if (!found) throw this.roleNotFound();
+
     return em.findOneByOrFail(Role, { id });
   }
 
@@ -650,7 +708,9 @@ export class RoleService {
   ): Promise<T> {
     return manager.transaction(async (em) => {
       const written = await write(em);
+
       if (audit) await this.auditService.log(audit, em);
+
       return written;
     });
   }
@@ -672,16 +732,21 @@ export class RoleService {
       Promise.withResolvers<void>();
     const result = await this.roleRepository.manager.transaction(async (em) => {
       const change = await write(em);
+
       if (change.event) {
         await this.eventEmitter.emitAsync(
           change.event.name,
           change.event.create(committed)
         );
       }
+
       if (change.audit) await this.auditService.log(change.audit, em);
+
       return change.result;
     });
+
     markCommitted();
+
     return result;
   }
 
@@ -698,7 +763,9 @@ export class RoleService {
       where: { id: userId },
       relations: { roles: true }
     });
+
     if (!targetUser) throw this.userNotFound(userId);
+
     return targetUser;
   }
 
@@ -708,7 +775,9 @@ export class RoleService {
     userId: string
   ): Promise<User> {
     const targetUser = await lockUserWithRoles(em, { id: userId });
+
     if (!targetUser) throw this.userNotFound(userId);
+
     return targetUser;
   }
 
@@ -735,6 +804,7 @@ export class RoleService {
     { user, role, actorId }: { user: User; role: Role; actorId?: string }
   ): Promise<void> {
     if (ability === SYSTEM_ABILITY) return;
+
     this.assertCanChangeHolder(ability, {
       action: 'assign',
       user,
@@ -748,6 +818,7 @@ export class RoleService {
       permissionId: rp.permissionId,
       conditions: rp.conditions ?? null
     }));
+
     await this.assertGrantAllowed(ability, grantItems, {
       actorId,
       roleId: role.id
@@ -765,7 +836,9 @@ export class RoleService {
   ): Promise<void> {
     const targetUser = await this.loadRoleAssignmentTarget(userId);
     const role = await this.roleRepository.findOne({ where: { id: roleId } });
+
     if (!role) throw this.unknownRole();
+
     // Checked here to answer early, and again on the locked rows.
     await this.assertCanAssignRole(this.roleRepository.manager, ability, {
       user: targetUser,
@@ -778,7 +851,9 @@ export class RoleService {
       async (em) => {
         const user = await this.lockRoleAssignmentTarget(em, userId);
         const locked = await this.lockRole(em, roleId);
+
         if (!locked) throw this.unknownRole();
+
         await this.assertCanAssignRole(em, ability, {
           user,
           role: locked,
@@ -809,6 +884,7 @@ export class RoleService {
         role: record,
         actorId
       });
+
     // Checked here to answer early, and again on the locked rows.
     check(targetUser, role);
 
@@ -818,6 +894,7 @@ export class RoleService {
       this.roleRepository.manager,
       async (em) => {
         const user = await this.lockRoleAssignmentTarget(em, userId);
+
         await this.lockRoleForLift(em, ability, {
           roleId,
           actorId,
@@ -829,6 +906,7 @@ export class RoleService {
           .from('user_roles')
           .where('user_id = :userId AND role_id = :roleId', { userId, roleId })
           .execute();
+
         if (!affected) {
           throw new ApiError(
             ErrorKeys.ROLES.ROLE_NOT_ASSIGNED,
@@ -847,6 +925,7 @@ export class RoleService {
     actorId?: string
   ): Promise<RolePermission[]> {
     await this.findOne(roleId, ability, actorId);
+
     return this.rolePermissionRepository.find({
       where: { roleId },
       relations: { permission: true }
@@ -860,6 +939,7 @@ export class RoleService {
   ): Promise<void> {
     const check = (role: Role) =>
       this.assertCanChangeGrants(ability, role, actorId);
+
     // Checked here to answer early, and again on the locked row.
     check(await this.loadRole(roleId));
     await this.assertGrantsApplicable(items);
@@ -886,6 +966,7 @@ export class RoleService {
             )
         });
         await em.delete(RolePermission, { roleId });
+
         if (items.length > 0) {
           const records = items.map(({ permissionId, conditions }) =>
             em.create(RolePermission, {
@@ -894,6 +975,7 @@ export class RoleService {
               conditions: conditions ?? null
             })
           );
+
           await em.save(RolePermission, records);
         }
       },
@@ -912,12 +994,14 @@ export class RoleService {
   ): Promise<void> {
     const check = (role: Role) =>
       this.assertCanChangeGrants(ability, role, actorId);
+
     // Checked here to answer early, and again on the locked row.
     check(await this.loadRole(roleId));
     const items = permissionIds.map((permissionId) => ({
       permissionId,
       conditions: conditions ?? null
     }));
+
     await this.assertGrantsApplicable(items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     const rolePermissions = permissionIds.map((permissionId) =>
@@ -927,6 +1011,7 @@ export class RoleService {
         conditions: conditions ?? null
       })
     );
+
     await this.writeAudited(
       this.rolePermissionRepository.manager,
       async (em) => {
@@ -951,6 +1036,7 @@ export class RoleService {
   ): Promise<void> {
     const check = (role: Role) =>
       this.assertCanChangeGrants(ability, role, actorId);
+
     // Checked here to answer early, and again on the locked row.
     check(await this.loadRole(roleId));
     await this.writeAudited(
@@ -967,6 +1053,7 @@ export class RoleService {
           roleId,
           permissionId
         });
+
         if (!affected) {
           throw new ApiError(
             ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED,
@@ -988,12 +1075,14 @@ export class RoleService {
 
   async findRoleByName(name: string): Promise<Role> {
     const role = await this.roleRepository.findOne({ where: { name } });
+
     if (!role) {
       // eslint-disable-next-line no-restricted-syntax -- a deployment error (500): the migrations were not run
       throw new InternalServerErrorException(
         `System role "${name}" not found. Run migrations.`
       );
     }
+
     return role;
   }
 
@@ -1012,11 +1101,13 @@ export class RoleService {
       .select('user.id')
       .innerJoin('user.roles', 'role', 'role.id = :roleId', { roleId })
       .getMany();
+
     return users.map((u) => u.id);
   }
 
   private async invalidateHolders(userIds: string[]): Promise<void> {
     if (userIds.length === 0) return;
+
     await Promise.all(
       userIds.map((id) => this.permissionService.invalidateUserCache(id))
     );

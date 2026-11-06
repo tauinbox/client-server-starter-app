@@ -42,6 +42,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -58,6 +59,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
         .send({ email, password, name: 'Ids Filter' })
         .expect(201);
     }
+
     for (const email of emails) {
       ids.push((await users.findOneByOrFail({ email })).id);
     }
@@ -66,6 +68,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     const admin = await users.findOneByOrFail({ email: adminEmail });
+
     await app
       .get(RoleService)
       .assignRoleToUser(admin.id, superRole.id, { ability: SYSTEM_ABILITY });
@@ -78,6 +81,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
         userAgent: 'ids-filter-e2e',
         ipAddress: null
       });
+
     token = tokens.access_token;
   }, 60000);
 

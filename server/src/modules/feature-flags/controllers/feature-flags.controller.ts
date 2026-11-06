@@ -52,7 +52,9 @@ export class FeatureFlagsController {
           req
         )
       : await this.resolver.evaluateAnonymous(anonId, req);
+
     if (issuedAnonId !== null) writeAnonId(res, issuedAnonId, secure);
+
     return result;
   }
 }

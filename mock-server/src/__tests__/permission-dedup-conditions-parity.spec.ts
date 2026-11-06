@@ -28,6 +28,7 @@ const DENY_B = { effect: 'deny' as const, custom: '{"email":"b@victim.test"}' };
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -48,7 +49,9 @@ function updateUserPermissionId(): string {
         p.resourceId === mockId('res-users') &&
         p.actionId === mockId('act-update')
     );
+
   if (!permission) throw new Error('Seed permission users/update is missing');
+
   return permission.id;
 }
 
@@ -60,6 +63,7 @@ function grantAllowAndTwoDenies(): MockUser {
   const state = getState();
   const permissionId = updateUserPermissionId();
   const [allowRoleId, denyRoleA, denyRoleB] = ROLE_IDS;
+
   state.rolePermissions = [
     ...state.rolePermissions.filter((rp) => !ROLE_IDS.includes(rp.roleId)),
     { id: 'rp-allow', roleId: allowRoleId, permissionId, conditions: null },
@@ -68,8 +72,11 @@ function grantAllowAndTwoDenies(): MockUser {
   ];
 
   const user = state.users.get(REGULAR_ID);
+
   if (!user) throw new Error('Seed user user@example.com is missing');
+
   user.roles = ['editor', 'moderator', 'support'];
+
   return user;
 }
 
@@ -93,6 +100,7 @@ describe('permission dedup keeps rows with different conditions', () => {
     for (const email of ['a@victim.test', 'b@victim.test']) {
       expect(ability.can('update', subject('User', { email }))).toBe(false);
     }
+
     expect(
       ability.can('update', subject('User', { email: 'c@victim.test' }))
     ).toBe(true);
@@ -102,7 +110,9 @@ describe('permission dedup keeps rows with different conditions', () => {
     const user = grantAllowAndTwoDenies();
     const state = getState();
     const denyB = state.rolePermissions.find((rp) => rp.id === 'rp-deny-b');
+
     if (!denyB) throw new Error('Test grant rp-deny-b is missing');
+
     denyB.conditions = { ...DENY_A };
 
     const conditions = getResolvedPermissionsForUser(user).map(
@@ -122,6 +132,7 @@ describe('permission dedup keeps rows with different conditions', () => {
         password: 'Password1'
       })
     });
+
     expect(login.status).toBe(200);
     const { tokens } = (await login.json()) as {
       tokens: { access_token: string };
@@ -137,6 +148,7 @@ describe('permission dedup keeps rows with different conditions', () => {
     const updates = body.permissions.filter(
       (p) => p.permission === 'users:update'
     );
+
     expect(updates.map((p) => p.conditions)).toEqual([null, DENY_A, DENY_B]);
   });
 });

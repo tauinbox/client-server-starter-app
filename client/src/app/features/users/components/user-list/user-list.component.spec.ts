@@ -51,6 +51,7 @@ describe('UserListComponent', () => {
   let fixture: ComponentFixture<UserListComponent>;
   let observeSpy: ReturnType<typeof vi.fn>;
   let disconnectSpy: ReturnType<typeof vi.fn>;
+
   function createUsersStoreMock() {
     return {
       ...listUrlStoreMock(USER_LIST_QUERY, 'users'),
@@ -166,6 +167,7 @@ describe('UserListComponent', () => {
   it('shows the stale banner, and its refresh action reloads the list', () => {
     const banner = () =>
       (fixture.nativeElement as HTMLElement).querySelector('.stale-notice');
+
     expect(banner()).toBeNull();
 
     usersStoreMock.stale.set(true);
@@ -212,13 +214,16 @@ describe('UserListComponent', () => {
 
   it('reports no unhandled error when the role catalog is refused', () => {
     const unhandled = vi.fn();
+
     config.onUnhandledError = unhandled;
     vi.useFakeTimers();
+
     try {
       roleCatalogMock.getAll.mockReturnValue(
         throwError(() => new Error('503'))
       );
       const refused = TestBed.createComponent(UserListComponent);
+
       refused.detectChanges();
       vi.runOnlyPendingTimers();
 
@@ -357,6 +362,7 @@ describe('UserListComponent', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(false))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.confirmDelete(mockUser);
@@ -368,6 +374,7 @@ describe('UserListComponent', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(true))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.confirmDelete(mockUser);
@@ -383,6 +390,7 @@ describe('UserListComponent', () => {
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(false))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.confirmDelete(mockUser);
@@ -395,10 +403,12 @@ describe('UserListComponent', () => {
         status: 403,
         error: { errorKey: 'errors.users.superTargetForbidden' }
       });
+
       usersStoreMock.deleteUser.mockReturnValue(throwError(() => failure));
       const dialogRefMock = {
         afterClosed: vi.fn().mockReturnValue(of(true))
       };
+
       dialogMock.open.mockReturnValue(dialogRefMock);
 
       component.confirmDelete(mockUser);
@@ -445,6 +455,7 @@ describe('UserListComponent', () => {
         status: 409,
         error: { errorKey: 'errors.users.notDeleted' }
       });
+
       usersStoreMock.restoreUser.mockReturnValue(throwError(() => failure));
       dialogMock.open.mockReturnValue({
         afterClosed: vi.fn().mockReturnValue(of(true))

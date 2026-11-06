@@ -28,7 +28,9 @@ runWithInfra('Register conflict is audited (e2e)', () => {
 
   const takenEmail = (label: string): string => {
     const email = `register-conflict-${label}-${Date.now()}@example.com`;
+
     emails.push(email);
+
     return email;
   };
 
@@ -39,20 +41,26 @@ runWithInfra('Register conflict is audited (e2e)', () => {
     action: AuditAction
   ): Promise<AuditLog[]> => {
     const repository = dataSource.getRepository(AuditLog);
+
     for (let attempt = 0; attempt < 40; attempt++) {
       const rows = await repository.find({ where: { actorEmail, action } });
+
       if (rows.length > 0) return rows;
+
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+
     return [];
   };
 
   const statusOf = async (run: Promise<unknown>): Promise<number> => {
     try {
       await run;
+
       return HttpStatus.OK;
     } catch (error) {
       if (error instanceof HttpException) return error.getStatus();
+
       throw error;
     }
   };
@@ -72,11 +80,13 @@ runWithInfra('Register conflict is audited (e2e)', () => {
   afterAll(async () => {
     if (emails.length) {
       const conditions = emails.map((email) => ({ email }));
+
       await dataSource?.getRepository(User).delete(conditions);
       await dataSource
         ?.getRepository(AuditLog)
         .delete(emails.map((email) => ({ actorEmail: email })));
     }
+
     await app?.close();
   });
 
@@ -94,12 +104,14 @@ runWithInfra('Register conflict is audited (e2e)', () => {
         requestId: 'e2e-register-conflict'
       })
     );
+
     expect(status).toBe(HttpStatus.CONFLICT);
 
     const conflictRows = await waitForAuditRows(
       email,
       AuditAction.USER_REGISTER_CONFLICT
     );
+
     expect(conflictRows).toHaveLength(1);
     expect(conflictRows[0].ipAddress).toBe('203.0.113.7');
     expect(conflictRows[0].requestId).toBe('e2e-register-conflict');
@@ -107,6 +119,7 @@ runWithInfra('Register conflict is audited (e2e)', () => {
     const registerRows = await dataSource.getRepository(AuditLog).find({
       where: { actorEmail: email, action: AuditAction.USER_REGISTER }
     });
+
     expect(registerRows).toHaveLength(1);
   });
 
@@ -120,6 +133,7 @@ runWithInfra('Register conflict is audited (e2e)', () => {
       .update({ email: owner }, { pendingEmail: pending });
 
     const status = await statusOf(authService.register(registerDto(pending)));
+
     expect(status).toBe(HttpStatus.CONFLICT);
 
     expect(

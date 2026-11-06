@@ -50,12 +50,16 @@ class ScriptedStrategy implements passport.Strategy {
       // (strategy.js:163) and when the provider returns error=access_denied
       // (strategy.js:136).
       this.fail({ message: 'Invalid authorization request state.' }, 403);
+
       return;
     }
+
     if (this.action === 'error') {
       this.error(new Error('Failed to obtain access token'));
+
       return;
     }
+
     this.success({ email: 'user@example.com' });
   }
 }

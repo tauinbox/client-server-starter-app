@@ -56,6 +56,7 @@ export class MfaPolicyService {
     }
 
     const roles = await this.permissionService.getRolesForUser(userId);
+
     return roles.some((role) => role.isSuper);
   }
 

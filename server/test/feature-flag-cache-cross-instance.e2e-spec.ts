@@ -39,7 +39,9 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
   let dataSource: DataSource;
   const ability = (() => {
     const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     builder.can('manage', 'all');
+
     return builder.build();
   })();
 
@@ -47,6 +49,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [CoreModule.forRoot()]
     }).compile();
+
     app = moduleRef.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
@@ -59,6 +62,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
 
   afterAll(async () => {
     jest.restoreAllMocks();
+
     if (dataSource) {
       await dataSource
         .getRepository(FeatureFlag)
@@ -74,6 +78,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
         .execute();
       await dataSource.getRepository(User).delete({ email });
     }
+
     await app?.close();
   });
 
@@ -96,6 +101,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
       set: async (...args: Parameters<Cache['set']>) => {
         markReached();
         await release;
+
         return cache.set(...args);
       }
     };
@@ -110,6 +116,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
       app.get(UsersService),
       app.get(MetricsService)
     );
+
     return { resolver, reachedWrite };
   }
 
@@ -128,10 +135,12 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
       { name: `${tag}-beta` },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.assignRoleToUser(holder.id, role.id, {
       ability: SYSTEM_ABILITY
     });
     const key = `${tag}-flag`;
+
     await app.get(FeatureFlagService).create(
       {
         key,
@@ -147,6 +156,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
       flagAuditActor()
     );
     const resolver = app.get(FeatureFlagResolverService);
+
     await resolver.invalidateAll();
 
     const { promise: released, resolve: release } =
@@ -156,18 +166,22 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
       await other.resolver.buildResolverUser(holder.id),
       null
     );
+
     await other.reachedWrite;
 
     // The flag-changed event runs after the commit and the rename does not
     // await it, so the test waits for the invalidation it starts.
     const invalidate = jest.spyOn(resolver, 'invalidateAll');
     const req = { user: { userId: holder.id, email } } as JwtAuthRequest;
+
     await app
       .get(RolesController)
       .update(role.id, { name: `${role.name}-2` }, req, ability);
+
     for (let i = 0; i < 1000 && invalidate.mock.results.length === 0; i++) {
       await new Promise((resolve) => setImmediate(resolve));
     }
+
     expect(invalidate).toHaveBeenCalledTimes(1);
     await invalidate.mock.results[0].value;
     invalidate.mockRestore();
@@ -175,6 +189,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
     await otherLoad;
 
     const user = await resolver.buildResolverUser(holder.id);
+
     expect(user.roles).toEqual([`${role.name}-2`]);
     expect((await resolver.evaluateForUser(user, null)).flags[key]).toBe(true);
   });

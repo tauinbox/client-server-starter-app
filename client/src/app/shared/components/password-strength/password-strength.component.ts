@@ -28,13 +28,17 @@ export function calculatePasswordStrength(
   password: string
 ): PasswordStrengthScore {
   if (!password) return 0;
+
   let score = 0;
+
   for (const threshold of [MIN_PASSWORD_LENGTH, 12, 16, 20]) {
     if (password.length >= threshold) score++;
   }
+
   if (CHARACTER_CLASSES.filter((rule) => rule.test(password)).length >= 3) {
     score++;
   }
+
   return Math.min(Math.max(score, 1), 4) as PasswordStrengthScore;
 }
 
@@ -54,6 +58,7 @@ export class PasswordStrengthComponent {
 
   readonly labelKey = computed(() => {
     const score = this.score();
+
     return score === 0 ? '' : STRENGTH_LABEL_KEYS[score];
   });
 

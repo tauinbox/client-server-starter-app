@@ -35,6 +35,7 @@ describe('ProductCardComponent', () => {
 
   it('renders the name, price and the unlocked entitlement with its duration', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
     expect(text).toContain('Report pack');
     expect(text).toContain('$5.00');
     expect(text).toContain('Reports');
@@ -43,6 +44,7 @@ describe('ProductCardComponent', () => {
 
   it('emits buy with the product key', () => {
     const emitted: string[] = [];
+
     fixture.componentInstance.buy.subscribe((key) => emitted.push(key));
 
     (

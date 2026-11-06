@@ -41,12 +41,14 @@ export function readIntentForFlow(
 
   const rest = intent.slice(BOUND_MARKER.length);
   const separatorIndex = rest.indexOf(FIELD_SEPARATOR);
+
   if (separatorIndex <= 0) {
     return null;
   }
 
   const boundState = rest.slice(0, separatorIndex);
   const token = rest.slice(separatorIndex + 1);
+
   if (token.length === 0 || !timingSafeStringEqual(boundState, providedState)) {
     return null;
   }

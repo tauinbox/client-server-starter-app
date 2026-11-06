@@ -17,10 +17,12 @@ function buildConfigService(overrides: Record<string, unknown> = {}): {
     JWT_MIN_IAT: undefined,
     ...overrides
   };
+
   return {
     get: jest.fn().mockImplementation((key: string) => values[key]),
     getOrThrow: jest.fn().mockImplementation((key: string) => {
       if (values[key] === undefined) throw new Error(`Missing: ${key}`);
+
       return values[key];
     })
   };
@@ -112,6 +114,7 @@ describe('JwtStrategy', () => {
       const revokedAt = new Date(
         (basePayload.iat! + 30) * 1000 // revoked 30 seconds after token was issued
       );
+
       mockRepository.findOne.mockResolvedValue({
         id: 'user-1',
         tokenRevokedAt: revokedAt
@@ -126,6 +129,7 @@ describe('JwtStrategy', () => {
       const revokedAt = new Date(
         (basePayload.iat! - 30) * 1000 // revoked 30 seconds before token was issued
       );
+
       mockRepository.findOne.mockResolvedValue({
         id: 'user-1',
         tokenRevokedAt: revokedAt
@@ -208,6 +212,7 @@ describe('JwtStrategy', () => {
         // so the query degraded to "first row" and authenticated the caller as
         // an arbitrary user - on a fresh deployment, the seeded admin.
         const firstUserInTable = { id: 'admin-1', tokenRevokedAt: null };
+
         mockRepository.findOne.mockResolvedValue(firstUserInTable);
 
         const oauthDataPayload = {
@@ -369,6 +374,7 @@ describe('JwtStrategy', () => {
             { provide: RefreshTokenService, useValue: mockRefreshTokenService }
           ]
         }).compile();
+
         rotationStrategy = module.get<JwtStrategy>(JwtStrategy);
       });
 
@@ -399,6 +405,7 @@ describe('JwtStrategy', () => {
         const freshStrategy = module.get<JwtStrategy>(JwtStrategy);
 
         const result = await freshStrategy.validate(basePayload);
+
         expect(result.userId).toBe('user-1');
       });
 
@@ -409,6 +416,7 @@ describe('JwtStrategy', () => {
         });
         // strategy from outer beforeEach has JWT_MIN_IAT=undefined
         const result = await strategy.validate(basePayload);
+
         expect(result.userId).toBe('user-1');
       });
     });

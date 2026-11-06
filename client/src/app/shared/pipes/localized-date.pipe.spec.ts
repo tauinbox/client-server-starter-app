@@ -38,13 +38,16 @@ describe('LocalizedDatePipe', () => {
     setup?: (host: HostComponent) => void
   ): () => string | null | undefined {
     const fixture = TestBed.createComponent(HostComponent);
+
     setup?.(fixture.componentInstance);
     fixture.detectChanges();
     const span = (fixture.nativeElement as HTMLElement).querySelector(
       '[data-testid="date"]'
     );
+
     return () => {
       fixture.detectChanges();
+
       return span?.textContent;
     };
   }
@@ -60,6 +63,7 @@ describe('LocalizedDatePipe', () => {
 
   it('formats a medium date and time in English', () => {
     const text = render((host) => host.format.set('medium'));
+
     expect(text()).toBe('Nov 2, 2026, 4:57:13 AM');
   });
 
@@ -78,11 +82,13 @@ describe('LocalizedDatePipe', () => {
       host.value.set('2026-11-01T23:30:00.000Z');
       host.timeZone.set('Asia/Tokyo');
     });
+
     expect(text()).toBe('Nov 2, 2026');
   });
 
   it('re-renders an OnPush host when the language changes at runtime', () => {
     const text = render();
+
     expect(text()).toBe('Nov 2, 2026');
 
     language.set('ru');

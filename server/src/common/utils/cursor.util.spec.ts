@@ -8,26 +8,31 @@ describe('cursor.util', () => {
     it('should encode and decode a string sortValue', () => {
       const payload = { sortValue: 'test@example.com', id: 'abc-123' };
       const cursor = encodeCursor(payload);
+
       expect(decodeCursor(cursor)).toEqual(payload);
     });
 
     it('should encode and decode a numeric sortValue', () => {
       const payload = { sortValue: 42, id: 'id-1' };
+
       expect(decodeCursor(encodeCursor(payload))).toEqual(payload);
     });
 
     it('should encode and decode a boolean sortValue', () => {
       const payload = { sortValue: true, id: 'id-2' };
+
       expect(decodeCursor(encodeCursor(payload))).toEqual(payload);
     });
 
     it('should encode and decode a null sortValue', () => {
       const payload = { sortValue: null, id: 'id-3' };
+
       expect(decodeCursor(encodeCursor(payload))).toEqual(payload);
     });
 
     it('should handle special characters in sort values', () => {
       const payload = { sortValue: 'user+test@exam.com', id: 'uuid-4' };
+
       expect(decodeCursor(encodeCursor(payload))).toEqual(payload);
     });
   });

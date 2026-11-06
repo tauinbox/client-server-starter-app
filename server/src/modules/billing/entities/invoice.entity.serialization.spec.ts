@@ -30,16 +30,19 @@ function createInvoice(overrides: Partial<Invoice> = {}): Invoice {
 describe('Invoice entity serialization', () => {
   it('hides providerEventId (webhook idempotency reference)', () => {
     const plain = instanceToPlain(createInvoice());
+
     expect(plain).not.toHaveProperty('providerEventId');
   });
 
   it('hides refundedMinor (internal partial-refund accounting)', () => {
     const plain = instanceToPlain(createInvoice());
+
     expect(plain).not.toHaveProperty('refundedMinor');
   });
 
   it('keeps the public invoice reference and amount', () => {
     const plain = instanceToPlain(createInvoice());
+
     expect(plain).toMatchObject({
       providerInvoiceRef: 'txn_public_ref',
       amountMinor: 1200,

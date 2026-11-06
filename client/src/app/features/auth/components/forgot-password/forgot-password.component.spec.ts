@@ -49,6 +49,7 @@ describe('ForgotPasswordComponent', () => {
 
     it('should require email', () => {
       const emailErrors = component.forgotPasswordForm.email().errors();
+
       expect(emailErrors.some((e) => e.kind === 'required')).toBe(true);
     });
 
@@ -56,6 +57,7 @@ describe('ForgotPasswordComponent', () => {
       component.forgotPasswordModel.set({ email: 'not-an-email' });
       await fixture.whenStable();
       const emailErrors = component.forgotPasswordForm.email().errors();
+
       expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
     });
 
@@ -177,6 +179,7 @@ describe('ForgotPasswordComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.forgotPassword.mockReturnValueOnce(
         throwError(() => httpError)
       );
@@ -201,6 +204,7 @@ describe('ForgotPasswordComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.forgotPassword
         .mockReturnValueOnce(throwError(() => httpError))
         .mockReturnValueOnce(of({ message: 'OK' }));
@@ -229,6 +233,7 @@ describe('ForgotPasswordComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.forgotPassword.mockReturnValueOnce(
         throwError(() => httpError)
       );
@@ -255,6 +260,7 @@ describe('ForgotPasswordComponent', () => {
         },
         status: 400
       });
+
       authServiceMock.forgotPassword.mockReturnValueOnce(
         throwError(() => httpError)
       );

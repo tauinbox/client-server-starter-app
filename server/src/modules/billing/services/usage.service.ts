@@ -74,6 +74,7 @@ export class UsageService {
         idempotencyKey: input.idempotencyKey
       }
     });
+
     if (existing) {
       return this.stampPricing(existing);
     }
@@ -90,6 +91,7 @@ export class UsageService {
     let saved: UsageRecord;
     let pricedByCurrentPlan: boolean;
     let planKey: string;
+
     try {
       // The subscription is read FOR SHARE and the row is inserted in the same
       // transaction. A close moves the window (or seals it) in a write that
@@ -110,13 +112,16 @@ export class UsageService {
             idempotencyKey: input.idempotencyKey
           }
         });
+
         if (winner) {
           this.logger.debug(
             `Idempotent usage replay on key ${input.idempotencyKey}`
           );
+
           return this.stampPricing(winner);
         }
       }
+
       throw error;
     }
 
@@ -148,6 +153,7 @@ export class UsageService {
       input.customerId,
       true
     );
+
     if (!subscription) {
       throw new ApiError(
         ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION,
@@ -160,6 +166,7 @@ export class UsageService {
     const candidates = await manager.getRepository(Plan).find({
       where: [{ key: subscription.planKey }, { meterKey: input.meterKey }]
     });
+
     if (!candidates.some((p) => p.meterKey === input.meterKey)) {
       throw new ApiError(
         ErrorKeys.BILLING.METER_NOT_DECLARED,
@@ -171,12 +178,14 @@ export class UsageService {
     const occurredAt = input.occurredAt
       ? new Date(input.occurredAt)
       : new Date(now);
+
     if (occurredAt.getTime() < usageIngestStart(subscription).getTime()) {
       throw new ApiError(
         ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW,
         'occurredAt is before the open metered window'
       );
     }
+
     if (occurredAt.getTime() > now + USAGE_FUTURE_TOLERANCE_MS) {
       throw new ApiError(
         ErrorKeys.BILLING.USAGE_IN_FUTURE,
@@ -196,6 +205,7 @@ export class UsageService {
       })
     );
     const ownPlan = candidates.find((p) => p.key === subscription.planKey);
+
     return {
       saved,
       pricedByCurrentPlan: ownPlan?.meterKey === input.meterKey,
@@ -236,7 +246,9 @@ export class UsageService {
     const plan = subscription
       ? await this.plans.findOne({ where: { key: subscription.planKey } })
       : null;
+
     record.pricedByCurrentPlan = plan?.meterKey === record.meterKey;
+
     return record;
   }
 }

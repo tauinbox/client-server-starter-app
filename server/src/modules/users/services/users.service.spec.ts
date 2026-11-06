@@ -491,6 +491,7 @@ describe('UsersService', () => {
         id: `user-${i}`,
         createdAt: new Date(`2025-01-0${i + 1}`)
       }));
+
       mockQueryBuilder.getMany.mockResolvedValue(users);
 
       const result = await service.findCursorPaginated(
@@ -548,12 +549,14 @@ describe('UsersService', () => {
       const andWhereCalls = mockQueryBuilder.andWhere.mock.calls as unknown[][];
       const bracketsCall = andWhereCalls.find((call) => {
         const [first] = call;
+
         return (
           typeof first === 'object' &&
           first !== null &&
           'whereFactory' in (first as Record<string, unknown>)
         );
       });
+
       expect(bracketsCall).toBeDefined();
       const brackets = bracketsCall?.[0] as BracketsLike;
 
@@ -561,18 +564,22 @@ describe('UsersService', () => {
       const sub: SubRecorder = {
         where: jest.fn((sql: string, params: unknown) => {
           subCalls.push({ sql, params });
+
           return sub;
         }),
         orWhere: jest.fn((sql: string, params: unknown) => {
           subCalls.push({ sql, params });
+
           return sub;
         })
       };
+
       brackets.whereFactory(sub);
 
       // `_` is a LIKE wildcard and MUST be escaped in the bound parameter.
       const expectedPattern = '%al\\_ice%';
       const params = { listSearch: expectedPattern };
+
       expect(subCalls).toEqual([
         { sql: 'user.email ILIKE :listSearch', params },
         { sql: 'user.name ILIKE :listSearch', params },
@@ -617,6 +624,7 @@ describe('UsersService', () => {
         ),
         update: jest.fn((_entity, _where, set: Partial<User>) => {
           Object.assign(written, set);
+
           return Promise.resolve({ affected: 1 });
         }),
         exists: jest.fn().mockResolvedValue(true),
@@ -654,6 +662,7 @@ describe('UsersService', () => {
 
     it('should update user fields', async () => {
       const updateDto = { name: 'Updated' };
+
       mockRepository.findOne.mockResolvedValue(mockUser);
 
       const result = await service.update('user-1', updateDto, {
@@ -778,6 +787,7 @@ describe('UsersService', () => {
 
     it('should hash password when updating password', async () => {
       const updateDto = { password: 'NewPassword1' };
+
       mockRepository.findOne.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed' as never);
 
@@ -841,6 +851,7 @@ describe('UsersService', () => {
       const hash = jest
         .spyOn(bcrypt, 'hash')
         .mockResolvedValue('new-hashed' as never);
+
       hash.mockClear();
       mockBreachedPasswordService.assertNotBreached.mockRejectedValue(
         new HttpException(
@@ -1087,6 +1098,7 @@ describe('UsersService', () => {
 
       it('resets isEmailVerified, issues a verification token and sends a verification email when email changes', async () => {
         const user = buildVerifiedUser();
+
         // First findOne -> findOne(id) inside update; second findOne -> uniqueness check
         mockRepository.findOne
           .mockResolvedValueOnce(user)
@@ -1115,6 +1127,7 @@ describe('UsersService', () => {
 
       it('does not reset verification when email field is unchanged', async () => {
         const user = buildVerifiedUser();
+
         mockRepository.findOne.mockResolvedValueOnce(user);
 
         const result = await service.update(
@@ -1129,6 +1142,7 @@ describe('UsersService', () => {
 
       it('throws 409 with EMAIL_EXISTS errorKey when target email is taken by another user', async () => {
         const user = buildVerifiedUser();
+
         mockRepository.findOne
           .mockResolvedValueOnce(user)
           .mockResolvedValueOnce({ ...user, id: 'other-user' });
@@ -1150,6 +1164,7 @@ describe('UsersService', () => {
 
       it('allows changing to an email already owned by the same user (no conflict)', async () => {
         const user = buildVerifiedUser();
+
         mockRepository.findOne
           .mockResolvedValueOnce(user)
           .mockResolvedValueOnce(user);
@@ -1186,9 +1201,11 @@ describe('UsersService', () => {
         softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
         ...overrides
       };
+
       mockDataSource.transaction.mockImplementation(
         (cb: (m: RemoveManagerMock) => Promise<void>) => cb(manager)
       );
+
       return manager;
     }
 
@@ -1324,11 +1341,13 @@ describe('UsersService', () => {
       for (let read = 0; read < 3; read++) {
         mockRepository.findOne.mockResolvedValueOnce(deleted);
       }
+
       if (after) mockRepository.findOne.mockResolvedValueOnce(after);
     }
 
     it('should lift the soft-delete without reactivating a deactivated user', async () => {
       const restoredUser = { ...deletedUser, deletedAt: null } as User;
+
       mockRestoreReads(deletedUser, restoredUser);
 
       const result = await service.restore('user-1', {
@@ -1355,6 +1374,7 @@ describe('UsersService', () => {
         ...mockUser,
         deletedAt: new Date('2025-06-01')
       } as User;
+
       mockRestoreReads(deletedActiveUser, mockUser);
 
       const result = await service.restore('user-1', {
@@ -1521,6 +1541,7 @@ describe('UsersService', () => {
 
     it('should return lockedUntil as Date when threshold is reached', async () => {
       const lockedDate = new Date(Date.now() + 900000).toISOString();
+
       mockUpdateQb.execute.mockResolvedValue({
         raw: [{ failed_login_attempts: 5, locked_until: lockedDate }]
       });
@@ -1609,6 +1630,7 @@ describe('UsersService', () => {
   describe('setEmailVerificationToken', () => {
     it('keys the write on the address it mails to', async () => {
       const expiresAt = new Date('2025-06-01');
+
       mockRepository.update.mockResolvedValueOnce({ affected: 1 });
 
       const issued = await service.setEmailVerificationToken('user-1', {
@@ -1702,6 +1724,7 @@ describe('UsersService', () => {
   describe('setPasswordResetToken', () => {
     it('keys the write on the address it mails to', async () => {
       const expiresAt = new Date('2025-06-01');
+
       mockRepository.update.mockResolvedValueOnce({ affected: 1 });
 
       const issued = await service.setPasswordResetToken('user-1', {
@@ -1801,8 +1824,10 @@ describe('UsersService', () => {
       action: string
     ): Promise<void> {
       const error: unknown = await write.catch((e: unknown) => e);
+
       expect(error).toBeInstanceOf(HttpException);
       const http = error as HttpException;
+
       expect(http.getStatus()).toBe(HttpStatus.FORBIDDEN);
       expect(http.getResponse()).toMatchObject({
         errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN

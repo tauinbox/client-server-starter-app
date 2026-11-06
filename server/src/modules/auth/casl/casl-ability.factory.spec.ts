@@ -43,6 +43,7 @@ describe('CaslAbilityFactory', () => {
           conditions: null
         }
       ];
+
       permissionService.getRolesForUser.mockResolvedValue(roles);
       permissionService.getPermissionsForUser.mockResolvedValue(permissions);
 

@@ -12,6 +12,7 @@ const openStreams: { close: () => void }[] = [];
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -43,8 +44,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -59,16 +62,20 @@ async function openStream(email: string): Promise<OpenStream> {
     headers: { authorization: `Bearer ${await login(email)}` },
     signal: controller.signal
   });
+
   expect(res.status).toBe(200);
 
   let body = '';
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
+
   void (async () => {
     try {
       for (;;) {
         const { done, value } = await reader.read();
+
         if (done) break;
+
         body += decoder.decode(value);
       }
     } catch {
@@ -87,7 +94,9 @@ async function openStream(email: string): Promise<OpenStream> {
         ),
     close: () => controller.abort()
   };
+
   openStreams.push(stream);
+
   return stream;
 }
 
@@ -107,6 +116,7 @@ async function call(
     },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
+
   return res.status;
 }
 
@@ -136,6 +146,7 @@ describe('SSE user list events outside the admin user routes', () => {
     admin.close();
     plain.close();
     const { id } = findUserByEmail('sse-registered@example.com')!;
+
     expect(admin.events()).toEqual([crud('created', id)]);
     expect(plain.events()).toEqual([]);
   });
@@ -192,6 +203,7 @@ describe('SSE user list events outside the admin user routes', () => {
 
   it('sends updated for a confirmed email change', async () => {
     const target = findUserByEmail('user@example.com')!;
+
     target.pendingEmail = 'sse-moved@example.com';
     target.pendingEmailExpiresAt = new Date(Date.now() + 60_000).toISOString();
     getState().pendingEmailTokens.set('sse-token', target.id);
@@ -230,6 +242,7 @@ describe('SSE user list events outside the admin user routes', () => {
     admin.close();
     plain.close();
     const stale = { type: 'user_list_stale' };
+
     expect(admin.events()).toEqual([stale, stale]);
     expect(plain.events()).toEqual([]);
   });

@@ -49,6 +49,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -99,6 +100,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
 
   async function lostRows(action: AuditAction): Promise<number> {
     const { values } = await failures.get();
+
     return values.find((v) => v.labels['action'] === action)?.value ?? 0;
   }
 
@@ -143,6 +145,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
 
   it('a password reset completes', async () => {
     const rawToken = `self-audit-ff-reset-${stamp}`;
+
     await dataSource.getRepository(User).update(ownerId, {
       passwordResetToken: hashToken(rawToken),
       passwordResetExpiresAt: new Date(Date.now() + 60_000)
@@ -154,6 +157,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
     ).resolves.toBeDefined();
 
     const after = await owner();
+
     expect(after.password).not.toBe(before);
     expect(after.passwordResetToken).toBeNull();
   });
@@ -176,9 +180,11 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
       const { recoveryCodes } = await mfaService.regenerateRecoveryCodes(
         await owner()
       );
+
       expect(recoveryCodes).toHaveLength(10);
 
       const { mfaToken } = mfaService.issuePendingToken(await owner());
+
       await expect(
         mfaService.consumeRecoveryCode(mfaToken, recoveryCodes[0])
       ).resolves.toMatchObject({ id: ownerId });

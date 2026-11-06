@@ -31,6 +31,7 @@ describe('EntitlementsStore', () => {
 
   it('load() populates the whole resolved set, limits included', async () => {
     const store = TestBed.inject(EntitlementsStore);
+
     expect(store.loaded()).toBe(false);
 
     await store.load();
@@ -44,6 +45,7 @@ describe('EntitlementsStore', () => {
   it('has(capability) is a reactive computed signal that fails closed until loaded', async () => {
     const store = TestBed.inject(EntitlementsStore);
     const reports = store.has('reports');
+
     expect(reports()).toBe(false);
 
     await store.load();
@@ -54,6 +56,7 @@ describe('EntitlementsStore', () => {
 
   it('limit(key) reports the plan number', async () => {
     const store = TestBed.inject(EntitlementsStore);
+
     await store.load();
 
     expect(store.limit('sessions')()).toBe(10);
@@ -62,6 +65,7 @@ describe('EntitlementsStore', () => {
   it('limit(key) is null when the plan in force carries no such limit', async () => {
     getEntitlements.mockReturnValue(of(FREE));
     const store = TestBed.inject(EntitlementsStore);
+
     await store.load();
 
     expect(store.limit('sessions')()).toBeNull();
@@ -69,11 +73,13 @@ describe('EntitlementsStore', () => {
 
   it('concurrent load() calls share one request', async () => {
     const subject = new Subject<EntitlementsResponse>();
+
     getEntitlements.mockReturnValue(subject);
     const store = TestBed.inject(EntitlementsStore);
 
     const first = store.load();
     const second = store.load();
+
     expect(getEntitlements).toHaveBeenCalledTimes(1);
 
     subject.next(PRO);
@@ -85,6 +91,7 @@ describe('EntitlementsStore', () => {
 
   it('load() resolves without a second request once loaded', async () => {
     const store = TestBed.inject(EntitlementsStore);
+
     await store.load();
     await store.load();
     expect(getEntitlements).toHaveBeenCalledTimes(1);
@@ -92,6 +99,7 @@ describe('EntitlementsStore', () => {
 
   it('reload() always re-fetches, so an entitlements push is not swallowed', async () => {
     const store = TestBed.inject(EntitlementsStore);
+
     await store.load();
 
     getEntitlements.mockReturnValue(of(FREE));
@@ -118,6 +126,7 @@ describe('EntitlementsStore', () => {
 
   it('clear() drops the mirror so a previous session cannot leak into the next', async () => {
     const store = TestBed.inject(EntitlementsStore);
+
     await store.load();
 
     store.clear();
@@ -130,10 +139,12 @@ describe('EntitlementsStore', () => {
 
   it('a response in flight when clear() runs cannot repopulate the mirror', async () => {
     const subject = new Subject<EntitlementsResponse>();
+
     getEntitlements.mockReturnValue(subject);
     const store = TestBed.inject(EntitlementsStore);
 
     const pending = store.load();
+
     store.clear();
     subject.next(PRO);
     subject.complete();

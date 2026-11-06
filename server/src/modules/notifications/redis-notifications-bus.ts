@@ -35,6 +35,7 @@ export class RedisNotificationsBus
     this.#logger,
     'Notifications bus unavailable, pushes reach only the streams of this instance'
   );
+
   readonly #publisher: Redis;
   readonly #subscriber: Redis;
   readonly #channel: string;
@@ -80,17 +81,20 @@ export class RedisNotificationsBus
     const members = (this.#peer?.localUserIds() ?? []).map((userId) =>
       this.#member(userId)
     );
+
     if (members.length > 0) {
       await this.#publisher
         .zrem(this.#registryKey, ...members)
         .catch((error: unknown) => this.#failureLog.log(error));
     }
+
     this.#subscriber.disconnect();
     this.#publisher.disconnect();
   }
 
   publish(push: BusPush): void {
     const message: BusMessage = { origin: this.#instanceId, ...push };
+
     this.#publisher
       .publish(this.#channel, JSON.stringify(message))
       .catch((error: unknown) => this.#failureLog.log(error));
@@ -113,9 +117,11 @@ export class RedisNotificationsBus
         Date.now() - REGISTRY_TTL_MS,
         '+inf'
       );
+
       return members.map((member) => member.slice(member.indexOf(':') + 1));
     } catch (error) {
       this.#failureLog.log(error);
+
       return null;
     }
   }
@@ -125,12 +131,14 @@ export class RedisNotificationsBus
     const transaction = this.#publisher
       .multi()
       .zremrangebyscore(this.#registryKey, '-inf', now - REGISTRY_TTL_MS);
+
     if (userIds.length > 0) {
       transaction.zadd(
         this.#registryKey,
         ...userIds.flatMap((userId) => [now, this.#member(userId)])
       );
     }
+
     try {
       await transaction.pexpire(this.#registryKey, REGISTRY_TTL_MS).exec();
     } catch (error) {
@@ -144,13 +152,17 @@ export class RedisNotificationsBus
 
   #receive(raw: string): void {
     let message: BusMessage;
+
     try {
       message = JSON.parse(raw) as BusMessage;
     } catch (error) {
       this.#failureLog.log(error);
+
       return;
     }
+
     if (message.origin === this.#instanceId) return;
+
     this.#peer?.deliver({ userIds: message.userIds, event: message.event });
   }
 }

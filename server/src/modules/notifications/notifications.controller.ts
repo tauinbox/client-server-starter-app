@@ -31,7 +31,9 @@ export class NotificationsController {
     // The client can leave while the guard runs. Nest and the close listener
     // below do not see that close, so the stream would stay registered.
     if (req.socket.destroyed) return EMPTY;
+
     const connectionId = randomUUID();
+
     res.on('close', () => {
       this.notificationsService.closeStream(req.user.userId, connectionId);
     });

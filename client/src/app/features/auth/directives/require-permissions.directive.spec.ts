@@ -75,7 +75,9 @@ describe('RequirePermissionsDirective', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(host);
+
     fixture.detectChanges();
+
     return fixture;
   };
 
@@ -85,6 +87,7 @@ describe('RequirePermissionsDirective', () => {
   ): string | null => {
     const root = fixture.nativeElement as HTMLElement;
     const el = root.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+
     return el?.textContent?.trim() ?? null;
   };
 
@@ -142,7 +145,9 @@ describe('RequirePermissionsDirective', () => {
       }).compileComponents();
 
       const fixture = TestBed.createComponent(HostWithCheckListComponent);
+
       fixture.detectChanges();
+
       return fixture;
     };
 
@@ -150,6 +155,7 @@ describe('RequirePermissionsDirective', () => {
       const ability = createMongoAbility<AppAbility>([
         { action: 'manage', subject: 'all' }
       ]);
+
       TestBed.inject(AuthStore).setRules(
         packRules(ability.rules) as unknown[][]
       );

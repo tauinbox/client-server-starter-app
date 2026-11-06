@@ -38,8 +38,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -49,16 +51,20 @@ async function openStream(token: string): Promise<() => number> {
     headers: { authorization: `Bearer ${token}` },
     signal: controller.signal
   });
+
   expect(res.status).toBe(200);
 
   let body = '';
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
+
   void (async () => {
     try {
       for (;;) {
         const { done, value } = await reader.read();
+
         if (done) break;
+
         body += decoder.decode(value);
       }
     } catch {
@@ -91,6 +97,7 @@ async function call(
     },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
+
   return res.status;
 }
 
@@ -99,8 +106,10 @@ async function pushesAfter(
 ): Promise<number> {
   const admin = await login('admin@example.com');
   const pushes = await openStream(await login('user@example.com'));
+
   expect(await write(admin)).toBe(200);
   await wait(100);
+
   return pushes();
 }
 
@@ -120,6 +129,7 @@ describe('permissions_updated after a resource write', () => {
 
   it('is not sent when the grantable actions stay the same', async () => {
     const declared = getState().resources.get(USERS_RESOURCE_ID)!.actionNames;
+
     expect(
       await pushesAfter(async (token) => {
         const statuses = [
@@ -136,6 +146,7 @@ describe('permissions_updated after a resource write', () => {
             }
           })
         ];
+
         return statuses.every((status) => status === 200) ? 200 : 500;
       })
     ).toBe(0);
@@ -158,6 +169,7 @@ describe('permissions_updated after a resource write', () => {
           `/rbac/resources/${USERS_RESOURCE_ID}/restore`,
           { token }
         );
+
         return status === 409 ? 200 : 500;
       })
     ).toBe(0);

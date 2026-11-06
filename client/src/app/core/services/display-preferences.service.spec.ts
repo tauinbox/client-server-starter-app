@@ -23,6 +23,7 @@ describe('DisplayPreferencesService', () => {
 
   it('defaults to level 0 (no density attribute)', () => {
     const service = create();
+
     TestBed.tick();
 
     expect(service.density()).toBe(0);
@@ -31,6 +32,7 @@ describe('DisplayPreferencesService', () => {
 
   it('applies a density level to <html> and persists it', () => {
     const service = create();
+
     service.setDensity(3);
     TestBed.tick();
 
@@ -41,6 +43,7 @@ describe('DisplayPreferencesService', () => {
 
   it('removes the density attribute when returning to level 0', () => {
     const service = create();
+
     service.setDensity(2);
     TestBed.tick();
     expect(root.getAttribute('data-ui-density')).toBe('2');
@@ -67,6 +70,7 @@ describe('DisplayPreferencesService', () => {
     localStorage.setItem(STORAGE_KEY, '4');
 
     const service = create();
+
     TestBed.tick();
 
     expect(service.density()).toBe(4);

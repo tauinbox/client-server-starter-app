@@ -54,25 +54,31 @@ export function readListUrl<S extends ListQuerySpec>(
 ): ListUrlState<S> {
   const single = (param: string): string | undefined => {
     const values = params.getAll(listUrlParam(key, param));
+
     return values.length === 1 ? values[0] : undefined;
   };
   const parsed = (raw: string | undefined, read: (raw: string) => unknown) =>
     raw === undefined ? undefined : read(raw);
 
   const filters: Record<string, unknown> = {};
+
   if (spec.search.length > 0) {
     const q = parsed(single('q'), parseListSearch);
+
     if (q !== undefined) filters['q'] = q;
   }
+
   for (const [name, definition] of Object.entries(filterDefinitions(spec))) {
     const value = parsed(single(name), (raw) =>
       parseListParam(definition, raw)
     );
+
     if (value !== undefined) filters[name] = value;
   }
 
   const sortBy = single('sortBy');
   const sortOrder = single('sortOrder');
+
   return {
     // Each value was parsed by the parser of the kind that `spec` gives it.
     filters: filters as Partial<ListFilters<S>>,
@@ -104,16 +110,20 @@ export function listUrlParams<S extends ListQuerySpec>(
     ...Object.keys(filterDefinitions(spec))
   ];
   const params: Record<string, string | null> = {};
+
   for (const name of names) {
     const value = values[name];
+
     params[listUrlParam(key, name)] = isActiveFilterValue(value)
       ? formatListParam(value)
       : null;
   }
+
   params[listUrlParam(key, 'sortBy')] =
     state.sortBy === DEFAULT_SORT_BY ? null : state.sortBy;
   params[listUrlParam(key, 'sortOrder')] =
     state.sortOrder === DEFAULT_SORT_ORDER ? null : state.sortOrder;
+
   return params;
 }
 
@@ -132,10 +142,12 @@ export function isListUrlCanonical(
   const written = Object.entries(canonical).filter(
     ([, value]) => value !== null
   );
+
   return (
     own.length === written.length &&
     written.every(([name, value]) => {
       const values = params.getAll(name);
+
       return values.length === 1 && values[0] === value;
     })
   );

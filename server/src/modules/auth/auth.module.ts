@@ -60,6 +60,7 @@ function conditionalProvider(
       if (configService.get(envVar)) {
         return new strategyClass(configService);
       }
+
       // Strategy not configured — guards will throw NotFoundException
       return null;
     }

@@ -17,6 +17,7 @@ test.describe('Cross-tab logout', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
 
     const otherTab = await page.context().newPage();
+
     // Routes are per page, not per context, so the second tab needs its own.
     await routeApiToMockServer(otherTab, _mockServer.url);
 
@@ -47,6 +48,7 @@ test.describe('Cross-tab logout', () => {
     // removes. The listener keys on the removal only, so a write must leave the
     // observing tab alone.
     const otherTab = await page.context().newPage();
+
     await routeApiToMockServer(otherTab, _mockServer.url);
     await otherTab.goto('/profile');
     await otherTab.getByLabel('Full name').fill('Renamed Doe');

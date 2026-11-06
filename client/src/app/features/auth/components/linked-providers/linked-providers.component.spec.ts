@@ -82,7 +82,9 @@ describe('LinkedProvidersComponent', () => {
 
   function emitted(): ProviderChange[] {
     const changes: ProviderChange[] = [];
+
     component.reauthRequested.subscribe((change) => changes.push(change));
+
     return changes;
   }
 
@@ -128,6 +130,7 @@ describe('LinkedProvidersComponent', () => {
       const dates = fixture.nativeElement.querySelectorAll(
         '.oauth-provider-since'
       ) as NodeListOf<HTMLElement>;
+
       expect(dates).toHaveLength(1);
       expect(dates[0].textContent).toContain('2025');
     });
@@ -185,6 +188,7 @@ describe('LinkedProvidersComponent', () => {
 
     it('re-enables the controls when the link cannot start', async () => {
       const httpError = new HttpErrorResponse({ status: 500 });
+
       authServiceMock.initOAuthLink.mockReturnValue(
         throwError(() => httpError)
       );
@@ -237,6 +241,7 @@ describe('LinkedProvidersComponent', () => {
 
     it('sends the password with the unlink request and reports the removal', async () => {
       const unlinked: string[] = [];
+
       component.unlinked.subscribe((provider) => unlinked.push(provider));
 
       component.disconnectProvider('google');
@@ -259,10 +264,12 @@ describe('LinkedProvidersComponent', () => {
 
     it('keeps the provider when the server refuses the unlink', async () => {
       const httpError = new HttpErrorResponse({ status: 403 });
+
       authServiceMock.unlinkOAuthAccount.mockReturnValue(
         throwError(() => httpError)
       );
       const unlinked: string[] = [];
+
       component.unlinked.subscribe((provider) => unlinked.push(provider));
 
       component.disconnectProvider('google');
@@ -311,6 +318,7 @@ describe('LinkedProvidersComponent', () => {
         operation: STEP_UP_OPERATION.OAUTH_LINK,
         provider: 'facebook'
       };
+
       fixture.componentRef.setInput('resumeChange', change);
       fixture.detectChanges();
       fixture.componentRef.setInput('resumeChange', { ...change });

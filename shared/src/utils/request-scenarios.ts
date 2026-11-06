@@ -181,6 +181,7 @@ export interface ScenarioAnswer {
 export function expectedAnswers(scenario: RequestScenario): ScenarioAnswer[] {
   const { status, errorKey, earlier } = scenario.expect;
   const count = scenario.repeat ?? 1;
+
   return Array.from({ length: count }, (_, i) =>
     i === count - 1 ? { status, errorKey } : (earlier ?? { status, errorKey })
   );
@@ -193,6 +194,7 @@ export interface ScenarioFile {
 }
 
 const CONTRACTS_DIR = resolve(__dirname, '..', '..', '..', 'contracts');
+
 export const SCENARIOS_DIR = join(CONTRACTS_DIR, 'scenarios');
 export const ROUTES_DIR = join(CONTRACTS_DIR, 'routes');
 
@@ -220,39 +222,50 @@ function placeholdersIn(value: unknown): string[] {
   if (typeof value === 'string') {
     return value.startsWith('$') ? [value] : [];
   }
+
   if (Array.isArray(value)) return value.flatMap(placeholdersIn);
+
   if (value !== null && typeof value === 'object') {
     return Object.values(value).flatMap(placeholdersIn);
   }
+
   return [];
 }
 
 /** The problems of one scenario, as text. An empty list means it is valid. */
 export function scenarioErrors(scenario: RequestScenario): string[] {
   const errors: string[] = [];
+
   for (const key of Object.keys(scenario)) {
     if (!SCENARIO_KEYS.has(key)) errors.push(`unknown key "${key}"`);
   }
+
   if (!/^(POST|PUT|PATCH|DELETE|GET) \/\S+$/.test(scenario.route ?? '')) {
     errors.push(`route "${scenario.route}" is not "METHOD /path"`);
   }
+
   if (scenario.auth !== 'bearer' && scenario.auth !== 'none') {
     errors.push('auth must be "bearer" or "none"');
   }
+
   if (scenario.auth === 'bearer' && !scenario.actor) {
     errors.push('auth "bearer" needs an actor');
   }
+
   for (const fixture of [scenario.actor, scenario.target]) {
     if (fixture !== undefined && !includes(ACTOR_FIXTURES, fixture)) {
       errors.push(`unknown actor fixture "${fixture}"`);
     }
   }
+
   for (const fixture of scenario.state ?? []) {
     if (!includes(STATE_FIXTURES, fixture)) {
       errors.push(`unknown state fixture "${fixture}"`);
     }
   }
+
   const segments = (scenario.path ?? '').split('/');
+
   for (const name of [
     ...placeholdersIn(scenario.headers),
     ...placeholdersIn(scenario.body),
@@ -262,7 +275,9 @@ export function scenarioErrors(scenario: RequestScenario): string[] {
       errors.push(`unknown placeholder "${name}"`);
     }
   }
+
   const { expect } = scenario;
+
   if (
     typeof expect?.status !== 'number' ||
     !(expect.errorKey === null || typeof expect.errorKey === 'string') ||
@@ -270,15 +285,18 @@ export function scenarioErrors(scenario: RequestScenario): string[] {
   ) {
     errors.push('expect needs status, errorKey (or null) and audit');
   }
+
   if (
     scenario.repeat !== undefined &&
     !(Number.isInteger(scenario.repeat) && scenario.repeat > 1)
   ) {
     errors.push('repeat must be an integer above 1');
   }
+
   if (expect?.earlier !== undefined && scenario.repeat === undefined) {
     errors.push('expect.earlier needs repeat');
   }
+
   return errors.map((e) => `${scenario.name}: ${e}`);
 }
 
@@ -292,9 +310,11 @@ export function loadScenarioFiles(): ScenarioFile[] {
         readFileSync(join(SCENARIOS_DIR, file), 'utf-8')
       ) as { scenarios: RequestScenario[] };
       const errors = scenarios.flatMap(scenarioErrors);
+
       if (errors.length > 0) {
         throw new Error(`${file}: ${errors.join('; ')}`);
       }
+
       return { file, scenarios };
     });
 }
@@ -307,19 +327,25 @@ export function resolvePlaceholders<T>(
   const resolveOne = (v: unknown): unknown => {
     if (typeof v === 'string' && includes(SCENARIO_PLACEHOLDERS, v)) {
       const resolved = values[v as ScenarioPlaceholder];
+
       if (resolved === undefined) {
         throw new Error(`no value for placeholder ${v}`);
       }
+
       return resolved;
     }
+
     if (Array.isArray(v)) return v.map(resolveOne);
+
     if (v !== null && typeof v === 'object') {
       return Object.fromEntries(
         Object.entries(v).map(([k, inner]) => [k, resolveOne(inner)])
       );
     }
+
     return v;
   };
+
   return resolveOne(value) as T;
 }
 
@@ -329,6 +355,7 @@ export function scenarioPath(
   values: Partial<Record<ScenarioPlaceholder, string>>
 ): string {
   const path = scenario.path ?? scenario.route.split(' ')[1];
+
   return path
     .split('/')
     .map((segment) => resolvePlaceholders(segment, values))

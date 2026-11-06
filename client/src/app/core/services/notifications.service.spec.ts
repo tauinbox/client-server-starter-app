@@ -65,6 +65,7 @@ describe('NotificationsService', () => {
     service.connect();
 
     const req = httpController.expectOne('/api/v1/notifications/stream');
+
     expect(req.request.method).toBe('GET');
     expect(req.request.reportProgress).toBe(true);
     req.flush('');
@@ -81,6 +82,7 @@ describe('NotificationsService', () => {
     service.connect();
 
     const req = httpController.expectOne('/api/v1/notifications/stream');
+
     service.disconnect();
 
     expect(req.cancelled).toBe(true);
@@ -88,6 +90,7 @@ describe('NotificationsService', () => {
 
   it('should parse an SSE chunk and emit the NotificationEvent', () => {
     const received: NotificationEvent[] = [];
+
     service.userCrudEvents$.subscribe((e) => received.push(e));
 
     service.connect();
@@ -95,6 +98,7 @@ describe('NotificationsService', () => {
 
     const chunk =
       'data: {"type":"user_crud_events","action":"created","userId":"u-1"}\n\n';
+
     req.event(makeProgressEvent(chunk, chunk.length));
 
     expect(received).toHaveLength(1);
@@ -107,6 +111,7 @@ describe('NotificationsService', () => {
 
   it('should only process new content on subsequent chunks', () => {
     const received: NotificationEvent[] = [];
+
     service.userCrudEvents$.subscribe((e) => received.push(e));
 
     service.connect();
@@ -114,11 +119,13 @@ describe('NotificationsService', () => {
 
     const chunk1 =
       'data: {"type":"user_crud_events","action":"created","userId":"u-2"}\n\n';
+
     req.event(makeProgressEvent(chunk1, chunk1.length));
 
     const chunk2 =
       chunk1 +
       'data: {"type":"user_crud_events","action":"created","userId":"u-3"}\n\n';
+
     req.event(makeProgressEvent(chunk2, chunk2.length));
 
     expect(received).toEqual([
@@ -132,12 +139,14 @@ describe('NotificationsService', () => {
       NotificationEvent,
       { type: 'feature_flags_updated' }
     >[] = [];
+
     service.featureFlagsUpdated$.subscribe((e) => received.push(e));
 
     service.connect();
     const req = httpController.expectOne('/api/v1/notifications/stream');
 
     const chunk = 'data: {"type":"feature_flags_updated"}\n\n';
+
     req.event(makeProgressEvent(chunk, chunk.length));
 
     expect(received).toHaveLength(1);
@@ -166,6 +175,7 @@ describe('NotificationsService', () => {
       'data: {"type":"user_crud_events","action":"created","userId":"u-3"}\n\n' +
       'data: {"type":"feature_flags_updated"}\n\n' +
       'data: {"type":"user_list_stale"}\n\n';
+
     req.event(makeProgressEvent(chunk, chunk.length));
 
     expect(session).toEqual([{ type: 'session_invalidated' }]);
@@ -179,6 +189,7 @@ describe('NotificationsService', () => {
 
   it('emits an event exactly once when its SSE frame is split across two progress chunks', () => {
     const received: NotificationEvent[] = [];
+
     service.sessionInvalidated$.subscribe((e) => received.push(e));
 
     service.connect();
@@ -186,6 +197,7 @@ describe('NotificationsService', () => {
 
     const frame = 'data: {"type":"session_invalidated"}\n\n';
     const firstHalf = frame.slice(0, 25); // ends mid-JSON
+
     req.event(makeProgressEvent(firstHalf, firstHalf.length));
     expect(received).toHaveLength(0);
 
@@ -196,6 +208,7 @@ describe('NotificationsService', () => {
 
   it('parses complete frames immediately while buffering an incomplete trailing frame', () => {
     const received: NotificationEvent[] = [];
+
     service.userCrudEvents$.subscribe((e) => received.push(e));
 
     service.connect();
@@ -206,6 +219,7 @@ describe('NotificationsService', () => {
     const frameB =
       'data: {"type":"user_crud_events","action":"created","userId":"u-b"}\n\n';
     const chunk1 = frameA + frameB.slice(0, 30);
+
     req.event(makeProgressEvent(chunk1, chunk1.length));
 
     expect(received).toEqual([
@@ -213,6 +227,7 @@ describe('NotificationsService', () => {
     ]);
 
     const chunk2 = frameA + frameB;
+
     req.event(makeProgressEvent(chunk2, chunk2.length));
 
     expect(received).toEqual([
@@ -223,12 +238,14 @@ describe('NotificationsService', () => {
 
   it('does not emit anything for a chunk with no complete frame', () => {
     const received: NotificationEvent[] = [];
+
     service.userCrudEvents$.subscribe((e) => received.push(e));
 
     service.connect();
     const req = httpController.expectOne('/api/v1/notifications/stream');
 
     const partial = 'data: {"type":"user_crud_events","action":"cre';
+
     req.event(makeProgressEvent(partial, partial.length));
 
     expect(received).toHaveLength(0);
@@ -236,6 +253,7 @@ describe('NotificationsService', () => {
 
   it('should skip malformed SSE frames without throwing', () => {
     const received: NotificationEvent[] = [];
+
     service.sessionInvalidated$.subscribe((e) => received.push(e));
 
     service.connect();
@@ -248,6 +266,7 @@ describe('NotificationsService', () => {
 
   it('should skip heartbeat frames (empty data)', () => {
     const received: NotificationEvent[] = [];
+
     service.userCrudEvents$.subscribe((e) => received.push(e));
 
     service.connect();
@@ -281,6 +300,7 @@ describe('NotificationsService', () => {
 
     service.connect();
     const req = httpController.expectOne('/api/v1/notifications/stream');
+
     service.disconnect();
     expect(req.cancelled).toBe(true);
 
@@ -317,6 +337,7 @@ describe('NotificationsService', () => {
 
     expect(first.cancelled).toBe(true);
     const second = httpController.expectOne('/api/v1/notifications/stream');
+
     expect(second.cancelled).toBe(false);
 
     // The recycled connection schedules the next recycle in turn
@@ -333,6 +354,7 @@ describe('NotificationsService', () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
 
     const received: NotificationEvent[] = [];
+
     service.userCrudEvents$.subscribe((e) => received.push(e));
 
     service.connect();
@@ -343,6 +365,7 @@ describe('NotificationsService', () => {
     const recycled = httpController.expectOne('/api/v1/notifications/stream');
     const chunk =
       'data: {"type":"user_crud_events","action":"deleted","userId":"u-7"}\n\n';
+
     recycled.event(makeProgressEvent(chunk, chunk.length));
 
     expect(received).toEqual([
@@ -421,6 +444,7 @@ describe('NotificationsService', () => {
       vi.advanceTimersByTime(delayMs - 1);
       httpController.expectNone(STREAM);
       vi.advanceTimersByTime(1);
+
       return httpController.expectOne(STREAM);
     };
 
@@ -445,9 +469,11 @@ describe('NotificationsService', () => {
       service.connect();
 
       httpController.expectOne(STREAM).flush('');
+
       for (const delay of [3000, 6000, 12_000, 24_000, 48_000, 60_000]) {
         expectReconnectAfter(delay).flush('');
       }
+
       expectReconnectAfter(60_000);
     });
 
@@ -482,11 +508,13 @@ describe('NotificationsService', () => {
       vi.useFakeTimers();
       service.connect();
       const first = httpController.expectOne(STREAM);
+
       first.event(heartbeat);
       first.flush('');
 
       vi.advanceTimersByTime(3000);
       const second = httpController.expectOne(STREAM);
+
       expect(reconnects).toBe(0);
 
       second.event(heartbeat);
@@ -498,6 +526,7 @@ describe('NotificationsService', () => {
     it('emits when the recycled stream sends its first frame', () => {
       vi.useFakeTimers();
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+
       service.connect();
       httpController.expectOne(STREAM).event(heartbeat);
 

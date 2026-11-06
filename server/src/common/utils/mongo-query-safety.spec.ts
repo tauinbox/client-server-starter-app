@@ -5,9 +5,11 @@ import {
 
 function nest(depth: number): Record<string, unknown> {
   let obj: Record<string, unknown> = {};
+
   for (let i = 0; i < depth; i++) {
     obj = { a: obj };
   }
+
   return obj;
 }
 

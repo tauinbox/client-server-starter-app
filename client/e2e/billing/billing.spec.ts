@@ -20,6 +20,7 @@ async function countOpenedSnackbars(page: Page) {
   await page.addInitScript(() => {
     const counter = window as SnackbarCounter;
     const opened = new Set<Element>();
+
     counter.snackbarsOpened = 0;
     new MutationObserver(() => {
       for (const container of document.querySelectorAll(
@@ -27,6 +28,7 @@ async function countOpenedSnackbars(page: Page) {
       )) {
         opened.add(container);
       }
+
       counter.snackbarsOpened = opened.size;
     }).observe(document, { childList: true, subtree: true });
   });
@@ -100,6 +102,7 @@ test.describe('Billing', () => {
     await page.goto('/billing');
 
     const notice = page.locator('.payments-unavailable');
+
     await expect(notice).toHaveAttribute('role', 'status');
     await expect(notice).toContainText(
       'Payments are temporarily unavailable in your billing region.'
@@ -123,6 +126,7 @@ test.describe('Billing', () => {
       .locator('nxs-plan-card', { hasText: 'Pro' })
       .getByRole('button', { name: 'Choose' });
     const notice = page.locator('.payments-unavailable');
+
     await expect(notice).toBeVisible();
     await expect(choosePro).toBeDisabled();
 
@@ -131,6 +135,7 @@ test.describe('Billing', () => {
         response.url().includes('/billing/region') &&
         response.request().method() === 'PUT'
     );
+
     await page
       .locator('.region-control')
       .getByRole('radio', { name: 'Russia' })
@@ -158,6 +163,7 @@ test.describe('Billing', () => {
         response.url().includes('/billing/region') &&
         response.request().method() !== 'GET'
     );
+
     await region.getByRole('radio', { name: 'Russia' }).click();
     expect((await refused).status()).toBe(409);
 
@@ -188,10 +194,12 @@ test.describe('Billing', () => {
         response.url().includes('/billing/region') &&
         response.request().method() !== 'GET'
     );
+
     await region.getByRole('radio', { name: 'Россия' }).click();
     expect((await refused).status()).toBe(409);
 
     const snackbar = page.locator('mat-snack-bar-container');
+
     await expect(snackbar).toContainText(
       'Чтобы сменить регион оплаты, сначала отмените текущую подписку.'
     );
@@ -252,6 +260,7 @@ test.describe('Billing', () => {
     await page.goto('/billing');
 
     const region = page.locator('.region-control');
+
     await expect(region.getByRole('radio', { name: 'Russia' })).toBeVisible();
     await _mockServer.setBillingProviderEnabled('yookassa', false);
     const refused = page.waitForResponse(
@@ -259,6 +268,7 @@ test.describe('Billing', () => {
         response.url().includes('/billing/region') &&
         response.request().method() !== 'GET'
     );
+
     await region.getByRole('radio', { name: 'Russia' }).click();
     expect((await refused).status()).toBe(403);
 
@@ -281,6 +291,7 @@ test.describe('Billing', () => {
         response.url().includes('/billing/region') &&
         response.request().method() === 'PUT'
     );
+
     await region.getByRole('radio', { name: 'Russia' }).click();
     expect((await saved).status()).toBe(200);
 
@@ -293,6 +304,7 @@ test.describe('Billing', () => {
         response.url().includes('/billing/region') &&
         response.request().method() === 'PUT'
     );
+
     await region.getByRole('radio', { name: 'International' }).click();
     expect((await left).status()).toBe(200);
     await expect(region).toHaveCount(0);
@@ -348,6 +360,7 @@ test.describe('Billing', () => {
       planKey: 'pro'
     });
     let checkouts = 0;
+
     page.on('request', (request) => {
       if (
         request.method() === 'POST' &&
@@ -358,6 +371,7 @@ test.describe('Billing', () => {
     });
 
     await page.goto('/billing');
+
     for (const plan of ['Free', 'Business']) {
       await expect(
         page
@@ -365,6 +379,7 @@ test.describe('Billing', () => {
           .getByRole('button', { name: 'Change plan' })
       ).toBeVisible();
     }
+
     await expect(page.getByRole('button', { name: 'Choose' })).toHaveCount(0);
 
     await page
@@ -405,6 +420,7 @@ test.describe('Billing', () => {
 
     await page.goto('/billing');
     const pro = page.locator('nxs-plan-card', { hasText: 'Pro' });
+
     await expect(pro.getByRole('button', { name: 'Choose' })).toBeVisible();
     await expect(
       page
@@ -440,12 +456,14 @@ test.describe('Billing', () => {
 
     await page.goto('/billing/settings');
     const region = page.locator('.settings-header .region-control');
+
     await expect(region.getByRole('radio', { name: 'Auto' })).toBeChecked();
     const changed = page.waitForResponse(
       (response) =>
         response.url().includes('/billing/region') &&
         response.request().method() === 'PUT'
     );
+
     await region.getByRole('radio', { name: 'International' }).click();
 
     expect((await changed).status()).toBe(200);
@@ -469,6 +487,7 @@ test.describe('Billing', () => {
     await page.getByRole('button', { name: 'Change plan' }).click();
 
     const dialog = page.getByRole('dialog');
+
     await expect(
       dialog.getByRole('heading', { name: 'Change plan' })
     ).toBeVisible();
@@ -507,6 +526,7 @@ test.describe('Billing', () => {
     await page.getByRole('button', { name: 'Change plan' }).click();
 
     const dialog = page.getByRole('dialog');
+
     await dialog.getByRole('radio', { name: /Business/ }).click();
     await expect(dialog.locator('.due-now dd')).toBeVisible();
     await dialog.getByRole('button', { name: 'Confirm' }).click();
@@ -552,6 +572,7 @@ test.describe('Billing', () => {
     const skuCard = page.locator('nxs-product-card', {
       hasText: 'Report pack'
     });
+
     await expect(skuCard).toBeVisible();
     await expect(skuCard).toContainText('$5.00');
 
@@ -584,6 +605,7 @@ test.describe('Billing', () => {
 
     await page.goto('/billing');
     const donationCard = page.locator('nxs-donation-card');
+
     await expect(donationCard).toBeVisible();
 
     // Quick presets derive from the catalog minimum ($1): $3 / $5 / Custom.
@@ -619,10 +641,12 @@ test.describe('Billing', () => {
 
     await page.goto('/billing');
     const donationCard = page.locator('nxs-donation-card');
+
     await donationCard.getByRole('radio', { name: 'Custom' }).click();
 
     // $0.50 is below the $1 catalog minimum: error shown, pay disabled.
     const amount = donationCard.getByRole('textbox', { name: 'Amount' });
+
     await amount.fill('0.50');
     await amount.blur();
     await expect(donationCard.locator('mat-error')).toContainText(
@@ -646,6 +670,7 @@ test.describe('Billing', () => {
       userId: USER_ID,
       planKey: 'usage'
     });
+
     await _mockServer.seedBillingUsage({
       customerId: subscription.customerId,
       quantity: 142
@@ -654,6 +679,7 @@ test.describe('Billing', () => {
     await page.goto('/billing/settings');
 
     const meter = page.locator('nxs-usage-meter');
+
     await expect(meter).toBeVisible();
     await expect(meter.locator('.usage-readout .total')).toHaveText('142');
     await expect(meter.locator('.meter-key')).toHaveText('api_calls');
@@ -675,6 +701,7 @@ test.describe('Billing', () => {
     await page.goto('/billing/settings');
 
     const meter = page.locator('nxs-usage-meter');
+
     await expect(meter).toBeVisible();
     await expect(meter.locator('.usage-empty')).toBeVisible();
   });
@@ -688,6 +715,7 @@ test.describe('Billing', () => {
     // Before any purchase the wallet shows the confident zero state.
     await page.goto('/billing/settings');
     const credits = page.locator('.credits-card');
+
     await expect(credits.locator('.credits-units')).toHaveText('0');
     await expect(credits.locator('.credits-hint')).toBeVisible();
     await expect(credits.getByRole('link', { name: 'Top up' })).toBeVisible();
@@ -698,6 +726,7 @@ test.describe('Billing', () => {
     const pack = page.locator('nxs-product-card', {
       hasText: '1000 credits'
     });
+
     await expect(pack).toContainText('$9.00');
     await pack.getByRole('button', { name: 'Buy' }).click();
     await payOnMockCheckout(page);
@@ -723,6 +752,7 @@ test.describe('Billing', () => {
       userId: USER_ID,
       planKey: 'usage'
     });
+
     await page.goto('/billing');
     await page
       .locator('nxs-product-card', { hasText: '1000 credits' })
@@ -764,6 +794,7 @@ test.describe('Billing', () => {
       userId: USER_ID,
       planKey: 'usage'
     });
+
     await page.goto('/billing');
     await page
       .locator('nxs-product-card', { hasText: '1000 credits' })
@@ -778,11 +809,13 @@ test.describe('Billing', () => {
 
     await page.goto('/billing/settings');
     const units = page.locator('.credits-card .credits-units');
+
     await expect(units).toHaveText('1,000');
 
     // The switch bills the 142 units of the closing window with credits.
     await page.getByRole('button', { name: 'Change plan' }).click();
     const dialog = page.getByRole('dialog');
+
     await dialog.getByRole('radio', { name: 'Fixed' }).click();
     await dialog.getByRole('radio', { name: /^Pro/ }).click();
     await expect(dialog.locator('.due-now dd')).toBeVisible();

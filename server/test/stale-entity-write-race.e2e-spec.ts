@@ -60,6 +60,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -78,6 +79,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
+
     await roleService.assignRoleToUser(admin.id, superRole.id, {
       ability: SYSTEM_ABILITY
     });
@@ -87,6 +89,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
         userAgent: 'stale-write-e2e',
         ipAddress: null
       });
+
     token = tokens.access_token;
   }, 60000);
 
@@ -121,6 +124,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
         .where('email LIKE :prefix', { prefix: `${prefix}%` })
         .execute();
     }
+
     await app?.close();
   });
 
@@ -145,6 +149,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       setTimeout(resolve, 10000).unref();
     });
     const original = EntityManager.prototype.transaction;
+
     jest
       .spyOn(EntityManager.prototype, 'transaction')
       .mockImplementation(async function (
@@ -156,8 +161,10 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
           markArrived();
           await gate;
         }
+
         return original.apply(this, args);
       });
+
     return { arrived, release };
   }
 
@@ -170,6 +177,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       setTimeout(resolve, 5000).unref();
     });
     const original = EntityManager.prototype.transaction;
+
     jest
       .spyOn(EntityManager.prototype, 'transaction')
       .mockImplementation(async function (
@@ -178,11 +186,15 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       ) {
         if (held < 2) {
           held += 1;
+
           if (held === 2) release();
+
           await gate;
         }
+
         return original.apply(this, args);
       });
+
     return { held: () => held };
   }
 
@@ -222,10 +234,12 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
         .auth(token, { type: 'bearer' })
         .send(body)
         .then((r) => r);
+
       await barrier.arrived;
       const removed = await request(http())
         .delete(`/api/v1/roles/${role.id}`)
         .auth(token, { type: 'bearer' });
+
       barrier.release();
       const patched = await patch;
 
@@ -254,6 +268,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
         isOrphaned: true
       })
     );
+
     jest
       .spyOn(app.get(ResourceRegistryService), 'isRegistered')
       .mockReturnValue(true);
@@ -264,10 +279,12 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       .auth(token, { type: 'bearer' })
       .send({ description: 'changed' })
       .then((r) => r);
+
     await barrier.arrived;
     const restored = await request(http())
       .post(`/api/v1/rbac/resources/${resource.id}/restore`)
       .auth(token, { type: 'bearer' });
+
     barrier.release();
     const patched = await patch;
 
@@ -282,6 +299,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
   it('keeps a password reset that lands before an administrator edit', async () => {
     const user = await createUser('reset');
     const rawToken = `${prefix}-reset-token`;
+
     await usersService.setPasswordResetToken(user.id, {
       email: user.email,
       hashedToken: hashToken(rawToken),
@@ -294,6 +312,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       .auth(token, { type: 'bearer' })
       .send({ name: 'Renamed Target' })
       .then((r) => r);
+
     await barrier.arrived;
     const reset = await request(http())
       .post('/api/v1/auth/reset-password')
@@ -301,6 +320,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     const afterReset = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     barrier.release();
     const patched = await patch;
 
@@ -309,6 +329,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     const after = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     expect(after.password).toBe(afterReset.password);
     expect(after.password).not.toBe(user.password);
     expect(after.isEmailVerified).toBe(true);
@@ -324,10 +345,12 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       .auth(token, { type: 'bearer' })
       .send({ name: 'Renamed Target' })
       .then((r) => r);
+
     await barrier.arrived;
     const removed = await request(http())
       .delete(`/api/v1/users/${user.id}`)
       .auth(token, { type: 'bearer' });
+
     barrier.release();
     const patched = await patch;
 
@@ -337,6 +360,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     const after = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { id: user.id }, withDeleted: true });
+
     expect(after.deletedAt).not.toBeNull();
     expect(after.name).toBe('Target deleted');
     expect(await auditRows(AuditAction.USER_UPDATE, user.id)).toBe(0);
@@ -346,12 +370,15 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
   async function outcome(run: Promise<unknown>): Promise<string> {
     try {
       await run;
+
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {
         const body = error.getResponse() as { errorKey?: string };
+
         return `${error.getStatus()} ${body.errorKey ?? ''}`.trim();
       }
+
       throw error;
     }
   }
@@ -393,6 +420,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
           { ability: delegate }
         )
       );
+
       await barrier.arrived;
       await resourceService.update(
         resource.id,
@@ -418,6 +446,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       const edit = outcome(
         usersService.update(user.id, { name: 'After' }, { ability: delegate })
       );
+
       await barrier.arrived;
       await usersService.update(
         user.id,
@@ -432,6 +461,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       const after = await dataSource
         .getRepository(User)
         .findOneByOrFail({ id: user.id });
+
       expect(after.name).toBe('Target scoped-edit');
       expect(after.isActive).toBe(false);
     }, 30000);
@@ -451,6 +481,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       const assign = outcome(
         roleService.assignRoleToUser(user.id, role.id, { ability: delegate })
       );
+
       await barrier.arrived;
       await usersService.update(
         user.id,
@@ -466,6 +497,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
         where: { id: user.id },
         relations: { roles: true }
       });
+
       expect(after.roles.map((r) => r.id)).not.toContain(role.id);
     }, 30000);
   });
@@ -493,6 +525,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       const [rule] = await dataSource
         .getRepository(FeatureFlagRule)
         .findBy({ flagId });
+
       return (rule.payload as { roleNames: string[] }).roleNames;
     }
 
@@ -509,6 +542,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
         { name: `${prefix}-rename-c` },
         { ability: SYSTEM_ABILITY }
       );
+
       await barrier.arrived;
       await roleService.update(
         role.id,
@@ -530,6 +564,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       const barrier = holdFirstTransaction();
 
       const removal = roleService.delete(role.id, { ability: SYSTEM_ABILITY });
+
       await barrier.arrived;
       await roleService.update(
         role.id,
@@ -556,6 +591,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     expect(barrier.held()).toBe(2);
     expect(responses.map((r) => r.status).toSorted()).toEqual([200, 404]);
     const loser = responses.find((r) => r.status === 404);
+
     expect(loser && errorKey(loser)).toBe(ErrorKeys.USERS.NOT_FOUND);
     expect(await auditRows(AuditAction.USER_DELETE, user.id)).toBe(1);
   }, 30000);

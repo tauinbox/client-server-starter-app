@@ -16,6 +16,7 @@ export function stepUpFactorOf(
   user: Pick<UserResponse, 'hasPassword' | 'mfaEnabled'> | null | undefined
 ): StepUpFactor {
   if (user?.hasPassword !== false) return 'password';
+
   return user.mfaEnabled ? 'code' : 'none';
 }
 

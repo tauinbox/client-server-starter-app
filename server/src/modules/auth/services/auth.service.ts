@@ -231,6 +231,7 @@ export class AuthService {
           }
         );
       }
+
       // The window elapsed. Left at the threshold, one wrong password per window
       // would keep any known account locked indefinitely.
       await this.usersService.resetLoginAttempts(user.id);
@@ -259,6 +260,7 @@ export class AuthService {
       user.password,
       user.passwordHashVersion
     );
+
     if (!verdict.valid) {
       if (failedLoginAttempts >= MAX_FAILED_ATTEMPTS && lockedUntil) {
         throw this.lockedLogin(
@@ -269,6 +271,7 @@ export class AuthService {
           }
         );
       }
+
       throw this.invalidCredentials(email, failedLoginAttempts);
     }
 
@@ -334,16 +337,19 @@ export class AuthService {
     // Create user and set verification token atomically so a partial failure
     // never leaves a user without a token (which would prevent email verification).
     let user: User;
+
     try {
       user = await withTransaction(this.dataSource, async (manager) => {
         const existing = await manager.findOne(User, {
           where: addressTakenWhere(registerDto.email)
         });
+
         if (existing) {
           throw emailExistsConflict();
         }
 
         let newUser: User;
+
         try {
           newUser = await manager.save(User, {
             ...registerDto,
@@ -354,6 +360,7 @@ export class AuthService {
           });
         } catch (error: unknown) {
           if (isUniqueViolation(error)) throw emailExistsConflict();
+
           throw error;
         }
 
@@ -361,6 +368,7 @@ export class AuthService {
         const userRole = await this.roleService.findRoleByName(
           SYSTEM_ROLES.USER
         );
+
         await manager
           .createQueryBuilder()
           .relation(User, 'roles')
@@ -379,6 +387,7 @@ export class AuthService {
           context: auditContext
         });
       }
+
       throw error;
     }
 
@@ -441,6 +450,7 @@ export class AuthService {
     const verified = await this.usersService.markEmailVerified(user.id, {
       emailVerificationToken: hashedToken
     });
+
     if (!verified) {
       throw invalidToken;
     }
@@ -480,6 +490,7 @@ export class AuthService {
       hashedToken,
       expiresAt
     });
+
     // The row changed after the read: the address moved, was verified, or the
     // account was deactivated. The same answer as for any of those states.
     if (!issued) {
@@ -523,6 +534,7 @@ export class AuthService {
       hashedToken,
       expiresAt
     });
+
     // The address moved or the account was deactivated after the read: the
     // mailbox that asked no longer owns the account.
     if (!issued) {
@@ -612,12 +624,14 @@ export class AuthService {
             tokenRevokedAt: new Date()
           }
         );
+
         if (consumed.affected === 0) {
           throw new ApiError(
             ErrorKeys.AUTH.INVALID_RESET_TOKEN,
             'Invalid or expired password reset token'
           );
         }
+
         // Redeeming the token is the same proof of mailbox control that the
         // verification link carries: it is only ever mailed to user.email.
         const flipped = await manager.update(
@@ -625,7 +639,9 @@ export class AuthService {
           { id: user.id, isEmailVerified: false },
           { isEmailVerified: true }
         );
+
         await manager.delete(RefreshToken, { userId: user.id });
+
         // A provider that an intruder linked while holding the password would
         // otherwise keep signing in after the owner takes the account back.
         return {
@@ -646,6 +662,7 @@ export class AuthService {
       targetType: 'User',
       context: auditContext
     });
+
     if (verified) {
       this.auditService.logFireAndForget({
         action: AuditAction.EMAIL_VERIFIED,
@@ -657,6 +674,7 @@ export class AuthService {
         context: auditContext
       });
     }
+
     this.reportRemovedProviders(user, removedProviders, {
       source: 'password_reset',
       actor: { actorId: user.id, actorEmail: user.email },
@@ -694,6 +712,7 @@ export class AuthService {
     }
   ): Promise<void> {
     const removed = await this.oauthAccountService.removeAllForUser(account.id);
+
     this.reportRemovedProviders(account, removed, {
       source,
       actor,
@@ -703,6 +722,7 @@ export class AuthService {
 
   async linkedProviders(userId: string): Promise<string[]> {
     const accounts = await this.oauthAccountService.findByUserId(userId);
+
     return accounts.map((account) => account.provider);
   }
 
@@ -755,6 +775,7 @@ export class AuthService {
       // session and issue nothing, so a thief gains no token either.
       const successor =
         await this.refreshTokenService.findLostResponseSuccessor(tokenDoc);
+
       if (successor) {
         await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
         // A thief replays from another address, the owner's device from the
@@ -763,6 +784,7 @@ export class AuthService {
           ipAddress === null || successor.ipAddress === null
             ? null
             : ipAddress === successor.ipAddress;
+
         throw this.refreshRefusal(
           'lost_response_replay',
           { actorId: tokenDoc.userId },
@@ -802,6 +824,7 @@ export class AuthService {
     const absoluteMaxMs = Number(
       this.configService.getOrThrow<string>('SESSION_ABSOLUTE_MAX_MS')
     );
+
     if (
       absoluteMaxMs > 0 &&
       Date.now() - tokenDoc.sessionStartedAt.getTime() >= absoluteMaxMs
@@ -845,6 +868,7 @@ export class AuthService {
     // Not `findOne`: its error would replace the refusal below, and a
     // soft-deleted account whose session is not yet revoked arrives here.
     const user = await this.usersService.findById(tokenDoc.userId);
+
     if (!user) {
       await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
       throw this.refreshRefusal(
@@ -972,6 +996,7 @@ export class AuthService {
     );
 
     let conflict: boolean;
+
     try {
       conflict = await withTransaction(this.dataSource, async (manager) => {
         // Conflict if any OTHER user already holds this address as their
@@ -1004,12 +1029,14 @@ export class AuthService {
             pendingEmailExpiresAt: expiresAt
           }
         );
+
         if (affected === 0) {
           throw new ApiError(
             ErrorKeys.AUTH.TOKEN_REVOKED,
             'Token has been revoked'
           );
         }
+
         return false;
       });
     } catch (error: unknown) {
@@ -1018,10 +1045,12 @@ export class AuthService {
       // enumeration-safe path as a detected conflict - surfacing the violation
       // would reveal that someone else holds the address.
       if (!isUniqueViolation(error)) throw error;
+
       conflict = true;
     }
 
     const domain = dto.newEmail.slice(dto.newEmail.indexOf('@') + 1);
+
     this.auditService.logFireAndForget({
       action: AuditAction.USER_EMAIL_CHANGE_REQUEST,
       actorId: userId,
@@ -1070,6 +1099,7 @@ export class AuthService {
     let tokenHolderId: string | null = null;
 
     let outcome: ConfirmEmailChangeOutcome;
+
     try {
       outcome = await withTransaction(
         this.dataSource,
@@ -1077,6 +1107,7 @@ export class AuthService {
           const user = await manager.findOne(User, {
             where: { pendingEmailToken: hashedToken }
           });
+
           // Deactivation must also void an email-change token issued while the
           // account was still active, matching the isActive gate in
           // resetPassword. The response stays identical to the not-found case
@@ -1087,6 +1118,7 @@ export class AuthService {
               'Invalid or expired email-change token'
             );
           }
+
           tokenHolderId = user.id;
 
           if (
@@ -1104,6 +1136,7 @@ export class AuthService {
             .where('u.email = :email', { email: newEmail })
             .andWhere('u.id != :userId', { userId: user.id })
             .getOne();
+
           if (conflicting) {
             return { kind: 'conflict', userId: user.id };
           }
@@ -1126,12 +1159,14 @@ export class AuthService {
               tokenRevokedAt: new Date()
             }
           );
+
           if (consumed.affected === 0) {
             throw new ApiError(
               ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED,
               'Invalid or expired email-change token'
             );
           }
+
           // The confirmation link went to the new address, so following it
           // proves control of that mailbox.
           const flipped = await manager.update(
@@ -1139,6 +1174,7 @@ export class AuthService {
             { id: user.id, isEmailVerified: false },
             { isEmailVerified: true }
           );
+
           await manager.delete(RefreshToken, { userId: user.id });
 
           return {
@@ -1154,7 +1190,9 @@ export class AuthService {
       );
     } catch (error: unknown) {
       const racedUserId: string | null = tokenHolderId;
+
       if (!isUniqueViolation(error) || racedUserId === null) throw error;
+
       outcome = { kind: 'conflict', userId: racedUserId };
     }
 
@@ -1186,6 +1224,7 @@ export class AuthService {
       details: { oldEmail: result.oldEmail, newEmail: result.newEmail },
       context: auditContext
     });
+
     if (result.verified) {
       this.auditService.logFireAndForget({
         action: AuditAction.EMAIL_VERIFIED,
@@ -1197,6 +1236,7 @@ export class AuthService {
         context: auditContext
       });
     }
+
     this.eventEmitter.emit(
       UserUpdatedEvent.name,
       new UserUpdatedEvent(result.userId, result.previous)
@@ -1264,6 +1304,7 @@ export class AuthService {
     }
 
     const refusal = STEP_UP_REFUSALS[factor];
+
     throw new ApiError(refusal.key, refusal.message);
   }
 
@@ -1295,14 +1336,17 @@ export class AuthService {
       code,
       auditContext
     );
+
     if (codeVerdict.kind === 'accepted') {
       return { factor: null };
     }
+
     // The code that bars the authenticator ends the step-up: no other factor
     // is checked after it, as on the attempt that bars the password.
     if (codeVerdict.kind === 'refused' && codeVerdict.lockedMs !== undefined) {
       return { factor: 'code', lockedMs: codeVerdict.lockedMs };
     }
+
     // A wrong code still falls through to the other factor. When that factor
     // also fails without a password check, the refusal names the code that
     // the caller typed, not a factor the caller never offered.
@@ -1329,6 +1373,7 @@ export class AuthService {
       user.id,
       LOCKOUT_DURATION_MS
     );
+
     // Returned, not thrown, so assertStepUp writes the row for this attempt.
     if (count > MAX_FAILED_ATTEMPTS) {
       return { factor: 'password', lockedMs: remainingMs };
@@ -1339,6 +1384,7 @@ export class AuthService {
       user.password,
       user.passwordHashVersion
     );
+
     if (!verdict.valid) {
       return count >= MAX_FAILED_ATTEMPTS
         ? { factor: 'password', lockedMs: remainingMs }
@@ -1346,6 +1392,7 @@ export class AuthService {
     }
 
     await this.stepUpPasswordFailures.clear(user.id);
+
     if (verdict.upgrade) {
       // The caller keys its write on the hash that this check verified, so
       // the copy must carry the hash that is now on the row.
@@ -1353,8 +1400,10 @@ export class AuthService {
         user,
         currentPassword
       );
+
       if (upgraded) Object.assign(user, upgraded);
     }
+
     return { factor: null };
   }
 
@@ -1432,6 +1481,7 @@ export class AuthService {
     const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
 
     await this.assertStepUp(user, request);
+
     return user;
   }
 
@@ -1448,6 +1498,7 @@ export class AuthService {
     if (!refreshToken) return false;
 
     const tokenDoc = await this.refreshTokenService.findByToken(refreshToken);
+
     // A token belonging to somebody else ends nothing: the cookie is cleared
     // either way, so a mismatched value cannot be used to sign another account
     // out of one of its devices.
@@ -1474,6 +1525,7 @@ export class AuthService {
     if (!refreshToken) return;
 
     const tokenDoc = await this.refreshTokenService.findByToken(refreshToken);
+
     if (!tokenDoc) return;
 
     await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
@@ -1515,6 +1567,7 @@ export class AuthService {
       details: { reason, ...extraDetails }
     });
     this.metricsService.recordAuthEvent('token_refresh_failure');
+
     return new ApiError(refusal.key, refusal.message);
   }
 
@@ -1531,6 +1584,7 @@ export class AuthService {
       }
     });
     this.metricsService.recordAuthEvent('login_failure');
+
     return new ApiError(
       ErrorKeys.AUTH.INVALID_CREDENTIALS,
       'Invalid credentials'
@@ -1553,6 +1607,7 @@ export class AuthService {
       details
     });
     this.metricsService.recordAuthEvent('login_failure');
+
     return lockedException(
       'Account is temporarily locked due to too many failed login attempts',
       ErrorKeys.AUTH.ACCOUNT_LOCKED,

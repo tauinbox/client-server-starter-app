@@ -29,6 +29,7 @@ beforeEach(async () => {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   token = ((await res.json()) as { tokens: { access_token: string } }).tokens
     .access_token;
@@ -47,13 +48,17 @@ async function send<T>(
     'content-type': 'application/json',
     authorization: `Bearer ${token}`
   };
+
   if (ifMatch !== undefined) headers['if-match'] = versionEtag(ifMatch);
+
   const res = await fetch(`${baseUrl}/api/v1/${path}`, {
     method,
     headers,
     body: JSON.stringify(body)
   });
+
   expect(res.status).toBe(expected);
+
   return (await res.json()) as T;
 }
 
@@ -61,6 +66,7 @@ function lastChangedFields(action: string, targetId: string): unknown {
   const row = getState()
     .auditLogs.filter((r) => r.action === action && r.targetId === targetId)
     .at(-1);
+
   return row?.details?.['changedFields'];
 }
 

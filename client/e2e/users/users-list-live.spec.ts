@@ -9,6 +9,7 @@ const SEEDED = 25;
 // the second page.
 const seededUsers = Array.from({ length: SEEDED }, (_, index) => {
   const n = String(index).padStart(2, '0');
+
   return createMockUser({
     id: mockId(`live-${n}`),
     email: `live-${n}@example.com`,
@@ -24,6 +25,7 @@ async function openListWithStream(page: Page, mockServerUrl: string) {
   const stream = page.waitForRequest((r) =>
     r.url().includes('/api/v1/notifications/stream')
   );
+
   await page.goto('/users');
   await stream;
 }
@@ -31,8 +33,10 @@ async function openListWithStream(page: Page, mockServerUrl: string) {
 /** Counts the list requests that start from the first page. */
 function countFirstPageLoads(page: Page): () => number {
   let count = 0;
+
   page.on('request', (request) => {
     const url = request.url();
+
     if (
       url.includes('/api/v1/users/') &&
       url.includes('cursor') &&
@@ -41,6 +45,7 @@ function countFirstPageLoads(page: Page): () => number {
       count++;
     }
   });
+
   return () => count;
 }
 
@@ -53,6 +58,7 @@ async function adminToken(mockServerUrl: string): Promise<string> {
   const { tokens } = (await login.json()) as {
     tokens: { access_token: string };
   };
+
   return tokens.access_token;
 }
 
@@ -66,6 +72,7 @@ test.describe('User list - live changes', () => {
 
     const rows = page.locator('tr.mat-mdc-row');
     const target = rows.filter({ hasText: 'live-00@example.com' });
+
     await expect(rows.first()).toBeVisible();
     // The scroll sentinel loads the second page.
     await expect(async () => {
@@ -87,6 +94,7 @@ test.describe('User list - live changes', () => {
         body: JSON.stringify({ name: 'Renamed Member' })
       }
     );
+
     expect(patch.status).toBe(200);
 
     // The row is on the second page, so a reload would have dropped it.
@@ -102,6 +110,7 @@ test.describe('User list - live changes', () => {
     await openListWithStream(page, _mockServer.url);
 
     const rows = page.locator('tr.mat-mdc-row');
+
     await expect(rows.first()).toBeVisible();
     const firstPageLoads = countFirstPageLoads(page);
 
@@ -114,11 +123,13 @@ test.describe('User list - live changes', () => {
         name: 'Newcomer Person'
       })
     });
+
     expect(register.status).toBe(201);
 
     const banner = page.getByRole('status').filter({
       hasText: 'The user list has changed.'
     });
+
     await expect(banner).toBeVisible();
     expect(firstPageLoads()).toBe(0);
     await expect(page.getByText('newcomer@example.com')).toHaveCount(0);
@@ -141,6 +152,7 @@ test.describe('User list - live changes', () => {
     const reconnect = page.waitForRequest((r) =>
       r.url().includes('/api/v1/notifications/stream')
     );
+
     _workerMockServer.server.closeAllConnections();
     // The client waits at least 1.5 s before it reconnects, so the push of
     // this registration goes to no open stream.
@@ -153,6 +165,7 @@ test.describe('User list - live changes', () => {
         name: 'Gap Newcomer'
       })
     });
+
     expect(register.status).toBe(201);
     await reconnect;
 

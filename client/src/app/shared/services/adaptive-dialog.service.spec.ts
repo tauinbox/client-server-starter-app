@@ -75,6 +75,7 @@ describe('AdaptiveDialogService', () => {
     dialogMock.open.mockReturnValue({ afterClosed: () => of(true) });
 
     let result: boolean | undefined;
+
     service.openConfirm(mockData).subscribe((v) => (result = v));
 
     expect(result).toBe(true);
@@ -87,6 +88,7 @@ describe('AdaptiveDialogService', () => {
     });
 
     let result: boolean | undefined;
+
     service.openConfirm(mockData).subscribe((v) => (result = v));
 
     expect(result).toBe(false);

@@ -36,12 +36,14 @@ export class DisplayPreferencesService {
 
   setDensity(level: number): void {
     const clamped = clampLevel(level);
+
     this.#density.set(clamped);
     this.#storage.setItem(STORAGE_KEY, clamped);
   }
 
   #initial(): number {
     const saved = this.#storage.getItem<number>(STORAGE_KEY);
+
     return typeof saved === 'number' && Number.isFinite(saved)
       ? clampLevel(saved)
       : DEFAULT_DENSITY;
@@ -49,6 +51,7 @@ export class DisplayPreferencesService {
 
   #apply(level: number): void {
     const root = this.#document.documentElement;
+
     if (level > 0) {
       root.setAttribute('data-ui-density', String(level));
     } else {

@@ -20,10 +20,13 @@ describe('CreateButtonComponent', () => {
     detect: () => void;
   } {
     const fixture = TestBed.createComponent(CreateButtonComponent);
+
     fixture.componentRef.setInput('label', 'New role');
     const pressed = vi.fn();
+
     fixture.componentInstance.pressed.subscribe(pressed);
     fixture.detectChanges();
+
     return {
       host: fixture.nativeElement as HTMLElement,
       pressed,
@@ -44,6 +47,7 @@ describe('CreateButtonComponent', () => {
 
   it('becomes an extended FAB on a handset', () => {
     const { host, pressed, detect } = render();
+
     isHandset.set(true);
     detect();
     const button = host.querySelector('button') as HTMLButtonElement;

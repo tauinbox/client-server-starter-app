@@ -57,6 +57,7 @@ describe('PasswordStrengthComponent', () => {
   it('hides the meter when password is empty', () => {
     const root: HTMLElement = fixture.nativeElement;
     const container = root.querySelector('.password-strength');
+
     expect(container).not.toBeNull();
     expect(container?.getAttribute('data-strength')).toBe('0');
     expect(root.querySelector('.strength-bars')).toBeNull();
@@ -68,11 +69,13 @@ describe('PasswordStrengthComponent', () => {
     fixture.detectChanges();
 
     const root: HTMLElement = fixture.nativeElement;
+
     expect(component.score()).toBe(1);
     expect(
       root.querySelector('.password-strength')?.getAttribute('data-strength')
     ).toBe('1');
     const filled = root.querySelectorAll('.strength-bar.filled');
+
     expect(filled.length).toBe(1);
     expect(root.querySelector('.strength-label')?.textContent?.trim()).toBe(
       'Weak'
@@ -84,8 +87,10 @@ describe('PasswordStrengthComponent', () => {
     fixture.detectChanges();
 
     const root: HTMLElement = fixture.nativeElement;
+
     expect(component.score()).toBe(4);
     const filled = root.querySelectorAll('.strength-bar.filled');
+
     expect(filled.length).toBe(4);
     expect(root.querySelector('.strength-label')?.textContent?.trim()).toBe(
       'Strong'
@@ -97,6 +102,7 @@ describe('PasswordStrengthComponent', () => {
     fixture.detectChanges();
 
     const root: HTMLElement = fixture.nativeElement;
+
     expect(component.score()).toBe(3);
     expect(root.querySelector('.strength-label')?.textContent?.trim()).toBe(
       'Good'
@@ -108,6 +114,7 @@ describe('PasswordStrengthComponent', () => {
 
     it('stays hidden while the field is empty', () => {
       const root: HTMLElement = fixture.nativeElement;
+
       expect(root.querySelector(HINT)).toBeNull();
     });
 
@@ -117,6 +124,7 @@ describe('PasswordStrengthComponent', () => {
 
       const hint: HTMLElement | null =
         fixture.nativeElement.querySelector(HINT);
+
       expect(hint).not.toBeNull();
       expect(hint?.textContent).toContain('12 characters');
       expect(hint?.textContent).not.toContain('uppercase');
@@ -140,9 +148,11 @@ describe('PasswordStrengthComponent', () => {
 
     const root: HTMLElement = fixture.nativeElement;
     const label = root.querySelector('.strength-label');
+
     expect(label?.getAttribute('aria-live')).toBe('polite');
 
     const container = root.querySelector('.password-strength');
+
     expect(container?.getAttribute('role')).toBe('progressbar');
     expect(container?.getAttribute('aria-valuemin')).toBe('0');
     expect(container?.getAttribute('aria-valuemax')).toBe('4');

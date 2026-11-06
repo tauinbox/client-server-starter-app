@@ -68,6 +68,7 @@ export class PreferencesCardComponent {
   protected readonly locale = linkedSignal<AppLanguage>(() =>
     this.user()?.locale === 'ru' ? 'ru' : 'en'
   );
+
   protected readonly savingLocale = signal(false);
 
   protected readonly displayDensity = this.#displayPreferences.density;
@@ -80,6 +81,7 @@ export class PreferencesCardComponent {
    */
   onLocaleChange(value: AppLanguage): void {
     const previous = this.locale();
+
     if (value === previous || !this.canSaveLocale()) return;
 
     this.locale.set(value);

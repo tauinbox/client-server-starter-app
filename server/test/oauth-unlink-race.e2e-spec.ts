@@ -36,6 +36,7 @@ runWithInfra('OAuth unlink concurrency (e2e)', () => {
        VALUES ($1, 'Race Unlink', NULL) RETURNING id`,
       [`oauth-race-${stamp}@example.com`]
     );
+
     userId = id;
 
     for (const provider of providers) {
@@ -57,12 +58,14 @@ runWithInfra('OAuth unlink concurrency (e2e)', () => {
    */
   async function warmPool(): Promise<void> {
     const runners = [ds.createQueryRunner(), ds.createQueryRunner()];
+
     await Promise.all(runners.map((r) => r.connect()));
     await Promise.all(runners.map((r) => r.release()));
   }
 
   it('leaves one login method when both providers are unlinked concurrently', async () => {
     const id = await seedPasswordlessUser(['google', 'facebook']);
+
     await warmPool();
 
     const outcomes = await Promise.allSettled([
@@ -71,10 +74,12 @@ runWithInfra('OAuth unlink concurrency (e2e)', () => {
     ]);
 
     const remaining = await service.findByUserId(id);
+
     expect(remaining).toHaveLength(1);
     expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
 
     const rejected = outcomes.filter((o) => o.status === 'rejected');
+
     expect(rejected).toHaveLength(1);
     expect(rejected[0].reason).toMatchObject({
       status: 409
@@ -83,6 +88,7 @@ runWithInfra('OAuth unlink concurrency (e2e)', () => {
 
   it('allows both unlinks concurrently once a password exists', async () => {
     const id = await seedPasswordlessUser(['google', 'facebook']);
+
     await ds.query(`UPDATE users SET password = 'hashed' WHERE id = $1`, [id]);
     await warmPool();
 

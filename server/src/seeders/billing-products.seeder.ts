@@ -99,6 +99,7 @@ export default class BillingProductsSeeder extends Seeder {
     const toCreate = PRODUCTS.filter(
       (product) => !existingKeys.has(product.key)
     );
+
     if (toCreate.length === 0) return;
 
     await productRepo.save(

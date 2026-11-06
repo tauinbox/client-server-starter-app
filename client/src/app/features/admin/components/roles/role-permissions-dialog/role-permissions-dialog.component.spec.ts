@@ -62,6 +62,7 @@ const mockPermissionB = {
 /** A well-formed RolePermissionItem as the real server returns. */
 function makeRolePermItem(permissionId: string): RolePermissionItem {
   const perm = permissionId === 'perm-a' ? mockPermissionA : mockPermissionB;
+
   return {
     id: `rp-${permissionId}`,
     roleId: mockRole.id,
@@ -74,9 +75,12 @@ function makeRolePermItem(permissionId: string): RolePermissionItem {
 /** Builds a blur event whose target is a real textarea carrying `value`. */
 function textareaBlurEvent(value: string): Event {
   const textarea = document.createElement('textarea');
+
   textarea.value = value;
   const event = new Event('blur');
+
   textarea.dispatchEvent(event);
+
   return event;
 }
 
@@ -120,6 +124,7 @@ function setup(
   });
 
   const fixture = TestBed.createComponent(RolePermissionsDialogComponent);
+
   fixture.detectChanges();
   // forkJoin completes synchronously with of()
   fixture.detectChanges();
@@ -170,6 +175,7 @@ describe('RolePermissionsDialogComponent', () => {
           '.permission-items mat-checkbox'
         ) as NodeListOf<Element>
       ).map((el) => el.textContent?.trim());
+
       expect(labels).toEqual(['Search', 'Update']);
     });
 
@@ -191,16 +197,19 @@ describe('RolePermissionsDialogComponent', () => {
       const custom = Array.from(
         host.querySelectorAll('.condition-editor mat-checkbox')
       ).find((el) => el.textContent?.includes('Custom'));
+
       (custom?.querySelector('input') as HTMLInputElement).click();
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
 
       const builder = host.querySelector('nxs-condition-builder');
+
       expect(builder).not.toBeNull();
       const logic = Array.from(
         builder!.querySelectorAll('mat-button-toggle')
       ).map((el) => el.textContent?.trim());
+
       expect(logic).toEqual(expect.arrayContaining(['AND', 'OR']));
     });
 
@@ -297,7 +306,9 @@ describe('RolePermissionsDialogComponent', () => {
         string,
         { permissionId: string; conditions: null }[]
       ];
+
       expect(items.length).toBeGreaterThan(0);
+
       for (const item of items) {
         expect(item.permissionId).toBeDefined();
         expect(typeof item.permissionId).toBe('string');
@@ -318,6 +329,7 @@ describe('RolePermissionsDialogComponent', () => {
         { permissionId: string; conditions: null }[]
       ];
       const ids = items.map((i) => i.permissionId);
+
       expect(ids).toContain('perm-a');
       expect(ids).toContain('perm-b');
     });
@@ -351,6 +363,7 @@ describe('RolePermissionsDialogComponent', () => {
       const hasUndefinedId = items.some(
         (i) => i.permissionId === undefined || i.permissionId === 'undefined'
       );
+
       expect(hasUndefinedId).toBe(true); // documents the BROKEN behaviour
     });
 
@@ -366,6 +379,7 @@ describe('RolePermissionsDialogComponent', () => {
         string,
         unknown[]
       ];
+
       expect(roleId).toBe(mockRole.id);
     });
 
@@ -457,6 +471,7 @@ describe('RolePermissionsDialogComponent', () => {
       const saveButton = fixture.nativeElement.querySelector(
         'button[matButton="filled"]'
       );
+
       expect(saveButton).toBeNull();
     });
 
@@ -466,6 +481,7 @@ describe('RolePermissionsDialogComponent', () => {
       });
 
       const content: string = fixture.nativeElement.textContent ?? '';
+
       expect(content).toContain('You have read-only access');
     });
 
@@ -475,6 +491,7 @@ describe('RolePermissionsDialogComponent', () => {
       });
 
       const content: string = fixture.nativeElement.textContent ?? '';
+
       expect(content).not.toContain('You have read-only access');
     });
 
@@ -490,6 +507,7 @@ describe('RolePermissionsDialogComponent', () => {
       const checkboxInputs: NodeListOf<HTMLInputElement> =
         fixture.nativeElement.querySelectorAll('mat-checkbox input');
       const anyDisabled = Array.from(checkboxInputs).some((el) => el.disabled);
+
       expect(anyDisabled).toBe(true);
     });
   });
@@ -546,6 +564,7 @@ describe('RolePermissionsDialogComponent', () => {
         { permissionId: string; conditions: { effect?: string } | null }[]
       ];
       const item = items.find((i) => i.permissionId === 'perm-a');
+
       expect(item?.conditions?.effect).toBe('deny');
     });
 
@@ -579,6 +598,7 @@ describe('RolePermissionsDialogComponent', () => {
         getRolePermissions: vi.fn().mockReturnValue(of([])),
         setPermissions: vi.fn().mockReturnValue(of(undefined))
       };
+
       TestBed.configureTestingModule({
         imports: [
           RolePermissionsDialogComponent,
@@ -601,6 +621,7 @@ describe('RolePermissionsDialogComponent', () => {
         ]
       });
       const fixture = TestBed.createComponent(RolePermissionsDialogComponent);
+
       fixture.detectChanges();
       fixture.detectChanges();
       const component = fixture.componentInstance;
@@ -754,9 +775,12 @@ describe('RolePermissionsDialogComponent', () => {
   describe('ownership field validation', () => {
     function inputEvent(value: string): Event {
       const input = document.createElement('input');
+
       input.value = value;
       const event = new Event('input');
+
       input.dispatchEvent(event);
+
       return event;
     }
 

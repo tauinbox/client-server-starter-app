@@ -44,6 +44,7 @@ runWithInfra('Startup sync of an edited resource (e2e)', () => {
     // The real controllers stay in the list, so the sync orphans none of them.
     const discovery = app.get(DiscoveryService);
     const controllers = discovery.getControllers();
+
     jest
       .spyOn(discovery, 'getControllers')
       .mockReturnValue([
@@ -57,6 +58,7 @@ runWithInfra('Startup sync of an edited resource (e2e)', () => {
       const resource = await dataSource
         .getRepository(Resource)
         .findOneBy({ name });
+
       if (resource) {
         await dataSource
           .getRepository(Permission)
@@ -64,6 +66,7 @@ runWithInfra('Startup sync of an edited resource (e2e)', () => {
         await dataSource.getRepository(Resource).delete({ id: resource.id });
       }
     }
+
     await app?.close();
   });
 
@@ -73,6 +76,7 @@ runWithInfra('Startup sync of an edited resource (e2e)', () => {
 
     await sync.onApplicationBootstrap();
     const created = await resources.findOneByOrFail({ name });
+
     expect(created.displayName).toBe('Declared name');
 
     await resources.update(
@@ -84,6 +88,7 @@ runWithInfra('Startup sync of an edited resource (e2e)', () => {
     // No isOrphaned check: the app of a parallel suite syncs the same database
     // without this controller, and a sync never clears the flag.
     const synced = await resources.findOneByOrFail({ name });
+
     expect(synced).toEqual(
       expect.objectContaining({
         displayName: 'Edited name',

@@ -32,12 +32,15 @@ describe('LanguageService', () => {
 
   it('loads the new language and each loaded scope before it switches', async () => {
     const calls: string[] = [];
+
     vi.spyOn(transloco, 'load').mockImplementation((path) => {
       calls.push(`load ${path}`);
+
       return of({});
     });
     vi.spyOn(transloco, 'setActiveLang').mockImplementation((lang) => {
       calls.push(`activate ${lang}`);
+
       return transloco;
     });
 
@@ -59,11 +62,13 @@ describe('LanguageService', () => {
 
   it('keeps the last requested language when an earlier load ends later', async () => {
     const ruLoaded = new Subject<Translation>();
+
     vi.spyOn(transloco, 'load').mockImplementation((path) =>
       path.endsWith('ru') ? ruLoaded : of({})
     );
 
     const toRu = service.setLanguage('ru');
+
     await service.setLanguage('en');
     ruLoaded.next({});
     ruLoaded.complete();

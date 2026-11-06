@@ -103,6 +103,7 @@ export function applyListQuery<
 
   if (query.q) {
     const pattern = `%${escapeLikePattern(query.q)}%`;
+
     qb.andWhere(
       new Brackets((sb) => {
         for (const field of spec.search) {
@@ -116,14 +117,17 @@ export function applyListQuery<
 
   for (const [name, definition] of Object.entries(spec.filters)) {
     const value = values[name];
+
     // An empty text filter is unset, like an empty `q`: `ILIKE '%%'` would
     // still drop the rows whose column is NULL.
     if (value === undefined || value === '') continue;
+
     const [condition, parameters] = filterCondition(
       definition.kind,
       { column: filterColumns[name], param: `listFilter_${name}` },
       value
     );
+
     qb.andWhere(condition, parameters);
   }
 }
@@ -152,5 +156,6 @@ export async function applyList<
     sortColumnMap: columns.sort,
     idColumn: columns.id
   });
+
   return new CursorPaginatedResponseDto(data, nextCursor, limit);
 }

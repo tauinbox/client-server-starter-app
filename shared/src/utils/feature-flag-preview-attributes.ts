@@ -12,10 +12,13 @@ export function findPreviewAttributesError(value: unknown): string | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null;
   }
+
   const keys = Object.keys(value);
+
   if (keys.length > FEATURE_FLAG_PREVIEW_ATTRIBUTES_MAX_KEYS) {
     return `attributes must contain no more than ${FEATURE_FLAG_PREVIEW_ATTRIBUTES_MAX_KEYS} keys`;
   }
+
   if (
     keys.some(
       (key) =>
@@ -25,5 +28,6 @@ export function findPreviewAttributesError(value: unknown): string | null {
   ) {
     return `each key in attributes must be from 1 to ${FEATURE_FLAG_PREVIEW_ATTRIBUTE_KEY_MAX_LENGTH} characters long`;
   }
+
   return null;
 }

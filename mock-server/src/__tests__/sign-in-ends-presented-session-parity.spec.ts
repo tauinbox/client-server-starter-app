@@ -15,6 +15,7 @@ type Device = { accessToken: string; refreshCookie: string };
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -31,7 +32,9 @@ function refreshCookieOf(res: Response): string {
   const match = /refresh_token=([^;]+)/.exec(
     res.headers.get('set-cookie') ?? ''
   );
+
   expect(match).not.toBeNull();
+
   return `refresh_token=${match?.[1] ?? ''}`;
 }
 
@@ -56,8 +59,10 @@ async function signIn(
     credentials,
     presented ? { cookie: presented } : {}
   );
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return {
     accessToken: body.tokens.access_token,
     refreshCookie: refreshCookieOf(res)
@@ -73,6 +78,7 @@ function refreshStatus(cookie: string): Promise<number> {
 
 function liveTokensOf(email: string): number {
   const id = findUserByEmail(email)?.id;
+
   return [...getState().refreshTokens.values()].filter((uid) => uid === id)
     .length;
 }
@@ -112,6 +118,7 @@ describe('a sign-in ends the session of the presented refresh cookie', () => {
   it('the second factor, not the password, ends the replaced session', async () => {
     const owner = await signIn(USER);
     const auth = { authorization: `Bearer ${owner.accessToken}` };
+
     expect(
       (await post('/auth/mfa/setup', { currentPassword: USER.password }, auth))
         .status
@@ -130,6 +137,7 @@ describe('a sign-in ends the session of the presented refresh cookie', () => {
       cookie: owner.refreshCookie
     });
     const { mfaToken } = (await challenge.json()) as { mfaToken: string };
+
     expect(liveTokensOf(USER.email)).toBe(1);
 
     const verified = await post(

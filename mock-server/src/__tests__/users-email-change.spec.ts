@@ -11,6 +11,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -32,8 +33,10 @@ async function loginAsAdmin(): Promise<string> {
       password: 'Password1'
     })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -45,11 +48,14 @@ async function loginAsUser(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
   const setCookie = res.headers.get('set-cookie') ?? '';
   const refreshToken = /refresh_token=([^;]+)/.exec(setCookie)?.[1] ?? '';
+
   expect(refreshToken).not.toBe('');
+
   return { accessToken: body.tokens.access_token, refreshToken };
 }
 
@@ -80,6 +86,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
       field?: string;
       message: string;
     };
+
     expect(body.errorKey).toBe('errors.users.emailExists');
     // The server envelope is closed and never carried this key on the wire.
     expect(body.field).toBeUndefined();
@@ -105,6 +112,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
       email: string;
       isEmailVerified: boolean;
     };
+
     expect(body.email).toBe('changed@example.com');
     expect(body.isEmailVerified).toBe(false);
   });
@@ -124,17 +132,20 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
         currentPassword: 'Password1'
       })
     });
+
     expect(res.status).toBe(200);
 
     const profile = await fetch(`${baseUrl}/api/v1/auth/profile`, {
       headers: { authorization: `Bearer ${victim.accessToken}` }
     });
+
     expect(profile.status).toBe(401);
 
     const refreshed = await fetch(`${baseUrl}/api/v1/auth/refresh-token`, {
       method: 'POST',
       headers: { cookie: `refresh_token=${victim.refreshToken}` }
     });
+
     expect(refreshed.status).toBe(401);
   });
 
@@ -150,11 +161,13 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
       },
       body: JSON.stringify({ email: 'john@example.com', name: 'Johnny' })
     });
+
     expect(res.status).toBe(200);
 
     const profile = await fetch(`${baseUrl}/api/v1/auth/profile`, {
       headers: { authorization: `Bearer ${victim.accessToken}` }
     });
+
     expect(profile.status).toBe(200);
   });
 
@@ -172,6 +185,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { isEmailVerified: boolean };
+
     expect(body.isEmailVerified).toBe(true);
   });
 
@@ -189,9 +203,11 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
         currentPassword: 'Password1'
       })
     });
+
     expect(res.status).toBe(200);
 
     const rows = auditRows('USER_EMAIL_CHANGE_COMPLETE');
+
     expect(rows).toHaveLength(1);
     expect(rows[0].actorEmail).toBe('admin@example.com');
     expect(rows[0].targetId).toBe(mockId('user-3'));
@@ -219,6 +235,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
       },
       body: JSON.stringify({ email: 'john@example.com', name: 'Johnny' })
     });
+
     expect(res.status).toBe(200);
 
     expect(auditRows('USER_EMAIL_CHANGE_COMPLETE')).toHaveLength(0);

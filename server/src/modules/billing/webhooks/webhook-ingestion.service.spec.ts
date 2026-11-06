@@ -47,6 +47,7 @@ async function buildHarness(opts: {
     returning: jest.fn().mockReturnThis(),
     execute
   };
+
   values.mockReturnValue(qb);
   // On an insert conflict the service looks up the existing row to decide
   // whether to skip (already `processed`) or reprocess (still `received`).
@@ -91,6 +92,7 @@ async function buildHarness(opts: {
 describe('WebhookIngestionService', () => {
   it('rejects an empty body without touching the provider', async () => {
     const { service, verify } = await buildHarness({ withQueue: false });
+
     await expect(
       service.ingest('paddle', Buffer.alloc(0), {})
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -102,6 +104,7 @@ describe('WebhookIngestionService', () => {
       withQueue: false,
       verify: jest.fn().mockResolvedValue(null)
     });
+
     await expect(
       service.ingest('paddle', Buffer.from('{}'), {})
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -146,6 +149,7 @@ describe('WebhookIngestionService', () => {
     const { service, execute, update, reduce } = await buildHarness({
       withQueue: false
     });
+
     // First delivery inserts a row; replay hits the unique constraint (no row).
     execute
       .mockResolvedValueOnce({ raw: [{ id: 'wh-1' }] })
@@ -169,6 +173,7 @@ describe('WebhookIngestionService', () => {
     const { service, execute, findOne, reduce } = await buildHarness({
       withQueue: false
     });
+
     execute.mockResolvedValueOnce({ raw: [] }); // insert loses the unique race
     findOne.mockResolvedValueOnce({ id: 'wh-7', status: 'received' });
 
@@ -182,6 +187,7 @@ describe('WebhookIngestionService', () => {
     const { service, execute, findOne, update, reduce } = await buildHarness({
       withQueue: false
     });
+
     execute.mockResolvedValueOnce({ raw: [] }); // insert loses the unique race
     findOne.mockResolvedValueOnce({ id: 'wh-9', status: 'dead_letter' });
 
@@ -201,6 +207,7 @@ describe('WebhookIngestionService', () => {
     const { service, execute, findOne, reduce } = await buildHarness({
       withQueue: false
     });
+
     execute.mockResolvedValueOnce({ raw: [] });
     findOne.mockResolvedValueOnce({ id: 'wh-7', status: 'processed' });
 

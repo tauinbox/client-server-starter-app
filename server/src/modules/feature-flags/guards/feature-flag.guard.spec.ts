@@ -10,6 +10,7 @@ function makeContext(userId: string | undefined): ExecutionContext {
   const req = {
     user: userId ? { userId } : undefined
   };
+
   return createMockExecutionContext({ request: req, handler, class: cls });
 }
 

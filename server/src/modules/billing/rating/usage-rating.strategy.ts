@@ -56,6 +56,7 @@ export class UsageRating {
     }: { period: BillingPeriod; availableCreditUnits: number }
   ): Promise<CreditedUsageSummary> {
     const price = plan.prices[subscription.provider];
+
     if (!price) {
       throw new Error(
         `Plan "${plan.key}" has no price for provider "${subscription.provider}"`
@@ -69,6 +70,7 @@ export class UsageRating {
       : 0;
 
     const rated = rateUsage({ totalUnits, price, availableCreditUnits });
+
     return {
       totalUnits,
       ...rated,
@@ -117,6 +119,7 @@ export class UsageRating {
       .andWhere('u.occurredAt >= :start', { start: period.start })
       .andWhere('u.occurredAt < :end', { end: period.end })
       .getRawOne<{ total: string }>();
+
     return Money.fromMinor(BigInt(raw?.total ?? '0')).toNumber();
   }
 }

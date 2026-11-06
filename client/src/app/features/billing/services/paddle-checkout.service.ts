@@ -79,15 +79,20 @@ export class PaddleCheckoutService {
    */
   async open(transactionId: string): Promise<PaddleCheckoutResult> {
     if (!TRANSACTION_ID.test(transactionId)) return 'unavailable';
+
     this.#paddle ??= this.#initialize();
     const paddle = await this.#paddle;
+
     if (!paddle) {
       // A refused config request or a blocked CDN script: the next open tries
       // again instead of keeping the failure.
       this.#paddle = null;
+
       return 'unavailable';
     }
+
     this.#finish('closed');
+
     return new Promise<PaddleCheckoutResult>((resolve) => {
       this.#settle = resolve;
       paddle.Checkout.open({
@@ -103,18 +108,22 @@ export class PaddleCheckoutService {
   async #initialize(): Promise<PaddleApi | null> {
     try {
       const config = await firstValueFrom(this.#billing.getPaddleConfig());
+
       if (!config.clientToken) return null;
+
       const paddle = await loadExternalScript(this.#document, {
         name: 'Paddle.js',
         id: PADDLE_SCRIPT_ID,
         src: PADDLE_SCRIPT_URL,
         api: () => this.#document.defaultView?.Paddle
       });
+
       paddle.Environment.set(config.environment);
       paddle.Initialize({
         token: config.clientToken,
         eventCallback: (event) => this.#onEvent(paddle, event)
       });
+
       return paddle;
     } catch {
       return null;
@@ -133,6 +142,7 @@ export class PaddleCheckoutService {
 
   #finish(result: PaddleCheckoutResult): void {
     const settle = this.#settle;
+
     this.#settle = null;
     settle?.(result);
   }

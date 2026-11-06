@@ -48,6 +48,7 @@ describe('Auth DTO length caps', () => {
     const response = (error as BadRequestException).getResponse() as {
       message: string[];
     };
+
     expect(response.message.join(' ')).toContain(messagePart);
   }
 

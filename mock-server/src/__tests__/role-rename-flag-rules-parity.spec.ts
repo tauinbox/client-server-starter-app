@@ -9,6 +9,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -27,8 +28,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -54,7 +57,9 @@ function roleNamesOf(flagId: string): string[][] {
 
 function versionOf(flagId: string): number {
   const flag = getState().featureFlags.get(flagId);
+
   if (!flag) throw new Error(`Flag ${flagId} is missing`);
+
   return flag.version;
 }
 
@@ -74,13 +79,16 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
       path: '/roles',
       body: { name: 'beta' }
     });
+
     expect(roleRes.status).toBe(201);
     const roleId = ((await roleRes.json()) as { id: string }).id;
 
     const holder = getState()
       .users.values()
       .find((u) => u.email === 'user@example.com');
+
     if (!holder) throw new Error('Seed user is missing');
+
     holder.roles.push('beta');
     const user = await login('user@example.com');
 
@@ -97,14 +105,17 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
         }))
       }
     });
+
     expect(flagRes.status).toBe(201);
     const flagId = ((await flagRes.json()) as { id: string }).id;
+
     return { admin, user, roleId, flagId, key };
   }
 
   async function userSees(user: string, key: string): Promise<boolean> {
     const res = await call(user, { method: 'GET', path: '/feature-flags' });
     const body = (await res.json()) as { flags: Record<string, boolean> };
+
     return body.flags[key] === true;
   }
 
@@ -114,6 +125,7 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
       ['beta-2', 'beta']
     ]);
     const versionBefore = versionOf(flagId);
+
     expect(await userSees(user, key)).toBe(true);
 
     const renameRes = await call(admin, {
@@ -123,6 +135,7 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
         name: 'beta-2'
       }
     });
+
     expect(renameRes.status).toBe(200);
 
     expect(roleNamesOf(flagId)).toEqual([['beta-2', 'staff'], ['beta-2']]);
@@ -133,6 +146,7 @@ describe('role rename and delete rewrite flag role rules (parity)', () => {
       method: 'DELETE',
       path: `/roles/${roleId}`
     });
+
     expect(deleteRes.status).toBe(200);
 
     expect(roleNamesOf(flagId)).toEqual([['staff'], []]);

@@ -18,15 +18,18 @@ export const moneyColumnTransformer: ValueTransformer = {
     if (value === undefined) {
       return undefined;
     }
+
     if (value === null) {
       return null;
     }
+
     return value.toMinorString();
   },
   from(value: string | null): Money | null {
     if (value == null) {
       return null;
     }
+
     return Money.fromMinor(BigInt(value));
   }
 };

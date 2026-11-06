@@ -56,11 +56,15 @@ export class EntitlementService {
     const userVersion = await this.#userVersion.read(userId);
     const cacheKey = `entitlements:user:${userId}:u${userVersion}`;
     const cached = await this.cache.get<ResolvedEntitlements>(cacheKey);
+
     this.metrics.recordCacheAccess('entitlements', cached ? 'hit' : 'miss');
+
     if (cached) return cached;
 
     const resolved = await this.resolve(userId);
+
     await this.cache.set(cacheKey, resolved, USER_TTL_MS);
+
     return resolved;
   }
 
@@ -69,6 +73,7 @@ export class EntitlementService {
     capability: EntitlementCapability
   ): Promise<boolean> {
     const { capabilities } = await this.capabilitiesFor(userId);
+
     return capabilities.includes(capability);
   }
 
@@ -83,6 +88,7 @@ export class EntitlementService {
     key: EntitlementLimitKey
   ): Promise<number | null> {
     const { limits } = await this.capabilitiesFor(userId);
+
     return limits[key] ?? null;
   }
 
@@ -101,10 +107,13 @@ export class EntitlementService {
     const base = customer
       ? await this.subscriptionEntitlements(customer.id)
       : await this.freeEntitlements();
+
     if (!customer) return base;
 
     const granted = await this.activeGrantEntitlements(customer.id);
+
     if (granted.length === 0) return base;
+
     return {
       ...base,
       capabilities: [...new Set([...base.capabilities, ...granted])]
@@ -120,12 +129,15 @@ export class EntitlementService {
       where: { customerId, status: In([...ENTITLED_SUBSCRIPTION_STATUSES]) },
       order: { createdAt: 'DESC' }
     });
+
     if (subscription) {
       const plan = await this.plans.findOne({
         where: { key: subscription.planKey }
       });
+
       if (plan) return this.toResolved(plan);
     }
+
     return this.freeEntitlements();
   }
 
@@ -135,6 +147,7 @@ export class EntitlementService {
       where: { customerId, revokedAt: IsNull() }
     });
     const now = Date.now();
+
     return grants
       .filter((grant) => !grant.expiresAt || grant.expiresAt.getTime() > now)
       .map((grant) => grant.entitlement);
@@ -142,6 +155,7 @@ export class EntitlementService {
 
   private async freeEntitlements(): Promise<ResolvedEntitlements> {
     const free = await this.plans.findOne({ where: { key: FREE_PLAN_KEY } });
+
     return free
       ? this.toResolved(free)
       : { planKey: FREE_PLAN_KEY, capabilities: [], limits: {} };

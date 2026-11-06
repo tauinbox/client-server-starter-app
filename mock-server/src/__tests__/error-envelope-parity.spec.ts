@@ -38,6 +38,7 @@ describe('error envelope (server parity)', () => {
     const res = await postLogin(
       JSON.stringify({ email: 'admin@example.com', password: 'Wrong1xyz' })
     );
+
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({
       statusCode: 401,
@@ -54,6 +55,7 @@ describe('error envelope (server parity)', () => {
     const res = await fetch(`${baseUrl}/api/v1/auth/profile`, {
       headers: { authorization: 'Bearer not-a-token' }
     });
+
     expect(res.status).toBe(401);
     expect(res.headers.get('www-authenticate')).toBe('Bearer');
   });
@@ -64,9 +66,11 @@ describe('error envelope (server parity)', () => {
 
     beforeAll(async () => {
       const app = express();
+
       app.use(errorEnvelope);
       app.get('/key/:key', (req, res) => {
         const body = { message: 'probe', errorKey: req.params['key'] };
+
         res.status(400).json(body);
       });
       probe = await listenOnUnblockedPort(app);
@@ -81,6 +85,7 @@ describe('error envelope (server parity)', () => {
       const res = await fetch(
         `${probeUrl}/key/${ErrorKeys.AUTH.SESSION_IS_CURRENT}`
       );
+
       expect(res.status).toBe(403);
       expect(await res.json()).toMatchObject({
         statusCode: 403,
@@ -94,6 +99,7 @@ describe('error envelope (server parity)', () => {
       const res = await fetch(
         `${probeUrl}/key/${ErrorKeys.AUTH.TOKEN_REVOKED}`
       );
+
       expect(res.status).toBe(401);
       expect(res.headers.get('www-authenticate')).toBe(
         'Bearer error="invalid_token"'
@@ -103,6 +109,7 @@ describe('error envelope (server parity)', () => {
 
   it('answers an unknown route with a JSON 404', async () => {
     const res = await fetch(`${baseUrl}/api/v1/does-not-exist?x=1`);
+
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({
       statusCode: 404,
@@ -115,6 +122,7 @@ describe('error envelope (server parity)', () => {
 
   it('answers a malformed JSON body with a 400 and the parser message', async () => {
     const res = await postLogin('{bad');
+
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
       statusCode: 400,
@@ -127,6 +135,7 @@ describe('error envelope (server parity)', () => {
 
   it('answers a body over the size limit with a 413', async () => {
     const res = await postLogin(JSON.stringify({ email: 'x'.repeat(200_000) }));
+
     expect(res.status).toBe(413);
     expect(await res.json()).toEqual({
       statusCode: 413,

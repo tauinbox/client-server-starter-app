@@ -11,6 +11,7 @@ import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.serv
 
 function buildMockService(initialShortcuts: ShortcutDef[] = []) {
   const shortcuts = signal<ShortcutDef[]>(initialShortcuts);
+
   return {
     shortcuts: shortcuts.asReadonly(),
     _set: (value: ShortcutDef[]) => shortcuts.set(value),
@@ -55,6 +56,7 @@ describe('KeyboardShortcutsHelpComponent', () => {
       }
     ]);
     const headings = fixture.nativeElement.querySelectorAll('.group-heading');
+
     expect(headings).toHaveLength(2);
   });
 
@@ -68,6 +70,7 @@ describe('KeyboardShortcutsHelpComponent', () => {
       { key: '?', label: 'shortcuts.labelHelp', group: 'shortcuts.groupGlobal' }
     ]);
     const headings = fixture.nativeElement.querySelectorAll('.group-heading');
+
     expect(headings[0].textContent?.trim()).toBe('Global');
     expect(headings[1].textContent?.trim()).toBe('Forms');
   });
@@ -81,6 +84,7 @@ describe('KeyboardShortcutsHelpComponent', () => {
       }
     ]);
     const badge = fixture.nativeElement.querySelector('.key-badge');
+
     expect(badge?.textContent?.trim()).toBe('Ctrl+S');
   });
 
@@ -93,12 +97,14 @@ describe('KeyboardShortcutsHelpComponent', () => {
       }
     ]);
     const row = fixture.nativeElement.querySelector('td:last-child');
+
     expect(row?.textContent?.trim()).toBe('Save changes');
   });
 
   it('shows empty state when no shortcuts', async () => {
     await setup([]);
     const empty = fixture.nativeElement.querySelector('.empty-state');
+
     expect(empty).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.shortcuts-table')).toBeNull();
   });
@@ -133,6 +139,7 @@ describe('KeyboardShortcutsHelpComponent', () => {
       { key: '?', label: 'shortcuts.labelHelp', group: 'shortcuts.groupGlobal' }
     ]);
     const headings = fixture.nativeElement.querySelectorAll('.group-heading');
+
     expect(headings[0].textContent?.trim()).toBe('Global');
     expect(headings[1].textContent?.trim()).toBe('Forms');
   });
@@ -140,6 +147,7 @@ describe('KeyboardShortcutsHelpComponent', () => {
   it('close button exists with mat-dialog-close attribute', async () => {
     await setup([]);
     const closeBtn = fixture.nativeElement.querySelector('[mat-dialog-close]');
+
     expect(closeBtn).not.toBeNull();
   });
 });

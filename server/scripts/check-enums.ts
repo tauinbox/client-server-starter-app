@@ -35,6 +35,7 @@ const ENUM_CHECKS: { enumFile: string; pgType: string }[] = [
 /** Extract string values from a TypeScript string enum (e.g. FOO = 'FOO'). */
 function readEnumValues(filePath: string): string[] {
   const source = fs.readFileSync(filePath, 'utf-8');
+
   return [...source.matchAll(/\w+\s*=\s*'(\w+)'/g)].map((m) => m[1]);
 }
 
@@ -63,6 +64,7 @@ function readMigrationCoverage(
         'si'
       )
     );
+
     if (createMatch) {
       createMatch[1].matchAll(/'(\w+)'/g).forEach((m) => covered.add(m[1]));
     }

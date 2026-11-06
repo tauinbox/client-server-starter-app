@@ -44,6 +44,7 @@ export class BillingService {
         `Billing provider "${effective}" is not configured`
       );
     }
+
     if (!(await this.isProviderEnabled(effective, customer.userId))) {
       throw new ApiError(
         ErrorKeys.BILLING.PROVIDER_UNAVAILABLE,
@@ -93,12 +94,14 @@ export class BillingService {
    */
   getProviderById(id: BillingProviderId): PaymentProvider {
     const provider = this.providers.find((p) => p.id === id);
+
     if (!provider) {
       throw new ApiError(
         ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR,
         `Billing provider "${id}" is not registered`
       );
     }
+
     return provider;
   }
 

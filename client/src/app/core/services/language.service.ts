@@ -27,6 +27,7 @@ export class LanguageService {
   constructor() {
     effect(() => {
       const lang = this.#langSignal();
+
       this.#document.documentElement.lang = lang;
     });
 
@@ -43,7 +44,9 @@ export class LanguageService {
   async setLanguage(lang: AppLanguage): Promise<void> {
     this.#requestedLang = lang;
     await this.#preload(lang);
+
     if (this.#requestedLang !== lang) return;
+
     this.#langSignal.set(lang);
     this.#storage.setItem(LANGUAGE_KEY, lang);
     this.#translocoService.setActiveLang(lang);
@@ -61,6 +64,7 @@ export class LanguageService {
       lang,
       ...[...this.#loadedScopes].map((scope) => `${scope}/${lang}`)
     ];
+
     await firstValueFrom(
       forkJoin(
         paths.map((path) =>
@@ -72,11 +76,13 @@ export class LanguageService {
 
   #getInitialLang(): AppLanguage {
     const saved = this.#storage.getItem<AppLanguage>(LANGUAGE_KEY);
+
     if (saved && SUPPORTED_LANGUAGES.includes(saved)) {
       return saved;
     }
 
     const browserLang = navigator.language.split('-')[0].toLowerCase();
+
     if (SUPPORTED_LANGUAGES.includes(browserLang as AppLanguage)) {
       return browserLang as AppLanguage;
     }
@@ -86,10 +92,12 @@ export class LanguageService {
 
   async #registerLocale(lang: AppLanguage): Promise<void> {
     if (lang === 'en') return;
+
     try {
       const localeModule = await import(
         /* @vite-ignore */ `@angular/common/locales/${lang}`
       );
+
       registerLocaleData(localeModule.default);
     } catch {
       // Unknown locale — fall back to built-in en-US

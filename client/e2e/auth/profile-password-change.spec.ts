@@ -58,6 +58,7 @@ test.describe('Profile password change', () => {
     await loginViaUi(page, _mockServer.url);
 
     const otherTab = await page.context().newPage();
+
     await routeApiToMockServer(otherTab, _mockServer.url);
     await otherTab.goto('/profile');
     await expect(otherTab.getByLabel('Full name')).toBeVisible();
@@ -120,7 +121,9 @@ test.describe('Profile password change', () => {
       const box = page.getByRole('checkbox', {
         name: 'Also disconnect Google'
       });
+
       await expect(box).toBeChecked();
+
       if (keepProviders) await box.uncheck();
 
       await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -133,6 +136,7 @@ test.describe('Profile password change', () => {
       await changePassword(page, { keepProviders: false });
 
       const state = (await _mockServer.getState()) as ControlState;
+
       expect(state.oauthAccounts[userId] ?? []).toHaveLength(0);
     });
 
@@ -145,6 +149,7 @@ test.describe('Profile password change', () => {
       await changePassword(page, { keepProviders: true });
 
       const state = (await _mockServer.getState()) as ControlState;
+
       expect(state.oauthAccounts[userId]).toHaveLength(1);
     });
   });

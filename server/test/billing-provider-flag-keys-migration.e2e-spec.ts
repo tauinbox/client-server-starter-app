@@ -64,6 +64,7 @@ runWithInfra('rename billing provider flag keys migration (e2e)', () => {
 
     await migration.up(qr);
     const once = await rows();
+
     expect(once).toEqual([
       { key: 'billing-paddle', version: 2, enabled: true },
       { key: 'billing-yookassa', version: 2, enabled: true }

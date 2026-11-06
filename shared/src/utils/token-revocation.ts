@@ -18,5 +18,6 @@ export function issuedBeforeRevocation(
   if (revokedAt === null) {
     return false;
   }
+
   return iat < Math.floor(new Date(revokedAt).getTime() / 1000);
 }

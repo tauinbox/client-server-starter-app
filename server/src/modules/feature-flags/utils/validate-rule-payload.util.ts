@@ -8,8 +8,10 @@ export function validateRulePayload(
   knownCustomAttributeKeys: ReadonlySet<string>
 ): FeatureFlagRulePayload {
   const result = parseFeatureFlagRulePayload(payload, knownCustomAttributeKeys);
+
   if (!result.ok) {
     throw new ApiError(ErrorKeys.FEATURE_FLAGS.INVALID_RULE, result.message);
   }
+
   return result.payload;
 }

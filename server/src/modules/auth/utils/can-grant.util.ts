@@ -26,6 +26,7 @@ function scopeOf(ability: AppAbility): GrantScopeAbility {
 
 export function grantDenied(refusal: GrantRefusal): ApiError {
   const { message, errorKey, details } = refusal;
+
   return new ApiError(errorKey, message, { details });
 }
 

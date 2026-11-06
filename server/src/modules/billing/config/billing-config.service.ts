@@ -34,6 +34,7 @@ export class BillingConfigService implements OnModuleInit {
         this.config.get('PADDLE_WEBHOOK_SECRET')
       );
     }
+
     return this.hasYooKassaKeys() && Boolean(this.config.get('REDIS_URL'));
   }
 

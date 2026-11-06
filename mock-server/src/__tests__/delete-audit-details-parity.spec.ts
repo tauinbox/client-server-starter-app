@@ -11,6 +11,7 @@ let accessToken: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -29,6 +30,7 @@ beforeEach(async () => {
   const { tokens } = (await login.json()) as {
     tokens: { access_token: string };
   };
+
   accessToken = tokens.access_token;
 });
 
@@ -56,6 +58,7 @@ describe('delete audit details parity', () => {
     const created = await call('POST', '/api/v1/admin/feature-flags', {
       key: 'audit-probe-flag'
     });
+
     expect(created.status).toBe(201);
     const flag = (await created.json()) as { id: string };
 
@@ -64,6 +67,7 @@ describe('delete audit details parity', () => {
     ).toBe(204);
 
     const rows = auditRows('FEATURE_FLAG_DELETE');
+
     expect(rows).toHaveLength(1);
     expect(rows[0].targetType).toBe('FeatureFlag');
     expect(rows[0].details).toEqual({ key: 'audit-probe-flag' });
@@ -73,12 +77,14 @@ describe('delete audit details parity', () => {
     const created = await call('POST', '/api/v1/roles', {
       name: 'audit-probe-role'
     });
+
     expect(created.status).toBe(201);
     const role = (await created.json()) as { id: string; name: string };
 
     expect((await call('DELETE', `/api/v1/roles/${role.id}`)).status).toBe(200);
 
     const rows = auditRows('ROLE_DELETE');
+
     expect(rows).toHaveLength(1);
     expect(rows[0].targetType).toBe('Role');
     expect(rows[0].details).toEqual({ name: role.name });

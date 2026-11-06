@@ -15,6 +15,7 @@ type Device = { accessToken: string; refreshCookie: string };
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -30,7 +31,9 @@ beforeEach(() => {
 function refreshCookieOf(res: Response): string {
   const raw = res.headers.get('set-cookie') ?? '';
   const match = /refresh_token=([^;]+)/.exec(raw);
+
   expect(match).not.toBeNull();
+
   return `refresh_token=${match?.[1] ?? ''}`;
 }
 
@@ -40,8 +43,10 @@ async function signIn(): Promise<Device> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password: PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return {
     accessToken: body.tokens.access_token,
     refreshCookie: refreshCookieOf(res)
@@ -86,12 +91,14 @@ describe('per-device logout', () => {
       method: 'POST',
       headers: { cookie: desktop.refreshCookie }
     });
+
     expect(refreshed.status).toBe(200);
 
     const stale = await fetch(`${baseUrl}/api/v1/auth/refresh-token`, {
       method: 'POST',
       headers: { cookie: phone.refreshCookie }
     });
+
     expect(stale.status).toBe(401);
   });
 
@@ -103,6 +110,7 @@ describe('per-device logout', () => {
     const user = getState()
       .users.values()
       .find((u) => u.email === EMAIL);
+
     expect(user?.tokenRevokedAt ?? null).toBeNull();
   });
 
@@ -132,6 +140,7 @@ describe('per-device logout', () => {
       method: 'POST',
       headers: { cookie: desktop.refreshCookie }
     });
+
     expect(rotated.status).toBe(200);
 
     // A per-row session id would have ended this token on the rotation another
@@ -146,6 +155,7 @@ describe('per-device logout', () => {
       method: 'POST',
       headers: { cookie: desktop.refreshCookie }
     });
+
     expect(rotated.status).toBe(200);
 
     await logout({
@@ -175,6 +185,7 @@ describe('per-device logout', () => {
         password: NEW_PASSWORD
       })
     });
+
     expect(changed.status).toBe(200);
 
     await expect(profileStatus(phone)).resolves.toBe(401);

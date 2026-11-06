@@ -127,6 +127,7 @@ describe('Profile mass-assignment protection (e2e)', () => {
         .expect(422);
 
       const body = res.body as { message: string[] };
+
       expect(body.message).toEqual(
         expect.arrayContaining([`property ${field} should not exist`])
       );

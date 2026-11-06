@@ -48,6 +48,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
     await ds.initialize();
     releaseDbLock = await holdBillingDbLock(ds);
+
     for (const key of [PRO, BUSINESS]) {
       await ds.getRepository(Plan).save(
         ds.getRepository(Plan).create({
@@ -70,6 +71,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
   beforeEach(async () => {
     refund = jest.fn().mockResolvedValue(undefined);
     const provider = { id: 'yookassa', refund };
+
     module = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot()],
       providers: [
@@ -104,12 +106,14 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
 
   afterEach(async () => {
     await module.close();
+
     if (customerId) {
       // Invoices hold the customer under RESTRICT, so they go first; the
       // customer, its subscription and its cards then cascade from the user.
       await ds.getRepository(Invoice).delete({ customerId });
       customerId = undefined;
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
@@ -131,6 +135,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
     const customer = await ds.getRepository(Customer).save(
       ds.getRepository(Customer).create({
@@ -143,8 +148,10 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
     const now = new Date();
+
     return ds.getRepository(Subscription).save(
       ds.getRepository(Subscription).create({
         customerId: customer.id,
@@ -181,6 +188,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
       },
       planKey
     };
+
     return reducer.reduce({
       provider: 'yookassa',
       providerEventId: `payment.succeeded:${paymentId}`,
@@ -192,12 +200,15 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
   /** The listener runs after the reducer returns; wait for its settle. */
   async function invoicesAfterRefunds(count: number): Promise<Invoice[]> {
     const deadline = Date.now() + 10_000;
+
     for (;;) {
       const invoices = await ds
         .getRepository(Invoice)
         .find({ where: { customerId }, order: { providerInvoiceRef: 'ASC' } });
       const refunded = invoices.filter((i) => i.status === 'refunded');
+
       if (refunded.length >= count || Date.now() > deadline) return invoices;
+
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
   }
@@ -205,6 +216,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
   it('activates once and refunds the other of two concurrent first payments', async () => {
     const subscription = await seedIncomplete(PRO);
     const runners = [ds.createQueryRunner(), ds.createQueryRunner()];
+
     await Promise.all(runners.map((r) => r.connect()));
     await Promise.all(runners.map((r) => r.release()));
 
@@ -214,9 +226,11 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
     const row = await ds
       .getRepository(Subscription)
       .findOneByOrFail({ id: subscription.id });
+
     expect(row.status).toBe('active');
     expect(refund).toHaveBeenCalledTimes(1);
     const [refundedRef] = refund.mock.calls[0] as [string];
+
     expect(invoices.map((i) => [i.providerInvoiceRef, i.status])).toEqual([
       ['pay_a', refundedRef === 'pay_a' ? 'refunded' : 'paid'],
       ['pay_b', refundedRef === 'pay_b' ? 'refunded' : 'paid']
@@ -225,6 +239,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
     const cards = await ds
       .getRepository(PaymentMethod)
       .find({ where: { customerId } });
+
     expect(cards.map((c) => c.providerMethodRef)).toEqual([
       `pm_${refundedRef === 'pay_a' ? 'pay_b' : 'pay_a'}`
     ]);
@@ -240,6 +255,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
     const row = await ds
       .getRepository(Subscription)
       .findOneByOrFail({ id: subscription.id });
+
     expect(row.status).toBe('incomplete');
     expect(row.planKey).toBe(BUSINESS);
     expect(refund).toHaveBeenCalledWith(
@@ -252,6 +268,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
 
   it('refunds a payment for a row the user cancelled first', async () => {
     const subscription = await seedIncomplete(PRO);
+
     await ds
       .getRepository(Subscription)
       .update({ id: subscription.id }, { status: 'canceled' });
@@ -262,6 +279,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
     const row = await ds
       .getRepository(Subscription)
       .findOneByOrFail({ id: subscription.id });
+
     expect(row.status).toBe('canceled');
     expect(refund).toHaveBeenCalledTimes(1);
     expect(invoices.map((i) => i.status)).toEqual(['refunded']);

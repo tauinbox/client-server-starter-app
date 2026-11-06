@@ -33,6 +33,7 @@ function mockProfile(page: Page) {
         body: JSON.stringify(defaultUser)
       });
     }
+
     return route.fallback();
   });
 }
@@ -51,8 +52,10 @@ test.describe('Session restoration with expired access token', () => {
     await setExpiredAuthInStorage(page);
 
     let refreshTokenCalled = false;
+
     await page.route('**/api/v1/auth/refresh-token', (route) => {
       refreshTokenCalled = true;
+
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -91,6 +94,7 @@ test.describe('Session restoration with expired access token', () => {
         name?: string;
       };
       const { name: _name, ...rest } = stored;
+
       localStorage.setItem(
         'auth_user',
         JSON.stringify({ ...rest, firstName: 'John', lastName: 'Doe' })

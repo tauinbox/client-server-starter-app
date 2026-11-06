@@ -120,12 +120,14 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
 
   beforeEach(async () => {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
     providerId = `google-${stamp}`;
     const [{ id }] = await ds.query<Array<{ id: string }>>(
       `INSERT INTO users (email, "name", password, is_email_verified)
        VALUES ($1, 'Oauth Factor', NULL, true) RETURNING id`,
       [`oauth-mfa-${stamp}@example.com`]
     );
+
     userId = id;
     await ds.query(
       `INSERT INTO oauth_accounts (provider, provider_id, user_id)
@@ -152,6 +154,7 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
       `SELECT count(*)::int AS count FROM refresh_tokens WHERE user_id = $1`,
       [userId]
     );
+
     return count;
   };
 

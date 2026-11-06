@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -28,8 +29,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -50,8 +53,10 @@ async function seedActiveCustomer(): Promise<string> {
       body: JSON.stringify({ userId: me.user.id, planKey: 'pro' })
     }
   );
+
   expect(res.status).toBe(200);
   const sub = (await res.json()) as { customerId: string };
+
   return sub.customerId;
 }
 
@@ -85,8 +90,10 @@ async function activateSubscription(
       body: JSON.stringify({ userId: me.user.id, planKey })
     }
   );
+
   expect(res.status).toBe(200);
   const sub = (await res.json()) as { id: string; customerId: string };
+
   return {
     customerId: sub.customerId,
     subscriptionId: sub.id,
@@ -104,6 +111,7 @@ async function seedUsage(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ customerId, quantity, occurredAt, meterKey })
   });
+
   expect(res.status).toBe(200);
 }
 
@@ -116,6 +124,7 @@ function getUsage(token?: string): Promise<Response> {
 describe('GET /api/v1/billing/usage parity with server', () => {
   it('rejects unauthenticated calls (401)', async () => {
     const res = await getUsage();
+
     expect(res.status).toBe(401);
   });
 
@@ -136,6 +145,7 @@ describe('GET /api/v1/billing/usage parity with server', () => {
       'user@example.com',
       'usage'
     );
+
     await seedUsage(customerId, 30);
     await seedUsage(customerId, 12);
     // Outside the current period — must not count.
@@ -147,6 +157,7 @@ describe('GET /api/v1/billing/usage parity with server', () => {
     await seedUsage(customerId, 500, { meterKey: 'other_product_calls' });
 
     const res = await getUsage(token);
+
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
 
@@ -180,6 +191,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
 
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
+
     expect(body['quantity']).toBe(42);
     expect(body['meterKey']).toBe('api_calls');
     expect(body).not.toHaveProperty('idempotencyKey');
@@ -247,7 +259,9 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     );
     const state = getState();
     const first = state.billingSubscriptions.get(subscriptionId);
+
     if (!first) throw new Error('subscription was not seeded');
+
     first.createdAt = '2026-01-01T00:00:00.000Z';
     // A second active row for the same customer, as an admin action or a
     // webhook race can produce. Inserted after the older one, so an unordered
@@ -257,6 +271,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       id: '22222222-2222-2222-2222-222222222222',
       createdAt: '2026-06-01T00:00:00.000Z'
     };
+
     state.billingSubscriptions.set(newer.id, newer);
 
     const res = await postUsage(token, {
@@ -268,6 +283,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
 
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
+
     expect(body['subscriptionId']).toBe(newer.id);
   });
 
@@ -310,7 +326,9 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       'usage'
     );
     const sub = getState().billingSubscriptions.get(subscriptionId);
+
     if (!sub) throw new Error('subscription not seeded');
+
     const before = new Date(
       new Date(sub.currentPeriodStart).getTime() - 1
     ).toISOString();
@@ -339,8 +357,11 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       'usage'
     );
     const sub = getState().billingSubscriptions.get(subscriptionId);
+
     if (!sub) throw new Error('subscription not seeded');
+
     const now = Date.now();
+
     sub.currentPeriodStart = new Date(now - 10 * 86_400_000).toISOString();
     sub.meteredFrom = new Date(now - 86_400_000).toISOString();
 
@@ -377,9 +398,11 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
         body: JSON.stringify({ subscriptionId, outcome: 'failure' })
       }
     );
+
     expect(declined.status).toBe(200);
     const sealedAt =
       getState().billingSubscriptions.get(subscriptionId)?.usageSealedUntil;
+
     if (!sealedAt) throw new Error('renewal did not seal the window');
 
     const refused = await postUsage(token, {

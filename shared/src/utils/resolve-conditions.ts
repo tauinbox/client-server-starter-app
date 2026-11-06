@@ -55,6 +55,7 @@ export function resolveConditions(
     ctx.logger.warn(
       `Conditions of permission "${ctx.permissionLabel}" cannot be honored as authored for user ${ctx.userId} (${reason}) - failing closed, vetoing permission`
     );
+
     return { query, skipPermission: true };
   };
 
@@ -65,55 +66,68 @@ export function resolveConditions(
   }
 
   let ownershipField: string | undefined;
+
   if (ownership !== undefined && ownership !== null) {
     const shapeError = findOwnershipShapeError(ownership);
+
     if (shapeError) {
       return veto(shapeError);
     }
+
     ownershipField = ownership.userField;
     query[ownershipField] = ctx.userId;
   }
 
   if (fieldMatch !== undefined && fieldMatch !== null) {
     const shapeError = findFieldMatchShapeError(fieldMatch);
+
     if (shapeError) {
       return veto(shapeError);
     }
+
     for (const [field, values] of Object.entries(fieldMatch)) {
       if (field === ownershipField) {
         return veto(
           `fieldMatch key "${field}" collides with ownership.userField`
         );
       }
+
       query[field] = { $in: values };
     }
   }
 
   if (userAttr !== undefined && userAttr !== null) {
     const shapeError = findUserAttrShapeError(userAttr);
+
     if (shapeError) {
       return veto(shapeError);
     }
+
     // userContext can be extended as more user attributes become available.
     const userContext: Record<string, unknown> = { id: ctx.userId };
+
     for (const [field, attrName] of Object.entries(userAttr)) {
       const attr = attrName as string;
+
       if (!Object.hasOwn(userContext, attr)) {
         return veto(
           `userAttr references unknown attribute "${attr}" in field "${field}"`
         );
       }
+
       if (field === ownershipField) {
         return veto(
           `userAttr key "${field}" collides with ownership.userField`
         );
       }
+
       query[field] = userContext[attr];
     }
   }
 
   if (custom !== undefined && custom !== null) {
     let parsed: unknown;
+
     try {
       parsed = JSON.parse(custom);
     } catch {
@@ -131,14 +145,17 @@ export function resolveConditions(
     // Same allow-list the write layer applies, so a stored condition cannot
     // mean one thing to CASL and another to the SQL list-filter translator.
     const keyError = validateMongoQueryKeys(parsed, '');
+
     if (keyError) {
       return veto(`${keyError} in custom condition`);
     }
+
     if (ownershipField !== undefined && Object.hasOwn(parsed, ownershipField)) {
       return veto(
         `custom condition key "${ownershipField}" collides with ownership.userField`
       );
     }
+
     Object.assign(query, parsed);
   }
 

@@ -45,6 +45,7 @@ export class BillingWebhooksController {
     @Req() req: RawBodyRequest<Request>
   ): Promise<{ received: true }> {
     await this.ingestion.ingest('paddle', req.rawBody, req.headers);
+
     return { received: true };
   }
 
@@ -56,6 +57,7 @@ export class BillingWebhooksController {
     @Req() req: RawBodyRequest<Request>
   ): Promise<{ received: true }> {
     await this.ingestion.ingest('yookassa', req.rawBody, req.headers);
+
     return { received: true };
   }
 }

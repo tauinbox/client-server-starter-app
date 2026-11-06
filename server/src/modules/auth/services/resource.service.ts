@@ -95,9 +95,11 @@ export class ResourceService {
       { spec: RESOURCE_LIST_QUERY, columns: RESOURCE_LIST_COLUMNS },
       query
     );
+
     for (const resource of page.data) {
       resource.isRegistered = this.registry.isRegistered(resource.name);
     }
+
     return page;
   }
 
@@ -105,15 +107,19 @@ export class ResourceService {
     const resources = await this.resourceRepository.find({
       order: { name: 'ASC' }
     });
+
     return resources.map((r) => {
       r.isRegistered = this.registry.isRegistered(r.name);
+
       return r;
     });
   }
 
   private async loadResource(id: string): Promise<Resource> {
     const resource = await this.resourceRepository.findOne({ where: { id } });
+
     if (!resource) throw resourceNotFound();
+
     return resource;
   }
 
@@ -127,6 +133,7 @@ export class ResourceService {
     actorId?: string
   ): void {
     if (ability === SYSTEM_ABILITY) return;
+
     this.accessRefusals.assertCan(ability, {
       action: 'update',
       subject: subject('Permission', record),
@@ -148,19 +155,23 @@ export class ResourceService {
   ): Promise<Resource> {
     const check = (record: Resource) =>
       this.assertCanEdit(ability, record, { data, actorId });
+
     // Checked here to answer early, and again on the locked row.
     check(await this.loadResource(id));
     const { before, saved } = await this.updateAudited(id, data, {
       check,
       audit
     });
+
     await this.invalidateSubjectMapCache();
+
     if (
       data.allowedActionNames !== undefined &&
       changesGrantableActions(before, data.allowedActionNames)
     ) {
       this.#emitActionsChanged();
     }
+
     return saved;
   }
 
@@ -174,15 +185,18 @@ export class ResourceService {
     for (const record of [resource, withChanges(resource, data)]) {
       this.assertCanUpdate(ability, record, actorId);
     }
+
     const undeclared = (data.allowedActionNames ?? []).filter(
       (name) => !resource.actionNames.includes(name)
     );
+
     if (undeclared.length > 0) {
       throw new ApiError(
         ErrorKeys.RESOURCES.ACTION_NOT_DECLARED,
         `Resource "${resource.name}" does not check the actions: ${undeclared.join(', ')}`
       );
     }
+
     if (data.allowedActionNames !== undefined) {
       this.assertCanWiden(ability, resource, {
         reEnabled: reofferedActionNames(resource, data.allowedActionNames),
@@ -200,7 +214,9 @@ export class ResourceService {
       where: { id },
       lock: { mode: 'pessimistic_write' }
     });
+
     if (!locked) throw resourceNotFound();
+
     return locked;
   }
 
@@ -222,6 +238,7 @@ export class ResourceService {
     ) {
       return;
     }
+
     this.accessRefusals.refuse(
       {
         auditAction: AuditAction.PERMISSION_GRANT_DENIED,
@@ -262,11 +279,15 @@ export class ResourceService {
   ): Promise<{ before: Resource; saved: Resource }> {
     return this.resourceRepository.manager.transaction(async (em) => {
       const before = await this.lockResource(em, id);
+
       check(before);
+
       if (!(await keyedUpdate(em, Resource, { where: { id }, changes }))) {
         throw resourceNotFound();
       }
+
       if (audit) await this.auditService.log(audit({ ...before }), em);
+
       return { before, saved: await em.findOneByOrFail(Resource, { id }) };
     });
   }
@@ -275,7 +296,9 @@ export class ResourceService {
     const version = await this.#subjectMapVersion.read();
     const cacheKey = `${SUBJECT_MAP_CACHE_KEY}:v${version}`;
     const cached = await this.cacheManager.get<SubjectMaps>(cacheKey);
+
     this.metrics.recordCacheAccess('resources', cached ? 'hit' : 'miss');
+
     if (cached) {
       return cached;
     }
@@ -287,9 +310,11 @@ export class ResourceService {
       grantableActions: {},
       conditionalActions: {}
     };
+
     for (const r of resources) {
       maps.grantableActions[r.name] = grantableActionNames(r);
       maps.conditionalActions[r.name] = r.conditionalActionNames;
+
       if (r.isOrphaned) {
         maps.orphaned[r.name] = r.subject;
       } else {
@@ -298,6 +323,7 @@ export class ResourceService {
     }
 
     await this.cacheManager.set(cacheKey, maps, SUBJECT_MAP_CACHE_TTL);
+
     return maps;
   }
 
@@ -312,22 +338,30 @@ export class ResourceService {
     const resource = await this.resourceRepository.manager.transaction(
       async (em) => {
         const locked = await this.lockResource(em, id);
+
         this.assertCanRestore(ability, locked, actorId);
         const { affected } = await em.update(
           Resource,
           { id, isOrphaned: true },
           { isOrphaned: false }
         );
+
         if (affected === 0) throw notOrphaned(locked);
+
         if (audit) await this.auditService.log(audit, em);
+
         return locked;
       }
     );
     const woken = grantableActionNames(resource);
+
     resource.isOrphaned = false;
     await this.invalidateSubjectMapCache();
+
     if (woken.length > 0) this.#emitActionsChanged();
+
     resource.isRegistered = true;
+
     return resource;
   }
 
@@ -337,13 +371,16 @@ export class ResourceService {
     actorId?: string
   ): void {
     this.assertCanUpdate(ability, resource, actorId);
+
     if (!this.registry.isRegistered(resource.name)) {
       throw new ApiError(
         ErrorKeys.RESOURCES.CANNOT_RESTORE,
         `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`
       );
     }
+
     if (!resource.isOrphaned) throw notOrphaned(resource);
+
     this.assertCanWiden(ability, resource, {
       reEnabled: grantableActionNames(resource),
       actorId
@@ -387,6 +424,7 @@ export class ResourceService {
     // lands during the sync stays.
     if (existing) {
       const { id } = existing;
+
       await this.resourceRepository.update(
         { id },
         {
@@ -400,6 +438,7 @@ export class ResourceService {
         { id, description: IsNull() },
         { description: data.description }
       );
+
       return this.resourceRepository.findOneByOrFail({ id });
     }
 
@@ -409,6 +448,7 @@ export class ResourceService {
       isSystem: data.isSystem ?? false,
       lastSyncedAt: new Date()
     });
+
     return this.resourceRepository.save(resource);
   }
 

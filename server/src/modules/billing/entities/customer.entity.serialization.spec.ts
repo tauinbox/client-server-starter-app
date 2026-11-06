@@ -20,11 +20,13 @@ function createCustomer(overrides: Partial<Customer> = {}): Customer {
 describe('Customer entity serialization', () => {
   it('hides providerCustomerId (internal provider reference)', () => {
     const plain = instanceToPlain(createCustomer());
+
     expect(plain).not.toHaveProperty('providerCustomerId');
   });
 
   it('keeps the public wire fields', () => {
     const plain = instanceToPlain(createCustomer());
+
     expect(plain).toMatchObject({
       id: 'cus-1',
       userId: 'user-1',

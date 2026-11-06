@@ -105,22 +105,26 @@ export class BillingAdminService {
       where: { id },
       select: { id: true, status: true }
     });
+
     if (!event) {
       throw new ApiError(
         ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND,
         'Webhook event not found'
       );
     }
+
     if (event.status !== 'dead_letter') {
       throw new ApiError(
         ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE,
         'Only dead-lettered webhook events can be replayed'
       );
     }
+
     await this.webhookEvents.update(
       { id },
       { status: 'received', attempts: 0, lastError: null }
     );
+
     return { id, status: 'received' };
   }
 
@@ -135,12 +139,14 @@ export class BillingAdminService {
     mode: CancelMode = 'period_end'
   ): Promise<Subscription> {
     const subscription = await this.subscriptions.findOne({ where: { id } });
+
     if (!subscription) {
       throw new ApiError(
         ErrorKeys.BILLING.SUBSCRIPTION_NOT_FOUND,
         'Subscription not found'
       );
     }
+
     return cancelOpenSubscription(
       {
         subscriptions: this.subscriptions,
@@ -176,9 +182,11 @@ export class BillingAdminService {
     const { refundAmount, cumulativeRefunded, providerRef } =
       await withTransaction(this.dataSource, async (manager) => {
         const invoice = await lockInvoice(manager, { where: { id } });
+
         if (!invoice) {
           throw invoiceNotFound();
         }
+
         if (invoice.status !== 'paid') {
           throw new ApiError(
             ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE,
@@ -191,6 +199,7 @@ export class BillingAdminService {
         const remaining = remainingRefundable(invoice);
         const requested =
           amountMinor != null ? Money.fromMinor(amountMinor) : remaining;
+
         if (requested.compare(ZERO) <= 0 || requested.compare(remaining) > 0) {
           throw new ApiError(
             ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE,
@@ -213,6 +222,7 @@ export class BillingAdminService {
 
     try {
       const provider = this.billing.getProviderById(providerRef.provider);
+
       // Keying on the cumulative-after total makes a post-crash retry reuse
       // the same key and dedup at the provider.
       await provider.refund(
@@ -230,6 +240,7 @@ export class BillingAdminService {
       this.dataSource,
       async (manager) => {
         const invoice = await lockInvoice(manager, { where: { id } });
+
         if (!invoice) {
           throw invoiceNotFound();
         }
@@ -244,10 +255,13 @@ export class BillingAdminService {
         ) {
           return { saved: invoice, revokedUserId: null };
         }
+
         invoice.status = 'refunded';
         const revokedUserId = await this.revokeOneTimeGrants(manager, invoice);
+
         await this.clawbackCreditPurchase(manager, invoice);
         const saved = await manager.save(Invoice, invoice);
+
         return { saved, revokedUserId };
       }
     );
@@ -260,6 +274,7 @@ export class BillingAdminService {
         new InvoiceRefundedEvent(revokedUserId, id)
       );
     }
+
     return saved;
   }
 
@@ -279,6 +294,7 @@ export class BillingAdminService {
     try {
       await withTransaction(this.dataSource, async (manager) => {
         const invoice = await releaseRefund(manager, id, refundAmount);
+
         if (invoice?.status === 'refunded') {
           this.logger.error(
             `Invoice ${id} is marked refunded but a leg of ${refundAmount.toMinorString()} was released; reconcile against the provider`
@@ -306,14 +322,17 @@ export class BillingAdminService {
     if (invoice.kind !== 'one_time') {
       return null;
     }
+
     const revoked = await manager.update(
       CustomerGrant,
       { sourceInvoiceId: invoice.id, revokedAt: IsNull() },
       { revokedAt: new Date() }
     );
+
     if (!revoked.affected) {
       return null;
     }
+
     return this.resolveUserId(invoice.customerId);
   }
 
@@ -332,12 +351,15 @@ export class BillingAdminService {
     if (invoice.kind !== 'one_time' || !invoice.productId) {
       return;
     }
+
     const product = await manager.findOne(Product, {
       where: { id: invoice.productId }
     });
+
     if (product?.type !== 'credits' || !product.grant?.credits) {
       return;
     }
+
     await this.credits.clawbackPurchase(
       manager,
       { customerId: invoice.customerId, invoiceId: invoice.id },
@@ -350,6 +372,7 @@ export class BillingAdminService {
       where: { id: customerId },
       select: { id: true, userId: true }
     });
+
     return customer?.userId ?? null;
   }
 }

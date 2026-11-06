@@ -20,5 +20,6 @@ export function endPresentedSession(req: Request): void {
   const cookieToken = (req.cookies as Record<string, string> | undefined)?.[
     REFRESH_TOKEN_COOKIE
   ];
+
   if (cookieToken) endSessionOfToken(cookieToken);
 }

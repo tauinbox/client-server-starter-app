@@ -10,10 +10,12 @@ export function isSameOriginUrl(
   baseOrigin: string
 ): boolean {
   let parsed: URL;
+
   try {
     parsed = new URL(request.url, baseOrigin);
   } catch {
     return false;
   }
+
   return parsed.origin === baseOrigin;
 }

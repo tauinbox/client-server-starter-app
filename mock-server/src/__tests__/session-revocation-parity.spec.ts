@@ -32,11 +32,13 @@ async function signIn(email: string): Promise<Session> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: SEED_PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const match = /refresh_token=([^;]+)/.exec(
     res.headers.get('set-cookie') ?? ''
   );
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return {
     accessToken: body.tokens.access_token,
     refreshCookie: `refresh_token=${match?.[1] ?? ''}`
@@ -60,6 +62,7 @@ function iatOf(accessToken: string): number {
   const payload = JSON.parse(
     Buffer.from(accessToken.split('.')[1], 'base64url').toString()
   ) as { iat: number };
+
   return payload.iat;
 }
 
@@ -67,6 +70,7 @@ function supportRoleId(): string {
   const role = getState()
     .roles.values()
     .find((r) => r.name === 'support');
+
   return role!.id;
 }
 
@@ -82,6 +86,7 @@ describe('a role change ends the sessions (UserRoleChangedListener)', () => {
     if (method === 'DELETE') {
       findUserByEmail(USER_EMAIL)!.roles.push('support');
     }
+
     const user = await signIn(USER_EMAIL);
 
     const url =
@@ -96,6 +101,7 @@ describe('a role change ends the sessions (UserRoleChangedListener)', () => {
       },
       body: method === 'POST' ? JSON.stringify({ roleId }) : undefined
     });
+
     expect(change.status).toBe(method === 'POST' ? 201 : 200);
 
     expect((await refresh(user)).status).toBe(401);
@@ -113,6 +119,7 @@ describe('a user delete ends the sessions (SessionRevocationListener)', () => {
       method: 'DELETE',
       headers: { authorization: `Bearer ${admin.accessToken}` }
     });
+
     expect(res.status).toBe(200);
 
     expect(getState().users.get(userId)!.tokenRevokedAt).not.toBeNull();
@@ -123,6 +130,7 @@ describe('a user delete ends the sessions (SessionRevocationListener)', () => {
 describe('the revocation stamp is compared at whole seconds (JwtStrategy)', () => {
   it('accepts a token issued later in the second the revocation landed in', async () => {
     const user = await signIn(USER_EMAIL);
+
     findUserByEmail(USER_EMAIL)!.tokenRevokedAt = new Date(
       iatOf(user.accessToken) * 1000 + 500
     ).toISOString();
@@ -145,10 +153,12 @@ describe('POST /__control/invalidate-access-tokens', () => {
     expect((await profile(user.accessToken)).status).toBe(401);
 
     const refreshed = await refresh(user);
+
     expect(refreshed.status).toBe(200);
     const body = (await refreshed.json()) as {
       tokens: { access_token: string };
     };
+
     expect((await profile(body.tokens.access_token)).status).toBe(200);
   });
 });

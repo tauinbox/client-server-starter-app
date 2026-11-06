@@ -19,7 +19,9 @@ describe('role DTOs reject the super and system flags', () => {
       () => null,
       (e: unknown) => e
     );
+
     expect(error).toBeInstanceOf(BadRequestException);
+
     return (
       (error as BadRequestException).getResponse() as { message: unknown }
     ).message;

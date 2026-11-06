@@ -19,9 +19,11 @@ export function ArrayUniqueWithin(
       validator: {
         validate: (value: unknown): boolean => {
           if (!Array.isArray(value) || value.length > maxSize) return true;
+
           const keys = value.map((item: unknown) =>
             item != null ? identifier(item) : item
           );
+
           return new Set(keys).size === keys.length;
         },
         defaultMessage: buildMessage(

@@ -29,11 +29,13 @@ const SEEDED_RESOURCES: object[] = [
 function declarationOf(controller: object): ResourceMetadata {
   const meta = Reflect.getMetadata(RESOURCE_METADATA_KEY, controller) as
     ResourceMetadata | undefined;
+
   if (!meta) {
     throw new Error(
       'RBAC seeder: a seeded controller has no @RegisterResource'
     );
   }
+
   return meta;
 }
 
@@ -114,15 +116,18 @@ export default class RbacSeeder extends Seeder {
         lastSyncedAt: new Date()
       }))
     );
+
     // A stored row keeps its admin edits, but its declared lists follow the
     // code, as the sync rewrites them.
     for (const resource of resources) {
       const meta = declared.find((d) => d.name === resource.name);
+
       if (meta) {
         resource.actionNames = [...meta.actions];
         resource.conditionalActionNames = [...meta.conditionalActions];
       }
     }
+
     await resourceRepo.save(resources);
 
     const actions = await ensureRows(
@@ -135,6 +140,7 @@ export default class RbacSeeder extends Seeder {
 
     const adminRole = roles.find((r) => r.name === 'admin');
     const userRole = roles.find((r) => r.name === 'user');
+
     if (!adminRole || !userRole) {
       throw new Error('RBAC seeder: system roles could not be resolved');
     }
@@ -164,12 +170,14 @@ export default class RbacSeeder extends Seeder {
     const createdPermissions = missingPermissions.length
       ? await permissionRepo.save(missingPermissions)
       : [];
+
     for (const permission of createdPermissions) {
       permissionsByKey.set(
         permissionKey(permission.resourceId, permission.actionId),
         permission
       );
     }
+
     const seededPermissions = resources.flatMap((resource) =>
       declaredActions(resource)
         .map((action) =>
@@ -186,6 +194,7 @@ export default class RbacSeeder extends Seeder {
     const profileResource = resources.find((r) => r.name === 'profile');
     const usersResource = resources.find((r) => r.name === 'users');
     const updateAction = actions.find((a) => a.name === 'update');
+
     for (const permission of seededPermissions) {
       if (
         permission.resourceId === profileResource?.id &&
@@ -193,6 +202,7 @@ export default class RbacSeeder extends Seeder {
       ) {
         grants.push({ roleId: userRole.id, permissionId: permission.id });
       }
+
       if (
         permission.resourceId === usersResource?.id &&
         permission.actionId === updateAction?.id
@@ -214,6 +224,7 @@ export default class RbacSeeder extends Seeder {
       (grant) =>
         !storedGrants.has(rolePermissionKey(grant.roleId, grant.permissionId))
     );
+
     if (missingGrants.length === 0) return;
 
     await rolePermissionRepo.save(

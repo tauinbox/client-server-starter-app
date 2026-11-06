@@ -15,13 +15,16 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getHandler(),
       context.getClass()
     ]);
+
     if (isPublic) {
       return true;
     }
+
     const isOptionalAuth = this.reflector.getAllAndOverride<boolean>(
       IS_OPTIONAL_AUTH_KEY,
       [context.getHandler(), context.getClass()]
     );
+
     if (isOptionalAuth) {
       // Run the JWT strategy so a valid token populates `req.user`, but never
       // reject — handlers fall back to anonymous behaviour when the token is
@@ -31,6 +34,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         () => true
       );
     }
+
     return super.canActivate(context);
   }
 }

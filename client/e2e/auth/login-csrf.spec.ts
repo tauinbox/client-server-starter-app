@@ -17,6 +17,7 @@ test.describe('Login CSRF through a cross-site form', () => {
     const before = await refreshCookie();
 
     const attacker = await page.context().newPage();
+
     await attacker.route('http://attacker.test/**', (route) =>
       route.fulfill({
         contentType: 'text/html',
@@ -27,6 +28,7 @@ test.describe('Login CSRF through a cross-site form', () => {
       })
     );
     const loginResponse = attacker.waitForResponse(/\/api\/v1\/auth\/login/);
+
     await attacker.goto('http://attacker.test/');
     expect((await loginResponse).status()).toBe(401);
     await attacker.close();

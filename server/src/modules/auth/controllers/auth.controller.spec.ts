@@ -86,6 +86,7 @@ function mockLocalAuthRequest(
     updatedAt: new Date('2024-01-01'),
     deletedAt: null
   };
+
   return { user, ip: '127.0.0.1', headers: {}, cookies: {} };
 }
 
@@ -272,11 +273,13 @@ describe('AuthController', () => {
             }),
             getOrThrow: jest.fn().mockImplementation((key: string) => {
               const value = configValues[key];
+
               if (value === undefined) {
                 throw new TypeError(
                   `Configuration key "${key}" does not exist`
                 );
               }
+
               return value;
             })
           }
@@ -333,6 +336,7 @@ describe('AuthController', () => {
       const res = mockResponse();
 
       const result = await controller.login(req, res);
+
       assertSession(result);
 
       expect(result).toEqual({
@@ -343,6 +347,7 @@ describe('AuthController', () => {
 
     it('should answer with a challenge, not a session, when the account carries a second factor', async () => {
       const req = mockLocalAuthRequest() as LocalAuthRequest;
+
       req.user.totpEnabledAt = new Date('2026-01-01');
       const res = mockResponse();
 
@@ -365,6 +370,7 @@ describe('AuthController', () => {
     // session behind the old value must not outlive it on the server.
     it('ends the session of the refresh cookie the browser presented, before the new one exists', async () => {
       const req = mockLocalAuthRequest() as LocalAuthRequest;
+
       req.cookies['__Host-refresh_token'] = 'previous-refresh-token';
       const res = mockResponse();
 
@@ -442,11 +448,13 @@ describe('AuthController', () => {
       const res = mockResponse();
 
       const result = await controller.login(req, res);
+
       assertSession(result);
 
       expect(Array.isArray(result.user.roles)).toBe(true);
       expect(result.user.roles).toHaveLength(1);
       const [role] = result.user.roles;
+
       expect(role).toEqual(
         expect.objectContaining({
           id: expect.any(String),
@@ -597,6 +605,7 @@ describe('AuthController', () => {
         refresh_token: 'planted-device'
       }) as JwtAuthRequest;
       const res = mockResponse();
+
       authServiceMock.logoutSession.mockResolvedValue(false);
 
       await controller.logout(req, res);
@@ -613,6 +622,7 @@ describe('AuthController', () => {
         'user@example.com'
       ) as JwtAuthRequest;
       const res = mockResponse();
+
       authServiceMock.logoutSession.mockResolvedValue(false);
 
       const result = await controller.logout(req, res);
@@ -688,6 +698,7 @@ describe('AuthController', () => {
         'logout@example.com'
       ) as JwtAuthRequest;
       const res = mockResponse();
+
       authServiceMock.logoutSession.mockResolvedValue(false);
 
       await controller.logout(req, res);
@@ -741,6 +752,7 @@ describe('AuthController', () => {
     it('announces a name change with the record before the write', async () => {
       const req = mockJwtRequest('user-1') as JwtAuthRequest;
       const previous = { id: 'user-1', name: 'Old Name' };
+
       userServiceMock.findOne.mockResolvedValueOnce(previous);
       userServiceMock.update.mockResolvedValueOnce({
         ...previous,
@@ -758,6 +770,7 @@ describe('AuthController', () => {
     it('announces nothing when the name does not change', async () => {
       const req = mockJwtRequest('user-1') as JwtAuthRequest;
       const previous = { id: 'user-1', name: 'Same Name' };
+
       userServiceMock.findOne.mockResolvedValueOnce(previous);
       userServiceMock.update.mockResolvedValueOnce(previous);
 
@@ -825,6 +838,7 @@ describe('AuthController', () => {
     it('should notify the account owner about a self-service password change', async () => {
       const req = mockJwtRequest('user-1') as JwtAuthRequest;
       const res = mockResponse();
+
       userServiceMock.update.mockResolvedValueOnce({
         id: 'user-1',
         email: 'owner@example.com',
@@ -901,6 +915,7 @@ describe('AuthController', () => {
         email: 'owner@example.com',
         locale: 'en'
       };
+
       userServiceMock.update.mockResolvedValueOnce(updated);
 
       await controller.updateProfile(
@@ -984,6 +999,7 @@ describe('AuthController', () => {
       const loggerError = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation();
+
       mailServiceMock.sendPasswordChangedNotification.mockRejectedValueOnce(
         new Error('smtp down')
       );
@@ -995,6 +1011,7 @@ describe('AuthController', () => {
         { password: 'NewPassword1', currentPassword: 'CurrentPass1' },
         res
       );
+
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(result).toBeDefined();
@@ -1048,6 +1065,7 @@ describe('AuthController', () => {
         { errorKey: 'errors.auth.invalidCurrentPassword' },
         400
       );
+
       authServiceMock.assertStepUpForUser.mockRejectedValueOnce(httpErr);
 
       await expect(
@@ -1094,6 +1112,7 @@ describe('AuthController', () => {
       const cleared = res.clearCookie.mock.calls.map(
         ([name]: [string]) => name
       );
+
       expect(cleared).toEqual([...new Set(cleared)]);
       expect(cleared).toContain('__Host-reauth_proof');
     });
@@ -1103,6 +1122,7 @@ describe('AuthController', () => {
         '__Host-reauth_proof': 'proof'
       }) as JwtAuthRequest;
       const res = mockResponse();
+
       authServiceMock.assertStepUpForUser.mockRejectedValueOnce(
         new HttpException({ errorKey: 'errors.auth.reauthRequired' }, 400)
       );

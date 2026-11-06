@@ -15,6 +15,7 @@ const newPassword = 'NewPassword1';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -39,15 +40,19 @@ async function lockAccount(): Promise<void> {
   for (let attempt = 0; attempt < MAX_FAILED_ATTEMPTS; attempt++) {
     await postJson('login', { email, password: 'wrong-password' });
   }
+
   expect(findUserByEmail(email)?.lockedUntil).not.toBeNull();
 }
 
 async function issueResetToken(): Promise<string> {
   const res = await postJson('forgot-password', { email });
+
   expect(res.status).toBe(200);
 
   const [token] = [...getState().passwordResetTokens.keys()];
+
   expect(token).toBeDefined();
+
   return token;
 }
 
@@ -60,13 +65,16 @@ describe('lockout recovery', () => {
       token,
       password: newPassword
     });
+
     expect(reset.status).toBe(200);
 
     const user = findUserByEmail(email);
+
     expect(user?.failedLoginAttempts).toBe(0);
     expect(user?.lockedUntil).toBeNull();
 
     const login = await postJson('login', { email, password: newPassword });
+
     expect(login.status).toBe(200);
   });
 
@@ -74,13 +82,16 @@ describe('lockout recovery', () => {
     await lockAccount();
 
     const locked = findUserByEmail(email);
+
     expect(locked).toBeDefined();
     locked!.lockedUntil = new Date(Date.now() - 1000).toISOString();
 
     const res = await postJson('login', { email, password: 'wrong-password' });
+
     expect(res.status).toBe(401);
 
     const user = findUserByEmail(email);
+
     expect(user?.failedLoginAttempts).toBe(1);
     expect(user?.lockedUntil).toBeNull();
   });
@@ -88,9 +99,11 @@ describe('lockout recovery', () => {
   it('clears the strikes on a correct password before the verification check', async () => {
     await postJson('login', { email, password: 'wrong-password' });
     const user = findUserByEmail(email);
+
     user!.isEmailVerified = false;
 
     const res = await postJson('login', { email, password });
+
     expect(res.status).toBe(403);
     expect(findUserByEmail(email)?.failedLoginAttempts).toBe(0);
   });
@@ -99,6 +112,7 @@ describe('lockout recovery', () => {
     await lockAccount();
 
     const res = await postJson('login', { email, password });
+
     expect(res.status).toBe(423);
     expect(findUserByEmail(email)?.failedLoginAttempts).toBe(
       MAX_FAILED_ATTEMPTS
@@ -109,9 +123,11 @@ describe('lockout recovery', () => {
     await lockAccount();
 
     const res = await postJson('login', { email, password });
+
     expect(res.status).toBe(423);
 
     const body = (await res.json()) as { retryAfter: number };
+
     expect(body.retryAfter).toBeGreaterThan(0);
     expect(res.headers.get('retry-after')).toBe(String(body.retryAfter));
   });
@@ -138,6 +154,7 @@ describe('lockout recovery', () => {
     await lockAccount();
 
     const res = await postJson('login', { email, password: 'wrong-again' });
+
     expect(res.status).toBe(423);
     expect(findUserByEmail(email)?.failedLoginAttempts).toBe(
       MAX_FAILED_ATTEMPTS

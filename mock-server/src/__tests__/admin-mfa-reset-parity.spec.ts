@@ -35,8 +35,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: SEED_PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -69,6 +71,7 @@ function auditRows(action: string) {
 describe('POST /api/v1/users/:id/mfa/reset parity', () => {
   it('clears the factor, ends the sessions of the target and audits the administrator', async () => {
     const target = findUserByEmail('user@example.com')!;
+
     await login('user@example.com');
     enrol(target);
     const token = await login('admin@example.com');
@@ -97,6 +100,7 @@ describe('POST /api/v1/users/:id/mfa/reset parity', () => {
 
   it('refuses without a step-up of the caller', async () => {
     const target = findUserByEmail('user@example.com')!;
+
     enrol(target);
     const token = await login('admin@example.com');
 
@@ -113,6 +117,7 @@ describe('POST /api/v1/users/:id/mfa/reset parity', () => {
   it('refuses a self-target', async () => {
     const admin = findUserByEmail('admin@example.com')!;
     const token = await login('admin@example.com');
+
     enrol(admin);
 
     const res = await reset(token, admin.id, {
@@ -133,6 +138,7 @@ describe('POST /api/v1/users/:id/mfa/reset parity', () => {
           p.resourceId === mockId('res-users') &&
           p.actionId === mockId('act-update')
       )!;
+
     state.rolePermissions = [
       ...state.rolePermissions.filter((rp) => rp.roleId !== EDITOR_ROLE_ID),
       {
@@ -144,6 +150,7 @@ describe('POST /api/v1/users/:id/mfa/reset parity', () => {
     ];
     findUserByEmail('user@example.com')!.roles = ['editor'];
     const admin = findUserByEmail('admin@example.com')!;
+
     enrol(admin);
     const token = await login('user@example.com');
 

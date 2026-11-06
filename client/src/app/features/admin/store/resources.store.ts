@@ -25,6 +25,7 @@ export const ResourcesStore = signalStore(
     fallbackKey: 'admin.store.errorLoadResourcesFailed',
     fetcher: () => {
       const rbacService = inject(RbacAdminService);
+
       return (request, filters) =>
         rbacService.getResourcesCursor(request, filters);
     }

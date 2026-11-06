@@ -29,6 +29,7 @@ export const BillingSubscriptionsStore = signalStore(
     fallbackKey: 'admin.billing.errorLoadFailed',
     fetcher: () => {
       const billing = inject(BillingAdminService);
+
       return (request) => billing.listSubscriptions(request);
     }
   }),
@@ -45,18 +46,22 @@ export const BillingSubscriptionsStore = signalStore(
         mode: CancelMode = 'period_end'
       ): Promise<boolean> {
         patchState(store, { working: true });
+
         try {
           const updated = await firstValueFrom(
             billing.cancelSubscription(id, mode)
           );
+
           patchState(store, updateEntity({ id, changes: updated }));
           notify.success('admin.billing.successCancelled');
+
           return true;
         } catch (error) {
           notify.error(
             error as HttpErrorResponse,
             'admin.billing.errorCancelFailed'
           );
+
           return false;
         } finally {
           patchState(store, { working: false });

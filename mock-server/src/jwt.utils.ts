@@ -27,6 +27,7 @@ export function generateAccessToken(
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expiresInSeconds
   });
+
   return `${header}.${payload}.mock-signature`;
 }
 
@@ -47,6 +48,7 @@ export function generateMfaPendingToken(
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expiresInSeconds
   });
+
   return `${header}.${payload}.mock-signature`;
 }
 
@@ -87,11 +89,13 @@ export interface DecodedToken {
 export function decodeToken(token: string): DecodedToken | null {
   try {
     const parts = token.split('.');
+
     if (parts.length !== 3) return null;
 
     const payload = JSON.parse(
       Buffer.from(parts[1], 'base64').toString('utf-8')
     );
+
     return payload as DecodedToken;
   } catch {
     return null;
@@ -105,9 +109,11 @@ export function decodeToken(token: string): DecodedToken | null {
  */
 export function validateToken(token: string): DecodedToken | null {
   const decoded = decodeToken(token);
+
   if (!decoded) return null;
 
   const now = Math.floor(Date.now() / 1000);
+
   if (decoded.exp < now) return null;
 
   return decoded;

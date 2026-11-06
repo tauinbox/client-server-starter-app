@@ -24,6 +24,7 @@ export function formatMoney(
     currency
   });
   const fractionDigits = formatter.resolvedOptions().maximumFractionDigits ?? 2;
+
   return formatter.format(amountMinor / 10 ** fractionDigits);
 }
 
@@ -87,8 +88,12 @@ export function parseAmountToMinor(
   const normalized = text.trim().replace(',', '.');
   const pattern =
     scale > 0 ? new RegExp(`^\\d+(\\.\\d{1,${scale}})?$`) : /^\d+$/;
+
   if (!pattern.test(normalized)) return null;
+
   const major = Number(normalized);
+
   if (!Number.isFinite(major) || major <= 0) return null;
+
   return Math.round(major * 10 ** scale);
 }

@@ -54,9 +54,11 @@ export class OAuthCallbackComponent implements OnInit {
 
   ngOnInit(): void {
     this.#returnUrl = this.#oauthIntent.take();
+
     if (this.#returnUrl === null) {
       // This tab did not start the round trip, so it signs nobody in.
       this.#redirectToLogin(OAUTH_ERROR.AUTH_FAILED);
+
       return;
     }
 
@@ -66,6 +68,7 @@ export class OAuthCallbackComponent implements OnInit {
         // code is presented, so nothing is saved and no navigation happens yet.
         if ('mfaRequired' in response) {
           this.mfaChallenge.set(response);
+
           return;
         }
 

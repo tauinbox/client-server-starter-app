@@ -31,7 +31,9 @@ runWithInfra('seeder idempotency (e2e)', () => {
 
   const withAdminConnection = async (statements: string[]) => {
     const admin = new DataSource({ ...postgresConfig(), logging: false });
+
     await admin.initialize();
+
     try {
       for (const statement of statements) await admin.query(statement);
     } finally {
@@ -72,11 +74,13 @@ runWithInfra('seeder idempotency (e2e)', () => {
 
   afterAll(async () => {
     if (ds?.isInitialized) await ds.destroy();
+
     await dropSchema();
   });
 
   it('leaves the database unchanged when re-run', async () => {
     for (const seeder of seeders()) await seeder.run(ds);
+
     const afterFirstRun = await counts();
 
     // Sanity floor so an empty run cannot pass silently: the seed writes
@@ -103,6 +107,7 @@ runWithInfra('seeder idempotency (e2e)', () => {
     for (const seeder of seeders()) await seeder.run(ds);
 
     const restored = await counts();
+
     expect(restored.actions).toBeGreaterThan(0);
     expect(restored.permissions).toBe(restored.declaredPairs);
     expect(restored.flagRules).toBeGreaterThan(0);

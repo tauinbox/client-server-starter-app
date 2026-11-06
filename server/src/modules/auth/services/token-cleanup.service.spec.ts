@@ -42,6 +42,7 @@ describe('TokenCleanupService', () => {
       const options = Reflect.getMetadata('SCHEDULE_CRON_OPTIONS', method) as {
         timeZone?: string;
       };
+
       return options.timeZone;
     };
 
@@ -83,6 +84,7 @@ describe('TokenCleanupService', () => {
 
     it('should catch and log errors from removeExpiredTokens', async () => {
       const error = new Error('Delete failed');
+
       refreshTokenService.removeExpiredTokens.mockRejectedValue(error);
       const errorSpy = jest.spyOn(service['logger'], 'error');
 

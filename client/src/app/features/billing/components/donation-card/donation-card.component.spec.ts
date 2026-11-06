@@ -45,6 +45,7 @@ describe('DonationCardComponent', () => {
     const toggles = fixture.nativeElement.querySelectorAll(
       'mat-button-toggle button'
     ) as NodeListOf<HTMLButtonElement>;
+
     [...toggles].at(-1)!.click();
     fixture.detectChanges();
   }
@@ -57,6 +58,7 @@ describe('DonationCardComponent', () => {
     const toggles = Array.from(
       fixture.nativeElement.querySelectorAll('mat-button-toggle')
     ) as HTMLElement[];
+
     expect(toggles.map((toggle) => toggle.textContent?.trim())).toEqual([
       '$3.00',
       '$5.00',

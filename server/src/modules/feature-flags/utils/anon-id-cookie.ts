@@ -18,6 +18,7 @@ export function readAnonId(
   secure: boolean
 ): string | null {
   const value = readHostCookie(req, ANON_ID_COOKIE, secure);
+
   return value !== undefined && ANON_ID_PATTERN.test(value) ? value : null;
 }
 

@@ -141,9 +141,11 @@ export class AuthService {
    */
   #listenForCrossTabLogout(): void {
     const win = this.#window;
+
     if (!win) return;
 
     const onStorage = (event: StorageEvent) => this.#onSessionKeyChanged(event);
+
     win.addEventListener('storage', onStorage);
     this.#destroyRef.onDestroy(() =>
       win.removeEventListener('storage', onStorage)
@@ -191,6 +193,7 @@ export class AuthService {
           if ('mfaRequired' in response) {
             return [response];
           }
+
           return this.startSession(response);
         })
       );
@@ -286,6 +289,7 @@ export class AuthService {
 
   private startSession(response: AuthResponse): Observable<AuthResponse> {
     this.#authStore.saveAuthResponse(response);
+
     return from(this.completeAuthentication()).pipe(
       switchMap(() => [response])
     );
@@ -322,6 +326,7 @@ export class AuthService {
     const body = captchaToken
       ? { ...registerData, captchaToken }
       : registerData;
+
     return this.#http.post<User>(AuthApiEnum.Register, body, {
       context: silentContext()
     });
@@ -332,6 +337,7 @@ export class AuthService {
 
     const completeLogout = () => {
       const queryParams = reason ? { [SESSION_ENDED_PARAM]: reason } : {};
+
       if (returnUrl) {
         navigateToLogin(this.#router, returnUrl, queryParams);
       } else {
@@ -344,6 +350,7 @@ export class AuthService {
     if (!this.#authStore.isAuthenticated()) {
       this.#clearSessionState();
       completeLogout();
+
       return;
     }
 
@@ -449,6 +456,7 @@ export class AuthService {
           if ('mfaRequired' in response) {
             return [response];
           }
+
           // Checked before anything is saved: a partial response must not
           // leave a half-written session behind the redirect to /login.
           if (
@@ -458,6 +466,7 @@ export class AuthService {
           ) {
             return throwError(() => new Error('Incomplete OAuth response'));
           }
+
           return this.startSession(response);
         })
       );

@@ -21,9 +21,11 @@ export function createDependencyUpGauge(
   // Re-use the existing metric if already registered (multiple module
   // initializations in the same process during E2E tests or hot-reload).
   const existing = register.getSingleMetric(DEPENDENCY_UP_METRIC_NAME);
+
   if (existing) {
     return existing as Gauge<string>;
   }
+
   return new Gauge<string>({
     name: DEPENDENCY_UP_METRIC_NAME,
     help: 'External dependency health as observed by the readiness probe (1 = healthy, 0 = degraded or down)',

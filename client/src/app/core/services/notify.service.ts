@@ -58,9 +58,12 @@ export class NotifyService {
         )
       );
     }
+
     const fallbackKey =
       typeof paramsOrFallbackKey === 'string' ? paramsOrFallbackKey : undefined;
+
     this.#reported.add(source);
+
     return this.#open(
       parseHttpErrorMessage(source, this.#transloco, fallbackKey)
     );
@@ -74,6 +77,7 @@ export class NotifyService {
   reportLater(error: HttpErrorResponse, show: () => void): void {
     setTimeout(() => {
       if (this.#reported.has(error)) return;
+
       this.#reported.add(error);
       show();
     });

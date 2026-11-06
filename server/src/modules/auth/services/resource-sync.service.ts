@@ -49,6 +49,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     for (const wrapper of controllers) {
       const metatype = wrapper.metatype as
         (new (...args: unknown[]) => unknown) | undefined;
+
       if (!metatype) continue;
 
       const meta = this.reflector.get<ResourceMetadata | undefined>(
@@ -58,6 +59,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
 
       if (!meta) {
         const { name } = metatype;
+
         if (
           !name.includes('Health') &&
           !name.includes('Auth') &&
@@ -68,16 +70,19 @@ export class ResourceSyncService implements OnApplicationBootstrap {
             `Controller ${name} has no @RegisterResource decorator`
           );
         }
+
         continue;
       }
 
       const owner = declared.find(({ meta: m }) => m.name === meta.name);
+
       if (owner) {
         this.logger.error(
           `@RegisterResource name "${meta.name}" on controller "${metatype.name}" is already registered by "${owner.controllerName}" - skipped, so its permissions cannot be granted. Give the resource its own name.`
         );
         continue;
       }
+
       registeredNames.add(meta.name);
       declared.push({ meta, controllerName: metatype.name });
     }
@@ -99,6 +104,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
       const existing = await this.resourceRepository.findOne({
         where: { name: meta.name }
       });
+
       if (existing?.isOrphaned) {
         this.logger.warn(
           `Resource "${meta.name}" was previously orphaned and its controller is back. Permissions remain disabled until an admin explicitly restores it via POST /api/v1/rbac/resources/${existing.id}/restore`
@@ -119,6 +125,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
       const declaredActions = actions.filter((action) =>
         meta.actions.includes(action.name)
       );
+
       if (declaredActions.length > 0) {
         const existingPermissions = await this.permissionRepository.find({
           where: { resourceId: resource.id }
@@ -129,6 +136,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         const missingActions = declaredActions.filter(
           (action) => !existingActionIds.has(action.id)
         );
+
         if (missingActions.length > 0) {
           await this.permissionRepository.save(
             missingActions.map((action) =>
@@ -138,6 +146,7 @@ export class ResourceSyncService implements OnApplicationBootstrap {
               })
             )
           );
+
           for (const action of missingActions) {
             this.logger.log(`Created permission: ${meta.name}:${action.name}`);
           }
@@ -149,14 +158,17 @@ export class ResourceSyncService implements OnApplicationBootstrap {
 
     // Mark unregistered resources as orphaned
     const allResources = await this.resourceRepository.find();
+
     for (const resource of allResources) {
       if (registeredNames.has(resource.name)) continue;
+
       if (!resource.isOrphaned) {
         await this.resourceRepository.update(
           { id: resource.id, isOrphaned: false },
           { isOrphaned: true }
         );
       }
+
       this.logger.warn(
         `Resource "${resource.name}" is orphaned — no controller registered it. Permissions for this resource are disabled.`
       );
@@ -180,18 +192,23 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         this.logger.error(
           `Declared action "${name}" is a reserved CASL keyword - not created`
         );
+
         return false;
       }
+
       return !known.has(name);
     });
+
     if (missing.length === 0) return existing;
 
     const created = await this.actionRepository.save(
       missing.map((name) => this.actionRepository.create({ name }))
     );
+
     for (const action of created) {
       this.logger.log(`Created action: ${action.name}`);
     }
+
     return [...existing, ...created];
   }
 }

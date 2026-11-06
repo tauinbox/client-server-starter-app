@@ -18,6 +18,7 @@ const USER_ROLE_ID = mockId('role-user');
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -40,8 +41,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: PASSWORD })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -63,7 +66,9 @@ function userIdOf(email: string): string {
   const user = getState()
     .users.values()
     .find((u) => u.email === email);
+
   if (!user) throw new Error(`Seed user ${email} is missing`);
+
   return user.id;
 }
 
@@ -75,6 +80,7 @@ function clearedCookies(res: Response): string[] {
     .map((raw) => {
       const name = raw.slice(0, raw.indexOf('='));
       const path = /Path=([^;]+)/.exec(raw)?.[1] ?? '';
+
       return `${name} ${path}`;
     });
 }
@@ -98,6 +104,7 @@ describe('PATCH /auth/profile', () => {
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors).toEqual(['name should not be empty']);
   });
 
@@ -112,6 +119,7 @@ describe('PATCH /auth/profile', () => {
 
     expect(res.status).toBe(422);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors).toEqual([
       'name must be shorter than or equal to 255 characters',
       'name should not be empty'
@@ -142,6 +150,7 @@ describe('PATCH /auth/profile', () => {
           p.resourceId === mockId('res-profile') &&
           p.actionId === mockId('act-update')
       );
+
     expect(updateProfile).toBeDefined();
     state.rolePermissions = state.rolePermissions.filter(
       (rp) =>

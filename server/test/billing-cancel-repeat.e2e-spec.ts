@@ -126,6 +126,7 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
     const customer = await ds.getRepository(Customer).save(
       ds.getRepository(Customer).create({
@@ -153,6 +154,7 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
         providerSubscriptionId: `sub_${stamp}`
       })
     );
+
     subscriptionId = subscription.id;
   }
 

@@ -102,6 +102,7 @@ describe('NotificationsService', () => {
             completed = true;
           }
         });
+
       return {
         frames,
         subscription,
@@ -132,6 +133,7 @@ describe('NotificationsService', () => {
 
     it('sends session_invalidated and completes when the session has ended', async () => {
       const stream = collect('user-1', 'session-1');
+
       service.push('user-1', { type: 'feature_flags_updated' });
 
       refreshTokenService.hasLiveSession.mockResolvedValue(false);
@@ -162,6 +164,7 @@ describe('NotificationsService', () => {
 
     it('removes the connection when the subscriber goes away', () => {
       const stream = collect('user-1', 'session-1');
+
       expect(mockSseRef.getCount()).toBe(1);
 
       stream.subscription.unsubscribe();
@@ -175,11 +178,13 @@ describe('NotificationsService', () => {
       }
 
       let error: unknown;
+
       try {
         service.openStream('user-1', 'session-1', 'conn-over');
       } catch (caught) {
         error = caught;
       }
+
       expect(error).toBeInstanceOf(HttpException);
       expect((error as HttpException).getStatus()).toBe(
         HttpStatus.TOO_MANY_REQUESTS
@@ -195,6 +200,7 @@ describe('NotificationsService', () => {
 
   it('should create a stream for a new userId/connectionId', () => {
     const subject = service.createStream('user-1', 'conn-1');
+
     expect(subject).toBeDefined();
   });
 
@@ -210,6 +216,7 @@ describe('NotificationsService', () => {
     subject.subscribe({
       next: (event) => {
         received.push(event);
+
         if (received.length === 1) {
           expect(received[0]).toEqual({
             data: { type: 'session_invalidated' }
@@ -228,6 +235,7 @@ describe('NotificationsService', () => {
 
     const received1: unknown[] = [];
     const received2: unknown[] = [];
+
     subject1.subscribe((e) => received1.push(e));
     subject2.subscribe((e) => received2.push(e));
 
@@ -243,6 +251,7 @@ describe('NotificationsService', () => {
 
     const receivedA: unknown[] = [];
     const receivedB: unknown[] = [];
+
     subA.subscribe((e) => receivedA.push(e));
     subB.subscribe((e) => receivedB.push(e));
 
@@ -291,11 +300,13 @@ describe('NotificationsService', () => {
 
     it('should fail closed when the grant holder lookup throws', async () => {
       const subject = service.createStream('admin-4', 'conn-1');
+
       usersWithListAccess.add('admin-4');
       permissionService.filterGrantHolders.mockRejectedValue(
         new Error('db down')
       );
       const received: unknown[] = [];
+
       subject.subscribe((e) => received.push(e));
 
       await expect(
@@ -307,15 +318,18 @@ describe('NotificationsService', () => {
 
     it('resolves at most 50 abilities at a time', async () => {
       const userIds = Array.from({ length: 120 }, (_, i) => `admin-${i}`);
+
       bus.remoteUserIds = userIds;
       userIds.forEach((userId) => usersWithListAccess.add(userId));
       let running = 0;
       let peak = 0;
+
       caslAbilityFactory.resolveForUser.mockImplementation(
         async (userId: string) => {
           peak = Math.max(peak, ++running);
           await Promise.resolve();
           running--;
+
           return {
             ability: { can: () => usersWithListAccess.has(userId) },
             roles: [],
@@ -336,10 +350,12 @@ describe('NotificationsService', () => {
     it('should deliver only to users whose ability satisfies the check', async () => {
       const adminSub = service.createStream('admin-1', 'conn-1');
       const basicSub = service.createStream('basic-1', 'conn-1');
+
       usersWithListAccess.add('admin-1');
 
       const adminReceived: unknown[] = [];
       const basicReceived: unknown[] = [];
+
       adminSub.subscribe((e) => adminReceived.push(e));
       basicSub.subscribe((e) => basicReceived.push(e));
 
@@ -351,10 +367,12 @@ describe('NotificationsService', () => {
 
     it('should fail closed when ability resolution throws', async () => {
       const subject = service.createStream('admin-2', 'conn-1');
+
       usersWithListAccess.add('admin-2');
       caslAbilityFactory.resolveForUser.mockRejectedValue(new Error('db down'));
 
       const received: unknown[] = [];
+
       subject.subscribe((e) => received.push(e));
 
       await expect(
@@ -366,6 +384,7 @@ describe('NotificationsService', () => {
     it('should resolve abilities per push so permission changes take effect', async () => {
       const subject = service.createStream('user-a', 'conn-1');
       const received: unknown[] = [];
+
       subject.subscribe((e) => received.push(e));
 
       await service.pushToAuthorized(crudEvent, canSearchUsers, searchUser);
@@ -379,6 +398,7 @@ describe('NotificationsService', () => {
     it('checks the users of other instances here and publishes only the allowed ones', async () => {
       const local = service.createStream('local-admin', 'conn-1');
       const received: unknown[] = [];
+
       local.subscribe((e) => received.push(e));
       bus.remoteUserIds = ['remote-admin', 'remote-basic', 'local-admin'];
       usersWithListAccess.add('local-admin');
@@ -411,6 +431,7 @@ describe('NotificationsService', () => {
     it('publishes one message with only the connected users', async () => {
       const local = service.createStream('local-1', 'conn-1');
       const received: unknown[] = [];
+
       local.subscribe((e) => received.push(e));
       bus.remoteUserIds = ['remote-1', 'other-1'];
 
@@ -460,6 +481,7 @@ describe('NotificationsService', () => {
       const second = service.createStream('user-2', 'conn-1');
       const firstReceived: unknown[] = [];
       const secondReceived: unknown[] = [];
+
       first.subscribe((e) => firstReceived.push(e));
       second.subscribe((e) => secondReceived.push(e));
 
@@ -489,6 +511,7 @@ describe('NotificationsService', () => {
     const subject = service.createStream('user-6', 'conn-1');
 
     let completed = false;
+
     subject.subscribe({
       complete: () => {
         completed = true;

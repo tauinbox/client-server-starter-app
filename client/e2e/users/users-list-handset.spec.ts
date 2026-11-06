@@ -20,9 +20,11 @@ test.describe('User List page — handset layout', () => {
     await expect(page.locator('mat-card.user-card').first()).toBeVisible();
 
     const tableCount = await page.locator('table').count();
+
     expect(tableCount).toBe(0);
 
     const cardCount = await page.locator('mat-card.user-card').count();
+
     expect(cardCount).toBeGreaterThan(0);
   });
 
@@ -42,6 +44,7 @@ test.describe('User List page — handset layout', () => {
           })
         });
       }
+
       return route.fallback();
     });
     await page.goto('/users');
@@ -68,6 +71,7 @@ test.describe('User List page — handset layout', () => {
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z'
     };
+
     await page.route('**/api/v1/users/cursor?*', (route) => {
       if (
         route.request().method() === 'GET' &&
@@ -82,11 +86,13 @@ test.describe('User List page — handset layout', () => {
           })
         });
       }
+
       return route.fallback();
     });
     await page.goto('/users');
 
     const card = page.locator('mat-card.user-card').first();
+
     await expect(card).toBeVisible();
     await expect(card).toContainText('Admin User');
     await expect(card).toContainText('admin@example.com');
@@ -94,6 +100,7 @@ test.describe('User List page — handset layout', () => {
     await card.locator('button.user-card-menu-trigger').click();
 
     const menu = page.getByRole('menu');
+
     await expect(menu).toBeVisible();
 
     await menu.getByRole('menuitem', { name: /View Details/i }).click();
@@ -137,6 +144,7 @@ test.describe('User List page — handset layout', () => {
         updatedAt: '2025-01-01T00:00:00.000Z'
       }
     ];
+
     await page.route('**/api/v1/users/cursor?*', (route) => {
       if (
         route.request().method() === 'GET' &&
@@ -151,20 +159,25 @@ test.describe('User List page — handset layout', () => {
           })
         });
       }
+
       return route.fallback();
     });
     await page.goto('/users');
 
     const cards = page.locator('mat-card.user-card');
+
     await expect(cards.first()).toBeVisible();
     await expect(cards).toHaveCount(2);
 
     const viewportSize = page.viewportSize();
+
     if (!viewportSize) throw new Error('viewportSize() returned null');
+
     const viewportWidth = viewportSize.width;
 
     const triggers = page.locator('button.user-card-menu-trigger');
     const triggerCount = await triggers.count();
+
     expect(triggerCount).toBe(2);
 
     for (let i = 0; i < triggerCount; i++) {
@@ -172,11 +185,14 @@ test.describe('User List page — handset layout', () => {
       const card = cards.nth(i);
       const triggerBox = await trigger.boundingBox();
       const cardBox = await card.boundingBox();
+
       if (!triggerBox || !cardBox) {
         throw new Error(`boundingBox returned null at card ${i}`);
       }
+
       const triggerRight = triggerBox.x + triggerBox.width;
       const cardRight = cardBox.x + cardBox.width;
+
       expect(
         triggerRight,
         `Card ${i}: action trigger right edge (${triggerRight}px) must not exceed viewport width (${viewportWidth}px)`
@@ -206,6 +222,7 @@ test.describe('User List page — handset layout', () => {
       createdAt: '2025-02-01T00:00:00.000Z',
       updatedAt: '2025-02-01T00:00:00.000Z'
     };
+
     await page.route('**/api/v1/users/cursor?*', (route) => {
       if (
         route.request().method() === 'GET' &&
@@ -220,11 +237,13 @@ test.describe('User List page — handset layout', () => {
           })
         });
       }
+
       return route.fallback();
     });
     await page.goto('/users');
 
     const card = page.locator('mat-card.user-card').first();
+
     await expect(card).toBeVisible();
 
     await card.locator('button.user-card-menu-trigger').click();
@@ -237,6 +256,7 @@ test.describe('User List page — handset layout', () => {
 
     // On handset viewport, confirm opens as a bottom sheet instead of a dialog
     const bottomSheet = page.locator('mat-bottom-sheet-container');
+
     await expect(bottomSheet).toBeVisible();
     await expect(
       page.getByText(/Are you sure you want to delete user John Smith/)

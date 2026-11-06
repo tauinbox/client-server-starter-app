@@ -28,8 +28,10 @@ async function adminToken(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -47,6 +49,7 @@ async function send(
     body: JSON.stringify(body)
   });
   const json = (await res.json()) as { errorKey?: string };
+
   return { status: res.status, errorKey: json.errorKey };
 }
 
@@ -58,9 +61,11 @@ function permissionId(resourceSlug: string, actionSlug: string): string {
         p.resourceId === mockId(resourceSlug) &&
         p.actionId === mockId(actionSlug)
     );
+
   if (!permission) {
     throw new Error(`Seed permission ${resourceSlug}/${actionSlug} is missing`);
   }
+
   return permission.id;
 }
 
@@ -114,6 +119,7 @@ describe('declared action lists parity with server', () => {
 
   it('turns a stored deny on a misspelt field into a blanket deny', () => {
     const state = getState();
+
     state.rolePermissions = [
       {
         id: 'rp-stored-read',
@@ -129,6 +135,7 @@ describe('declared action lists parity with server', () => {
       }
     ];
     const user = state.users.get(mockId('user-2'))!;
+
     user.roles = ['editor'];
 
     const ability = buildAbilityForUser(user);
@@ -153,6 +160,7 @@ describe('declared action lists parity with server', () => {
 
   it('fails closed on a stored grant the declared lists no longer allow', () => {
     const state = getState();
+
     state.resources.get(mockId('res-billing'))!.allowedActionNames = ['search'];
     state.rolePermissions = [
       {
@@ -169,6 +177,7 @@ describe('declared action lists parity with server', () => {
       }
     ];
     const user = state.users.get(mockId('user-2'))!;
+
     user.roles = ['editor'];
 
     const ability = buildAbilityForUser(user);

@@ -50,16 +50,19 @@ type RepoMock = {
 /** Chainable query-builder stub; `getMany` is what each test drives. */
 function queryBuilder(): QueryBuilderMock {
   const qb: Partial<QueryBuilderMock> = {};
+
   qb.andWhere = jest.fn().mockReturnValue(qb);
   qb.orderBy = jest.fn().mockReturnValue(qb);
   qb.addOrderBy = jest.fn().mockReturnValue(qb);
   qb.take = jest.fn().mockReturnValue(qb);
   qb.getMany = jest.fn().mockResolvedValue([]);
+
   return qb as QueryBuilderMock;
 }
 
 function repo(): RepoMock {
   const qb = queryBuilder();
+
   return {
     findOne: jest.fn().mockResolvedValue(null),
     find: jest.fn().mockResolvedValue([]),
@@ -134,6 +137,7 @@ async function build() {
   const subscriptions = repo();
   // The cancel write runs in a transaction on the manager of the repository.
   const cancelManager = { withRepository: () => subscriptions };
+
   Object.assign(subscriptions, {
     manager: {
       transaction: (cb: (m: typeof cancelManager) => unknown) =>
@@ -162,8 +166,10 @@ async function build() {
     findOne: jest.fn((entity: unknown, options: unknown): Promise<unknown> => {
       if (entity === Invoice)
         return invoices.findOne(options) as Promise<unknown>;
+
       if (entity === Product)
         return products.findOne(options) as Promise<unknown>;
+
       return Promise.resolve(null);
     }),
     update: jest.fn(
@@ -174,11 +180,13 @@ async function build() {
       ): Promise<unknown> => {
         if (entity === CustomerGrant)
           return grants.update(criteria, partial) as Promise<unknown>;
+
         return Promise.resolve({ affected: 0 });
       }
     ),
     save: jest.fn((entity: unknown, data: unknown): Promise<unknown> => {
       if (entity === Invoice) return invoices.save(data) as Promise<unknown>;
+
       return Promise.resolve(data);
     })
   };
@@ -224,6 +232,7 @@ describe('BillingAdminService', () => {
   describe('listSubscriptions / listInvoices', () => {
     it('lists subscriptions newest first, bounded to one page', async () => {
       const ctx = await build();
+
       await ctx.service.listSubscriptions(cursorQuery());
 
       expect(ctx.subscriptions.qb.orderBy).toHaveBeenCalledWith(
@@ -242,6 +251,7 @@ describe('BillingAdminService', () => {
 
     it('lists invoices newest first, bounded to one page', async () => {
       const ctx = await build();
+
       await ctx.service.listInvoices(cursorQuery());
 
       expect(ctx.invoices.qb.orderBy).toHaveBeenCalledWith(
@@ -258,6 +268,7 @@ describe('BillingAdminService', () => {
       const rows = Array.from({ length: 3 }, (_, i) =>
         makeSubscription({ id: `sub-${i}` })
       );
+
       ctx.subscriptions.qb.getMany.mockResolvedValue(rows);
 
       const result = await ctx.service.listSubscriptions(
@@ -273,6 +284,7 @@ describe('BillingAdminService', () => {
 
     it('closes the list when no extra row comes back', async () => {
       const ctx = await build();
+
       ctx.invoices.qb.getMany.mockResolvedValue([makeInvoice()]);
 
       const result = await ctx.service.listInvoices(cursorQuery({ limit: 2 }));
@@ -301,6 +313,7 @@ describe('BillingAdminService', () => {
   describe('cancelSubscription', () => {
     it('throws 404 when the subscription does not exist', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(null);
       await expect(ctx.service.cancelSubscription('missing')).rejects.toThrow(
         ApiError
@@ -309,6 +322,7 @@ describe('BillingAdminService', () => {
 
     it('marks period-end cancel without invalidating entitlements', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(makeSubscription());
       ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
 
@@ -321,10 +335,12 @@ describe('BillingAdminService', () => {
 
     it('immediate cancel sets canceled, asks the provider, and emits the event', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({ providerSubscriptionId: 'sub_ext_1' })
       );
       const yoo = providerStub('yookassa');
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
       ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
       ctx.customers.findOne.mockResolvedValue({
@@ -354,6 +370,7 @@ describe('BillingAdminService', () => {
     it('bills the closing metered period before an immediate cancel', async () => {
       const ctx = await build();
       const sub = makeSubscription({ providerSubscriptionId: null });
+
       ctx.subscriptions.findOne.mockResolvedValue(sub);
       ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
 
@@ -368,6 +385,7 @@ describe('BillingAdminService', () => {
 
     it('leaves a period-end cancel to the renewal scan at the boundary', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({ providerSubscriptionId: null })
       );
@@ -380,6 +398,7 @@ describe('BillingAdminService', () => {
 
     it('does not call the provider for a self-managed sub without a provider ref', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({ providerSubscriptionId: null })
       );
@@ -392,6 +411,7 @@ describe('BillingAdminService', () => {
 
     it('refuses to cancel locally when the provider of a linked sub is not registered', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({ providerSubscriptionId: 'sub_ext_1' })
       );
@@ -409,6 +429,7 @@ describe('BillingAdminService', () => {
 
     it('refuses a second cancel of an already-canceled subscription', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({
           status: 'canceled',
@@ -416,6 +437,7 @@ describe('BillingAdminService', () => {
         })
       );
       const yoo = providerStub('yookassa');
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       const refusal = ctx.service.cancelSubscription('sub-1', 'immediate');
@@ -432,6 +454,7 @@ describe('BillingAdminService', () => {
 
     it('refuses a period-end cancel of a canceled row rather than flagging it', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({ status: 'canceled' })
       );
@@ -447,6 +470,7 @@ describe('BillingAdminService', () => {
 
     it('refuses a period-end repeat of a scheduled row before the provider call', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({
           cancelAtPeriodEnd: true,
@@ -454,6 +478,7 @@ describe('BillingAdminService', () => {
         })
       );
       const yoo = providerStub('yookassa');
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       await expect(
@@ -471,6 +496,7 @@ describe('BillingAdminService', () => {
 
     it('refuses a period-end cancel of an incomplete row, which has no period to end', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({ status: 'incomplete' })
       );
@@ -493,6 +519,7 @@ describe('BillingAdminService', () => {
       ['an incomplete', { status: 'incomplete' as const }]
     ])('still ends %s row immediately', async (_label, overrides) => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(makeSubscription(overrides));
       ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
 
@@ -507,6 +534,7 @@ describe('BillingAdminService', () => {
 
     it('writes a period-end cancel only to an unscheduled row with a paid period', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(makeSubscription());
       ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
 
@@ -524,6 +552,7 @@ describe('BillingAdminService', () => {
 
     it('names the concurrent period-end cancel that won the write', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne
         .mockResolvedValueOnce(makeSubscription())
         .mockResolvedValueOnce(makeSubscription({ cancelAtPeriodEnd: true }));
@@ -540,10 +569,12 @@ describe('BillingAdminService', () => {
 
     it('answers 409 when a concurrent cancel lands during the provider call', async () => {
       const ctx = await build();
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSubscription({ providerSubscriptionId: 'sub_ext_1' })
       );
       const yoo = providerStub('yookassa');
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
       ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
 
@@ -559,6 +590,7 @@ describe('BillingAdminService', () => {
   describe('refundInvoice', () => {
     it('throws 404 when the invoice does not exist', async () => {
       const ctx = await build();
+
       ctx.invoices.findOne.mockResolvedValue(null);
       await expect(ctx.service.refundInvoice('missing')).rejects.toThrow(
         ApiError
@@ -567,6 +599,7 @@ describe('BillingAdminService', () => {
 
     it('row-locks the invoice in both the pricing and the settling transaction', async () => {
       const ctx = await build();
+
       ctx.invoices.findOne.mockResolvedValue(
         makeInvoice({
           kind: 'one_time',
@@ -608,11 +641,14 @@ describe('BillingAdminService', () => {
 
     it('calls the provider outside any open transaction', async () => {
       const ctx = await build();
+
       ctx.invoices.findOne.mockResolvedValue(makeInvoice());
       let openTransactions = 0;
       const seenDuringRefund: number[] = [];
+
       ctx.dataSource.transaction.mockImplementation(async (cb) => {
         openTransactions++;
+
         try {
           return await cb(ctx.manager);
         } finally {
@@ -620,8 +656,10 @@ describe('BillingAdminService', () => {
         }
       });
       const yoo = providerStub('yookassa');
+
       yoo.refund.mockImplementation(() => {
         seenDuringRefund.push(openTransactions);
+
         return Promise.resolve();
       });
       ctx.billing.getProviderById.mockReturnValue(yoo);
@@ -636,11 +674,14 @@ describe('BillingAdminService', () => {
     it('reserves the leg on the invoice before calling the provider', async () => {
       const ctx = await build();
       const invoice = makeInvoice();
+
       ctx.invoices.findOne.mockResolvedValue(invoice);
       const yoo = providerStub('yookassa');
       const reservedAtCallTime: string[] = [];
+
       yoo.refund.mockImplementation(() => {
         reservedAtCallTime.push(invoice.refundedMinor.toMinorString());
+
         return Promise.resolve();
       });
       ctx.billing.getProviderById.mockReturnValue(yoo);
@@ -652,6 +693,7 @@ describe('BillingAdminService', () => {
 
     it('rejects a concurrent leg against the reserved total before it reaches the provider', async () => {
       const ctx = await build();
+
       ctx.invoices.findOne.mockResolvedValue(
         makeInvoice({
           kind: 'one_time',
@@ -668,6 +710,7 @@ describe('BillingAdminService', () => {
       const yoo = providerStub('yookassa');
       const { promise: firstRefund, resolve: releaseFirst } =
         Promise.withResolvers<void>();
+
       yoo.refund.mockImplementationOnce(() => firstRefund);
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
@@ -675,6 +718,7 @@ describe('BillingAdminService', () => {
       // released while its money is in flight - the window a second leg used to
       // price itself from a base that no longer reflected reality.
       const firstPromise = ctx.service.refundInvoice('inv-1');
+
       await new Promise((resolve) => setImmediate(resolve));
       await expect(ctx.service.refundInvoice('inv-1', 10000)).rejects.toThrow(
         ApiError
@@ -696,8 +740,10 @@ describe('BillingAdminService', () => {
     it('releases the reservation when the provider call fails', async () => {
       const ctx = await build();
       const invoice = makeInvoice();
+
       ctx.invoices.findOne.mockResolvedValue(invoice);
       const yoo = providerStub('yookassa');
+
       yoo.refund.mockRejectedValueOnce(new Error('provider down'));
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
@@ -723,6 +769,7 @@ describe('BillingAdminService', () => {
     it('refuses a refund with no registered provider and records nothing', async () => {
       const ctx = await build();
       const invoice = makeInvoice();
+
       ctx.invoices.findOne.mockResolvedValue(invoice);
       ctx.billing.getProviderById.mockImplementation(() => {
         throw new ApiError(ErrorKeys.GENERAL.INTERNAL_SERVER_ERROR, 'unknown');
@@ -738,6 +785,7 @@ describe('BillingAdminService', () => {
 
     it('does not settle on a concurrent leg reservation whose money is still in flight', async () => {
       const ctx = await build();
+
       ctx.invoices.findOne.mockResolvedValue(
         makeInvoice({
           kind: 'one_time',
@@ -753,6 +801,7 @@ describe('BillingAdminService', () => {
       });
       const yoo = providerStub('yookassa');
       const releases: (() => void)[] = [];
+
       yoo.refund.mockImplementation(
         () => new Promise<void>((resolve) => releases.push(resolve))
       );
@@ -761,23 +810,28 @@ describe('BillingAdminService', () => {
       // Two halves are in flight at once, so the row reads as fully refunded
       // while neither leg has heard back from the provider.
       const firstPromise = ctx.service.refundInvoice('inv-1', 24500);
+
       await new Promise((resolve) => setImmediate(resolve));
       const secondPromise = ctx.service.refundInvoice('inv-1', 24500);
+
       await new Promise((resolve) => setImmediate(resolve));
 
       releases[0]();
       const first = await firstPromise;
+
       expect(first.status).toBe('paid');
       expect(ctx.credits.clawbackPurchase).not.toHaveBeenCalled();
 
       releases[1]();
       const second = await secondPromise;
+
       expect(second.status).toBe('refunded');
       expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
     });
 
     it('rejects a repeat full refund and claws credits back exactly once', async () => {
       const ctx = await build();
+
       // The same row is re-read on the second call (a serialized concurrent
       // refund sees the committed state): once flipped to `refunded` it can no
       // longer be refunded, so the clawback runs exactly once.
@@ -797,6 +851,7 @@ describe('BillingAdminService', () => {
       ctx.billing.getProviderById.mockReturnValue(providerStub('yookassa'));
 
       const first = await ctx.service.refundInvoice('inv-1');
+
       expect(first.status).toBe('refunded');
 
       await expect(ctx.service.refundInvoice('inv-1')).rejects.toThrow(
@@ -807,10 +862,12 @@ describe('BillingAdminService', () => {
 
     it('rejects refunding an unpaid invoice', async () => {
       const ctx = await build();
+
       ctx.invoices.findOne.mockResolvedValue(
         makeInvoice({ status: 'pending' })
       );
       const refusal = ctx.service.refundInvoice('inv-1');
+
       await expect(refusal).rejects.toThrow(ApiError);
       await expect(refusal).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE }
@@ -819,8 +876,10 @@ describe('BillingAdminService', () => {
 
     it('rejects a partial amount above the invoice total', async () => {
       const ctx = await build();
+
       ctx.invoices.findOne.mockResolvedValue(makeInvoice());
       const refusal = ctx.service.refundInvoice('inv-1', 99001);
+
       await expect(refusal).rejects.toThrow(ApiError);
       await expect(refusal).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE }
@@ -829,11 +888,13 @@ describe('BillingAdminService', () => {
 
     it('rejects a refund that would push cumulative refunds past the total', async () => {
       const ctx = await build();
+
       // 50000 already refunded → only 49000 of the 99000 total remains.
       ctx.invoices.findOne.mockResolvedValue(
         makeInvoice({ refundedMinor: Money.fromMinor(50000) })
       );
       const yoo = providerStub('yookassa');
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       await expect(ctx.service.refundInvoice('inv-1', 50000)).rejects.toThrow(
@@ -844,8 +905,10 @@ describe('BillingAdminService', () => {
 
     it('full refund marks the invoice refunded and calls the provider', async () => {
       const ctx = await build();
+
       ctx.invoices.findOne.mockResolvedValue(makeInvoice());
       const yoo = providerStub('yookassa');
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       const saved = await ctx.service.refundInvoice('inv-1');
@@ -860,8 +923,10 @@ describe('BillingAdminService', () => {
 
     it('partial refund leaves the invoice paid', async () => {
       const ctx = await build();
+
       ctx.invoices.findOne.mockResolvedValue(makeInvoice());
       const yoo = providerStub('yookassa');
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       const saved = await ctx.service.refundInvoice('inv-1', 50000);
@@ -887,6 +952,7 @@ describe('BillingAdminService', () => {
 
       it('full refund of an sku purchase revokes its grant and emits the refund event', async () => {
         const ctx = await build();
+
         ctx.invoices.findOne.mockResolvedValue(makeOneTimeInvoice());
         ctx.grants.update.mockResolvedValue({ affected: 1 });
         ctx.customers.findOne.mockResolvedValue({
@@ -894,6 +960,7 @@ describe('BillingAdminService', () => {
           userId: 'user-1'
         });
         const yoo = providerStub('yookassa');
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
 
         const saved = await ctx.service.refundInvoice('inv-1');
@@ -913,6 +980,7 @@ describe('BillingAdminService', () => {
         const ctx = await build();
         // amountMinor 49000 → two 24500 legs reach the total.
         const invoice = makeOneTimeInvoice();
+
         ctx.invoices.findOne.mockResolvedValue(invoice);
         ctx.grants.update.mockResolvedValue({ affected: 1 });
         ctx.customers.findOne.mockResolvedValue({
@@ -920,13 +988,16 @@ describe('BillingAdminService', () => {
           userId: 'user-1'
         });
         const yoo = providerStub('yookassa');
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
 
         const first = await ctx.service.refundInvoice('inv-1', 24500);
+
         expect(first.status).toBe('paid');
         expect(ctx.grants.update).not.toHaveBeenCalled();
 
         const second = await ctx.service.refundInvoice('inv-1', 24500);
+
         expect(second.status).toBe('refunded');
         expect(ctx.grants.update).toHaveBeenCalledTimes(1);
         expect(ctx.emit).toHaveBeenCalledTimes(1);
@@ -950,6 +1021,7 @@ describe('BillingAdminService', () => {
       it('two partial refunds summing to the total claw the credit pack back once', async () => {
         const ctx = await build();
         const invoice = makeOneTimeInvoice({ productId: 'prod-cr' });
+
         ctx.invoices.findOne.mockResolvedValue(invoice);
         ctx.products.findOne.mockResolvedValue({
           id: 'prod-cr',
@@ -957,12 +1029,14 @@ describe('BillingAdminService', () => {
           grant: { credits: 500 }
         });
         const yoo = providerStub('yookassa');
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
 
         await ctx.service.refundInvoice('inv-1', 24500);
         expect(ctx.credits.clawbackPurchase).not.toHaveBeenCalled();
 
         const second = await ctx.service.refundInvoice('inv-1', 24500);
+
         expect(second.status).toBe('refunded');
         expect(ctx.credits.clawbackPurchase).toHaveBeenCalledTimes(1);
         expect(ctx.credits.clawbackPurchase).toHaveBeenCalledWith(
@@ -974,8 +1048,10 @@ describe('BillingAdminService', () => {
 
       it('partial refund of an sku purchase keeps the grant', async () => {
         const ctx = await build();
+
         ctx.invoices.findOne.mockResolvedValue(makeOneTimeInvoice());
         const yoo = providerStub('yookassa');
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
 
         const saved = await ctx.service.refundInvoice('inv-1', 10000);
@@ -987,11 +1063,13 @@ describe('BillingAdminService', () => {
 
       it('full refund of a custom purchase is a plain refund (no grants matched)', async () => {
         const ctx = await build();
+
         ctx.invoices.findOne.mockResolvedValue(
           makeOneTimeInvoice({ productId: 'prod-don' })
         );
         ctx.grants.update.mockResolvedValue({ affected: 0 });
         const yoo = providerStub('yookassa');
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
 
         const saved = await ctx.service.refundInvoice('inv-1');
@@ -1002,8 +1080,10 @@ describe('BillingAdminService', () => {
 
       it('never touches grants when refunding a subscription invoice', async () => {
         const ctx = await build();
+
         ctx.invoices.findOne.mockResolvedValue(makeInvoice());
         const yoo = providerStub('yookassa');
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
 
         await ctx.service.refundInvoice('inv-1');
@@ -1014,6 +1094,7 @@ describe('BillingAdminService', () => {
 
       it('full refund of a credit pack claws the granted units back', async () => {
         const ctx = await build();
+
         ctx.invoices.findOne.mockResolvedValue(
           makeOneTimeInvoice({ productId: 'prod-cr' })
         );
@@ -1023,6 +1104,7 @@ describe('BillingAdminService', () => {
           grant: { credits: 500 }
         });
         const yoo = providerStub('yookassa');
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
 
         const saved = await ctx.service.refundInvoice('inv-1');
@@ -1037,6 +1119,7 @@ describe('BillingAdminService', () => {
 
       it('partial refund of a credit pack claws nothing back', async () => {
         const ctx = await build();
+
         ctx.invoices.findOne.mockResolvedValue(
           makeOneTimeInvoice({ productId: 'prod-cr' })
         );
@@ -1046,6 +1129,7 @@ describe('BillingAdminService', () => {
           grant: { credits: 500 }
         });
         const yoo = providerStub('yookassa');
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
 
         const saved = await ctx.service.refundInvoice('inv-1', 10000);
@@ -1056,6 +1140,7 @@ describe('BillingAdminService', () => {
 
       it('full refund of an sku purchase claws no credits back', async () => {
         const ctx = await build();
+
         ctx.invoices.findOne.mockResolvedValue(makeOneTimeInvoice());
         ctx.products.findOne.mockResolvedValue({
           id: 'prod-1',
@@ -1063,6 +1148,7 @@ describe('BillingAdminService', () => {
           grant: { entitlement: 'reports' }
         });
         const yoo = providerStub('yookassa');
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
 
         await ctx.service.refundInvoice('inv-1');
@@ -1075,6 +1161,7 @@ describe('BillingAdminService', () => {
   describe('replayWebhookEvent', () => {
     it('throws 404 when the webhook event does not exist', async () => {
       const ctx = await build();
+
       ctx.webhookEvents.findOne.mockResolvedValue(null);
       await expect(ctx.service.replayWebhookEvent('missing')).rejects.toThrow(
         ApiError
@@ -1083,6 +1170,7 @@ describe('BillingAdminService', () => {
 
     it('rejects replaying a row that is not dead-lettered', async () => {
       const ctx = await build();
+
       ctx.webhookEvents.findOne.mockResolvedValue({
         id: 'wh-1',
         status: 'received'
@@ -1095,6 +1183,7 @@ describe('BillingAdminService', () => {
 
     it('resets a dead-lettered row to `received` and zeroes its failure history', async () => {
       const ctx = await build();
+
       ctx.webhookEvents.findOne.mockResolvedValue({
         id: 'wh-1',
         status: 'dead_letter'

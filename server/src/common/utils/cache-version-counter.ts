@@ -55,12 +55,16 @@ export class CacheVersionCounter {
     const counterKey = this.#scoped(this.#counterKey, scope);
     const fallbackKey = this.#scoped(this.#fallbackKey, scope);
     const redis = redisClientOf(this.#cache);
+
     if (redis) {
       try {
         const raw = await redis.get(counterKey);
+
         // Nothing invalidated yet, so nothing to orphan: 0 is a valid suffix.
         if (raw === null) return 0;
+
         const parsed = Number(raw);
+
         if (Number.isFinite(parsed)) return parsed;
       } catch (error: unknown) {
         this.#failureLog.log(error);
@@ -77,15 +81,23 @@ export class CacheVersionCounter {
    */
   #readFallback(fallbackKey: string): Promise<number> {
     const pending = this.#fallbackReads.get(fallbackKey);
+
     if (pending) return pending;
+
     const read = (async () => {
       const cached = await this.#cache.get<number>(fallbackKey);
+
       if (typeof cached === 'number') return cached;
+
       const initial = Date.now();
+
       await this.#cache.set(fallbackKey, initial, 0);
+
       return initial;
     })().finally(() => this.#fallbackReads.delete(fallbackKey));
+
     this.#fallbackReads.set(fallbackKey, read);
+
     return read;
   }
 
@@ -93,9 +105,11 @@ export class CacheVersionCounter {
     const counterKey = this.#scoped(this.#counterKey, scope);
     const fallbackKey = this.#scoped(this.#fallbackKey, scope);
     const redis = redisClientOf(this.#cache);
+
     if (redis) {
       try {
         await redis.incr(counterKey);
+
         return;
       } catch (error: unknown) {
         this.#failureLog.log(error);
@@ -110,6 +124,7 @@ export class CacheVersionCounter {
       Date.now(),
       (typeof previous === 'number' ? previous : 0) + 1
     );
+
     await this.#cache.set(fallbackKey, next, 0);
   }
 

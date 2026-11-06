@@ -3,7 +3,7 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import angular from 'angular-eslint';
 import prettier from 'eslint-config-prettier';
-import prettierPlugin from 'eslint-plugin-prettier';
+import stylistic from '@stylistic/eslint-plugin';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
@@ -32,7 +32,7 @@ export default tseslint.config(
       prettier
     ],
     plugins: {
-      prettier: prettierPlugin,
+      '@stylistic': stylistic,
       'import-x': importX,
       unicorn,
       'unused-imports': unusedImportsPlugin
@@ -40,7 +40,6 @@ export default tseslint.config(
     processor: angular.processInlineTemplates,
     rules: {
       ...baseRules,
-      'prettier/prettier': 'error',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       'unused-imports/no-unused-imports': 'error',
@@ -178,12 +177,6 @@ export default tseslint.config(
       ...angular.configs.templateRecommended,
       ...angular.configs.templateAccessibility,
       prettier
-    ],
-    plugins: {
-      prettier: prettierPlugin
-    },
-    rules: {
-      'prettier/prettier': 'error'
-    }
+    ]
   }
 );

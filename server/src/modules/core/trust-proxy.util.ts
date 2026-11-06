@@ -14,19 +14,25 @@ export function parseTrustedProxies(
   if (raw === undefined) {
     return undefined;
   }
+
   const trimmed = raw.trim();
+
   if (trimmed === '') {
     return undefined;
   }
+
   if (trimmed === 'true') {
     return true;
   }
+
   if (trimmed === 'false') {
     return false;
   }
+
   if (/^\d+$/.test(trimmed)) {
     return Number(trimmed);
   }
+
   return trimmed;
 }
 
@@ -35,9 +41,12 @@ export function applyTrustProxy(
   raw: string | undefined
 ): TrustProxyValue | undefined {
   const value = parseTrustedProxies(raw);
+
   if (value === undefined) {
     return undefined;
   }
+
   app.set('trust proxy', value);
+
   return value;
 }

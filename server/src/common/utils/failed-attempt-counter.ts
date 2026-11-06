@@ -83,22 +83,27 @@ export class FailedAttemptCounter {
           keys: [key],
           arguments: [String(windowMs)]
         })) as [number, number];
+
         return { count, remainingMs: ttl > 0 ? ttl : 0 };
       } catch (error: unknown) {
         this.#failureLog.log(error);
+
         return NO_WINDOW;
       }
     }
 
     const now = Date.now();
+
     this.#pruneLocal(now);
     const open = this.#local.get(key);
     const entry =
       open && open.expiresAt > now
         ? open
         : { count: 0, expiresAt: now + windowMs };
+
     entry.count += 1;
     this.#local.set(key, entry);
+
     return { count: entry.count, remainingMs: entry.expiresAt - now };
   }
 
@@ -113,6 +118,7 @@ export class FailedAttemptCounter {
       } catch (error: unknown) {
         this.#failureLog.log(error);
       }
+
       return;
     }
 

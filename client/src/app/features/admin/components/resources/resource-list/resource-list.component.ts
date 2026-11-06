@@ -188,6 +188,7 @@ export class ResourceListComponent {
 
   openEditResource(resource: ResourceResponse): void {
     const data: ResourceFormDialogData = { resource };
+
     this.#dialog.open(ResourceFormDialogComponent, {
       ...dialogSizeConfig(DialogSize.Form),
       panelClass: 'app-dialog-tall',

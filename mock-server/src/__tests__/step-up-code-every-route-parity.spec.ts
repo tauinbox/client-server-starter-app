@@ -32,6 +32,7 @@ async function oauthOnlyEnrolledToken(): Promise<string> {
   const template = getState()
     .users.values()
     .find((u) => u.email === 'user@example.com') as MockUser;
+
   getState().users.set(OAUTH_ONLY_ID, {
     ...template,
     id: OAUTH_ONLY_ID,
@@ -53,7 +54,9 @@ async function oauthOnlyEnrolledToken(): Promise<string> {
 
   // Enrolled after the sign-in, which would otherwise answer with a challenge.
   const user = getState().users.get(OAUTH_ONLY_ID) as MockUser;
+
   user.totpEnabledAt = '2025-01-01T00:00:00.000Z';
+
   return body.tokens.access_token;
 }
 
@@ -95,6 +98,7 @@ const routes: ReadonlyArray<
 it('refuses a code in place of the current password for a password change', async () => {
   const token = await oauthOnlyEnrolledToken();
   const user = getState().users.get(OAUTH_ONLY_ID) as MockUser;
+
   user.password = 'Current-Orchard-52';
 
   const res = await send(token, {
@@ -116,6 +120,7 @@ it('refuses a code in place of the current password for a password change', asyn
 it('names the code, not the password, when only a wrong code is offered', async () => {
   const token = await oauthOnlyEnrolledToken();
   const user = getState().users.get(OAUTH_ONLY_ID) as MockUser;
+
   user.password = 'Current-Orchard-52';
 
   const res = await send(token, {

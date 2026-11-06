@@ -104,6 +104,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     await ds.initialize();
     releaseDbLock = await holdBillingDbLock(ds);
     const plans = ds.getRepository(Plan);
+
     await plans.save([
       plans.create({
         key: FIXED_KEY,
@@ -162,6 +163,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
       await ds.getRepository(Invoice).delete({ customerId });
       customerId = undefined;
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
@@ -220,12 +222,14 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
           useValue: {
             emit: (name: string, payload: unknown) => {
               emitted.push({ name, payload });
+
               return true;
             }
           }
         }
       ]
     }).compile();
+
     planChange = module.get(PlanChangeService);
     renewals = module.get(RenewalService);
     invoicing = module.get(UsageInvoicingService);
@@ -237,6 +241,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     planKey: string
   ): Promise<void> {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
     providerSubscriptionRef = `sub_${stamp}`;
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
@@ -245,6 +250,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
 
     const customer = await ds.getRepository(Customer).save(
@@ -258,6 +264,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
 
     const selfManaged = providerId === 'yookassa';
@@ -282,6 +289,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
         nextRenewalAttemptAt: null
       })
     );
+
     subscriptionId = subscription.id;
 
     // One hundred units, five days before the switch, on the plan in force then.
@@ -308,7 +316,9 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     const closes = emitted.filter(
       (e) => e.name === UsagePeriodClosedEvent.name
     );
+
     emitted = [];
+
     for (const close of closes) {
       await invoicing.invoiceClosedPeriod(
         close.payload as UsagePeriodClosedEvent
@@ -321,6 +331,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     const { planKey } = await ds
       .getRepository(Subscription)
       .findOneByOrFail({ id: subscriptionId });
+
     await reducer.reduce({
       provider: 'paddle',
       providerEventId: `evt-renew-${subscriptionId}`,
@@ -371,6 +382,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
         providerEventId: `renewal:${subscriptionId}:${periodEnd.getTime()}`
       }
     });
+
     expect(renewal.billingMode).toBe('usage');
     expect(renewal.amountMinor.toNumber()).toBe(0);
     expect(provider.chargeOffSession).not.toHaveBeenCalled();
@@ -383,6 +395,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     await planChange.changePlan(userId as string, FIXED_KEY);
 
     const [closing] = await usageInvoices();
+
     expect(closing).toMatchObject({
       providerEventId: `cancel:${subscriptionId}:${periodStart.getTime()}`,
       status: 'paid'
@@ -398,6 +411,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
         providerEventId: `renewal:${subscriptionId}:${periodEnd.getTime()}`
       }
     });
+
     expect(renewal.billingMode).toBe('fixed');
     expect(renewal.amountMinor.toNumber()).toBe(99000);
     expect(
@@ -443,6 +457,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
 
     expect(provider.chargeUsage).not.toHaveBeenCalled();
     const [close] = await usageInvoices();
+
     expect(close).toMatchObject({
       providerEventId: `usage:${subscriptionId}:${periodEnd.getTime()}`,
       status: 'paid'
@@ -467,6 +482,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
       chargeKey: expect.stringMatching(new RegExp(`^usage:${subscriptionId}:`))
     });
     const invoices = await usageInvoices();
+
     expect(invoices).toHaveLength(1);
     expect(invoices[0].status).toBe('pending');
     expect(invoices[0].amountMinor.toNumber()).toBe(200);
@@ -491,6 +507,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
     const row = await ds
       .getRepository(Subscription)
       .findOneByOrFail({ id: subscriptionId });
+
     expect(row).toMatchObject({ planKey: FIXED_KEY, billingMode: 'fixed' });
     expect(row.meteredFrom).not.toBeNull();
 
@@ -506,6 +523,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
       chargeKey: expect.stringMatching(new RegExp(`^usage:${subscriptionId}:`))
     });
     const invoices = await usageInvoices();
+
     expect(invoices).toHaveLength(1);
     expect(invoices[0].amountMinor.toNumber()).toBe(200);
   }, 30000);
@@ -526,6 +544,7 @@ runWithInfra('Metered window across a switch of billing mode (e2e)', () => {
 
     expect(provider.chargeUsage).toHaveBeenCalledTimes(1);
     const invoices = await usageInvoices();
+
     expect(invoices).toHaveLength(1);
     expect(invoices[0].amountMinor.toNumber()).toBe(200);
     expect(

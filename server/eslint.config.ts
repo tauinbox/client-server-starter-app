@@ -5,6 +5,7 @@ import prettierConfig from 'eslint-config-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
+import stylistic from '@stylistic/eslint-plugin';
 import baseRules from '../eslint.base.config.mjs';
 
 type RestrictedSyntax = { selector: string; message: string };
@@ -110,7 +111,7 @@ export default defineConfig(
     rules: { 'import-x/no-cycle': 'error' }
   },
   {
-    plugins: { unicorn },
+    plugins: { unicorn, '@stylistic': stylistic },
     rules: {
       ...baseRules,
       '@typescript-eslint/interface-name-prefix': 'off',
@@ -167,6 +168,15 @@ export default defineConfig(
     basePath: __dirname,
     files: ['src/**/*.spec.ts'],
     rules: { 'no-restricted-syntax': ['error', ...restrictedSyntax] }
+  },
+  {
+    // A migration is applied history, and Prettier skips this folder too.
+    basePath: __dirname,
+    files: ['src/migrations/**/*.ts'],
+    rules: {
+      '@stylistic/padding-line-between-statements': 'off',
+      '@stylistic/lines-between-class-members': 'off'
+    }
   },
   {
     basePath: __dirname,

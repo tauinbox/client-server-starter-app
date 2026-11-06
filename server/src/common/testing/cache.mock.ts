@@ -15,6 +15,7 @@ export function createMockCache(): Cache {
     get: jest.fn((key: string) => Promise.resolve(entries.get(key))),
     set: jest.fn((key: string, value: unknown) => {
       entries.set(key, value);
+
       return Promise.resolve(value);
     }),
     del: jest.fn((key: string) => Promise.resolve(entries.delete(key)))

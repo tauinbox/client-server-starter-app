@@ -54,6 +54,7 @@ async function search(
     q,
     ...(opts.includeDeleted ? { includeDeleted: 'true' } : {})
   });
+
   await page
     .getByRole('checkbox', { name: 'Include deleted users' })
     .setChecked(opts.includeDeleted);

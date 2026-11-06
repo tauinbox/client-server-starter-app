@@ -28,11 +28,13 @@ function createJwt(payload: Record<string, unknown>): string {
       .replaceAll('+', '-')
       .replaceAll('/', '_')
       .replace(/=+$/, '');
+
   return `${encode(header)}.${encode(payload)}.fake-signature`;
 }
 
 function createMockAuthResponse(): AuthResponse {
   const exp = Math.floor(Date.now() / 1000) + 3600;
+
   return {
     tokens: {
       access_token: createJwt({ sub: '1', email: 'test@example.com', exp }),
@@ -102,10 +104,12 @@ describe('TokenService', () => {
       const tokensPromise = firstValueFrom(service.refreshTokens());
 
       const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
+
       expect(req.request.body).toEqual({});
       req.flush(newAuth);
 
       const tokens = await tokensPromise;
+
       expect(tokens).toEqual(newAuth.tokens);
       expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(newAuth);
     });
@@ -116,12 +120,14 @@ describe('TokenService', () => {
       );
 
       const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
+
       req.flush(
         { message: 'Invalid refresh token' },
         { status: 401, statusText: 'Unauthorized' }
       );
 
       const error = await tokensPromise;
+
       expect(error.status).toBe(401);
       expect(authStoreMock.clearSession).not.toHaveBeenCalled();
     });
@@ -133,9 +139,11 @@ describe('TokenService', () => {
       const promise2 = firstValueFrom(service.refreshTokens());
 
       const req = httpMock.expectOne(AuthApiEnum.RefreshToken);
+
       req.flush(newAuth);
 
       const [tokens1, tokens2] = await Promise.all([promise1, promise2]);
+
       expect(tokens1).toEqual(newAuth.tokens);
       expect(tokens2).toEqual(newAuth.tokens);
     });
@@ -153,9 +161,11 @@ describe('TokenService', () => {
       await expect(supersededPromise).resolves.toBeNull();
 
       const joinedPromise = firstValueFrom(service.refreshTokens());
+
       httpMock.expectNone(AuthApiEnum.RefreshToken);
 
       const newAuth = createMockAuthResponse();
+
       currentReq.flush(newAuth);
 
       await expect(currentPromise).resolves.toEqual(newAuth.tokens);
@@ -251,8 +261,10 @@ describe('TokenService', () => {
 
     it('should announce the teardown before navigating away', () => {
       const router = TestBed.inject(Router);
+
       vi.spyOn(router, 'navigate').mockResolvedValue(true);
       const cleared = vi.fn();
+
       service.sessionCleared$.subscribe(cleared);
 
       service.forceLogout();
@@ -310,6 +322,7 @@ describe('TokenService', () => {
 
       const newAuth = createMockAuthResponse();
       const tokensPromise = firstValueFrom(service.refreshTokens());
+
       httpMock.expectOne(AuthApiEnum.RefreshToken).flush(newAuth);
 
       await expect(tokensPromise).resolves.toEqual(newAuth.tokens);

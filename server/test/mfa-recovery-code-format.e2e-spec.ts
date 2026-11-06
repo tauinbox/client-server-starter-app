@@ -37,6 +37,7 @@ runWithInfra('POST /auth/mfa/recovery code format (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -82,6 +83,7 @@ runWithInfra('POST /auth/mfa/recovery code format (e2e)', () => {
     const user = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     return mfaService.issuePendingToken(user).mfaToken;
   }
 
@@ -93,21 +95,25 @@ runWithInfra('POST /auth/mfa/recovery code format (e2e)', () => {
 
   it('signs in with a three-group code', async () => {
     const res = await recover(currentCode.toLowerCase());
+
     expect(res.status).toBe(200);
   }, 30000);
 
   it('signs in with a legacy two-group code', async () => {
     const res = await recover(legacyCode);
+
     expect(res.status).toBe(200);
 
     const stored = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     expect(stored.totpRecoveryCodes).toEqual([]);
   }, 30000);
 
   it('rejects a third group of the wrong length before it reaches the service', async () => {
     const res = await recover('ABCDEFGH-IJKLMNOP-QRST');
+
     expect(res.status).toBe(422);
     expect(JSON.stringify(res.body)).toContain(
       'recoveryCode must match /^[A-Za-z2-7]{8}-?[A-Za-z2-7]{8}(?:-?[A-Za-z2-7]{8})?$/ regular expression'

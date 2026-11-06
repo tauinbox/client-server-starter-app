@@ -37,10 +37,12 @@ describe('FeatureFlagResolverService', () => {
       get: jest.fn((k: string) => Promise.resolve(cacheStore.get(k))),
       set: jest.fn((k: string, v: unknown) => {
         cacheStore.set(k, v);
+
         return Promise.resolve();
       }),
       del: jest.fn((k: string) => {
         cacheStore.delete(k);
+
         return Promise.resolve();
       })
     };
@@ -111,6 +113,7 @@ describe('FeatureFlagResolverService', () => {
 
   it('buildResolverUser assembles the user record and roles', async () => {
     const user = await service.buildResolverUser('u1');
+
     expect(usersService.findOne).toHaveBeenCalledWith('u1', SYSTEM_ABILITY);
     expect(permissionService.getRoleNamesForUser).toHaveBeenCalledWith('u1');
     expect(user).toEqual({
@@ -126,6 +129,7 @@ describe('FeatureFlagResolverService', () => {
       new HttpException('User with ID u1 not found', HttpStatus.NOT_FOUND)
     );
     const user = await service.buildResolverUser('u1');
+
     expect(user).toEqual({
       userId: 'u1',
       email: null,
@@ -136,6 +140,7 @@ describe('FeatureFlagResolverService', () => {
 
   it('buildResolverUser rethrows a lookup error that is not a 404', async () => {
     const failure = new Error('connection terminated');
+
     usersService.findOne.mockRejectedValueOnce(failure);
     await expect(service.buildResolverUser('u1')).rejects.toBe(failure);
   });
@@ -196,6 +201,7 @@ describe('FeatureFlagResolverService', () => {
       { userId: 'u1', email: 'a@b.com', createdAt: null, roles: [] },
       fakeReq
     );
+
     expect(result.flags['a']).toBe(true);
     expect(typeof result.evaluatedAt).toBe('string');
   });
@@ -210,6 +216,7 @@ describe('FeatureFlagResolverService', () => {
       { userId: 'u1', email: 'a@b.com', createdAt: null, roles: [] },
       fakeReq
     );
+
     // Disabled non-public flag key must not leak to authenticated callers.
     expect('disabled-private' in result.flags).toBe(false);
     // Disabled-but-public stays present (its existence is intentionally visible).
@@ -278,6 +285,7 @@ describe('FeatureFlagResolverService', () => {
       { id: 'f2', key: 'priv', enabled: true, public: false }
     ]);
     const { result } = await service.evaluateAnonymous('anon-1', fakeReq);
+
     expect(result.flags['pub']).toBe(true);
     expect('priv' in result.flags).toBe(false);
   });
@@ -307,6 +315,7 @@ describe('FeatureFlagResolverService', () => {
         ]
       );
       const { issuedAnonId } = await service.evaluateAnonymous(null, fakeReq);
+
       expect(issuedAnonId).toBeNull();
     });
 
@@ -319,6 +328,7 @@ describe('FeatureFlagResolverService', () => {
         null,
         fakeReq
       );
+
       expect(issuedAnonId).toMatch(UUID);
       // percent 100: the flag is on only when the evaluation saw the new id.
       expect(result.flags['pub-pct']).toBe(true);
@@ -333,6 +343,7 @@ describe('FeatureFlagResolverService', () => {
         'held-id',
         fakeReq
       );
+
       expect(issuedAnonId).toBeNull();
       expect(result.flags['pub-pct']).toBe(true);
     });
@@ -348,6 +359,7 @@ describe('FeatureFlagResolverService', () => {
           [{ flagId: 'f1' }]
         );
         const { issuedAnonId } = await service.evaluateAnonymous(null, fakeReq);
+
         expect(issuedAnonId).toBeNull();
       }
     );
@@ -365,6 +377,7 @@ describe('FeatureFlagResolverService', () => {
         [{ flagId: 'f1', effect: 'exclude' }]
       );
       const { issuedAnonId } = await service.evaluateAnonymous(null, fakeReq);
+
       expect(issuedAnonId).toMatch(UUID);
     });
   });
@@ -393,6 +406,7 @@ describe('FeatureFlagResolverService', () => {
     function pickAnonId(fits: (bucket: number) => boolean): string {
       for (let i = 0; ; i++) {
         const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+
         if (fits(percentageBucket(id, 'dev-pct'))) return id;
       }
     }
@@ -404,6 +418,7 @@ describe('FeatureFlagResolverService', () => {
         null,
         fakeReq
       );
+
       expect(issuedAnonId).toBeNull();
       expect(result.flags['pct']).toBe(true);
     });
@@ -415,6 +430,7 @@ describe('FeatureFlagResolverService', () => {
         null,
         fakeReq
       );
+
       expect(issuedAnonId).toMatch(UUID);
       expect(result.flags['dev-pct']).toBe(true);
     });
@@ -423,6 +439,7 @@ describe('FeatureFlagResolverService', () => {
       seedFlags([{ id: 'f1', key: 'dev-pct' }], [deviceRule(50)]);
       const inside = await service.evaluateSignedIn(user, inId, fakeReq);
       const outside = await service.evaluateSignedIn(user, outId, fakeReq);
+
       expect(inside.result.flags).toEqual({ 'dev-pct': true });
       expect(inside.issuedAnonId).toBeNull();
       expect(outside.result.flags['dev-pct']).toBeUndefined();
@@ -439,6 +456,7 @@ describe('FeatureFlagResolverService', () => {
   it('invalidateAll makes the next evaluation reload the flags', async () => {
     seedFlags([{ id: 'f1', key: 'a', enabled: true }]);
     const user = { userId: 'u1', email: null, createdAt: null, roles: [] };
+
     await service.evaluateForUser(user, fakeReq);
 
     await service.invalidateAll();
@@ -450,11 +468,13 @@ describe('FeatureFlagResolverService', () => {
   it('concurrent evaluations share one DB load (single-flight)', async () => {
     const { promise: found, resolve: resolveFind } =
       Promise.withResolvers<Partial<FeatureFlag>[]>();
+
     flagRepo.find.mockReturnValue(found);
     ruleRepo.find.mockResolvedValue([]);
 
     const first = service.evaluateAnonymous('anon-1', fakeReq);
     const second = service.evaluateAnonymous('anon-2', fakeReq);
+
     resolveFind([
       { id: 'f1', key: 'pub', enabled: true, environments: [], public: true }
     ]);
@@ -468,10 +488,12 @@ describe('FeatureFlagResolverService', () => {
   it('a load overlapped by invalidateAll does not repopulate the all-flags cache', async () => {
     const { promise: found, resolve: resolveFind } =
       Promise.withResolvers<Partial<FeatureFlag>[]>();
+
     flagRepo.find.mockReturnValueOnce(found);
     ruleRepo.find.mockResolvedValue([]);
 
     const inFlight = service.evaluateAnonymous('anon-1', fakeReq);
+
     // Let the load pass its cache-miss check and reach the (pending) DB read
     // before invalidating, so the invalidation genuinely overlaps it.
     await new Promise((resolve) => setImmediate(resolve));
@@ -484,6 +506,7 @@ describe('FeatureFlagResolverService', () => {
     // The superseded load must not write pre-invalidation rows under the
     // version that readers now use.
     const version = String(cacheStore.get('featureflags:version'));
+
     expect(cacheStore.has(`featureflags:all:v${version}`)).toBe(false);
 
     // The next evaluation starts a fresh DB load instead of joining the
@@ -491,6 +514,7 @@ describe('FeatureFlagResolverService', () => {
     seedFlags([{ id: 'f2', key: 'fresh', enabled: true, public: true }]);
     flagRepo.find.mockClear();
     const { result } = await service.evaluateAnonymous('anon-1', fakeReq);
+
     expect(flagRepo.find).toHaveBeenCalledTimes(1);
     expect(result.flags['fresh']).toBe(true);
   });

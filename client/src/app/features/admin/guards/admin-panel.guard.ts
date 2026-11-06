@@ -18,8 +18,11 @@ export const adminPanelGuard: CanActivateFn = (route, state) => {
     state.url,
     () => {
       const enrolment = mfaEnrolmentRedirect(authStore, router);
+
       if (enrolment) return enrolment;
+
       if (canAccessAdminPanel(authStore)) return true;
+
       return router.createUrlTree([`/${AppRouteSegmentEnum.Forbidden}`]);
     }
   );

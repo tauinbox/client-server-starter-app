@@ -72,6 +72,7 @@ describe('ConfirmDialogComponent', () => {
       }).compileComponents();
 
       const noIconFixture = TestBed.createComponent(ConfirmDialogComponent);
+
       noIconFixture.detectChanges();
       expect(noIconFixture.componentInstance.data.icon).toBeUndefined();
     });

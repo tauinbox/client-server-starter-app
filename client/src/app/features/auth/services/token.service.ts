@@ -58,6 +58,7 @@ export class TokenService {
       }),
       shareReplay({ bufferSize: 1, refCount: true })
     );
+
     this.#refreshInFlight$ = inFlight$;
 
     return inFlight$;
@@ -67,6 +68,7 @@ export class TokenService {
     this.#refreshSubscription?.unsubscribe();
 
     const expiryTime = this.#authStore.getTokenExpiryTime();
+
     if (!expiryTime) return;
 
     const now = Date.now();
@@ -172,6 +174,7 @@ export class TokenService {
 
     this.#authStore.saveAuthResponse(response);
     this.scheduleTokenRefresh();
+
     return response.tokens;
   }
 }

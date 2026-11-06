@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -28,8 +29,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -48,6 +51,7 @@ async function send(
     },
     body: JSON.stringify(body)
   });
+
   return { status: res.status, body: (await res.json()) as ErrorBody };
 }
 
@@ -252,11 +256,14 @@ describe('validation-error envelope parity with server', () => {
           body: JSON.stringify({ userId: mockId('user-2'), planKey: 'pro' })
         }
       );
+
       expect(res.status).toBe(200);
       const invoice = getState()
         .billingInvoices.values()
         .find((i) => i.status === 'paid');
+
       if (!invoice) throw new Error('Activation produced no paid invoice');
+
       return invoice.id;
     }
 

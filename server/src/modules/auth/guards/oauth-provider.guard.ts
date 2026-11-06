@@ -36,7 +36,9 @@ export function createOAuthProviderGuard(
     async canActivate(context: ExecutionContext): Promise<boolean> {
       try {
         const result = super.canActivate(context);
+
         if (isObservable(result)) return firstValueFrom(result);
+
         return await result;
       } catch (error) {
         if (
@@ -46,6 +48,7 @@ export function createOAuthProviderGuard(
           // eslint-disable-next-line no-restricted-syntax -- a browser navigation, never read by the client error funnel
           throw new NotFoundException(`${displayName} OAuth is not configured`);
         }
+
         throw error;
       }
     }
@@ -72,6 +75,7 @@ export function createOAuthProviderGuard(
       if (err || !user) {
         const request = context.switchToHttp().getRequest<ExpressRequest>();
         const intents = this.cookies.claimedIntents(request);
+
         throw new OAuthAuthenticationFailedException(
           resolveErrorKey(request, intents),
           {
@@ -81,9 +85,11 @@ export function createOAuthProviderGuard(
           }
         );
       }
+
       return user as TUser;
     }
   }
+
   return OAuthProviderGuard;
 }
 
@@ -97,6 +103,7 @@ function resolveErrorKey(
   if (intents.reauth !== null) {
     return OAUTH_ERROR.REAUTH_FAILED;
   }
+
   return request.query?.['error'] === PROVIDER_CANCELLED_ERROR
     ? OAUTH_ERROR.CANCELLED
     : OAUTH_ERROR.AUTH_FAILED;

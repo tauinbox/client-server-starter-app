@@ -114,6 +114,7 @@ export class LinkedProvidersComponent {
   protected readonly visibleProviders = computed(() => {
     const flags = this.#flagsStore.flags();
     const linked = new Set(this.accounts().map((a) => a.provider));
+
     return OAUTH_PROVIDER_FLAGS.filter(
       (p) => flags[p.flagKey] === true || linked.has(p.provider)
     ).map((p) => p.provider);
@@ -131,6 +132,7 @@ export class LinkedProvidersComponent {
 
   protected readonly stepUpPromptLabel = computed(() => {
     const prompt = this.stepUpPrompt();
+
     return prompt ? this.#providerLabel(prompt.provider) : '';
   });
 
@@ -138,6 +140,7 @@ export class LinkedProvidersComponent {
     passwordRequired: 'auth.profile.stepUpPasswordRequired',
     codeRequired: 'auth.profile.stepUpCodeRequired'
   });
+
   readonly passwordModel = this.#stepUp.passwordModel;
   readonly passwordForm = this.#stepUp.passwordForm;
   readonly codeModel = this.#stepUp.codeModel;
@@ -153,8 +156,11 @@ export class LinkedProvidersComponent {
   constructor() {
     effect(() => {
       const change = this.resumeChange();
+
       if (!change || this.#resumed) return;
+
       this.#resumed = true;
+
       // The proof the trip earned is in place, so a link can start at the
       // provider the user picked before leaving, and an unlink needs no second
       // trip.
@@ -188,6 +194,7 @@ export class LinkedProvidersComponent {
 
     if (this.stepUpFactor() !== 'none') {
       this.#openStepUpPrompt(provider, 'link');
+
       return;
     }
 
@@ -208,6 +215,7 @@ export class LinkedProvidersComponent {
 
     if (this.stepUpFactor() !== 'none') {
       this.#openStepUpPrompt(provider, 'unlink');
+
       return;
     }
 
@@ -220,10 +228,12 @@ export class LinkedProvidersComponent {
   /** The step-up prompt on the provider controls, answered. */
   protected confirmStepUp(): void {
     const prompt = this.stepUpPrompt();
+
     if (!prompt || this.stepUpBlocked()) return;
 
     if (prompt.mode === 'link') {
       this.#startLink(prompt.provider, this.#stepUp.request());
+
       return;
     }
 
@@ -253,6 +263,7 @@ export class LinkedProvidersComponent {
         next: () => {
           this.#closeStepUpPrompt();
           this.#oauthIntent.start('/profile');
+
           if (this.#window) {
             this.#window.location.href = OAUTH_URLS[provider];
           }

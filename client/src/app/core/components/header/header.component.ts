@@ -54,6 +54,7 @@ export class HeaderComponent {
       dateStyle: 'short',
       timeStyle: 'short'
     }).format(new Date(BUILD_DATE));
+
     return `v${APP_VERSION} (${BUILD_HASH}) · ${builtAt}`;
   });
 

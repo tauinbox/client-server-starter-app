@@ -33,6 +33,7 @@ export class SessionLimitService {
         `Falling back to the default session limit for user ${userId}`,
         error as Error
       );
+
       return MAX_CONCURRENT_SESSIONS;
     }
   }

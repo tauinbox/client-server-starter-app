@@ -76,10 +76,14 @@ export class NxsChipsAutocompleteComponent {
   protected readonly filteredOptions = computed<ChipOption[]>(() => {
     const term = this.inputValue().trim().toLowerCase();
     const taken = new Set(this.selected().map((c) => c.value));
+
     return this.options().filter((opt) => {
       if (taken.has(opt.value)) return false;
+
       if (term.length === 0) return true;
+
       if (opt.label.toLowerCase().includes(term)) return true;
+
       return opt.sub ? opt.sub.toLowerCase().includes(term) : false;
     });
   });
@@ -91,22 +95,30 @@ export class NxsChipsAutocompleteComponent {
 
   protected addFromTokenEnd(event: MatChipInputEvent): void {
     const raw = event.value.trim();
+
     event.chipInput?.clear();
     this.inputValue.set('');
+
     if (!this.allowFreeText() || raw.length === 0) return;
+
     if (this.selected().some((c) => c.value === raw)) return;
+
     this.selectedChange.emit([...this.selected(), { value: raw, label: raw }]);
   }
 
   protected addFromOption(event: MatAutocompleteSelectedEvent): void {
     const option = event.option.value as ChipOption;
+
     this.#clearInput();
+
     if (this.selected().some((c) => c.value === option.value)) return;
+
     this.selectedChange.emit([...this.selected(), option]);
   }
 
   protected removeChip(option: ChipOption): void {
     const next = this.selected().filter((c) => c.value !== option.value);
+
     this.selectedChange.emit(next);
   }
 

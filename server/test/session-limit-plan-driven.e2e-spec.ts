@@ -59,16 +59,22 @@ function makeRefreshTokenRepoMock(store: Map<string, RefreshToken>): {
   const repo = {
     create: (data: Partial<RefreshToken>) => {
       const token = new RefreshToken();
+
       Object.assign(token, data);
+
       return token;
     },
     save: jest.fn((entity: RefreshToken) => {
       if (!entity.id) entity.id = `rt-${++idSeq}`;
+
       // Monotonic created_at: a same-millisecond tie would make oldest-first
       // ordering arbitrary and the eviction assertions meaningless.
       if (!entity.createdAt) entity.createdAt = new Date(++clock);
+
       if (entity.revoked === undefined) entity.revoked = false;
+
       store.set(entity.id, entity);
+
       return Promise.resolve(entity);
     }),
     count: jest.fn((opts: { where: { userId: string } }) =>
@@ -87,7 +93,9 @@ function makeRefreshTokenRepoMock(store: Map<string, RefreshToken>): {
                 0,
                 params.excess
               );
+
               for (const token of doomed) store.delete(token.id);
+
               return Promise.resolve({ affected: doomed.length });
             }
           })
@@ -95,6 +103,7 @@ function makeRefreshTokenRepoMock(store: Map<string, RefreshToken>): {
       })
     }))
   };
+
   // @ts-expect-error - partial RefreshToken repository fake: only used methods
   return { repo, excessSeen };
 }
@@ -155,6 +164,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
   beforeEach(async () => {
     tokens = new Map();
     const rt = makeRefreshTokenRepoMock(tokens);
+
     excessSeen = rt.excessSeen;
 
     // No customer row by default — the Free-tier path, which must fall back.
@@ -167,10 +177,12 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
       get: jest.fn((k: string) => Promise.resolve(cacheStore.get(k))),
       set: jest.fn((k: string, v: unknown) => {
         cacheStore.set(k, v);
+
         return Promise.resolve();
       }),
       del: jest.fn((k: string) => {
         cacheStore.delete(k);
+
         return Promise.resolve();
       })
     };
@@ -221,6 +233,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
             get: jest.fn(),
             getOrThrow: jest.fn((key: string) => {
               if (key === 'JWT_REFRESH_EXPIRATION') return '604800';
+
               throw new Error(`unexpected config key ${key}`);
             })
           }
@@ -321,6 +334,7 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
       userAgent: null,
       ipAddress: null
     });
+
     expect(typeof result.tokens.access_token).toBe('string');
 
     await signIn(MAX_CONCURRENT_SESSIONS + 2);

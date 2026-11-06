@@ -72,6 +72,7 @@ describe('SecretEncryptionService', () => {
       const payload = service.encrypt('JBSWY3DPEHPK3PXP');
       const parts = payload.split('.');
       const flipped = Buffer.from(parts[3], 'base64url');
+
       flipped[0] = flipped[0] ^ 0xff;
       parts[3] = flipped.toString('base64url');
 

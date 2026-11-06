@@ -13,6 +13,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -34,8 +35,10 @@ async function loginAsAdmin(): Promise<string> {
       password: 'Password1'
     })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -58,6 +61,7 @@ describe('User list/search filter-param validation parity with server', () => {
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors).toEqual([
         `${field} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`,
         `${field} must be a string`
@@ -76,6 +80,7 @@ describe('User list/search filter-param validation parity with server', () => {
 
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors).toEqual([
       `role must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`,
       'role must be a string',
@@ -111,6 +116,7 @@ describe('User list/search filter-param validation parity with server', () => {
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe(
         `${field} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`
       );
@@ -126,6 +132,7 @@ describe('User list/search filter-param validation parity with server', () => {
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe(`${field} must be a boolean value`);
     }
   );
@@ -151,6 +158,7 @@ describe('User list/search filter-param validation parity with server', () => {
     expect(withFilter.status).toBe(200);
     const filtered = (await withFilter.json()) as { data: unknown[] };
     const all = (await without.json()) as { data: unknown[] };
+
     expect(filtered.data.length).toBe(all.data.length);
   });
 
@@ -195,7 +203,9 @@ describe('User list/search filter-param validation parity with server', () => {
       const token = await loginAsAdmin();
       const [first, second] = seededIds();
       const deleted = getState().users.get(second);
+
       if (!deleted) throw new Error('seed user missing');
+
       deleted.deletedAt = new Date().toISOString();
 
       const live = await getUsers(
@@ -233,6 +243,7 @@ describe('User list/search filter-param validation parity with server', () => {
 
       expect(res.status).toBe(400);
       const body = (await res.json()) as { message: string };
+
       expect(body.message).toBe(message);
     });
 
@@ -247,6 +258,7 @@ describe('User list/search filter-param validation parity with server', () => {
       );
 
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors).toEqual([
         'each value in ids must be a UUID',
         `ids must contain no more than ${MAX_PAGE_SIZE} elements`
@@ -261,6 +273,7 @@ describe('User list/search filter-param validation parity with server', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { email: string }[] };
+
     expect(body.data.map((u) => u.email)).toEqual(['admin@example.com']);
   });
 
@@ -271,6 +284,7 @@ describe('User list/search filter-param validation parity with server', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { email: string }[] };
+
     expect(body.data.some((u) => u.email === 'admin@example.com')).toBe(true);
   });
 });

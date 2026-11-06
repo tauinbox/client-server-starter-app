@@ -33,6 +33,7 @@ function createQueryBuilder(affected: number): QueryBuilderMock {
     where: jest.fn().mockReturnThis(),
     execute: jest.fn().mockResolvedValue({ affected })
   };
+
   return qb;
 }
 
@@ -149,8 +150,10 @@ describe('FeatureFlagService', () => {
     it('returns the flag with rules ordered by createdAt', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
       const rule = { id: 'r1', flagId: 'flag-1' };
+
       ruleRepo.find.mockResolvedValueOnce([rule]);
       const result = await service.findOne('flag-1', SYSTEM_ABILITY);
+
       expect(result).toBe(sampleFlag);
       expect(result.rules).toEqual([rule]);
       expect(flagRepo.findOne).toHaveBeenCalledWith({
@@ -189,9 +192,11 @@ describe('FeatureFlagService', () => {
       createQueryBuilder: jest.fn(),
       ...overrides
     };
+
     dataSource.transaction.mockImplementation(
       (cb: (em: MockEm) => Promise<unknown>) => cb(em)
     );
+
     return em;
   }
 
@@ -220,6 +225,7 @@ describe('FeatureFlagService', () => {
         SYSTEM_ABILITY,
         actor
       );
+
       expect(result.id).toBe('new-id');
       expect(em.create).toHaveBeenCalledWith(
         FeatureFlag,
@@ -262,6 +268,7 @@ describe('FeatureFlagService', () => {
           .mockResolvedValueOnce({ ...sampleFlag, id: 'new-id' })
           .mockResolvedValue({})
       });
+
       await service.create(
         { key: 'beta-export', rules: [percentRule(25), percentRule(50)] },
         SYSTEM_ABILITY,
@@ -374,6 +381,7 @@ describe('FeatureFlagService', () => {
         .mockResolvedValueOnce({ ...sampleFlag })
         .mockResolvedValueOnce({ ...sampleFlag, enabled: true, version: 2 });
       const qb = createQueryBuilder(1);
+
       mockTransaction({ createQueryBuilder: jest.fn().mockReturnValue(qb) });
 
       await service.update(
@@ -402,6 +410,7 @@ describe('FeatureFlagService', () => {
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(0))
       });
+
       await expect(
         service.update(
           'flag-1',
@@ -431,6 +440,7 @@ describe('FeatureFlagService', () => {
         { enabled: true },
         { ifMatch: version(1), ability: SYSTEM_ABILITY, actor }
       );
+
       expect(qb.where).toHaveBeenCalledWith(
         'id = :id AND version = :expected',
         { id: 'flag-1', expected: 1 }
@@ -455,6 +465,7 @@ describe('FeatureFlagService', () => {
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(qb)
       });
+
       await service.update(
         'flag-1',
         { rules: [] },
@@ -472,6 +483,7 @@ describe('FeatureFlagService', () => {
       const em = mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(1))
       });
+
       await service.update(
         'flag-1',
         { enabled: true, rules: [percentRule(25)] },
@@ -520,11 +532,13 @@ describe('FeatureFlagService', () => {
     // A grant on flags of the `production` environment only.
     const scoped = (() => {
       const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
       for (const action of ['read', 'create', 'update', 'delete']) {
         builder.can(action, 'FeatureFlag', {
           environments: { $all: ['production'] }
         });
       }
+
       return builder.build();
     })();
     const refused = {
@@ -589,6 +603,7 @@ describe('FeatureFlagService', () => {
           conditions: { enabled: false }
         }
       ]);
+
       flagRepo.findOne.mockResolvedValue({ ...sampleFlag });
 
       await expect(
@@ -655,6 +670,7 @@ describe('FeatureFlagService', () => {
 
     it('evaluates against synthetic role context and returns included-by-rule', () => {
       const result = service.preview(previewFlag, { roles: ['beta'] });
+
       expect(result.result).toBe(true);
       expect(result.reason).toBe('included-by-rule');
       expect(result.matchedRule).toEqual({
@@ -669,6 +685,7 @@ describe('FeatureFlagService', () => {
         roles: ['beta'],
         env: 'staging'
       });
+
       expect(result).toEqual({
         result: false,
         reason: 'env-mismatch',
@@ -702,6 +719,7 @@ describe('FeatureFlagService', () => {
           }
         ]
       });
+
       expect(result.result).toBe(false);
       expect(result.matchedRule).toBeNull();
     });
@@ -719,6 +737,7 @@ describe('FeatureFlagService', () => {
           ]
         }
       );
+
       expect(result.result).toBe(true);
       expect(result.reason).toBe('included-by-rule');
       expect(result.matchedRule).toEqual({
@@ -730,6 +749,7 @@ describe('FeatureFlagService', () => {
 
     it('rejects a supplied rule payload the save path also rejects', () => {
       let error: unknown;
+
       try {
         service.preview(previewFlag, {
           rules: [
@@ -743,6 +763,7 @@ describe('FeatureFlagService', () => {
       } catch (e: unknown) {
         error = e;
       }
+
       expect(error).toMatchObject({
         status: 422,
         response: {
@@ -756,6 +777,7 @@ describe('FeatureFlagService', () => {
         roles: ['beta'],
         enabled: false
       });
+
       expect(result).toEqual({
         result: false,
         reason: 'disabled',
@@ -768,6 +790,7 @@ describe('FeatureFlagService', () => {
         roles: ['beta'],
         environments: ['staging']
       });
+
       expect(result).toEqual({
         result: false,
         reason: 'env-mismatch',
@@ -780,6 +803,7 @@ describe('FeatureFlagService', () => {
     it('removes the flag and audits its key in one transaction', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
       const em = mockTransaction();
+
       await service.delete('flag-1', SYSTEM_ABILITY, actor);
       expect(em.delete).toHaveBeenCalledWith(FeatureFlag, { id: 'flag-1' });
       expect(auditService.log).toHaveBeenCalledWith(

@@ -21,6 +21,7 @@ describe('FeatureFlagChangedListener', () => {
         { provide: NotificationsService, useValue: notifications }
       ]
     }).compile();
+
     listener = module.get(FeatureFlagChangedListener);
   });
 

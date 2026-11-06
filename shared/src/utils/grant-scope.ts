@@ -41,13 +41,16 @@ export interface GrantRefusal {
 
 function deepEquals(a: unknown, b: unknown): boolean {
   if (a === b) return true;
+
   if (typeof a !== typeof b) return false;
+
   if (a === null || b === null) return false;
 
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
       return false;
     }
+
     return a.every((item, i) => deepEquals(item, b[i]));
   }
 
@@ -55,7 +58,9 @@ function deepEquals(a: unknown, b: unknown): boolean {
     const aObj = a as Record<string, unknown>;
     const bObj = b as Record<string, unknown>;
     const aKeys = Object.keys(aObj);
+
     if (aKeys.length !== Object.keys(bObj).length) return false;
+
     return aKeys.every(
       (key) => Object.hasOwn(bObj, key) && deepEquals(aObj[key], bObj[key])
     );
@@ -73,6 +78,7 @@ function deepEquals(a: unknown, b: unknown): boolean {
  */
 function admittedValues(predicate: unknown): JsonScalar[] | null {
   if (isJsonScalar(predicate)) return [predicate];
+
   if (
     typeof predicate !== 'object' ||
     predicate === null ||
@@ -80,10 +86,15 @@ function admittedValues(predicate: unknown): JsonScalar[] | null {
   ) {
     return null;
   }
+
   const keys = Object.keys(predicate);
+
   if (keys.length !== 1 || keys[0] !== '$in') return null;
+
   const values = (predicate as { $in: unknown }).$in;
+
   if (!Array.isArray(values) || !values.every(isJsonScalar)) return null;
+
   return values;
 }
 
@@ -105,6 +116,7 @@ function predicateIsAtLeastAsNarrow(
 
   const callerValues = admittedValues(callerPredicate);
   const grantValues = admittedValues(grantPredicate);
+
   if (callerValues === null || grantValues === null) return false;
 
   return grantValues.every((value) =>
@@ -136,6 +148,7 @@ function grantIsContained(
 
 function holdsDeny(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(holdsDeny);
+
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -165,6 +178,7 @@ export function sameConditions(
   const normalise = (value: PermissionCondition | null | undefined): unknown =>
     // eslint-disable-next-line unicorn/prefer-structured-clone -- structuredClone keeps the undefined keys
     JSON.parse(JSON.stringify(value ?? null)) as unknown;
+
   return deepEquals(normalise(a), normalise(b));
 }
 
@@ -300,8 +314,10 @@ export function findGrantRefusal(
 
   for (const item of items) {
     const refused = grantItemRefusal(ability, item, ctx);
+
     if (refused) return refused;
   }
+
   return null;
 }
 
@@ -339,5 +355,6 @@ export function findLiftRefusal(
       });
     }
   }
+
   return null;
 }

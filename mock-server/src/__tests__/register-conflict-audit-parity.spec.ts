@@ -11,6 +11,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -46,6 +47,7 @@ describe('register conflict audit parity', () => {
     expect((await register(validBody)).status).toBe(201);
 
     const conflict = await register(validBody);
+
     expect(conflict.status).toBe(409);
     expect(await readErrorBody(conflict)).toEqual({
       message: 'User with this email already exists',
@@ -54,6 +56,7 @@ describe('register conflict audit parity', () => {
     });
 
     const rows = auditRows('USER_REGISTER_CONFLICT');
+
     expect(rows).toHaveLength(1);
     expect(rows[0].actorEmail).toBe('taken@example.com');
     expect(auditRows('USER_REGISTER')).toHaveLength(1);
@@ -100,6 +103,7 @@ describe('register conflict audit parity', () => {
       },
       body: JSON.stringify({ ...validBody, email: 'admin@example.com' })
     });
+
     expect(created.status).toBe(409);
 
     expect(auditRows('USER_REGISTER_CONFLICT')).toHaveLength(0);

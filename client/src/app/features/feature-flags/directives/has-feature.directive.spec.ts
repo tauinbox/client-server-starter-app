@@ -56,7 +56,9 @@ describe('HasFeatureDirective', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(host);
+
     fixture.detectChanges();
+
     return fixture;
   };
 
@@ -65,6 +67,7 @@ describe('HasFeatureDirective', () => {
     id: string
   ): string | null => {
     const root = fixture.nativeElement as HTMLElement;
+
     return (
       root
         .querySelector<HTMLElement>(`[data-testid="${id}"]`)
@@ -76,6 +79,7 @@ describe('HasFeatureDirective', () => {
     it('renders main template when flag is on', async () => {
       flagsSignal.set({ 'new-dashboard': true });
       const fixture = await configure(HostWithElseComponent);
+
       expect(text(fixture, 'active')).toBe('ACTIVE');
       expect(text(fixture, 'coming')).toBeNull();
     });
@@ -83,6 +87,7 @@ describe('HasFeatureDirective', () => {
     it('renders else template when flag is off', async () => {
       flagsSignal.set({ 'new-dashboard': false });
       const fixture = await configure(HostWithElseComponent);
+
       expect(text(fixture, 'active')).toBeNull();
       expect(text(fixture, 'coming')).toBe('COMING SOON');
     });
@@ -90,6 +95,7 @@ describe('HasFeatureDirective', () => {
     it('swaps templates when the underlying signal flips', async () => {
       flagsSignal.set({ 'new-dashboard': false });
       const fixture = await configure(HostWithElseComponent);
+
       expect(text(fixture, 'coming')).toBe('COMING SOON');
 
       flagsSignal.set({ 'new-dashboard': true });
@@ -102,6 +108,7 @@ describe('HasFeatureDirective', () => {
     it('reacts to the key input changing', async () => {
       flagsSignal.set({ a: true, b: false });
       const fixture = await configure(HostWithElseComponent);
+
       fixture.componentInstance.flagKey.set('a');
       fixture.detectChanges();
       expect(text(fixture, 'active')).toBe('ACTIVE');
@@ -117,12 +124,14 @@ describe('HasFeatureDirective', () => {
     it('renders nothing when flag is off', async () => {
       flagsSignal.set({ 'new-dashboard': false });
       const fixture = await configure(HostWithoutElseComponent);
+
       expect(text(fixture, 'active')).toBeNull();
     });
 
     it('renders the host template when flag is on', async () => {
       flagsSignal.set({ 'new-dashboard': true });
       const fixture = await configure(HostWithoutElseComponent);
+
       expect(text(fixture, 'active')).toBe('ACTIVE');
     });
   });

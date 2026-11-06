@@ -47,10 +47,13 @@ function statusMatches(
   expected: InvoiceCriteria['status']
 ): boolean {
   if (expected === undefined) return true;
+
   if (typeof expected === 'string') return row.status === expected;
+
   const allowed: string[] = Array.isArray(expected.value)
     ? expected.value
     : [expected.value];
+
   return allowed.includes(row.status ?? '');
 }
 
@@ -74,11 +77,14 @@ function makeInsertStore(invoices: RepoMock) {
           row.providerEventId === criteria.providerEventId) &&
         statusMatches(row, criteria.status)
     );
+
     for (const row of matched) {
       Object.assign(row, patch);
     }
+
     return { affected: matched.length };
   };
+
   invoices.update = jest.fn(
     (criteria: InvoiceCriteria, patch: Record<string, unknown>) =>
       Promise.resolve(applyInvoiceUpdate(criteria, patch))
@@ -108,12 +114,15 @@ function makeInsertStore(invoices: RepoMock) {
         options: { where?: InvoiceCriteria }
       ): Promise<unknown> => {
         if (entity !== Invoice) return Promise.resolve(null);
+
         const eventId = options.where?.providerEventId;
+
         if (eventId !== undefined) {
           return Promise.resolve(
             inserted.find((row) => row.providerEventId === eventId) ?? null
           );
         }
+
         return invoices.findOne(options) as Promise<unknown>;
       }
     ),
@@ -124,7 +133,9 @@ function makeInsertStore(invoices: RepoMock) {
           !statusMatches(row, criteria.status)
       );
       const affected = inserted.length - kept.length;
+
       inserted.splice(0, inserted.length, ...kept);
+
       return Promise.resolve({ affected });
     }),
     createQueryBuilder: () => {
@@ -134,6 +145,7 @@ function makeInsertStore(invoices: RepoMock) {
         into: () => builder,
         values: (v: InsertedInvoice) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
@@ -143,12 +155,17 @@ function makeInsertStore(invoices: RepoMock) {
           const dup = inserted.some(
             (i) => i.providerEventId === v.providerEventId
           );
+
           if (dup) return Promise.resolve({ raw: [] });
+
           const id = `inv-${++seq}`;
+
           inserted.push({ id, ...v });
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     }
   };
@@ -161,6 +178,7 @@ function makeInsertStore(invoices: RepoMock) {
   const restore = (rows: InsertedInvoice[]): void => {
     inserted.splice(0, inserted.length, ...rows);
   };
+
   return { inserted, manager, snapshot, restore };
 }
 
@@ -179,6 +197,7 @@ async function build() {
     manager: insertStore.manager,
     transaction: jest.fn(async (cb: (m: unknown) => unknown) => {
       const before = insertStore.snapshot();
+
       try {
         return await cb(insertStore.manager);
       } catch (error) {
@@ -287,6 +306,7 @@ describe('PlanChangeService', () => {
         business: businessPlan,
         usage: usagePlan
       };
+
       ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
         Promise.resolve(byKey[opts.where.key] ?? null)
       );
@@ -316,12 +336,14 @@ describe('PlanChangeService', () => {
       'refuses a self-managed change on %s, before any money moves',
       async (_case, overrides) => {
         const ctx = await build();
+
         plansByKey(ctx);
         ctx.customers.findOne.mockResolvedValue(customer);
         ctx.subscriptions.findOne.mockResolvedValue(
           makeSub({ planKey: 'usage', billingMode: 'usage', ...overrides })
         );
         const yoo = provider('yookassa', false);
+
         ctx.billing.getProviderById.mockReturnValue(yoo);
         const message =
           'The billing period has ended and its renewal is in progress. Try again shortly.';
@@ -345,6 +367,7 @@ describe('PlanChangeService', () => {
 
     it('lets a provider-managed row change after its local period end', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
       ctx.subscriptions.findOne.mockResolvedValue(
@@ -356,6 +379,7 @@ describe('PlanChangeService', () => {
         })
       );
       const paddle = provider('paddle', true);
+
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
       const result = await ctx.service.changePlan('user-1', 'business');
@@ -365,6 +389,7 @@ describe('PlanChangeService', () => {
 
     it('delegates a provider-managed change to the provider and updates the local row', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
       const sub = makeSub({
@@ -372,8 +397,10 @@ describe('PlanChangeService', () => {
         lifecycleOwner: 'provider',
         providerSubscriptionId: 'sub_ext'
       });
+
       ctx.subscriptions.findOne.mockResolvedValue(sub);
       const paddle = provider('paddle', true);
+
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
       const result = await ctx.service.changePlan('user-1', 'business');
@@ -400,6 +427,7 @@ describe('PlanChangeService', () => {
 
     it('upgrade (self-managed): charges the prorated difference, then refunds the remainder', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
@@ -412,6 +440,7 @@ describe('PlanChangeService', () => {
         billingMode: 'fixed'
       });
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       const result = await ctx.service.changePlan('user-1', 'business');
@@ -459,11 +488,13 @@ describe('PlanChangeService', () => {
 
     it('records an uncaptured proration charge as pending and defers InvoicePaid to the webhook', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
+
       yoo.chargeOffSession.mockResolvedValue({
         providerInvoiceRef: 'pay_change',
         status: 'pending'
@@ -494,6 +525,7 @@ describe('PlanChangeService', () => {
 
     it('downgrade caps the refund at the original invoice amount', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(
@@ -510,6 +542,7 @@ describe('PlanChangeService', () => {
         billingMode: 'fixed'
       });
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       await ctx.service.changePlan('user-1', 'pro');
@@ -535,6 +568,7 @@ describe('PlanChangeService', () => {
 
     it('charges and records both legs in the currency of the price, not the locale currency of the customer', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       // A non-Russian locale that chose the region "Russia": USD on the
       // customer row, RUB on every YooKassa price.
@@ -555,6 +589,7 @@ describe('PlanChangeService', () => {
         billingMode: 'fixed'
       });
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       await ctx.service.changePlan('user-1', 'business');
@@ -581,6 +616,7 @@ describe('PlanChangeService', () => {
 
     it('previews a trial switch in the currency of the target price', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue({
         ...customer,
@@ -598,9 +634,11 @@ describe('PlanChangeService', () => {
 
     it('fixed → usage refunds the remainder without charging', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       const sub = makeSub();
+
       ctx.subscriptions.findOne.mockResolvedValue(sub);
       ctx.invoices.findOne.mockResolvedValue({
         id: 'inv-period',
@@ -611,6 +649,7 @@ describe('PlanChangeService', () => {
         billingMode: 'fixed'
       });
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       const result = await ctx.service.changePlan('user-1', 'usage');
@@ -626,6 +665,7 @@ describe('PlanChangeService', () => {
 
     it('fixed → usage starts the metered window at the switch and bills nothing for it', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
@@ -649,19 +689,23 @@ describe('PlanChangeService', () => {
 
     it('usage → fixed bills the closing window under the outgoing plan, then moves it', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({ planKey: 'usage', billingMode: 'usage' })
       );
       const planAtClose: string[] = [];
+
       ctx.renewals.billClosingUsagePeriod.mockImplementation(
         (sub: Subscription) => {
           planAtClose.push(sub.planKey);
+
           return Promise.resolve();
         }
       );
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       const result = await ctx.service.changePlan('user-1', 'pro');
@@ -680,12 +724,14 @@ describe('PlanChangeService', () => {
 
     it('usage → fixed bills nothing when the prorated charge is declined', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({ planKey: 'usage', billingMode: 'usage' })
       );
       const yoo = provider('yookassa', false);
+
       yoo.chargeOffSession.mockRejectedValue(new Error('declined'));
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
@@ -709,6 +755,7 @@ describe('PlanChangeService', () => {
           }
         }
       });
+
       ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
         Promise.resolve(
           opts.where.key === 'usage'
@@ -720,6 +767,7 @@ describe('PlanChangeService', () => {
       );
       ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
       const switchedIn = new Date('2026-06-05T00:00:00Z');
+
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({
           planKey: 'usage',
@@ -758,6 +806,7 @@ describe('PlanChangeService', () => {
 
     it('a switch that keeps the billing mode leaves the metered window alone', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
       ctx.subscriptions.findOne.mockResolvedValue(
@@ -788,12 +837,14 @@ describe('PlanChangeService', () => {
 
     it('moves no money on a trial switch', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({ status: 'trialing', trialEnd: new Date('2026-06-25') })
       );
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       const result = await ctx.service.changePlan('user-1', 'business');
@@ -806,10 +857,12 @@ describe('PlanChangeService', () => {
 
     it('a declined charge aborts the switch with nothing moved', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       const yoo = provider('yookassa', false);
+
       yoo.chargeOffSession.mockRejectedValue(new Error('declined'));
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
@@ -824,6 +877,7 @@ describe('PlanChangeService', () => {
 
     it('guards: no subscription, same plan, past_due, scheduled cancel, missing provider price', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
 
@@ -867,6 +921,7 @@ describe('PlanChangeService', () => {
 
     it('serializes concurrent changes: the claim CAS loser is rejected with no second charge', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
@@ -879,6 +934,7 @@ describe('PlanChangeService', () => {
         refundedMinor: Money.fromMinor(0)
       });
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
       // First claim wins the compare-and-swap; the second misses (affected 0).
       ctx.subscriptions.update
@@ -894,6 +950,7 @@ describe('PlanChangeService', () => {
       const rejected = results.filter(
         (r): r is PromiseRejectedResult => r.status === 'rejected'
       );
+
       expect(rejected).toHaveLength(1);
       expectApiError(rejected[0].reason, ErrorKeys.BILLING.SUBSCRIPTION_BUSY);
       // The loser never reaches the provider, so the customer is charged once.
@@ -902,11 +959,13 @@ describe('PlanChangeService', () => {
 
     it('commits the charge invoice and the plan apply in one transaction — a commit failure announces nothing', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
       // The single local transaction fails after the provider charge succeeded.
       ctx.dataSource.transaction.mockImplementation(() => {
@@ -925,15 +984,19 @@ describe('PlanChangeService', () => {
 
     it('excludes its own charge leg from the refund source so it cannot refund itself', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
       let sourceWhere: Record<string, unknown> | undefined;
+
       ctx.invoices.findOne.mockImplementation(
         (options: { where: Record<string, unknown> }) => {
           sourceWhere = options.where;
+
           return Promise.resolve({
             id: 'inv-period',
             amountMinor: Money.fromMinor(99000),
@@ -961,14 +1024,17 @@ describe('PlanChangeService', () => {
 
     it('records the charge before asking the provider for the money', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
       let recordedWhenCharged: InsertedInvoice | undefined;
+
       yoo.chargeOffSession.mockImplementation(() => {
         recordedWhenCharged = { ...ctx.insertedInvoices[0] };
+
         return Promise.resolve({
           providerInvoiceRef: 'pay_change',
           status: 'captured'
@@ -988,11 +1054,13 @@ describe('PlanChangeService', () => {
 
     it('leaves the captured charge on the books when the closing transaction dies', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
       const applyUpdate =
         ctx.dataSource.manager.update.getMockImplementation() as (
@@ -1000,6 +1068,7 @@ describe('PlanChangeService', () => {
           criteria: unknown,
           patch: unknown
         ) => Promise<{ affected: number }>;
+
       // The request dies after the capture: a pool timeout, the provider
       // deadline unwinding the handler, a restart.
       ctx.dataSource.manager.update.mockImplementation(
@@ -1025,6 +1094,7 @@ describe('PlanChangeService', () => {
 
     it('a retry after the closing transaction died charges nothing again and refunds the same leg', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
@@ -1037,8 +1107,10 @@ describe('PlanChangeService', () => {
         status: 'paid',
         billingMode: 'fixed'
       };
+
       ctx.invoices.findOne.mockResolvedValue(source);
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
       const applyUpdate =
         ctx.dataSource.manager.update.getMockImplementation() as (
@@ -1046,6 +1118,7 @@ describe('PlanChangeService', () => {
           criteria: unknown,
           patch: unknown
         ) => Promise<{ affected: number }>;
+
       ctx.dataSource.manager.update.mockImplementationOnce(() =>
         Promise.reject(new Error('connection terminated'))
       );
@@ -1085,6 +1158,7 @@ describe('PlanChangeService', () => {
 
     it('gives the reservation back and drops the pending leg when the refund fails', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
@@ -1097,8 +1171,10 @@ describe('PlanChangeService', () => {
         status: 'paid',
         billingMode: 'fixed'
       };
+
       ctx.invoices.findOne.mockResolvedValue(source);
       const yoo = provider('yookassa', false);
+
       yoo.refund.mockRejectedValue(new Error('refund refused'));
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
@@ -1114,6 +1190,7 @@ describe('PlanChangeService', () => {
 
     it('keys the legs on the count of committed switches', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(
@@ -1129,6 +1206,7 @@ describe('PlanChangeService', () => {
         billingMode: 'fixed'
       });
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       await ctx.service.changePlan('user-1', 'business');
@@ -1148,11 +1226,13 @@ describe('PlanChangeService', () => {
 
     it('marks the planted row failed when the provider declines the card', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
+
       yoo.chargeOffSession.mockRejectedValue(new ChargeDeclinedError());
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
@@ -1169,11 +1249,13 @@ describe('PlanChangeService', () => {
 
     it('leaves the planted row pending when the charge outcome is unknown', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
+
       yoo.chargeOffSession.mockRejectedValue(
         new ProviderTimeoutError('yookassa', 'chargeOffSession', 20000)
       );
@@ -1190,6 +1272,7 @@ describe('PlanChangeService', () => {
 
     it('applies the switch as a guarded write of the plan columns and the switch counter, never as a whole-entity save', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
@@ -1221,11 +1304,13 @@ describe('PlanChangeService', () => {
 
     it('refuses the switch but keeps the money recorded when the row moved during the charge', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
       ctx.invoices.findOne.mockResolvedValue(null);
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
       // A cancel (or any guarded column change) landed while the charge was in
       // flight, so the apply finds no row matching the claim. Only the
@@ -1236,6 +1321,7 @@ describe('PlanChangeService', () => {
           criteria: unknown,
           patch: unknown
         ) => Promise<{ affected: number }>;
+
       ctx.dataSource.manager.update.mockImplementation(
         (target: unknown, criteria: unknown, patch: unknown) =>
           target === Subscription
@@ -1266,6 +1352,7 @@ describe('PlanChangeService', () => {
 
     it('rejects a provider-managed change whose local row moved during the provider call', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
       ctx.subscriptions.findOne.mockResolvedValue(
@@ -1289,6 +1376,7 @@ describe('PlanChangeService', () => {
 
     it('caps the proration refund by the source’s already-refunded amount', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
@@ -1301,6 +1389,7 @@ describe('PlanChangeService', () => {
         refundedMinor: Money.fromMinor(80000)
       });
       const yoo = provider('yookassa', false);
+
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
       await ctx.service.changePlan('user-1', 'business');
@@ -1321,6 +1410,7 @@ describe('PlanChangeService', () => {
 
     it('keeps the source paid when the full proration refund fails at the provider', async () => {
       const ctx = await build();
+
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(
@@ -1335,6 +1425,7 @@ describe('PlanChangeService', () => {
         billingMode: 'fixed'
       });
       const yoo = provider('yookassa', false);
+
       yoo.refund.mockRejectedValue(new Error('provider down'));
       ctx.billing.getProviderById.mockReturnValue(yoo);
 
@@ -1380,6 +1471,7 @@ describe('PlanChangeService', () => {
           prices: { yookassa: { currency: 'RUB', amountMinor: 290000 } }
         })
       };
+
       ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
         Promise.resolve(byKey[opts.where.key] ?? null)
       );
@@ -1421,6 +1513,7 @@ describe('PlanChangeService', () => {
 
     it('returns the computed split for a self-managed subscription', async () => {
       const ctx = await build();
+
       setupYoo(ctx);
       sourceOnly(ctx, periodInvoice(0));
       ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
@@ -1448,6 +1541,7 @@ describe('PlanChangeService', () => {
 
     it('caps the credit by what is still refundable on the source invoice', async () => {
       const ctx = await build();
+
       setupYoo(ctx);
       sourceOnly(ctx, periodInvoice(80000));
       ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
@@ -1464,6 +1558,7 @@ describe('PlanChangeService', () => {
 
     it('quotes nothing when the charge and the refund leg of an earlier attempt are settled', async () => {
       const ctx = await build();
+
       setupYoo(ctx);
       ctx.subscriptions.findOne.mockResolvedValue({
         ...(await ctx.subscriptions.findOne()),
@@ -1490,6 +1585,7 @@ describe('PlanChangeService', () => {
 
     it('shows no credit when no paid fixed invoice covers the period', async () => {
       const ctx = await build();
+
       setupYoo(ctx);
       ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
 
@@ -1527,6 +1623,7 @@ describe('PlanChangeService', () => {
           }
         })
       };
+
       ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
         Promise.resolve(byKey[opts.where.key] ?? null)
       );
@@ -1542,6 +1639,7 @@ describe('PlanChangeService', () => {
         cancelAtPeriodEnd: false
       });
       const paddle = provider('paddle', true);
+
       ctx.billing.getProviderById.mockReturnValue(paddle);
 
       const preview = await ctx.service.previewChange('user-1', 'business');

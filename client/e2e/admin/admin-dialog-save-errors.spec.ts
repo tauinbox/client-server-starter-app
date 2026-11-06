@@ -25,18 +25,23 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     const dialog = await openedDialog(page);
 
     const description = dialog.getByLabel('Description');
+
     await description.fill('Rolled out to the beta group');
     await dialog.getByRole('button', { name: 'Add rule' }).click();
     await dialog.getByRole('button', { name: 'Add rule' }).click();
     const ruleRows = dialog.locator('nxs-feature-flag-rule-row');
+
     await expect(ruleRows).toHaveCount(3);
 
     let patches = 0;
+
     await page.route('**/api/v1/admin/feature-flags/*', async (route) => {
       if (route.request().method() !== 'PATCH') {
         await route.fallback();
+
         return;
       }
+
       patches++;
       await route.fulfill({
         status: 409,
@@ -52,6 +57,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     await dialog.getByRole('button', { name: 'Save' }).click();
 
     const alert = dialog.getByRole('alert');
+
     await expect(alert).toHaveText(
       'Feature flag was modified by another request. Reload and retry.'
     );
@@ -72,6 +78,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/feature-flags');
     const row = page.getByRole('row', { name: /new-dashboard/ });
+
     await expect(row).toBeVisible();
 
     // A second admin changes the flag after the list was loaded.
@@ -98,13 +105,16 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
         body: JSON.stringify({ description: 'Changed by another admin' })
       }
     );
+
     expect(otherPatch.status).toBe(200);
 
     const editButton = row.getByRole('button', {
       name: /Edit flag new-dashboard/
     });
+
     await editButton.click();
     const dialog = await openedDialog(page);
+
     await dialog.getByLabel('Description').fill('Stale edit');
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog.getByRole('alert')).toHaveText(
@@ -116,6 +126,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     await editButton.click();
     const reopened = await openedDialog(page);
     const description = reopened.getByLabel('Description');
+
     await expect(description).toHaveValue('Changed by another admin');
     await description.fill('Edit on the current version');
     const save = page.waitForResponse(
@@ -123,6 +134,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
         r.request().method() === 'PATCH' &&
         r.url().includes('/api/v1/admin/feature-flags/')
     );
+
     await reopened.getByRole('button', { name: 'Save' }).click();
     expect((await save).status()).toBe(200);
     await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -140,6 +152,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     const dialog = await openedDialog(page);
 
     const name = dialog.getByLabel('Name');
+
     await name.fill('moderator');
     await dialog.getByLabel('Description').fill('Edits and moderates content');
     await dialog.getByRole('button', { name: 'Save' }).click();
@@ -164,13 +177,16 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
 
     await page.getByRole('button', { name: 'Edit resource Users' }).click();
     const dialog = await openedDialog(page);
+
     await dialog.getByLabel('Display name').fill('People');
 
     await page.route('**/api/v1/rbac/resources/*', async (route) => {
       if (route.request().method() !== 'PATCH') {
         await route.fallback();
+
         return;
       }
+
       await route.fulfill({
         status: 404,
         contentType: 'application/json',

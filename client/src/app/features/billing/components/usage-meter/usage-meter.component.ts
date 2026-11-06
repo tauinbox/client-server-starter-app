@@ -46,6 +46,7 @@ export class UsageMeterComponent {
 
   protected readonly includedPct = computed(() => {
     const { totalUnits, includedUnits } = this.usage();
+
     return (Math.min(totalUnits, includedUnits) / this.#scale()) * 100;
   });
 

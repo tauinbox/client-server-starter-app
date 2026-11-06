@@ -90,9 +90,13 @@ function isAttributeScalar(value: unknown): value is AttributeScalar {
 // only when the text round-trips exactly, keeping "007" and "1.50" strings.
 function parseAttributeScalar(raw: string): AttributeScalar {
   if (raw === 'true') return true;
+
   if (raw === 'false') return false;
+
   const num = Number(raw);
+
   if (Number.isFinite(num) && String(num) === raw) return num;
+
   return raw;
 }
 
@@ -153,8 +157,11 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   protected readonly userChips = computed<ChipOption[]>(() => {
     const { payload } = this.rule();
+
     if (payload.type !== 'user') return [];
+
     const cache = this.#userLabelCache();
+
     return payload.userIds.map(
       (id) => cache.get(id) ?? { value: id, label: id }
     );
@@ -162,8 +169,11 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   protected readonly roleChips = computed<ChipOption[]>(() => {
     const { payload } = this.rule();
+
     if (payload.type !== 'role') return [];
+
     const labels = this.#roleLabels();
+
     return payload.roleNames.map(
       (name) => labels.get(name) ?? { value: name, label: name }
     );
@@ -171,9 +181,12 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   protected readonly attrValueChips = computed<ChipOption[]>(() => {
     const { payload } = this.rule();
+
     if (payload.type !== 'attribute' || payload.op !== 'in') return [];
+
     const v = payload.value;
     const arr = Array.isArray(v) ? v : [];
+
     return arr
       .filter(isAttributeScalar)
       .map((x) => String(x))
@@ -185,21 +198,25 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   protected get percentValue(): number {
     const p = this.rule().payload;
+
     return p.type === 'percentage' ? p.percent : 0;
   }
 
   protected get bucketByValue(): FeatureFlagBucketBy {
     const p = this.rule().payload;
+
     return p.type === 'percentage' ? (p.bucketBy ?? 'user') : 'user';
   }
 
   protected get attributeField(): FeatureFlagAttributeField {
     const p = this.rule().payload;
+
     return p.type === 'attribute' ? p.field : 'email';
   }
 
   protected get attributeOp(): FeatureFlagAttributeOp {
     const p = this.rule().payload;
+
     return p.type === 'attribute' ? p.op : 'eq';
   }
 
@@ -209,37 +226,52 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   protected get attributeValueText(): string {
     const p = this.rule().payload;
+
     if (p.type !== 'attribute') return '';
+
     const v = p.value;
+
     if (Array.isArray(v)) return '';
+
     if (typeof v === 'string') return v;
+
     if (v === undefined || v === null) return '';
+
     return String(v);
   }
 
   protected get attributeCustomKey(): string {
     const p = this.rule().payload;
+
     return p.type === 'attribute' ? (p.customKey ?? '') : '';
   }
 
   protected get attributeDateValue(): Date | null {
     const p = this.rule().payload;
+
     if (p.type !== 'attribute') return null;
+
     if (p.op !== 'before' && p.op !== 'after') return null;
+
     if (typeof p.value !== 'string' || p.value.length === 0) return null;
+
     const d = new Date(p.value);
+
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
   protected readonly filteredCustomKeys = computed<string[]>(() => {
     const term = this.attributeCustomKey.trim().toLowerCase();
     const options = this.customKeyOptions();
+
     if (term === '') return [...options];
+
     return options.filter((key) => key.toLowerCase().includes(term));
   });
 
   protected readonly isDateOp = computed(() => {
     const p = this.rule().payload;
+
     return p.type === 'attribute' && (p.op === 'before' || p.op === 'after');
   });
 
@@ -254,11 +286,14 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
       .subscribe((users) => {
         const next = new Map(this.#userLabelCache());
         const chips: ChipOption[] = [];
+
         for (const u of users) {
           const chip = userToChip(u);
+
           next.set(chip.value, chip);
           chips.push(chip);
         }
+
         this.#userLabelCache.set(next);
         this.userOptions.set(chips);
       });
@@ -270,16 +305,22 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   #preloadUserLabelsFromExistingRule(): void {
     const { payload } = this.rule();
+
     if (payload.type !== 'user' || payload.userIds.length === 0) return;
+
     const cache = this.#userLabelCache();
     const missing = payload.userIds.filter((id) => !cache.has(id));
+
     if (missing.length === 0) return;
+
     // One page per chunk: a request per id spent the global rate limit of
     // the admin on a single large rule.
     const chunks: string[][] = [];
+
     for (let i = 0; i < missing.length; i += MAX_PAGE_SIZE) {
       chunks.push(missing.slice(i, i + MAX_PAGE_SIZE));
     }
+
     forkJoin(
       chunks.map((ids) =>
         this.#userService
@@ -296,22 +337,28 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((pages) => {
         const next = new Map(this.#userLabelCache());
+
         for (const u of pages.flat()) {
           const chip = userToChip(u);
+
           next.set(chip.value, chip);
         }
+
         this.#userLabelCache.set(next);
       });
   }
 
   #searchUsers(term: string) {
     const trimmed = term.trim();
+
     if (!isSearchableTerm(trimmed)) return of([] as User[]);
+
     return searchUsersPage(this.#userService, trimmed);
   }
 
   onTypeChange(type: FeatureFlagRuleType): void {
     const next: FeatureFlagRulePayload = this.#defaultPayloadFor(type);
+
     this.rule.set({ ...this.rule(), payload: next });
   }
 
@@ -321,7 +368,9 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   onUserChipsChange(chips: ChipOption[]): void {
     const cache = new Map(this.#userLabelCache());
+
     for (const c of chips) cache.set(c.value, c);
+
     this.#userLabelCache.set(cache);
     this.#updatePayload({
       type: 'user',
@@ -349,6 +398,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
           : 0;
     const snapped = Math.round(num / PERCENT_STEP) * PERCENT_STEP;
     const clamped = Math.max(0, Math.min(100, snapped));
+
     this.#updatePercentage({ percent: clamped });
   }
 
@@ -363,6 +413,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
     const bucketBy =
       partial.bucketBy ??
       (current.type === 'percentage' ? current.bucketBy : undefined);
+
     this.#updatePayload({
       type: 'percentage',
       percent,
@@ -388,6 +439,7 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
           ? (current.customKey ?? '')
           : ''
         : undefined;
+
     this.#updatePayload({
       type: 'attribute',
       field,
@@ -399,11 +451,15 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   onAttributeOpChange(op: FeatureFlagAttributeOp): void {
     const current = this.rule().payload;
+
     if (current.type !== 'attribute') return;
+
     let nextValue: unknown;
+
     if (op === 'in') {
       // Switching INTO `in`: preserve any existing scalar as the first chip.
       const existing = current.value;
+
       if (Array.isArray(existing)) nextValue = existing;
       else if (typeof existing === 'string')
         nextValue = existing.trim().length > 0 ? [existing.trim()] : [];
@@ -413,10 +469,12 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
       // Switching OUT of `in`: collapse first chip to a scalar so the new
       // single-input field has a sensible starting value.
       const arr = Array.isArray(current.value) ? current.value : [];
+
       nextValue = arr.length > 0 && isAttributeScalar(arr[0]) ? arr[0] : '';
     } else {
       nextValue = current.value;
     }
+
     this.#patchAttributePayload({ op, value: nextValue });
   }
 
@@ -426,27 +484,37 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
 
   onAttributeDateChange(date: Date | null): void {
     const current = this.rule().payload;
+
     if (current.type !== 'attribute') return;
+
     if (current.op !== 'before' && current.op !== 'after') return;
+
     const value =
       date instanceof Date && !Number.isNaN(date.getTime())
         ? date.toISOString()
         : '';
+
     this.#patchAttributePayload({ value });
   }
 
   onAttributeChipsChange(chips: ChipOption[]): void {
     const current = this.rule().payload;
+
     if (current.type !== 'attribute' || current.op !== 'in') return;
+
     // Map a chip back to the primitive it was rendered from, so an untouched
     // entry keeps its type and only a newly typed chip reaches the parser.
     const stored = new Map<string, AttributeScalar>();
     const arr = Array.isArray(current.value) ? current.value : [];
+
     for (const entry of arr) {
       if (!isAttributeScalar(entry)) continue;
+
       const text = String(entry);
+
       if (!stored.has(text)) stored.set(text, entry);
     }
+
     this.#patchAttributePayload({
       value: chips.map(
         (c) => stored.get(c.value) ?? parseAttributeScalar(c.value)
@@ -474,9 +542,12 @@ export class FeatureFlagRuleRowComponent implements OnInit, OnDestroy {
     partial: Partial<Pick<AttributePayload, 'op' | 'value' | 'customKey'>>
   ): void {
     const current = this.rule().payload;
+
     if (current.type !== 'attribute') return;
+
     const customKey =
       'customKey' in partial ? partial.customKey : current.customKey;
+
     this.#updatePayload({
       type: 'attribute',
       field: current.field,

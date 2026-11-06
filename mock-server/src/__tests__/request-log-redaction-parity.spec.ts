@@ -20,6 +20,7 @@ afterAll((done) => {
 
 it('writes the callback URL to the request log without the code or the state', async () => {
   const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+
   try {
     await fetch(
       `${baseUrl}/api/v1/auth/oauth/google/callback?state=s3cr3t-state&code=s3cr3t-code`
@@ -31,6 +32,7 @@ it('writes the callback URL to the request log without the code or the state', a
     const lines = log.mock.calls
       .map(([line]) => String(line))
       .filter((line) => line.startsWith('[HTTP]'));
+
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain(
       '/api/v1/auth/oauth/google/callback?state=REDACTED&code=REDACTED'

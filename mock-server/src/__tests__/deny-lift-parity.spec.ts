@@ -39,7 +39,9 @@ function permissionId(resource: string, action: string): string {
         p.resourceId === mockId(`res-${resource}`) &&
         p.actionId === mockId(`act-${action}`)
     );
+
   if (!permission) throw new Error(`Seed permission ${resource}/${action}`);
+
   return permission.id;
 }
 
@@ -49,6 +51,7 @@ beforeEach(() => {
   resetState();
   const state = getState();
   const now = '2025-01-01T00:00:00.000Z';
+
   for (const [id, name] of [
     [DELEGATED_ROLE_ID, 'delegated'],
     [RESTRICT_ROLE_ID, 'restrict']
@@ -63,12 +66,14 @@ beforeEach(() => {
       updatedAt: now
     });
   }
+
   const grants: [string, string][] = [
     ['users', 'update'],
     ['roles', 'update'],
     ['roles', 'assign'],
     ['roles', 'delete']
   ];
+
   for (const [resource, action] of grants) {
     state.rolePermissions.push({
       id: `rp-delegated-${resource}-${action}`,
@@ -77,16 +82,19 @@ beforeEach(() => {
       conditions: null
     });
   }
+
   state.rolePermissions.push({
     id: 'rp-restrict',
     roleId: RESTRICT_ROLE_ID,
     permissionId: updateUserId(),
     conditions: DENY_CEO
   });
+
   for (const user of state.users.values()) {
     if (user.email === RESTRICTED_EMAIL) {
       user.roles = ['user', 'delegated', 'restrict'];
     }
+
     if (user.email === UNRESTRICTED_EMAIL) {
       user.roles = ['user', 'delegated'];
     }
@@ -99,8 +107,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -118,6 +128,7 @@ async function call(
   });
   const text = await res.text();
   const parsed = text ? (JSON.parse(text) as { errorKey?: string }) : {};
+
   return { status: res.status, errorKey: parsed.errorKey };
 }
 
@@ -125,7 +136,9 @@ const userId = (email: string): string => {
   const user = getState()
     .users.values()
     .find((u) => u.email === email);
+
   if (!user) throw new Error(`Seed user ${email}`);
+
   return user.id;
 };
 
@@ -155,6 +168,7 @@ describe('deny lift parity with server', () => {
       const audit = getState().auditLogs.filter(
         (row) => row.action === 'PERMISSION_GRANT_DENIED'
       );
+
       expect(audit).toHaveLength(1);
       expect(audit[0]).toMatchObject({
         actorId: self,

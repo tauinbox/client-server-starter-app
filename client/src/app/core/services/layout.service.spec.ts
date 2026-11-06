@@ -22,8 +22,11 @@ describe('LayoutService', () => {
     observeSpy = vi.fn(
       (value: string | readonly string[]): Observable<BreakpointState> => {
         const query = Array.isArray(value) ? value[0] : (value as string);
+
         if (query === Breakpoints.Handset) return handsetSubject.asObservable();
+
         if (query === Breakpoints.Tablet) return tabletSubject.asObservable();
+
         return new BehaviorSubject<BreakpointState>(
           stateOf(false)
         ).asObservable();
@@ -42,16 +45,19 @@ describe('LayoutService', () => {
 
   it('should be created', () => {
     const service = TestBed.inject(LayoutService);
+
     expect(service).toBeTruthy();
   });
 
   it('should expose isHandset as false by default', () => {
     const service = TestBed.inject(LayoutService);
+
     expect(service.isHandset()).toBe(false);
   });
 
   it('should reflect handset matches from BreakpointObserver', () => {
     const service = TestBed.inject(LayoutService);
+
     expect(service.isHandset()).toBe(false);
 
     handsetSubject.next(stateOf(true));
@@ -63,6 +69,7 @@ describe('LayoutService', () => {
 
   it('should reflect tablet matches from BreakpointObserver', () => {
     const service = TestBed.inject(LayoutService);
+
     expect(service.isTablet()).toBe(false);
 
     tabletSubject.next(stateOf(true));
@@ -71,6 +78,7 @@ describe('LayoutService', () => {
 
   it('should derive isWeb as !isHandset && !isTablet', () => {
     const service = TestBed.inject(LayoutService);
+
     expect(service.isWeb()).toBe(true);
 
     handsetSubject.next(stateOf(true));

@@ -65,6 +65,7 @@ describe('jwtInterceptor', () => {
     http.get('/api/v1/users').subscribe();
 
     const req = httpMock.expectOne('/api/v1/users');
+
     expect(req.request.headers.get('Authorization')).toBe(
       'Bearer my-access-token'
     );
@@ -81,6 +82,7 @@ describe('jwtInterceptor', () => {
     TestBed.runInInjectionContext(() =>
       jwtInterceptor(original, (req) => {
         sent = req;
+
         return of(new HttpResponse());
       })
     ).subscribe();
@@ -97,6 +99,7 @@ describe('jwtInterceptor', () => {
     http.post('/api/v1/auth/login', { email: 'a', password: 'b' }).subscribe();
 
     const req = httpMock.expectOne('/api/v1/auth/login');
+
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({});
   });
@@ -107,6 +110,7 @@ describe('jwtInterceptor', () => {
     http.post('/api/v1/auth/register', {}).subscribe();
 
     const req = httpMock.expectOne('/api/v1/auth/register');
+
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({});
   });
@@ -117,6 +121,7 @@ describe('jwtInterceptor', () => {
     http.post('/api/v1/auth/refresh-token', {}).subscribe();
 
     const req = httpMock.expectOne('/api/v1/auth/refresh-token');
+
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({});
   });
@@ -127,6 +132,7 @@ describe('jwtInterceptor', () => {
     http.get('https://external.example.com/data').subscribe();
 
     const req = httpMock.expectOne('https://external.example.com/data');
+
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({});
   });
@@ -138,6 +144,7 @@ describe('jwtInterceptor', () => {
     http.get(url).subscribe();
 
     const req = httpMock.expectOne(url);
+
     expect(req.request.headers.get('Authorization')).toBe(
       'Bearer my-access-token'
     );
@@ -153,6 +160,7 @@ describe('jwtInterceptor', () => {
     });
 
     const req = httpMock.expectOne('https://external.example.com/data');
+
     req.flush(
       { message: 'Unauthorized' },
       { status: 401, statusText: 'Unauthorized' }
@@ -168,6 +176,7 @@ describe('jwtInterceptor', () => {
     http.get('/api/v1/users').subscribe();
 
     const req = httpMock.expectOne('/api/v1/users');
+
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush([]);
   });
@@ -179,12 +188,14 @@ describe('jwtInterceptor', () => {
       access_token: 'new-access-token',
       expires_in: 3600
     };
+
     tokenServiceMock.refreshTokens.mockReturnValue(of(newTokens));
 
     http.get('/api/v1/users').subscribe();
 
     // First request fails with 401
     const req = httpMock.expectOne('/api/v1/users');
+
     req.flush(
       { message: 'Unauthorized' },
       { status: 401, statusText: 'Unauthorized' }
@@ -192,6 +203,7 @@ describe('jwtInterceptor', () => {
 
     // Retry with new token
     const retryReq = httpMock.expectOne('/api/v1/users');
+
     expect(retryReq.request.headers.get('Authorization')).toBe(
       'Bearer new-access-token'
     );
@@ -207,6 +219,7 @@ describe('jwtInterceptor', () => {
     });
 
     const req = httpMock.expectOne('/api/v1/auth/login');
+
     req.flush(
       { message: 'Unauthorized' },
       { status: 401, statusText: 'Unauthorized' }
@@ -227,6 +240,7 @@ describe('jwtInterceptor', () => {
     });
 
     const req = httpMock.expectOne('/api/v1/auth/mfa/enable');
+
     // The route sits behind the session guard, so the header must survive.
     expect(req.request.headers.get('Authorization')).toBe(
       'Bearer my-access-token'
@@ -252,6 +266,7 @@ describe('jwtInterceptor', () => {
     });
 
     const req = httpMock.expectOne('/api/v1/auth/oauth/exchange');
+
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush(
       { message: 'Missing OAuth data' },
@@ -278,6 +293,7 @@ describe('jwtInterceptor', () => {
     });
 
     const req = httpMock.expectOne('/api/v1/users');
+
     req.flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(caughtError).toBe(true);
@@ -297,6 +313,7 @@ describe('jwtInterceptor', () => {
     });
 
     const req = httpMock.expectOne('/api/v1/users');
+
     req.flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(caughtError).toBe(true);
@@ -316,6 +333,7 @@ describe('jwtInterceptor', () => {
     });
 
     const req = httpMock.expectOne('/api/v1/users');
+
     req.flush({ message: statusText }, { status, statusText });
 
     expect(caughtError!.status).toBe(status);
@@ -331,6 +349,7 @@ describe('jwtInterceptor', () => {
     });
 
     const req = httpMock.expectOne('/api/v1/auth/logout');
+
     expect(req.request.headers.get('Authorization')).toBe(
       'Bearer my-access-token'
     );

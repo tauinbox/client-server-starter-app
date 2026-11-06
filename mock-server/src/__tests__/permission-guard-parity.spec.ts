@@ -20,6 +20,7 @@ const ROLES_RESOURCE_ID = mockId('res-roles');
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -38,8 +39,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -51,9 +54,11 @@ function permissionId(resourceSlug: string, actionSlug: string): string {
         p.resourceId === mockId(resourceSlug) &&
         p.actionId === mockId(actionSlug)
     );
+
   if (!permission) {
     throw new Error(`Seed permission ${resourceSlug}/${actionSlug} is missing`);
   }
+
   return permission.id;
 }
 
@@ -69,6 +74,7 @@ function delegateToRegularUser(
   }[]
 ): void {
   const state = getState();
+
   state.rolePermissions = [
     ...state.rolePermissions.filter((rp) => rp.roleId !== EDITOR_ROLE_ID),
     ...grants.map((grant, index) => ({
@@ -80,12 +86,15 @@ function delegateToRegularUser(
   ];
 
   const user = state.users.get(REGULAR_ID);
+
   if (!user) throw new Error('Seed user user@example.com is missing');
+
   user.roles = ['editor'];
 }
 
 async function readMessage(res: Response): Promise<string> {
   const body = (await res.json()) as { message?: string };
+
   return body.message ?? '';
 }
 
@@ -131,6 +140,7 @@ describe('permission-based route authorization', () => {
       const read = await fetch(`${baseUrl}/api/v1/users/${ADMIN_ID}`, {
         headers: { authorization: `Bearer ${token}` }
       });
+
       expect(read.status).toBe(200);
 
       const patch = await fetch(`${baseUrl}/api/v1/users/${ADMIN_ID}`, {
@@ -141,6 +151,7 @@ describe('permission-based route authorization', () => {
         },
         body: JSON.stringify({ name: 'Renamed' })
       });
+
       expect(patch.status).toBe(403);
       expect(await readMessage(patch)).toBe('Insufficient permissions');
     });
@@ -170,9 +181,11 @@ describe('permission-based route authorization', () => {
       }
 
       const allowed = await createRole('blessed');
+
       expect(allowed.status).toBe(201);
 
       const denied = await createRole('unblessed');
+
       expect(denied.status).toBe(403);
       expect(await readMessage(denied)).toBe('Insufficient permissions');
     });
@@ -230,7 +243,9 @@ describe('permission-based route authorization', () => {
     function seedOrdinaryTarget(): void {
       const state = getState();
       const template = state.users.get(REGULAR_ID);
+
       if (!template) throw new Error('Seed user user@example.com is missing');
+
       state.users.set(OTHER_ID, {
         ...template,
         id: OTHER_ID,
@@ -246,6 +261,7 @@ describe('permission-based route authorization', () => {
       }[]
     ): Promise<string> {
       delegateToRegularUser(grants);
+
       return login('user@example.com');
     }
 
@@ -303,6 +319,7 @@ describe('permission-based route authorization', () => {
           locale: 'ru'
         }
       });
+
       expect(allowed.status).toBe(201);
 
       await expectRefused(
@@ -376,6 +393,7 @@ describe('permission-based route authorization', () => {
         path: `/api/v1/users/${REGULAR_ID}`,
         body: { name: 'Renamed' }
       });
+
       expect(allowed.status).toBe(200);
 
       await expectRefused(
@@ -482,6 +500,7 @@ describe('permission-based route authorization', () => {
         path: `/api/v1/roles/${MODERATOR_ROLE_ID}`,
         body: { description: 'Renamed' }
       });
+
       expect(allowed.status).toBe(200);
 
       await expectRefused(
@@ -656,6 +675,7 @@ describe('permission-based route authorization', () => {
       // Orphaned, and offering no action, so the restore wakes no grant
       // and the widen check of a non-super caller passes.
       const usersResource = getState().resources.get(USERS_RESOURCE_ID)!;
+
       usersResource.isOrphaned = true;
       usersResource.allowedActionNames = [];
       expect(
@@ -687,6 +707,7 @@ describe('permission-based route authorization', () => {
         `${baseUrl}/api/v1/admin/feature-flags/cursor`,
         { headers: { authorization: `Bearer ${readOnly}` } }
       );
+
       expect(refused.status).toBe(403);
 
       delegateToRegularUser([
@@ -697,6 +718,7 @@ describe('permission-based route authorization', () => {
         `${baseUrl}/api/v1/admin/feature-flags/cursor`,
         { headers: { authorization: `Bearer ${searcher}` } }
       );
+
       expect(admitted.status).toBe(200);
     });
 
@@ -746,6 +768,7 @@ describe('permission-based route authorization', () => {
 
       expect(res.status).toBe(200);
       const resources = (await res.json()) as { name: string }[];
+
       expect(resources.map((r) => r.name).toSorted()).toEqual([
         'billing',
         'feature-flags',
@@ -765,6 +788,7 @@ describe('permission-based route authorization', () => {
 
       expect(res.status).toBe(200);
       const permissions = (await res.json()) as unknown[];
+
       // users 5 + roles 5 + permissions 2 + profile 1 + billing 4 + flags 5
       expect(permissions).toHaveLength(22);
     });
@@ -785,9 +809,11 @@ describe('permission-based route authorization', () => {
       const res = await fetch(`${baseUrl}/api/v1/users/${ADMIN_ID}`, {
         headers: { authorization: `Bearer ${token}` }
       });
+
       expect(res.status).toBe(403);
 
       const rows = denials();
+
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         actorId: REGULAR_ID,
@@ -823,9 +849,11 @@ describe('permission-based route authorization', () => {
         },
         body: JSON.stringify({ name: 'unblessed' })
       });
+
       expect(res.status).toBe(403);
 
       const rows = denials();
+
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         actorId: REGULAR_ID,
@@ -865,9 +893,11 @@ describe('permission-based route authorization', () => {
           body: JSON.stringify({ displayName: 'Renamed' })
         }
       );
+
       expect(res.status).toBe(403);
 
       const rows = denials();
+
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         actorId: REGULAR_ID,

@@ -53,6 +53,7 @@ describe('billingAvailableGuard', () => {
 
   it('awaits the flags load before evaluating', async () => {
     let flagValue = false;
+
     flagsMock.load.mockImplementation(async () => {
       flagValue = true;
     });

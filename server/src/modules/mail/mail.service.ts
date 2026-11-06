@@ -26,6 +26,7 @@ import {
  */
 function credentialChangeDetails(ip?: string): CredentialChangeDetails {
   const when = `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+
   return ip ? { when, ip } : { when };
 }
 
@@ -51,6 +52,7 @@ export class MailService {
     private readonly queue?: Queue<MailJobData>
   ) {
     const smtpHost = this.configService.get<string>('SMTP_HOST');
+
     this.clientUrl =
       this.configService.get<string>('CLIENT_URL') || 'http://localhost:4200';
     this.from =
@@ -76,6 +78,7 @@ export class MailService {
       // only break plaintext delivery. Certificate validation stays on
       // (nodemailer default rejectUnauthorized:true) to guard against MITM.
       const requireTLS = !secure && !!(user && pass);
+
       // The nodemailer default connectionTimeout is 2 min: with blocked egress
       // a send or a health verify holds its socket that long.
       this.transporter = nodemailer.createTransport({
@@ -111,6 +114,7 @@ export class MailService {
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const url = `${this.clientUrl}/verify-email?token=${rawToken}`;
+
     await this.send(email, mailMessages(loc).verification(url), loc);
   }
 
@@ -121,6 +125,7 @@ export class MailService {
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const url = `${this.clientUrl}/reset-password?token=${rawToken}`;
+
     await this.send(email, mailMessages(loc).passwordReset(url), loc);
   }
 
@@ -131,6 +136,7 @@ export class MailService {
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const url = `${this.clientUrl}/confirm-email-change?token=${rawToken}`;
+
     await this.send(newEmail, mailMessages(loc).emailChangeConfirm(url), loc);
   }
 
@@ -148,6 +154,7 @@ export class MailService {
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).emailChangeNotifyOld(maskEmail(newEmail));
+
     await this.send(oldEmail, message, loc);
   }
 
@@ -158,6 +165,7 @@ export class MailService {
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).emailChangeCompleted(newEmail);
+
     await this.send(oldEmail, message, loc);
   }
 
@@ -181,6 +189,7 @@ export class MailService {
       credentialChangeDetails(ip),
       stillLinked
     );
+
     await this.send(email, message, loc);
   }
 
@@ -194,6 +203,7 @@ export class MailService {
       provider,
       credentialChangeDetails(ip)
     );
+
     await this.send(email, message, loc);
   }
 
@@ -207,6 +217,7 @@ export class MailService {
       provider,
       credentialChangeDetails(ip)
     );
+
     await this.send(email, message, loc);
   }
 
@@ -217,6 +228,7 @@ export class MailService {
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).mfaEnabled(credentialChangeDetails(ip));
+
     await this.send(email, message, loc);
   }
 
@@ -227,6 +239,7 @@ export class MailService {
   ): Promise<void> {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).mfaDisabled(credentialChangeDetails(ip));
+
     await this.send(email, message, loc);
   }
 
@@ -239,6 +252,7 @@ export class MailService {
     const message = mailMessages(loc).mfaRecoveryCodesReplaced(
       credentialChangeDetails(ip)
     );
+
     await this.send(email, message, loc);
   }
 
@@ -251,6 +265,7 @@ export class MailService {
     const message = mailMessages(loc).mfaResetByAdmin(
       credentialChangeDetails(ip)
     );
+
     await this.send(email, message, loc);
   }
 
@@ -287,6 +302,7 @@ export class MailService {
   ): Promise<void> {
     if (this.useConsole) {
       const link = message.button ? `\n  Link: ${message.button.url}` : '';
+
       this.logger.log(`[MAIL] To: ${to} | ${message.subject}${link}`);
     }
 
@@ -313,6 +329,7 @@ export class MailService {
           error
         );
       }
+
       return;
     }
 

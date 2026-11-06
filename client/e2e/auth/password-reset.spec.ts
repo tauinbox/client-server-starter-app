@@ -69,6 +69,7 @@ test.describe('Password reset', () => {
     const tokenEntry = Object.entries(resetTokens).find(
       ([, userId]) => userId === mockId('user-2')
     );
+
     expect(tokenEntry).toBeTruthy();
     const [token] = tokenEntry!;
 
@@ -92,6 +93,7 @@ test.describe('Password reset', () => {
 
     // Login with the new password
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('user@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Quartz-Meadow-77');
@@ -132,6 +134,7 @@ test.describe('Password reset', () => {
     const tokenEntry = Object.entries(tokens.passwordResetTokens).find(
       ([, userId]) => userId === mockId('user-2')
     );
+
     expect(tokenEntry).toBeTruthy();
     const [token] = tokenEntry!;
 
@@ -218,6 +221,7 @@ test.describe('Password reset', () => {
     // Try to login with old password
     await page.goto('/login');
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('user@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');

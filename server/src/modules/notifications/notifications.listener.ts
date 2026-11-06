@@ -109,10 +109,13 @@ export class NotificationsListener {
     // the record before the change must learn of it, so that its list can
     // drop a user that left its scope.
     const user = await this.usersService.findByIdWithDeleted(userId);
+
     if (!user) return;
+
     const records = [user, ...(previous ? [previous] : [])].map((row) =>
       subject('User', row)
     );
+
     await this.notificationsService.pushToAuthorized(
       { type: 'user_crud_events', action, userId },
       (ability) => records.some((record) => ability.can('search', record)),

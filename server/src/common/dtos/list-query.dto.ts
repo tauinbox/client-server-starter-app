@@ -100,20 +100,24 @@ export function ListQueryDto<S extends ListQuerySpec>(
       `Case-insensitive substring search across ${spec.search.join(', ')}. Combined with the other filters via AND.`
     )(target, 'q');
   }
+
   for (const [name, definition] of Object.entries(spec.filters)) {
     FILTER_DECORATORS[definition.kind](name, definition)(target, name);
   }
+
   if (!spec.params) return ListQueryHost;
 
   // The params sit on a subclass: class-validator reports the own properties
   // of a class before the inherited ones, so they come before `q`.
   class ListParamsHost extends ListQueryHost {}
+
   for (const [name, definition] of Object.entries(spec.params)) {
     FILTER_DECORATORS[definition.kind](name, definition)(
       ListParamsHost.prototype,
       name
     );
   }
+
   return ListParamsHost;
 }
 
@@ -130,6 +134,7 @@ export function ListCursorQueryDto<S extends ListQuerySpec>(
   spec: S
 ): Type<ListCursorQuery<S>> {
   const listParams: Type<object> = ListQueryDto(spec);
+
   class ListCursorQueryHost extends IntersectionType(
     CursorPaginationQueryDto,
     listParams
@@ -139,6 +144,7 @@ export function ListCursorQueryDto<S extends ListQuerySpec>(
     IsOptional(),
     ApiPropertyOptional({ default: DEFAULT_SORT_BY, enum: spec.sort })
   )(ListCursorQueryHost.prototype, 'sortBy');
+
   // TypeScript cannot extend an intersection over a generic `spec`, so the
   // list params of the class are typed here; ListQueryDto(spec) declares them.
   return ListCursorQueryHost as Type<ListCursorQuery<S>>;

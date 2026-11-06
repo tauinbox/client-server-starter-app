@@ -54,6 +54,7 @@ describe('deepEqual', () => {
 
   it('compares non-plain objects by reference only', () => {
     const date = new Date('2026-05-19T10:00:00Z');
+
     expect(deepEqual(date, date)).toBe(true);
     expect(deepEqual(date, new Date('2026-05-19T10:00:00Z'))).toBe(false);
   });

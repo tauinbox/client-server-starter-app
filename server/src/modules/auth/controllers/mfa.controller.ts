@@ -75,6 +75,7 @@ export class MfaController {
       req.user.userId,
       SYSTEM_ABILITY
     );
+
     // A stolen session must not be able to enrol a device of its own, which
     // would lock the owner out of their own account.
     await this.authService.assertStepUp(user, {
@@ -85,7 +86,9 @@ export class MfaController {
     });
 
     const enrolment = await this.mfaService.beginEnrolment(user);
+
     this.cookies.clearReauthProof(res);
+
     return enrolment;
   }
 
@@ -108,6 +111,7 @@ export class MfaController {
       req.user.userId,
       SYSTEM_ABILITY
     );
+
     return await this.mfaService.completeEnrolment(
       user,
       dto.code,
@@ -130,6 +134,7 @@ export class MfaController {
       req.user.userId,
       SYSTEM_ABILITY
     );
+
     await this.authService.assertStepUp(user, {
       currentPassword: dto.currentPassword,
       reauthProof: this.cookies.readReauthProof(req),
@@ -140,6 +145,7 @@ export class MfaController {
 
     await this.mfaService.disable(user, extractAuditContext(req));
     this.cookies.clearReauthProof(res);
+
     return { message: 'Two-factor authentication has been turned off' };
   }
 
@@ -161,6 +167,7 @@ export class MfaController {
       req.user.userId,
       SYSTEM_ABILITY
     );
+
     await this.authService.assertStepUp(user, {
       currentPassword: dto.currentPassword,
       reauthProof: this.cookies.readReauthProof(req),
@@ -173,7 +180,9 @@ export class MfaController {
       user,
       extractAuditContext(req)
     );
+
     this.cookies.clearReauthProof(res);
+
     return codes;
   }
 

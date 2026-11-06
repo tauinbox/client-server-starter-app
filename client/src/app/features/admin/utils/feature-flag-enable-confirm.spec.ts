@@ -26,11 +26,13 @@ describe('confirmEnableForEveryone', () => {
 
   function dialogReturning(answer: boolean | undefined) {
     const openConfirm = vi.fn((_data: ConfirmDialogData) => of(answer));
+
     return { openConfirm };
   }
 
   it('asks with the translated texts and the flag key', async () => {
     const dialog = dialogReturning(true);
+
     await firstValueFrom(confirmEnableForEveryone(dialog, transloco, 'beta'));
     expect(dialog.openConfirm).toHaveBeenCalledWith({
       title: 'admin.featureFlags.confirmEnableNoRulesTitle',
@@ -48,6 +50,7 @@ describe('confirmEnableForEveryone', () => {
     const result = await firstValueFrom(
       confirmEnableForEveryone(dialogReturning(answer), transloco, 'beta')
     );
+
     expect(result).toBe(expected);
   });
 });

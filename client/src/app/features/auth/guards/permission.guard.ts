@@ -22,8 +22,11 @@ export function permissionGuard(
       state.url,
       () => {
         const enrolment = mfaEnrolmentRedirect(authStore, router);
+
         if (enrolment) return enrolment;
+
         if (authStore.hasPermissions({ action, subject })) return true;
+
         return router.createUrlTree([`/${AppRouteSegmentEnum.Forbidden}`]);
       }
     );

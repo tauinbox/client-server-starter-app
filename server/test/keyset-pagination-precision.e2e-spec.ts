@@ -99,6 +99,7 @@ runWithInfra('keyset pagination sort-column precision (e2e)', () => {
     'walks %s pages over the same rows a plain ORDER BY returns',
     async (sortOrder) => {
       const expected = await expectedIds(sortOrder);
+
       expect(expected).toHaveLength(ROW_COUNT);
 
       const paged = await pageThrough(sortOrder);

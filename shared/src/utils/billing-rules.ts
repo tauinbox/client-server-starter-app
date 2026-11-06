@@ -34,7 +34,9 @@ export function overrideForRegion(
   region: BillingRegion
 ): BillingProviderId | null {
   if (region === 'ru') return 'yookassa';
+
   if (region === 'world') return 'paddle';
+
   return null;
 }
 
@@ -43,7 +45,9 @@ export function regionForOverride(
   override: BillingProviderId | null
 ): BillingRegion {
   if (override === 'yookassa') return 'ru';
+
   if (override === 'paddle') return 'world';
+
   return 'auto';
 }
 
@@ -59,6 +63,7 @@ export function meteredWindowStart<T extends Instant>(subscription: {
   meteredFrom?: T | null;
 }): T {
   const { currentPeriodStart, meteredFrom } = subscription;
+
   return meteredFrom && epochMs(meteredFrom) > epochMs(currentPeriodStart)
     ? meteredFrom
     : currentPeriodStart;
@@ -76,6 +81,7 @@ export function usageIngestStart<T extends Instant>(subscription: {
 }): T {
   const windowStart = meteredWindowStart(subscription);
   const { usageSealedUntil } = subscription;
+
   return usageSealedUntil && epochMs(usageSealedUntil) > epochMs(windowStart)
     ? usageSealedUntil
     : windowStart;
@@ -129,6 +135,7 @@ export function rateUsage(input: UsageRatingInput): RatedUsage {
     billableUnits
   );
   const chargedUnits = billableUnits - creditUnitsApplied;
+
   return {
     includedUnits,
     unitPriceMinor,

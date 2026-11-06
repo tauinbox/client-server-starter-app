@@ -112,13 +112,16 @@ function makePlan(): Plan {
  */
 function readSubscription(store: Store, id: unknown): Subscription | null {
   const row = store.subscriptions.find((s) => s.id === id);
+
   return row ? Object.assign(new Subscription(), row) : null;
 }
 
 /** A `status: In([...])` criterion arrives as a FindOperator; unwrap it. */
 function criterionStatuses(criterion: unknown): string[] | null {
   if (criterion === undefined) return null;
+
   if (typeof criterion === 'string') return [criterion];
+
   return (criterion as { value: string[] }).value ?? [];
 }
 
@@ -127,6 +130,7 @@ function matchesSubscription(
   criteria: Record<string, unknown>
 ): boolean {
   const statuses = criterionStatuses(criteria['status']);
+
   return (
     s.id === criteria['id'] &&
     (criteria['currentPeriodEnd'] === undefined ||
@@ -148,12 +152,15 @@ function updateSubscriptions(
   const match = store.subscriptions.find((s) =>
     matchesSubscription(s, criteria)
   );
+
   if (match) Object.assign(match, values);
+
   return Promise.resolve({ affected: match ? 1 : 0 });
 }
 
 function makeManager(store: Store) {
   let seq = 0;
+
   return {
     findOne: (
       entity: unknown,
@@ -162,6 +169,7 @@ function makeManager(store: Store) {
       if (entity === Subscription) {
         return Promise.resolve(readSubscription(store, opts.where.id));
       }
+
       if (entity === Invoice) {
         return Promise.resolve(
           store.invoices.find(
@@ -172,11 +180,14 @@ function makeManager(store: Store) {
           ) ?? null
         );
       }
+
       return Promise.resolve(null);
     },
     save: (entity: Subscription) => {
       const row = store.subscriptions.find((s) => s.id === entity.id);
+
       if (row) Object.assign(row, entity);
+
       return Promise.resolve(entity);
     },
     update: (
@@ -185,9 +196,11 @@ function makeManager(store: Store) {
       values: Record<string, unknown>
     ) => {
       const statuses = criterionStatuses(criteria['status']);
+
       if (entity === Subscription) {
         return updateSubscriptions(store, criteria, values);
       }
+
       if (entity === Invoice) {
         const matches = store.invoices.filter(
           (i) =>
@@ -196,9 +209,12 @@ function makeManager(store: Store) {
             (criteria['id'] === undefined || i.id === criteria['id']) &&
             (statuses === null || statuses.includes(i.status))
         );
+
         matches.forEach((i) => Object.assign(i, values));
+
         return Promise.resolve({ affected: matches.length });
       }
+
       return Promise.resolve({ affected: 0 });
     },
     createQueryBuilder: () => {
@@ -208,6 +224,7 @@ function makeManager(store: Store) {
         into: () => builder,
         values: (v: Record<string, unknown>) => {
           captured.values = v;
+
           return builder;
         },
         orIgnore: () => builder,
@@ -217,17 +234,22 @@ function makeManager(store: Store) {
           const dup = store.invoices.some(
             (i) => i.providerEventId === v['providerEventId']
           );
+
           if (dup) return Promise.resolve({ raw: [] });
+
           const id = `inv-${++seq}`;
           // @ts-expect-error - partial Invoice fake assembled from insert().values()
           const row: Invoice & { providerEventId: string | null } = {
             id,
             ...v
           };
+
           store.invoices.push(row);
+
           return Promise.resolve({ raw: [{ id }] });
         }
       };
+
       return builder;
     }
   };
@@ -239,7 +261,9 @@ function subscriptionsRepo(store: Store) {
       Promise.resolve(readSubscription(store, opts.where.id)),
     save: (entity: Subscription) => {
       const row = store.subscriptions.find((s) => s.id === entity.id);
+
       if (row) Object.assign(row, entity);
+
       return Promise.resolve(entity);
     },
     update: (
@@ -251,6 +275,7 @@ function subscriptionsRepo(store: Store) {
       const qb = {
         innerJoin: (_entity: unknown, _alias: string, condition: string) => {
           store.capturedJoins.push(condition);
+
           return qb;
         },
         where: () => qb,
@@ -259,6 +284,7 @@ function subscriptionsRepo(store: Store) {
         orderBy: () => qb,
         limit: (n: number) => {
           take = n;
+
           return qb;
         },
         // Mirrors the non-time WHERE clauses (self + fixed + open status), the
@@ -271,6 +297,7 @@ function subscriptionsRepo(store: Store) {
               const customer = store.customers.find(
                 (c) => c.id === s.customerId
               );
+
               return (
                 s.lifecycleOwner === 'self' &&
                 ['trialing', 'active', 'past_due'].includes(s.status) &&
@@ -282,9 +309,11 @@ function subscriptionsRepo(store: Store) {
               (a, b) =>
                 a.currentPeriodEnd.getTime() - b.currentPeriodEnd.getTime()
             );
+
           return Promise.resolve(take === null ? rows : rows.slice(0, take));
         }
       };
+
       return qb;
     }
   };
@@ -365,6 +394,7 @@ async function build(
                 total: String((await usageSum()) ?? 0)
               })
             };
+
             return qb;
           }
         }
@@ -488,6 +518,7 @@ describe('RenewalService', () => {
     async (outcome, status) => {
       const sub = makeSub();
       const store = baseStore(sub);
+
       // A non-Russian locale that chose the region "Russia".
       Object.assign(store.customers[0], {
         country: 'US',
@@ -521,6 +552,7 @@ describe('RenewalService', () => {
   it('books the closing charge of an immediate usage cancel in the currency of the price', async () => {
     const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
     const store = baseStore(sub);
+
     store.customers[0].currency = 'USD';
     store.plans.push(
       Object.assign(makePlan(), {
@@ -565,6 +597,7 @@ describe('RenewalService', () => {
     const stalled = makeSub();
     const next = makeSub({ id: 'sub-2', customerId: 'cust-2' });
     const store = baseStore(stalled);
+
     store.subscriptions.push(next);
     store.customers.push(
       Object.assign(makeCustomer(), { id: 'cust-2', userId: 'user-2' })
@@ -606,6 +639,7 @@ describe('RenewalService', () => {
       makeSub({ id: `sub-${i + 1}` })
     );
     const store = baseStore(subs[0]);
+
     store.subscriptions = subs;
     const charge = jest
       .fn()
@@ -622,6 +656,7 @@ describe('RenewalService', () => {
       expect.stringContaining('per-run ceiling')
     );
     const overflow = subs.slice(RENEWAL_SCAN_MAX_PER_RUN);
+
     overflow.forEach((s) => {
       expect(s.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
     });
@@ -679,10 +714,12 @@ describe('RenewalService', () => {
         .mockResolvedValue({ providerInvoiceRef: 'pay', status: 'captured' });
       const { service } = await build(store, charge);
       const ends: string[] = [];
+
       for (let i = 0; i < periods; i++) {
         await service.runDueRenewals(sub.currentPeriodEnd);
         ends.push(sub.currentPeriodEnd.toISOString());
       }
+
       return ends;
     }
 
@@ -719,6 +756,7 @@ describe('RenewalService', () => {
 
       await service.runDueRenewals(sub.currentPeriodEnd);
       const firstEnd = sub.currentPeriodEnd;
+
       await service.runDueRenewals(sub.currentPeriodEnd);
 
       expect(store.invoices).toHaveLength(2);
@@ -805,6 +843,7 @@ describe('RenewalService', () => {
       const keys = charge.mock.calls.map(
         (call: [unknown, { idempotencyKey?: string }]) => call[1].idempotencyKey
       );
+
       expect(keys[0]).toEqual(expect.any(String));
       expect(keys[1]).toBe(keys[0]);
       expect(sub.status).toBe('active');
@@ -817,6 +856,7 @@ describe('RenewalService', () => {
         nextRenewalAttemptAt: new Date('2026-06-07T00:00:00Z')
       });
       const store = baseStore(sub);
+
       store.invoices.push(priorInvoice());
       const charge = jest.fn();
       const findCharge = jest.fn().mockResolvedValue({
@@ -855,6 +895,7 @@ describe('RenewalService', () => {
         nextRenewalAttemptAt: new Date('2026-06-07T00:00:00Z')
       });
       const store = baseStore(sub);
+
       store.invoices.push(priorInvoice());
       const charge = jest.fn();
       const findCharge = jest.fn().mockRejectedValue(new Error('api down'));
@@ -945,6 +986,7 @@ describe('RenewalService', () => {
   it('does not sweep a self-managed subscription whose owning user is soft-deleted', async () => {
     const sub = makeSub();
     const store = baseStore(sub);
+
     store.deletedUserIds.add('user-1');
     const charge = jest.fn();
     const { service } = await build(store, charge);
@@ -1034,11 +1076,13 @@ describe('RenewalService', () => {
     const { promise: gate, resolve: openGate } = Promise.withResolvers<void>();
     const charge = jest.fn(() => {
       charging();
+
       return gate.then<never>(() => Promise.reject(new Error('declined')));
     });
     const { service, emit } = await build(store, charge);
 
     const first = service.runDueRenewals(NOW);
+
     await charged;
     await service.runDueRenewals(NOW);
     openGate();
@@ -1126,7 +1170,9 @@ describe('RenewalService', () => {
 
     function usageStore(sub: Subscription): Store {
       const store = baseStore(sub);
+
       store.plans.push(makeUsagePlan());
+
       return store;
     }
 
@@ -1139,6 +1185,7 @@ describe('RenewalService', () => {
       let sealAtRating: Date | null | undefined;
       const sum = jest.fn(() => {
         sealAtRating = sub.usageSealedUntil;
+
         return Promise.resolve(142);
       });
       const { service } = await build(
@@ -1566,6 +1613,7 @@ describe('RenewalService', () => {
         let sealAtRating: Date | null | undefined;
         const sum = jest.fn(() => {
           sealAtRating = store.subscriptions[0].usageSealedUntil;
+
           return Promise.resolve(142);
         });
         const { service } = await build(
@@ -1639,6 +1687,7 @@ describe('RenewalService', () => {
           providerInvoiceRef: '',
           creditUnitsApplied: 0
         };
+
         store.invoices.push(booked);
         const charge = jest.fn();
         const { service } = await build(store, charge);
@@ -1700,6 +1749,7 @@ describe('RenewalService', () => {
           providerInvoiceRef: '',
           creditUnitsApplied: 0
         };
+
         store.invoices.push(booked);
         const charge = jest.fn().mockResolvedValue({
           providerInvoiceRef: 'pay_now',
@@ -1782,6 +1832,7 @@ describe('RenewalService', () => {
   it('renews a fixed $0 plan without a provider charge via a zero invoice', async () => {
     const sub = makeSub({ planKey: 'free' });
     const store = baseStore(sub);
+
     store.plans.push(
       Object.assign(new Plan(), {
         ...makePlan(),
@@ -1845,6 +1896,7 @@ describe('RenewalService', () => {
     // currentPeriodEnd untouched, so only the status guard can stop the advance.
     const charge = jest.fn().mockImplementation(() => {
       sub.status = 'canceled';
+
       return Promise.resolve({
         providerInvoiceRef: 'pay_1',
         status: 'captured'
@@ -1896,6 +1948,7 @@ describe('RenewalService', () => {
       providerInvoiceRef: 'pay_wh',
       creditUnitsApplied: 0
     };
+
     store.invoices.push(preInvoice);
     const charge = jest.fn();
     const { service, emit, credits } = await build(store, charge);
@@ -2011,6 +2064,7 @@ describe('RenewalService', () => {
       const sub = makeSub();
       const store = baseStore(sub);
       const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
+
       store.invoices.push(priorInvoice({ status: 'pending' }));
       const findCharge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_scan',
@@ -2097,6 +2151,7 @@ describe('RenewalService', () => {
         providerInvoiceRef: 'pay_pend',
         creditUnitsApplied: 0
       };
+
       store.invoices.push(preInvoice);
       const charge = jest.fn();
       const { service, emit } = await build(store, charge);
@@ -2115,6 +2170,7 @@ describe('RenewalService', () => {
     it('spends the stored credit units on settle, not re-rated ones', async () => {
       const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
       const store = baseStore(sub);
+
       store.plans.push(
         Object.assign(new Plan(), {
           ...makePlan(),
@@ -2172,6 +2228,7 @@ describe('RenewalService', () => {
         nextRenewalAttemptAt: new Date('2026-06-07T00:00:00Z')
       });
       const store = baseStore(sub);
+
       store.invoices.push(priorInvoice());
       const charge = jest.fn();
       const findCharge = jest.fn().mockResolvedValue({
@@ -2224,6 +2281,7 @@ describe('RenewalService', () => {
     it('polls the open charge instead of settling it from re-rated values', async () => {
       const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
       const store = baseStore(sub);
+
       pushUsagePlan(store);
       const charge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_real',
@@ -2270,6 +2328,7 @@ describe('RenewalService', () => {
     it('settles the open charge at its stored amount and credit units', async () => {
       const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
       const store = baseStore(sub);
+
       pushUsagePlan(store);
       const charge = jest.fn().mockResolvedValue({
         providerInvoiceRef: 'pay_real',
@@ -2317,6 +2376,7 @@ describe('RenewalService', () => {
         nextRenewalAttemptAt: new Date('2026-06-07T00:00:00Z')
       });
       const store = baseStore(sub);
+
       pushUsagePlan(store);
       const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
       // @ts-expect-error - partial Invoice fake for this scenario
@@ -2328,6 +2388,7 @@ describe('RenewalService', () => {
         amountMinor: Money.fromMinor(4400),
         creditUnitsApplied: 10
       };
+
       store.invoices.push(failedInvoice);
       const charge = jest.fn();
       const findCharge = jest.fn().mockResolvedValue(null);
@@ -2414,6 +2475,7 @@ describe('RenewalService', () => {
     function usageStore(): { sub: Subscription; store: Store } {
       const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
       const store = baseStore(sub);
+
       store.plans.push(
         Object.assign(new Plan(), {
           ...makePlan(),
@@ -2431,6 +2493,7 @@ describe('RenewalService', () => {
           }
         })
       );
+
       return { sub, store };
     }
 
@@ -2439,6 +2502,7 @@ describe('RenewalService', () => {
       const recorded: Invoice[] = [];
       const charge = jest.fn(() => {
         recorded.push({ ...store.invoices[0] });
+
         return Promise.resolve({
           providerInvoiceRef: 'pay_1',
           status: 'captured'
@@ -2469,6 +2533,7 @@ describe('RenewalService', () => {
 
     it('re-rates a dunning retry without the hold of its own row', async () => {
       const { sub, store } = usageStore();
+
       Object.assign(sub, {
         status: 'past_due',
         dunningAttempts: 1,

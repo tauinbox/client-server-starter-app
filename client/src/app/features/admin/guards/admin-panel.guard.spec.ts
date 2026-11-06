@@ -68,6 +68,7 @@ describe('adminPanelGuard', () => {
 
   it('should redirect to forbidden when no admin-panel permission is held', () => {
     const router = TestBed.inject(Router);
+
     vi.spyOn(router, 'navigate');
 
     expect(String(run())).toBe('/forbidden');

@@ -58,7 +58,9 @@ describe('HasEntitlementDirective', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(host);
+
     fixture.detectChanges();
+
     return fixture;
   };
 
@@ -67,6 +69,7 @@ describe('HasEntitlementDirective', () => {
     id: string
   ): string | null => {
     const root = fixture.nativeElement as HTMLElement;
+
     return (
       root
         .querySelector<HTMLElement>(`[data-testid="${id}"]`)
@@ -83,6 +86,7 @@ describe('HasEntitlementDirective', () => {
     it('renders the host template when the capability is granted', async () => {
       capabilitiesSignal.set(['reports']);
       const fixture = await configure(HostWithElseComponent);
+
       expect(text(fixture, 'granted')).toBe('REPORTS');
       expect(text(fixture, 'upgrade')).toBeNull();
     });
@@ -90,12 +94,14 @@ describe('HasEntitlementDirective', () => {
     it('renders the else template when it is not', async () => {
       capabilitiesSignal.set(['data-export']);
       const fixture = await configure(HostWithElseComponent);
+
       expect(text(fixture, 'granted')).toBeNull();
       expect(text(fixture, 'upgrade')).toBe('UPGRADE');
     });
 
     it('swaps templates when the mirror updates, e.g. after an entitlements push', async () => {
       const fixture = await configure(HostWithElseComponent);
+
       expect(text(fixture, 'upgrade')).toBe('UPGRADE');
 
       capabilitiesSignal.set(['reports']);
@@ -108,6 +114,7 @@ describe('HasEntitlementDirective', () => {
     it('reacts to the capability input changing', async () => {
       capabilitiesSignal.set(['reports']);
       const fixture = await configure(HostWithElseComponent);
+
       expect(text(fixture, 'granted')).toBe('REPORTS');
 
       fixture.componentInstance.capability.set('priority-support');
@@ -121,12 +128,14 @@ describe('HasEntitlementDirective', () => {
   describe('without else template', () => {
     it('fails closed while the mirror is empty', async () => {
       const fixture = await configure(HostWithoutElseComponent);
+
       expect(text(fixture, 'granted')).toBeNull();
     });
 
     it('renders the host template once the capability is granted', async () => {
       capabilitiesSignal.set(['reports']);
       const fixture = await configure(HostWithoutElseComponent);
+
       expect(text(fixture, 'granted')).toBe('REPORTS');
     });
   });

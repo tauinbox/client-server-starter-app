@@ -25,8 +25,10 @@ export async function holdBillingDbLock(
   ds: DataSource
 ): Promise<() => Promise<void>> {
   const runner = ds.createQueryRunner();
+
   await runner.connect();
   await runner.query('SELECT pg_advisory_lock($1)', [BILLING_DB_LOCK_KEY]);
+
   return async () => {
     await runner.query('SELECT pg_advisory_unlock($1)', [BILLING_DB_LOCK_KEY]);
     await runner.release();

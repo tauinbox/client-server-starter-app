@@ -37,6 +37,7 @@ describe('AdminPanelComponent — auto-redirect on permission loss', () => {
     }).compileComponents();
 
     const router = TestBed.inject(Router);
+
     navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(AdminPanelComponent);

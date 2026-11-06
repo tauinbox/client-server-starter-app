@@ -26,6 +26,7 @@ async function build(): Promise<{
       { provide: EventEmitter2, useValue: new EventEmitter2() }
     ]
   }).compile();
+
   return {
     listener: moduleRef.get(EntitlementChangedListener),
     emitter: moduleRef.get(EventEmitter2),
@@ -37,6 +38,7 @@ async function build(): Promise<{
 describe('EntitlementChangedListener', () => {
   it('invalidates the affected user on a subscription event', async () => {
     const { listener, invalidateUser } = await build();
+
     await listener.handleBillingChange(
       new SubscriptionActivatedEvent('user-1', 'sub-1')
     );
@@ -45,12 +47,14 @@ describe('EntitlementChangedListener', () => {
 
   it('invalidates the affected user on an invoice event', async () => {
     const { listener, invalidateUser } = await build();
+
     await listener.handleBillingChange(new InvoicePaidEvent('user-2', 'inv-1'));
     expect(invalidateUser).toHaveBeenCalledWith('user-2');
   });
 
   it('pushes entitlements_updated to the affected user only', async () => {
     const { listener, push } = await build();
+
     await listener.handleBillingChange(new InvoicePaidEvent('user-2', 'inv-1'));
     expect(push).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith('user-2', {
@@ -61,8 +65,10 @@ describe('EntitlementChangedListener', () => {
   it('invalidates before notifying, so the client cannot re-cache a stale set', async () => {
     const { listener, invalidateUser, push } = await build();
     const order: string[] = [];
+
     invalidateUser.mockImplementation(() => {
       order.push('invalidate');
+
       return Promise.resolve();
     });
     push.mockImplementation(() => {
@@ -76,6 +82,7 @@ describe('EntitlementChangedListener', () => {
 
   it('does not notify when invalidation fails', async () => {
     const { listener, invalidateUser, push } = await build();
+
     invalidateUser.mockRejectedValue(new Error('cache down'));
 
     await expect(
@@ -86,6 +93,7 @@ describe('EntitlementChangedListener', () => {
 
   it('binds to every entitlement-changing event name on bootstrap', async () => {
     const { listener, emitter, invalidateUser } = await build();
+
     listener.onApplicationBootstrap();
 
     emitter.emit(

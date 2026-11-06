@@ -46,6 +46,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -64,6 +65,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
+
     await roleService.assignRoleToUser(admin.id, superRole.id, {
       ability: SYSTEM_ABILITY
     });
@@ -73,6 +75,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
         userAgent: 'write-race-e2e',
         ipAddress: null
       });
+
     token = tokens.access_token;
   }, 60000);
 
@@ -91,6 +94,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
       await dataSource.getRepository(FeatureFlag).delete({ key: prefix });
       await dataSource.getRepository(User).delete({ email: adminEmail });
     }
+
     await app?.close();
   });
 
@@ -107,6 +111,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
       setTimeout(resolve, 5000).unref();
     });
     const original = EntityManager.prototype.transaction;
+
     jest
       .spyOn(EntityManager.prototype, 'transaction')
       .mockImplementation(async function (
@@ -115,11 +120,15 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
       ) {
         if (held < 2) {
           held += 1;
+
           if (held === 2) release();
+
           await gate;
         }
+
         return original.apply(this, args);
       });
+
     return { held: () => held };
   }
 
@@ -143,6 +152,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
     expect(barrier.held()).toBe(2);
     expect(responses.map((r) => r.status).toSorted()).toEqual([200, 404]);
     const loser = responses.find((r) => r.status === 404);
+
     expect((loser?.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.ROLES.NOT_FOUND
     );
@@ -167,6 +177,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
     expect(barrier.held()).toBe(2);
     expect(responses.map((r) => r.status).toSorted()).toEqual([204, 404]);
     const loser = responses.find((r) => r.status === 404);
+
     expect((loser?.body as { errorKey?: string }).errorKey).toBe(
       ErrorKeys.FEATURE_FLAGS.NOT_FOUND
     );
@@ -195,6 +206,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
     const grants = await dataSource
       .getRepository(RolePermission)
       .findBy({ roleId: role.id });
+
     expect(grants.map((g) => g.permissionId)).toEqual([permission.id]);
   }, 30000);
 });

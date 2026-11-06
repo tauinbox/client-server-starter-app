@@ -92,7 +92,9 @@ export class CheckoutReturnComponent implements OnInit {
 
   protected readonly purchaseAmount = computed(() => {
     const pending = this.purchase();
+
     if (!pending || pending.amountMinor <= 0) return '';
+
     return formatMoney(pending.amountMinor, pending.currency, this.#lang());
   });
 
@@ -102,6 +104,7 @@ export class CheckoutReturnComponent implements OnInit {
     if (this.mode() === 'cancel') {
       // An abandoned checkout leaves nothing to confirm.
       clearPendingPurchase();
+
       return;
     }
 
@@ -111,6 +114,7 @@ export class CheckoutReturnComponent implements OnInit {
     // Paddle sends the buyer here to pay: open the Paddle checkout of that
     // transaction before polling.
     const transactionId = paddleTransactionId(this.#route);
+
     if (transactionId) {
       void this.#pay(transactionId);
     } else {
@@ -121,15 +125,20 @@ export class CheckoutReturnComponent implements OnInit {
   async #pay(transactionId: string): Promise<void> {
     this.pollState.set('paying');
     const result = await this.#paddleCheckout.open(transactionId);
+
     if (result === 'unavailable') {
       clearPendingPurchase();
       this.pollState.set('unavailable');
+
       return;
     }
+
     if (result === 'closed') {
       void this.#router.navigate([this.cancelRoute], { replaceUrl: true });
+
       return;
     }
+
     dropPaddleTransactionId(this.#router);
     this.pollState.set('pending');
     this.#startPolling();
@@ -137,7 +146,9 @@ export class CheckoutReturnComponent implements OnInit {
 
   #startPolling(): void {
     const pending = readPendingPurchase();
+
     this.purchase.set(pending);
+
     if (pending) {
       void this.#pollPurchase(pending, 0);
     } else {
@@ -146,20 +157,26 @@ export class CheckoutReturnComponent implements OnInit {
       if (this.store.plans().length === 0) {
         void this.store.loadPlans();
       }
+
       void this.#poll(0);
     }
   }
 
   async #poll(attempt: number): Promise<void> {
     await this.store.refreshSubscription();
+
     if (this.store.hasActiveSubscription()) {
       this.pollState.set('confirmed');
+
       return;
     }
+
     if (attempt + 1 >= MAX_POLLS) {
       this.pollState.set('unconfirmed');
+
       return;
     }
+
     this.#timer = setTimeout(
       () => void this.#poll(attempt + 1),
       POLL_INTERVAL_MS
@@ -181,17 +198,22 @@ export class CheckoutReturnComponent implements OnInit {
         invoice.providerInvoiceRef === pending.sessionRef &&
         invoice.status === 'paid'
     );
+
     if (paid) {
       clearPendingPurchase();
       this.pollState.set('confirmed');
+
       return;
     }
+
     if (attempt + 1 >= MAX_POLLS) {
       // Stale refs must not hijack a later subscription checkout's return.
       clearPendingPurchase();
       this.pollState.set('unconfirmed');
+
       return;
     }
+
     this.#timer = setTimeout(
       () => void this.#pollPurchase(pending, attempt + 1),
       POLL_INTERVAL_MS

@@ -29,6 +29,7 @@ async function arriveAtCallback(
   const admin = (state.users as UserResponse[]).find(
     (u) => u.email === 'admin@example.com'
   );
+
   expect(admin).toBeDefined();
 
   const { token } = await mockServer.issueOAuthData(admin!.id);
@@ -76,6 +77,7 @@ test.describe('OAuth sign-in — completed session', () => {
     // reload on purpose: a reload re-runs the bootstrap initializer, which
     // loads the permissions the callback skipped and masks the defect.
     const adminLink = page.locator('a.nav-link[aria-label="Admin panel"]');
+
     await expect(adminLink).toBeVisible();
 
     // In-app navigation, so the guard evaluates against the same live ability.

@@ -92,6 +92,7 @@ export class PricingPageComponent implements OnInit {
   // anonymous "Choose" goes to login first.
   protected readonly paymentsAvailable = computed(() => {
     const region = this.store.region();
+
     return (
       !region || region.availableProviders.includes(region.effectiveProvider)
     );
@@ -106,8 +107,11 @@ export class PricingPageComponent implements OnInit {
   // an unpaid `incomplete` checkout.
   protected readonly currentPlanKey = computed(() => {
     if (!this.isAuthenticated()) return null;
+
     const sub = this.store.subscription();
+
     if (sub && this.store.hasActiveSubscription()) return sub.planKey;
+
     return 'free';
   });
 
@@ -115,11 +119,13 @@ export class PricingPageComponent implements OnInit {
     const provider = this.displayProvider();
     const lang = this.#lang();
     const current = this.currentPlanKey();
+
     return this.store
       .plans()
       .filter((plan) => plan.billingMode === 'fixed')
       .map((plan) => {
         const price = planPriceFor(plan, provider);
+
         return {
           key: plan.key,
           plan,
@@ -140,9 +146,13 @@ export class PricingPageComponent implements OnInit {
 
   protected readonly usagePrice = computed(() => {
     const plan = this.usagePlan();
+
     if (!plan) return '';
+
     const price = planPriceFor(plan, this.displayProvider());
+
     if (!price?.unitPriceMinor) return '';
+
     return formatMoney(price.unitPriceMinor, price.currency, this.#lang());
   });
 
@@ -152,11 +162,13 @@ export class PricingPageComponent implements OnInit {
   protected readonly oneTimeProducts = computed<PricedProduct[]>(() => {
     const provider = this.displayProvider();
     const lang = this.#lang();
+
     return this.store
       .products()
       .filter((product) => product.type !== 'custom')
       .map((product) => {
         const price = productPriceFor(product, provider);
+
         return {
           key: product.key,
           product,
@@ -184,6 +196,7 @@ export class PricingPageComponent implements OnInit {
       void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
         queryParams: { returnUrl: `/${AppRouteSegmentEnum.Billing}` }
       });
+
       return;
     }
 
@@ -191,6 +204,7 @@ export class PricingPageComponent implements OnInit {
     // the plan change lives on the settings page.
     if (this.store.hasActiveSubscription()) {
       void this.#router.navigateByUrl(this.settingsRoute);
+
       return;
     }
 
@@ -203,6 +217,7 @@ export class PricingPageComponent implements OnInit {
 
   onBuy(item: PricedProduct): void {
     const price = productPriceFor(item.product, this.displayProvider());
+
     void this.#purchase(
       { productKey: item.product.key },
       {
@@ -219,6 +234,7 @@ export class PricingPageComponent implements OnInit {
 
   onDonate(product: ProductResponse, submit: DonationSubmit): void {
     const price = productPriceFor(product, this.displayProvider());
+
     void this.#purchase(
       {
         productKey: product.key,
@@ -248,12 +264,17 @@ export class PricingPageComponent implements OnInit {
     pending: Omit<PendingPurchase, 'sessionRef'>
   ): Promise<void> {
     const session = await this.store.purchase(request);
+
     if (!session) return;
+
     storePendingPurchase({ ...pending, sessionRef: session.sessionRef });
+
     if (session.url) {
       this.#checkoutRedirect.redirect(session.url);
+
       return;
     }
+
     void this.#router.navigate(
       [`/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingSuccess}`],
       session.provider === 'paddle'

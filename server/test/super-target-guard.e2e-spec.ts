@@ -49,6 +49,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -78,14 +79,17 @@ runWithInfra('User writes on a super target (e2e)', () => {
       const found = permissions.find(
         (p) => p.action.name === action && p.resource.subject === subjectName
       );
+
       if (!found)
         throw new Error(`Permission ${action}:${subjectName} missing`);
+
       return { permissionId: found.id, conditions: null };
     };
     const support = await roleService.create(
       { name: supportRoleName },
       { ability: SYSTEM_ABILITY }
     );
+
     supportRoleId = support.id;
     await roleService.setPermissionsForRole(
       support.id,
@@ -102,6 +106,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
     const superRole = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
+
     for (const email of [superEmail, otherSuperEmail]) {
       await roleService.assignRoleToUser(await userId(email), superRole.id, {
         ability: SYSTEM_ABILITY
@@ -132,6 +137,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
     const found = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email }, withDeleted: true });
+
     return found.id;
   }
 
@@ -146,6 +152,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
       userAgent: 'super-target-e2e',
       ipAddress: null
     });
+
     return tokens.access_token;
   }
 
@@ -172,6 +179,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
 
     expectSuperTargetRefusal(res);
     const target = await row(superEmail);
+
     expect(
       (
         await verifyPassword(
@@ -220,6 +228,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
   it('refuses a restore of a super account by a delegated role', async () => {
     const token = await tokenFor(supportEmail);
     const id = await userId(superEmail);
+
     await usersService.remove(id, { ability: SYSTEM_ABILITY });
 
     try {
@@ -268,6 +277,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
       await userId(superEmail),
       SYSTEM_ABILITY
     );
+
     expect(target.roles.map((r) => r.name)).not.toContain(supportRoleName);
     expect(target.tokenRevokedAt).toBeNull();
   }, 30000);
@@ -284,6 +294,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
       await userId(superEmail),
       SYSTEM_ABILITY
     );
+
     expect(target.roles.map((r) => r.name)).toContain('user');
     expect(target.tokenRevokedAt).toBeNull();
   }, 30000);

@@ -41,16 +41,21 @@ router.get(
   (req, res) => {
     const query = req.query as Record<string, unknown>;
     const errors = listQueryErrors(query, RESOURCE_LIST_QUERY);
+
     if (errors.length > 0) {
       sendValidationError(res, 'query', errors);
+
       return;
     }
+
     if (rejectInvalidCursor(res, query)) return;
+
     const page = listPage(
       Array.from(getState().resources.values()),
       RESOURCE_LIST_QUERY,
       query
     );
+
     res.json({ data: page.data.map(toResourceResponse), meta: page.meta });
   }
 );
@@ -60,6 +65,7 @@ router.get('/resources', permissionGuard('read', 'Permission'), (_req, res) => {
   const resources = Array.from(getState().resources.values())
     .toSorted((a, b) => a.name.localeCompare(b.name))
     .map(toResourceResponse);
+
   res.json(resources);
 });
 
@@ -75,6 +81,7 @@ router.post(
 
     if (!resource) {
       sendError(res, ErrorKeys.RESOURCES.NOT_FOUND, 'Resource not found');
+
       return;
     }
 
@@ -97,6 +104,7 @@ router.post(
         ErrorKeys.RESOURCES.CANNOT_RESTORE,
         `Cannot restore resource "${resource.name}": its @RegisterResource controller is not registered. Restore the controller code first.`
       );
+
       return;
     }
 
@@ -106,21 +114,25 @@ router.post(
         ErrorKeys.RESOURCES.NOT_ORPHANED,
         `Resource "${resource.name}" is not orphaned, so there is nothing to restore`
       );
+
       return;
     }
 
     const woken = grantableActionNames(resource);
+
     if (!assertCanWiden(req, res, { resource, reEnabled: woken })) {
       return;
     }
 
     resource.isOrphaned = false;
+
     // Mirrors the server's ResourceActionsChangedEvent broadcast.
     if (woken.length > 0) {
       pushToAll({ type: 'permissions_updated' });
     }
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('RESOURCE_RESTORE', {
       actorId: actor.id,
       actorEmail: actor.email,
@@ -172,6 +184,7 @@ router.patch(
 
     if (errors.length > 0) {
       sendValidationError(res, 'body', errors);
+
       return;
     }
 
@@ -182,6 +195,7 @@ router.patch(
 
     if (!resource) {
       sendError(res, ErrorKeys.RESOURCES.NOT_FOUND, 'Resource not found');
+
       return;
     }
 
@@ -191,6 +205,7 @@ router.patch(
       description,
       allowedActionNames
     });
+
     if (
       !assertInstancePermission(req, res, {
         action: 'update',
@@ -213,12 +228,14 @@ router.patch(
     const undeclared = ((allowedActionNames as string[] | null) ?? []).filter(
       (name) => !resource.actionNames.includes(name)
     );
+
     if (undeclared.length > 0) {
       sendError(
         res,
         ErrorKeys.RESOURCES.ACTION_NOT_DECLARED,
         `Resource "${resource.name}" does not check the actions: ${undeclared.join(', ')}`
       );
+
       return;
     }
 
@@ -261,6 +278,7 @@ router.patch(
     }
 
     const actor = (req as AuthenticatedRequest).user;
+
     logAudit('RESOURCE_UPDATE', {
       actorId: actor.id,
       actorEmail: actor.email,

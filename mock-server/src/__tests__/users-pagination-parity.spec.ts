@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -28,8 +29,10 @@ async function loginAdmin(): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -51,8 +54,10 @@ describe('user list routes reject out-of-range paging like the server', () => {
     const token = await loginAdmin();
 
     const res = await get(token, `${path}?limit=${MAX_PAGE_SIZE + 1}`);
+
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors).toContain(
       `limit must not be greater than ${MAX_PAGE_SIZE}`
     );
@@ -62,8 +67,10 @@ describe('user list routes reject out-of-range paging like the server', () => {
     const token = await loginAdmin();
 
     const res = await get(token, `${path}?limit=0`);
+
     expect(res.status).toBe(400);
     const body = (await res.json()) as { errors: string[] };
+
     expect(body.errors).toContain('limit must not be less than 1');
   });
 
@@ -71,6 +78,7 @@ describe('user list routes reject out-of-range paging like the server', () => {
     const token = await loginAdmin();
 
     const res = await get(token, `${path}?limit=${MAX_PAGE_SIZE}`);
+
     expect(res.status).toBe(200);
   });
 
@@ -80,8 +88,10 @@ describe('user list routes reject out-of-range paging like the server', () => {
       const token = await loginAdmin();
 
       const res = await get(token, `${path}?sortBy=password`);
+
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors[0]).toContain('sortBy must be one of');
     }
   );
@@ -95,8 +105,10 @@ describe('user list routes reject out-of-range paging like the server', () => {
         token,
         `${path}?limit=0&foo=1&sortOrder=up&sortBy=password`
       );
+
       expect(res.status).toBe(400);
       const body = (await res.json()) as { errors: string[] };
+
       expect(body.errors).toHaveLength(4);
       expect(body.errors.slice(0, 2)).toEqual([
         'property foo should not exist',
@@ -118,6 +130,7 @@ describe('user list routes reject out-of-range paging like the server', () => {
       token,
       '/api/v1/users/search/cursor?q=admin&isActive=true&limit=5'
     );
+
     expect(res.status).toBe(200);
   });
 });

@@ -54,12 +54,14 @@ runWithInfra(
         .spyOn(app.get(AuditService), 'logFireAndForget')
         .mockImplementation(() => undefined);
       const provider = { refund: jest.fn().mockResolvedValue(undefined) };
+
       jest
         .spyOn(app.get(BillingService), 'getProviderById')
         // @ts-expect-error the refund path calls only `refund` of the provider
         .mockReturnValue(provider);
 
       const users = dataSource.getRepository(User);
+
       user = await users.save(
         users.create({
           email: `refund-push-${stamp}@example.com`,
@@ -69,6 +71,7 @@ runWithInfra(
         })
       );
       const customers = dataSource.getRepository(Customer);
+
       customer = await customers.save(
         customers.create({
           userId: user.id,
@@ -84,14 +87,17 @@ runWithInfra(
 
     afterAll(async () => {
       for (const req of requests) req.destroy();
+
       if (dataSource && customer) {
         await dataSource
           .getRepository(Invoice)
           .delete({ customerId: customer.id });
       }
+
       if (dataSource && user) {
         await dataSource.getRepository(User).delete({ id: user.id });
       }
+
       await app?.close();
     });
 
@@ -102,6 +108,7 @@ runWithInfra(
           userAgent: 'refund-push-e2e',
           ipAddress: '203.0.113.12'
         });
+
       return new Promise((resolve, reject) => {
         const req = get(
           {
@@ -112,9 +119,12 @@ runWithInfra(
           (res: IncomingMessage) => {
             if (res.statusCode !== 200) {
               reject(new Error(`stream status ${res.statusCode}`));
+
               return;
             }
+
             let body = '';
+
             res.setEncoding('utf8');
             res.on('data', (chunk: string) => {
               body += chunk;
@@ -128,6 +138,7 @@ runWithInfra(
             );
           }
         );
+
         req.on('error', () => undefined);
         requests.push(req);
       });
@@ -158,6 +169,7 @@ runWithInfra(
         })
       );
       const grants = dataSource.getRepository(CustomerGrant);
+
       await grants.save(
         grants.create({
           customerId: customer.id,
@@ -167,12 +179,14 @@ runWithInfra(
           revokedAt: null
         })
       );
+
       return invoice;
     }
 
     it('pushes entitlements_updated after the cache drops the revoked grant', async () => {
       const invoice = await seedGrantedPurchase();
       const entitlements = app.get(EntitlementService);
+
       expect(
         (await entitlements.capabilitiesFor(user.id)).capabilities
       ).toContain(CAPABILITY);
@@ -185,8 +199,10 @@ runWithInfra(
       expect(saved.status).toBe('refunded');
       const pushed = await eventually(async () => {
         const found = events().filter((e) => e.type === 'entitlements_updated');
+
         return Promise.resolve(found.length > 0 ? found : null);
       });
+
       expect(pushed).toEqual([{ type: 'entitlements_updated' }]);
       expect(
         (await entitlements.capabilitiesFor(user.id)).capabilities

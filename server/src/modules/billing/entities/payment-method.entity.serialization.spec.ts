@@ -21,11 +21,13 @@ function createPaymentMethod(
 describe('PaymentMethod entity serialization', () => {
   it('hides providerMethodRef (tokenised provider reference)', () => {
     const plain = instanceToPlain(createPaymentMethod());
+
     expect(plain).not.toHaveProperty('providerMethodRef');
   });
 
   it('keeps the display fields', () => {
     const plain = instanceToPlain(createPaymentMethod());
+
     expect(plain).toMatchObject({
       brand: 'visa',
       last4: '4242',

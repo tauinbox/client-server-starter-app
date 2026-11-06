@@ -35,6 +35,7 @@ export function withList<
   fetcher: () => ListFetcher<Entity, S>;
 }) {
   const noFilters: Partial<ListFilters<S>> = {};
+
   return signalStoreFeature(
     withEntities<Entity>(),
     withCursorList<Entity>({ fallbackKey: config.fallbackKey }),

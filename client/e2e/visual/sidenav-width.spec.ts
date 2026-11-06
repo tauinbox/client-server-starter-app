@@ -11,14 +11,18 @@ const WIDE_PX = 220;
 
 const widthOf = async (page: Page, selector: string): Promise<number> => {
   const box = await page.locator(selector).boundingBox();
+
   if (box === null) throw new Error(`Not visible: ${selector}`);
+
   return box.width;
 };
 
 const marginLeftOf = (page: Page, selector: string): Promise<number> =>
   page.evaluate((s) => {
     const el = document.querySelector(s);
+
     if (el === null) throw new Error(`Selector not found: ${s}`);
+
     return parseFloat(getComputedStyle(el).marginLeft);
   }, selector);
 

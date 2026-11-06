@@ -64,6 +64,7 @@ describe('SingleUseTokenLedger', () => {
     // seconds-long credential, so it degrades to the pre-ledger behaviour.
     it('fails open and warns when the cache throws', async () => {
       const cache = createMockCache();
+
       jest
         .spyOn(cache, 'get')
         .mockRejectedValue(new Error('cache unreachable'));
@@ -79,9 +80,12 @@ describe('SingleUseTokenLedger', () => {
   describe('Redis-backed cache', () => {
     function cacheWithRedis(set: jest.Mock): Cache {
       const store = Object.create(KeyvRedis.prototype) as KeyvRedis<unknown>;
+
       Object.defineProperty(store, 'client', { value: { set } });
       const cache = createMockCache();
+
       Object.defineProperty(cache, 'stores', { value: [{ store }] });
+
       return cache;
     }
 

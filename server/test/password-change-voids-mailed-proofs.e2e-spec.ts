@@ -28,12 +28,15 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
   const errorKeyOf = async (run: Promise<unknown>): Promise<string> => {
     try {
       await run;
+
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {
         const body = error.getResponse() as { errorKey?: string };
+
         return body.errorKey ?? `STATUS_${error.getStatus()}`;
       }
+
       throw error;
     }
   };
@@ -43,9 +46,11 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
     overrides: Partial<User> = {}
   ): Promise<User> => {
     const email = `voids-proofs-${label}-${Date.now()}@example.com`;
+
     emails.push(email);
 
     const repository = dataSource.getRepository(User);
+
     return repository.save(
       repository.create({
         email,
@@ -75,6 +80,7 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
         ?.getRepository(User)
         .delete(emails.map((e) => ({ email: e })));
     }
+
     await app?.close();
   });
 
@@ -94,6 +100,7 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
     const afterChange = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     expect(afterChange.passwordResetToken).toBeNull();
     expect(afterChange.passwordResetExpiresAt).toBeNull();
 
@@ -106,6 +113,7 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
   it('drops an email change in flight when the password changes', async () => {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const pendingEmail = `voids-proofs-pending-${Date.now()}@example.com`;
+
     emails.push(pendingEmail);
     const user = await createUser('pending', {
       pendingEmail,
@@ -122,6 +130,7 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
     const afterChange = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     expect(afterChange.pendingEmail).toBeNull();
     expect(afterChange.pendingEmailToken).toBeNull();
     expect(afterChange.pendingEmailExpiresAt).toBeNull();
@@ -137,6 +146,7 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
     const rawResetToken = crypto.randomBytes(32).toString('hex');
     const rawPendingToken = crypto.randomBytes(32).toString('hex');
     const pendingEmail = `voids-proofs-kept-${Date.now()}@example.com`;
+
     emails.push(pendingEmail);
     const user = await createUser('kept', {
       passwordResetToken: hashToken(rawResetToken),
@@ -155,6 +165,7 @@ runWithInfra('A password change voids the mailed proofs (e2e)', () => {
     const afterChange = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: user.id });
+
     expect(afterChange.name).toBe('Renamed');
     expect(afterChange.passwordResetToken).not.toBeNull();
     expect(afterChange.pendingEmailToken).not.toBeNull();

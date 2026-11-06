@@ -101,6 +101,7 @@ describe('logout with an expired access token', () => {
   afterEach(() => {
     rxjsConfig.onUnhandledError = originalOnUnhandledError;
     localStorage.removeItem(AUTH_USER_KEY);
+
     try {
       httpMock.verify();
     } finally {
@@ -120,10 +121,12 @@ describe('logout with an expired access token', () => {
 
     const refresh = httpMock.expectOne(AuthApiEnum.RefreshToken);
     const revived = createAuthResponse(3600);
+
     refresh.flush(revived);
     await settle();
 
     const logout = httpMock.expectOne(AuthApiEnum.Logout);
+
     expect(logout.request.headers.get('Authorization')).toBe(
       `Bearer ${revived.tokens.access_token}`
     );
@@ -136,12 +139,14 @@ describe('logout with an expired access token', () => {
 
   it('posts the logout straight away while the access token is still usable', () => {
     const session = createAuthResponse(3600);
+
     authStore.saveAuthResponse(session);
 
     authService.logout();
 
     httpMock.expectNone(AuthApiEnum.RefreshToken);
     const logout = httpMock.expectOne(AuthApiEnum.Logout);
+
     expect(logout.request.headers.get('Authorization')).toBe(
       `Bearer ${session.tokens.access_token}`
     );

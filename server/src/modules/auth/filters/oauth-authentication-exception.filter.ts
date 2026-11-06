@@ -27,6 +27,7 @@ export class OAuthAuthenticationExceptionFilter implements ExceptionFilter {
   ): void {
     const reason =
       exception.reason instanceof Error ? `: ${exception.reason.message}` : '';
+
     this.logger.warn(`${exception.message}${reason}`);
 
     const http = host.switchToHttp();
@@ -39,9 +40,11 @@ export class OAuthAuthenticationExceptionFilter implements ExceptionFilter {
     // clears it on the success and in-handler failure paths. An intent of
     // another flow stays: that flow may still finish in another tab.
     const { link, reauth } = this.cookies.claimedIntents(request);
+
     if (link !== null) {
       this.cookies.clear(response, OAUTH_LINK_COOKIE);
     }
+
     if (reauth !== null) {
       this.cookies.clear(response, OAUTH_REAUTH_COOKIE);
     }

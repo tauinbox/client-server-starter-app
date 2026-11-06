@@ -47,6 +47,7 @@ function createAuthResponse(): AuthResponse {
     email: user.email,
     exp: Math.floor(Date.now() / 1000) + 3600
   });
+
   return {
     tokens: {
       access_token: `${header}.${payload}.fake-signature`,
@@ -85,6 +86,7 @@ describe('a stream that the server ends for a dead session', () => {
   afterEach(() => {
     vi.useRealTimers();
     localStorage.removeItem(AUTH_USER_KEY);
+
     try {
       httpMock.verify();
     } finally {

@@ -131,6 +131,7 @@ export class FeatureFlagListComponent {
   loadMore(): void {
     this.#store.loadMore();
   }
+
   readonly flags = this.#store.entities;
   readonly filters = this.#store.filters;
   readonly hasActiveFilters = this.#store.hasActiveFilters;
@@ -202,6 +203,7 @@ export class FeatureFlagListComponent {
   readonly canCreate = computed(() =>
     this.authStore.hasPermissions({ action: 'create', subject: 'FeatureFlag' })
   );
+
   canUpdate(flag: FeatureFlagResponse): boolean {
     return this.authStore.hasPermissions({
       action: 'update',
@@ -230,6 +232,7 @@ export class FeatureFlagListComponent {
     // The switch moves on click, before the write; put it back when the
     // write does not happen or fails.
     const revert = () => (change.source.checked = flag.enabled);
+
     if (!flag.enabled && !hasIncludeRule(flag.rules)) {
       confirmEnableForEveryone(this.#adaptiveDialog, this.#transloco, flag.key)
         .pipe(takeUntilDestroyed(this.#destroyRef))
@@ -237,8 +240,10 @@ export class FeatureFlagListComponent {
           if (confirmed) this.#applyToggle(flag, revert);
           else revert();
         });
+
       return;
     }
+
     this.#applyToggle(flag, revert);
   }
 
@@ -280,6 +285,7 @@ export class FeatureFlagListComponent {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((confirmed: boolean | undefined) => {
         if (!confirmed) return;
+
         this.#store
           .deleteFlag(flag.id)
           .pipe(takeUntilDestroyed(this.#destroyRef))
@@ -303,6 +309,7 @@ export class FeatureFlagListComponent {
     const panelClass = this.layout.isHandset()
       ? 'app-dialog-fullscreen-mobile'
       : [];
+
     this.#dialog
       .open(FeatureFlagFormDialogComponent, {
         ...sizing,
@@ -314,6 +321,7 @@ export class FeatureFlagListComponent {
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((saved: FeatureFlagResponse | undefined) => {
         if (!saved) return;
+
         this.#notify.success(
           data.flag
             ? 'admin.featureFlags.successUpdated'

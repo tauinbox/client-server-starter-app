@@ -53,6 +53,7 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
     await ds.initialize();
 
     const users = ds.getRepository(User);
+
     module = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -113,6 +114,7 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
       passwordResetToken: hashToken(`reset-${stamp}`),
       passwordResetExpiresAt: new Date(Date.now() + 3600000)
     });
+
     userId = saved.id;
   });
 
@@ -144,6 +146,7 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
 
   it('a password reset removes the provider, so it no longer signs in as the owner', async () => {
     const providerId = `google-intruder-${stamp}`;
+
     await link(providerId);
 
     await reset();
@@ -215,6 +218,7 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
     const { promise: reachedInsert, resolve: insertReached } =
       Promise.withResolvers<void>();
     const original = EntityManager.prototype.insert;
+
     jest
       .spyOn(EntityManager.prototype, 'insert')
       .mockImplementation(async function (
@@ -225,17 +229,21 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
           insertReached();
           await insertGate;
         }
+
         return original.apply(this, args);
       });
 
     const linking = link(`google-racer-${stamp}`);
+
     await reachedInsert;
 
     let resetDone = false;
     const resetting = reset().then((result) => {
       resetDone = true;
+
       return result;
     });
+
     await new Promise((resolve) => setTimeout(resolve, 500));
     // The link holds the user row, so the reset cannot write it yet.
     expect(resetDone).toBe(false);

@@ -52,6 +52,7 @@ export type MfaResetDialogData = {
 export class MfaResetDialogComponent {
   readonly #dialogRef =
     inject<MatDialogRef<MfaResetDialogComponent, User>>(MatDialogRef);
+
   readonly #usersStore = inject(UsersStore);
   readonly #notify = inject(NotifyService);
   readonly #translocoService = inject(TranslocoService);
@@ -62,6 +63,7 @@ export class MfaResetDialogComponent {
     passwordRequired: 'users.edit.currentPasswordRequired',
     codeRequired: 'users.edit.stepUpCodeRequired'
   });
+
   readonly passwordModel = this.#stepUp.passwordModel;
   readonly passwordForm = this.#stepUp.passwordForm;
   readonly codeModel = this.#stepUp.codeModel;

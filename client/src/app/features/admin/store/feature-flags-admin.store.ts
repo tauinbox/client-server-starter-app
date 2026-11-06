@@ -27,6 +27,7 @@ export const FeatureFlagsAdminStore = signalStore(
     fallbackKey: 'admin.featureFlags.errorLoadFailed',
     fetcher: () => {
       const service = inject(FeatureFlagsAdminService);
+
       return (request, filters) => service.getAllCursor(request, filters);
     }
   }),
@@ -61,6 +62,7 @@ export const FeatureFlagsAdminStore = signalStore(
             ) {
               return throwError(() => err);
             }
+
             return service.getOne(id).pipe(
               tap((flag) => {
                 patchState(store, setEntity(flag));

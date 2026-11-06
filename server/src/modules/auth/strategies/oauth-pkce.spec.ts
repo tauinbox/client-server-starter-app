@@ -32,6 +32,7 @@ function startFlow(strategy: passport.Strategy): {
   const res: Response = {
     cookie: (_name: string, value: string) => {
       cookie = value;
+
       return res;
     }
   };
@@ -55,6 +56,7 @@ function startFlow(strategy: passport.Strategy): {
       throw err;
     }
   });
+
   // An absolute callback URL spares the request the host and socket fields
   // that passport-oauth2 reads to resolve a relative one.
   created.authenticate(req, { callbackURL: 'http://localhost:3000/cb' });

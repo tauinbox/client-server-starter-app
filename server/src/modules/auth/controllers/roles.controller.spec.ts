@@ -110,6 +110,7 @@ describe('RolesController', () => {
   describe('findAll', () => {
     it('should return whatever roleService.findAll returns', () => {
       const roles = [{ id: 'role-1', name: 'admin' }];
+
       roleServiceMock.findAll.mockReturnValue(roles);
 
       const result = controller.findAll();
@@ -122,6 +123,7 @@ describe('RolesController', () => {
   describe('findAllPermissions', () => {
     it('should return whatever roleService.findAllPermissions returns', () => {
       const permissions = [{ id: 'perm-1', name: 'read:users' }];
+
       roleServiceMock.findAllPermissions.mockReturnValue(permissions);
 
       const result = controller.findAllPermissions();
@@ -136,6 +138,7 @@ describe('RolesController', () => {
   describe('findOne', () => {
     it('passes the ability and the actor to roleService.findOne', async () => {
       const role = { id: 'role-42', name: 'moderator' };
+
       roleServiceMock.findOne.mockResolvedValue(role);
 
       const result = await controller.findOne('role-42', mockReq, mockAbility);
@@ -160,6 +163,7 @@ describe('RolesController', () => {
   describe('getPermissionsForRole', () => {
     it('passes the ability and the actor to roleService.getPermissionsForRole', async () => {
       const perms = [{ id: 'rp-1' }];
+
       roleServiceMock.getPermissionsForRole.mockResolvedValue(perms);
 
       const result = await controller.getPermissionsForRole(
@@ -181,6 +185,7 @@ describe('RolesController', () => {
     it('passes the dto, the ability and the actor to roleService.create', async () => {
       const dto = { name: 'editor', description: 'Can edit' };
       const role = { id: 'role-new', name: 'editor' };
+
       roleServiceMock.create.mockResolvedValue(role);
 
       const result = await controller.create(dto, mockReq, mockAbility);
@@ -198,6 +203,7 @@ describe('RolesController', () => {
     it('passes the dto, the ability and the actor to roleService.update', async () => {
       const dto = { name: 'senior-editor' };
       const updated = { id: 'role-1', name: 'senior-editor' };
+
       roleServiceMock.update.mockResolvedValue(updated);
 
       const result = await controller.update(
@@ -431,6 +437,7 @@ describe('RolesController', () => {
         unknown,
         { audit: (role: { id: string }) => AuditLogParams }
       ];
+
       expect(row({ id: 'role-new' })).toEqual({
         ...actorFields,
         action: AuditAction.ROLE_CREATE,
@@ -458,6 +465,7 @@ describe('RolesController', () => {
           }) => AuditLogParams;
         }
       ];
+
       expect(row({ name: 'editor', description: 'old' })).toEqual({
         ...actorFields,
         action: AuditAction.ROLE_UPDATE,
@@ -474,6 +482,7 @@ describe('RolesController', () => {
         unknown,
         { audit: (role: { name: string }) => AuditLogParams }
       ];
+
       expect(row({ name: 'editor' })).toEqual({
         ...actorFields,
         action: AuditAction.ROLE_DELETE,

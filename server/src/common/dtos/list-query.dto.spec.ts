@@ -37,7 +37,9 @@ async function messages(
     () => null,
     (e: unknown) => e
   );
+
   expect(error).toBeInstanceOf(BadRequestException);
+
   return ((error as BadRequestException).getResponse() as { message: string[] })
     .message;
 }
@@ -51,6 +53,7 @@ describe('list query DTOs', () => {
     const result = await validate(metatype, { q: 'abc', ...filters });
 
     expect(result['q']).toBe('abc');
+
     for (const [key, raw] of Object.entries(filters)) {
       expect(result[key]).toBe(raw === 'true');
     }

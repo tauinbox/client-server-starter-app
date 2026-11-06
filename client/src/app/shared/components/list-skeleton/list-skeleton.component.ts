@@ -29,6 +29,7 @@ export class ListSkeletonComponent {
     'medium',
     'actions'
   ]);
+
   /** Off when a divider already sits right above the skeleton. */
   readonly topBorder = input(true);
 

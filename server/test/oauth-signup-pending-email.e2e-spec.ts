@@ -26,19 +26,24 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
   const errorKeyOf = async (run: Promise<unknown>): Promise<string> => {
     try {
       await run;
+
       return 'RESOLVED';
     } catch (error) {
       if (error instanceof HttpException) {
         const body = error.getResponse() as { errorKey?: string };
+
         return body.errorKey ?? `STATUS_${error.getStatus()}`;
       }
+
       throw error;
     }
   };
 
   const uniqueEmail = (label: string): string => {
     const email = `oauth-pending-${label}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}@example.com`;
+
     emails.push(email);
+
     return email;
   };
 
@@ -70,6 +75,7 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
         ?.getRepository(User)
         .delete(emails.map((e) => ({ email: e })));
     }
+
     await app?.close();
   });
 
@@ -101,6 +107,7 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
       'RESOLVED'
     );
     const confirmed = await repository.findOneByOrFail({ id: owner.id });
+
     expect(confirmed.email).toBe(pendingEmail);
     expect(confirmed.pendingEmail).toBeNull();
   }, 60000);

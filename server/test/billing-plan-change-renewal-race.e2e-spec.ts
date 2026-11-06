@@ -70,6 +70,7 @@ function fakeProvider(): FakeProvider {
 
 async function waitPast(moment: Date): Promise<void> {
   const remaining = moment.getTime() - Date.now() + 50;
+
   if (remaining > 0) {
     await new Promise((resolve) => setTimeout(resolve, remaining));
   }
@@ -93,6 +94,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     await ds.initialize();
     releaseDbLock = await holdBillingDbLock(ds);
     const plans = ds.getRepository(Plan);
+
     await plans.save([
       plans.create({
         key: FIXED_KEY,
@@ -132,12 +134,14 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
 
   afterEach(async () => {
     jest.restoreAllMocks();
+
     if (customerId) {
       // Invoices hold the customer under RESTRICT, so they go first; the
       // customer, its subscription and its usage then cascade from the user.
       await ds.getRepository(Invoice).delete({ customerId });
       customerId = undefined;
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
@@ -188,6 +192,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();
+
     planChange = module.get(PlanChangeService);
     renewals = module.get(RenewalService);
   }
@@ -202,6 +207,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
 
     const customer = await ds.getRepository(Customer).save(
@@ -215,9 +221,11 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
 
     const periodStart = new Date(Date.now() - 30 * DAY_MS);
+
     periodEnd = new Date(Date.now() + ANCHOR_DELAY_MS);
     const subscription = await ds.getRepository(Subscription).save(
       ds.getRepository(Subscription).create({
@@ -240,6 +248,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
         nextRenewalAttemptAt: null
       })
     );
+
     subscriptionId = subscription.id;
 
     await ds.getRepository(UsageRecord).save(
@@ -264,6 +273,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
       ): Promise<ChargeResult> => {
         charges.push({ key, amount });
         await onCharge(key);
+
         return { providerInvoiceRef: `pay_${key}`, status: 'captured' };
       }
     );
@@ -275,6 +285,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
    */
   function gateOn(prefix: string, during: () => Promise<void>): void {
     let fired = false;
+
     answerCharges(async (key) => {
       if (!fired && key.startsWith(prefix)) {
         fired = true;
@@ -312,6 +323,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   async function expectSwitchThenFixedRenewal(): Promise<void> {
     expect(chargedPrefixes()).toEqual(['change-charge', 'cancel', 'renewal']);
     const usage = (await invoices()).filter((i) => i.billingMode === 'usage');
+
     expect(usage).toHaveLength(1);
     expect(usage[0].providerEventId).toMatch(/^cancel:/);
     expect(usage[0].amountMinor.toNumber()).toBe(20000);
@@ -319,11 +331,13 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     const renewal = await ds.getRepository(Invoice).findOneByOrFail({
       providerEventId: `renewal:${subscriptionId}:${periodEnd.getTime()}`
     });
+
     expect(renewal).toMatchObject({ billingMode: 'fixed', status: 'paid' });
     expect(renewal.amountMinor.toNumber()).toBe(99000);
     expect(renewal.periodStart).toEqual(periodEnd);
 
     const current = await row();
+
     expect(current).toMatchObject({ planKey: FIXED_KEY, billingMode: 'fixed' });
     expect(current.currentPeriodStart).toEqual(periodEnd);
     expect(current.planChangeStartedAt).toBeNull();
@@ -359,8 +373,10 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     // that follows it returns after the anchor: by the claim, the scan owns it.
     const plans = ds.getRepository(Plan);
     const findPlan = plans.findOne.bind(plans);
+
     jest.spyOn(plans, 'findOne').mockImplementation(async (options) => {
       await waitPast(periodEnd);
+
       return findPlan(options);
     });
 
@@ -401,6 +417,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     // recorded and refundable, as for every guard miss.
     expect(chargedPrefixes()).toEqual(['change-charge', 'renewal']);
     const all = await invoices();
+
     expect(
       all.map((i) => [i.providerEventId?.split(':')[0], i.status])
     ).toEqual([
@@ -408,6 +425,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
       ['renewal', 'paid']
     ]);
     const current = await row();
+
     expect(current).toMatchObject({ planKey: USAGE_KEY, billingMode: 'usage' });
     expect(current.currentPeriodStart).toEqual(periodEnd);
   }, 30000);
@@ -432,6 +450,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     const renewal = await ds.getRepository(Invoice).findOneByOrFail({
       providerEventId: `renewal:${subscriptionId}:${periodEnd.getTime()}`
     });
+
     expect(renewal.amountMinor.toNumber()).toBe(20000);
   }, 30000);
 

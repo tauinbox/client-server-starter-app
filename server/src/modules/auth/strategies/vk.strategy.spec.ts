@@ -29,6 +29,7 @@ describe('VkStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.emailVerified).toBe(false);
     expect(profile.provider).toBe(OAuthProvider.VK);
     expect(profile.email).toBe('a@example.com');
@@ -49,6 +50,7 @@ describe('VkStrategy.validate', () => {
     );
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.email).toBe('john@mail.ru');
   });
 
@@ -65,6 +67,7 @@ describe('VkStrategy.validate', () => {
     strategy.validate('access', 'refresh', {}, vkProfile, done);
 
     const [, profile] = done.mock.calls[0] as [unknown, OAuthUserProfile];
+
     expect(profile.name).toBe('Ivan');
   });
 });

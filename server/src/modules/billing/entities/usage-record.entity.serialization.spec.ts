@@ -20,11 +20,13 @@ function createUsageRecord(overrides: Partial<UsageRecord> = {}): UsageRecord {
 describe('UsageRecord entity serialization', () => {
   it('hides idempotencyKey (internal write-dedup key)', () => {
     const plain = instanceToPlain(createUsageRecord());
+
     expect(plain).not.toHaveProperty('idempotencyKey');
   });
 
   it('keeps the public wire fields', () => {
     const plain = instanceToPlain(createUsageRecord());
+
     expect(plain).toMatchObject({ meterKey: 'api_calls', quantity: 42 });
   });
 
@@ -32,6 +34,7 @@ describe('UsageRecord entity serialization', () => {
     const plain = instanceToPlain(
       createUsageRecord({ pricedByCurrentPlan: false })
     );
+
     expect(plain).toMatchObject({ pricedByCurrentPlan: false });
   });
 });

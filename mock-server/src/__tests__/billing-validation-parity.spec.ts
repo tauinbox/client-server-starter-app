@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -28,8 +29,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -53,6 +56,7 @@ async function send(
     },
     body: JSON.stringify(body)
   });
+
   return { status: res.status, body: (await res.json()) as ErrorBody };
 }
 
@@ -67,7 +71,9 @@ async function activateSubscription(
       body: JSON.stringify({ userId: mockId('user-2'), planKey })
     }
   );
+
   expect(res.status).toBe(200);
+
   return (await res.json()) as { id: string; customerId: string };
 }
 
@@ -357,7 +363,9 @@ describe('billing request-body validation parity with server', () => {
       // instant, or the ingest refuses it as before the metered window.
       const today = new Date().toISOString().slice(0, 10);
       const sub = getState().billingSubscriptions.get(id);
+
       if (!sub) throw new Error('subscription not seeded');
+
       sub.currentPeriodStart = `${today}T00:00:00.000Z`;
 
       const { status } = await send('POST', '/admin/billing/usage', {

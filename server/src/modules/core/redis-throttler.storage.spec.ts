@@ -82,6 +82,7 @@ describe('RedisThrottlerStorage', () => {
         ]
       }).compile();
       const app = moduleRef.createNestApplication();
+
       await app.init();
 
       expect(redisMock.disconnect).not.toHaveBeenCalled();
@@ -138,6 +139,7 @@ describe('RedisThrottlerStorage', () => {
 
     it('should respect existing block key and return isBlocked=true', async () => {
       const blockExpiry = Date.now() + 10000;
+
       multiMock.exec.mockResolvedValue([
         [null, 0],
         [null, 1],

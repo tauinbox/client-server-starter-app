@@ -14,7 +14,9 @@ const runWithRedis = REDIS_URL ? describe : describe.skip;
 function writeEnvFile(contents: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'e2e-redis-'));
   const path = join(dir, '.env');
+
   writeFileSync(path, contents);
+
   return path;
 }
 
@@ -36,6 +38,7 @@ describe('e2e Redis isolation', () => {
       const isolated = new URL(
         withRedisDatabase('rediss://user:p%40ss@cache.internal:6380', 9)
       );
+
       expect(isolated.protocol).toBe('rediss:');
       expect(isolated.username).toBe('user');
       expect(isolated.password).toBe('p%40ss');

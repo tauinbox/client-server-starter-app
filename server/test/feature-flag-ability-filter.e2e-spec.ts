@@ -40,6 +40,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
     dataSource = app.get(DataSource);
     flagService = app.get(FeatureFlagService);
     const repo = dataSource.getRepository(FeatureFlag);
+
     flags = await repo.save([
       repo.create({ key: keys.on, enabled: true, public: false }),
       repo.create({ key: keys.off, enabled: false, public: false }),
@@ -64,6 +65,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
         .where('key LIKE :prefix', { prefix: `${tag}%` })
         .execute();
     }
+
     await app?.close();
   });
 
@@ -71,7 +73,9 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
     define: (b: AbilityBuilder<AppAbility>) => void
   ): AppAbility {
     const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
+
     define(builder);
+
     return builder.build();
   }
 
@@ -80,6 +84,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
       { limit: 100, sortBy: 'key', sortOrder: 'asc' },
       ability
     );
+
     return page.data.map((f) => f.key).filter((k) => k.startsWith(tag));
   }
 
@@ -92,6 +97,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
 
   it('lists every flag for an unconditional grant', async () => {
     const ability = abilityOf((b) => b.can('search', 'FeatureFlag'));
+
     expect(await listedKeys(ability)).toEqual(
       [keys.off, keys.on, keys.publicOff].toSorted()
     );
@@ -102,6 +108,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
       b.can('search', 'FeatureFlag', { key: { $in: [keys.on, keys.off] } })
     );
     const listed = await listedKeys(ability);
+
     expect(listed).toEqual([keys.off, keys.on].toSorted());
     expect(listed).toEqual(allowedKeys(ability));
   });
@@ -112,6 +119,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
       b.cannot('search', 'FeatureFlag', { public: true });
     });
     const listed = await listedKeys(ability);
+
     expect(listed).toEqual([keys.off]);
     expect(listed).toEqual(allowedKeys(ability));
   });
@@ -120,6 +128,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
     const ability = abilityOf((b) =>
       b.can('search', 'FeatureFlag', { description: null })
     );
+
     expect(await listedKeys(ability)).toEqual([]);
   });
 
@@ -128,6 +137,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
       b.can('search', 'FeatureFlag');
       b.cannot('search', 'FeatureFlag', { description: null });
     });
+
     expect(await listedKeys(ability)).toEqual([]);
   });
 
@@ -139,6 +149,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
       { limit: 1, sortBy: 'key', sortOrder: 'asc' },
       ability
     );
+
     expect(first.data.map((f) => f.key)).toEqual([keys.off]);
     const second = await flagService.findCursorPaginated(
       {
@@ -149,6 +160,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
       },
       ability
     );
+
     expect(second.data.map((f) => f.key)).toEqual([keys.on]);
     expect(second.meta.nextCursor).toBeNull();
   });

@@ -38,6 +38,7 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     const toggleBtn = page.getByRole('switch', {
       name: /Toggle flag new-dashboard/i
     });
+
     await expect(toggleBtn).not.toBeChecked();
 
     // Wait for the SSE-driven re-fetch that follows the toggle. The bootstrap
@@ -61,6 +62,7 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
       flags: Record<string, boolean>;
       evaluatedAt: string;
     };
+
     expect(body.flags['new-dashboard']).toBe(true);
 
     // List itself reflects the change too — admin store has been updated by
@@ -75,8 +77,10 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     // /api/ rewriter only applies to browser-initiated requests, not to
     // Node-side fetch from the test process.
     const res = await fetch(`${_mockServer.url}/api/v1/feature-flags`);
+
     expect(res.status).toBe(200);
     const body = (await res.json()) as { flags: Record<string, boolean> };
+
     // Private seed flags (new-dashboard, beta-export) are not public, so anon
     // sees only the public OAuth provider flags and the billing flag - all of
     // which resolve true because the mock environment marks every provider
@@ -93,6 +97,7 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     expect(res.headers.get('set-cookie')).toBeNull();
 
     const health = await fetch(`${_mockServer.url}/api/health/live`);
+
     expect(health.headers.get('set-cookie')).toBeNull();
   });
 
@@ -107,6 +112,7 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
         password: 'Password1'
       })
     });
+
     expect(login.status).toBe(200);
     const { tokens } = (await login.json()) as {
       tokens: { access_token: string };
@@ -134,18 +140,22 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
         })
       }
     );
+
     expect(created.status).toBe(201);
 
     const first = await fetch(`${_mockServer.url}/api/v1/feature-flags`);
+
     expect(first.status).toBe(200);
     const firstBody = (await first.json()) as {
       flags: Record<string, boolean>;
     };
+
     // percent 100: true only if the evaluation used the id it just issued.
     expect(firstBody.flags['public-rollout']).toBe(true);
     const anonIdMatch = /nxs_anon_id=([0-9a-f-]{36});/.exec(
       first.headers.get('set-cookie') ?? ''
     );
+
     expect(anonIdMatch).not.toBeNull();
 
     // The value must survive a round-trip so percentage bucketing stays
@@ -153,6 +163,7 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     const second = await fetch(`${_mockServer.url}/api/v1/feature-flags`, {
       headers: { Cookie: `nxs_anon_id=${anonIdMatch![1]}` }
     });
+
     expect(second.status).toBe(200);
     expect(second.headers.get('set-cookie')).toBeNull();
   });

@@ -112,8 +112,11 @@ export class BillingSettingsComponent implements OnInit {
   protected readonly currentPriceLabel = computed(() => {
     const sub = this.store.subscription();
     const plan = this.store.currentPlan();
+
     if (!sub || !plan) return '';
+
     const price = planPriceFor(plan, sub.provider);
+
     return price
       ? formatMoney(price.amountMinor, price.currency, this.#lang())
       : '';
@@ -121,6 +124,7 @@ export class BillingSettingsComponent implements OnInit {
 
   protected readonly canCancel = computed(() => {
     const sub = this.store.subscription();
+
     return (
       this.store.hasActiveSubscription() &&
       sub !== null &&
@@ -131,6 +135,7 @@ export class BillingSettingsComponent implements OnInit {
   // A pending cancellation rules a switch out, as on the server.
   protected readonly canChangePlan = computed(() => {
     const sub = this.store.subscription();
+
     return (
       sub !== null &&
       CHANGEABLE_SUBSCRIPTION_STATUSES.includes(sub.status) &&
@@ -149,6 +154,7 @@ export class BillingSettingsComponent implements OnInit {
     void this.store.loadSettings();
     void this.#entitlements.load();
     const transactionId = paddleTransactionId(this.#route);
+
     if (transactionId) {
       void this.#payPaymentMethodChange(transactionId);
     }
@@ -166,7 +172,9 @@ export class BillingSettingsComponent implements OnInit {
         this.#transloco.load(`billing/${this.#transloco.getActiveLang()}`)
       ).catch(() => undefined)
     ]);
+
     dropPaddleTransactionId(this.#router);
+
     if (result === 'completed') {
       this.#notify.success('billing.settings.paymentMethodUpdated');
     } else if (result === 'unavailable') {
@@ -189,12 +197,15 @@ export class BillingSettingsComponent implements OnInit {
 
   onChangePlan(): void {
     const subscription = this.store.subscription();
+
     if (!subscription) return;
+
     const data: ChangePlanDialogData = {
       plans: this.store.plans(),
       subscription,
       currentPlan: this.store.currentPlan()
     };
+
     this.#matDialog
       .open<
         ChangePlanDialogComponent,
@@ -228,6 +239,7 @@ export class BillingSettingsComponent implements OnInit {
       this.store.subscription()?.billingMode === 'usage'
         ? 'billing.settings.cancelMessageUsage'
         : 'billing.settings.cancelMessage';
+
     this.#dialog
       .openConfirm({
         title: this.#transloco.translate('billing.settings.cancelTitle'),

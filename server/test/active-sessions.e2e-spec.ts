@@ -46,6 +46,7 @@ runWithInfra('Active sessions (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -97,7 +98,9 @@ runWithInfra('Active sessions (e2e)', () => {
     const current = (list.body as ActiveSessionResponse[]).find(
       (s) => s.current
     );
+
     if (!current) throw new Error('the new session is not in the list');
+
     return { token: tokens.access_token, sessionId: current.id };
   }
 
@@ -105,6 +108,7 @@ runWithInfra('Active sessions (e2e)', () => {
     const res = await request(http())
       .get('/api/v1/auth/profile')
       .auth(token, { type: 'bearer' });
+
     return res.status;
   }
 
@@ -120,6 +124,7 @@ runWithInfra('Active sessions (e2e)', () => {
 
     const mine = sessions.find((s) => s.id === a.sessionId);
     const theirs = sessions.find((s) => s.id === b.sessionId);
+
     expect(mine).toMatchObject({
       current: true,
       userAgent: 'Device-A',
@@ -136,12 +141,14 @@ runWithInfra('Active sessions (e2e)', () => {
   it('ends one other device at once and keeps the caller signed in', async () => {
     const a = await signIn(ownerEmail, 'Device-A');
     const b = await signIn(ownerEmail, 'Device-B');
+
     expect(await profileStatus(b.token)).toBe(200);
 
     // No factor: refused before anything is looked up.
     const refused = await request(http())
       .delete(`/api/v1/auth/sessions/${b.sessionId}`)
       .auth(a.token, { type: 'bearer' });
+
     expect(refused.status).toBe(403);
     expect(await profileStatus(b.token)).toBe(200);
 
@@ -160,6 +167,7 @@ runWithInfra('Active sessions (e2e)', () => {
         order: { createdAt: 'DESC' }
       })
     );
+
     expect(audit?.details).toEqual({ scope: 'one', count: 1 });
   }, 30000);
 
@@ -172,6 +180,7 @@ runWithInfra('Active sessions (e2e)', () => {
         .delete(`/api/v1/auth/sessions/${id}`)
         .auth(a.token, { type: 'bearer' })
         .send({ currentPassword: password });
+
       expect(res.status).toBe(404);
       expect((res.body as { errorKey?: string }).errorKey).toBe(
         ErrorKeys.AUTH.SESSION_NOT_FOUND
@@ -206,6 +215,7 @@ runWithInfra('Active sessions (e2e)', () => {
       .delete('/api/v1/auth/sessions')
       .auth(a.token, { type: 'bearer' })
       .send({ currentPassword: 'Wrong-Password-00' });
+
     expect(refused.status).toBe(403);
     expect(await profileStatus(c.token)).toBe(200);
 
@@ -214,6 +224,7 @@ runWithInfra('Active sessions (e2e)', () => {
       .auth(a.token, { type: 'bearer' })
       .send({ currentPassword: password })
       .expect(200);
+
     expect((res.body as { count: number }).count).toBeGreaterThanOrEqual(2);
 
     expect(await profileStatus(c.token)).toBe(401);
@@ -225,6 +236,7 @@ runWithInfra('Active sessions (e2e)', () => {
       .get('/api/v1/auth/sessions')
       .auth(a.token, { type: 'bearer' })
       .expect(200);
+
     expect((list.body as ActiveSessionResponse[]).map((s) => s.id)).toEqual([
       a.sessionId
     ]);

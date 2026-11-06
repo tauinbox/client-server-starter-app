@@ -16,6 +16,7 @@ export const RolesStore = signalStore(
     fallbackKey: 'admin.store.errorLoadRolesFailed',
     fetcher: () => {
       const roleService = inject(RoleService);
+
       return (request, filters) => roleService.getAllCursor(request, filters);
     }
   }),

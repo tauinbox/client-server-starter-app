@@ -40,10 +40,12 @@ describe('EntitlementService', () => {
       get: jest.fn((k: string) => Promise.resolve(cacheStore.get(k))),
       set: jest.fn((k: string, v: unknown) => {
         cacheStore.set(k, v);
+
         return Promise.resolve();
       }),
       del: jest.fn((k: string) => {
         cacheStore.delete(k);
+
         return Promise.resolve();
       })
     };
@@ -85,6 +87,7 @@ describe('EntitlementService', () => {
       async (status) => {
         withProSubscription(status);
         const resolved = await service.capabilitiesFor('user-1');
+
         expect(resolved).toEqual({
           planKey: 'pro',
           capabilities: ['reports', 'api-access', 'data-export'],
@@ -108,6 +111,7 @@ describe('EntitlementService', () => {
     it('falls back to the Free plan for a user with no customer record', async () => {
       plans.findOne.mockResolvedValue(FREE_PLAN);
       const resolved = await service.capabilitiesFor('user-1');
+
       expect(customers.findOne).toHaveBeenCalled();
       expect(subscriptions.findOne).not.toHaveBeenCalled();
       expect(resolved).toEqual({
@@ -122,12 +126,14 @@ describe('EntitlementService', () => {
       subscriptions.findOne.mockResolvedValue(null);
       plans.findOne.mockResolvedValue(FREE_PLAN);
       const resolved = await service.capabilitiesFor('user-1');
+
       expect(resolved.planKey).toBe(FREE_PLAN_KEY);
       expect(resolved.capabilities).toEqual([]);
     });
 
     it('returns an empty capability set when even the Free plan is not seeded', async () => {
       const resolved = await service.capabilitiesFor('user-1');
+
       expect(resolved).toEqual({
         planKey: FREE_PLAN_KEY,
         capabilities: [],
@@ -161,6 +167,7 @@ describe('EntitlementService', () => {
         { entitlement: 'reports', expiresAt: null, revokedAt: null }
       ]);
       const resolved = await service.capabilitiesFor('user-1');
+
       expect(resolved.capabilities).toEqual([
         'reports',
         'api-access',
@@ -177,6 +184,7 @@ describe('EntitlementService', () => {
         { entitlement: 'reports', expiresAt: null, revokedAt: null }
       ]);
       const resolved = await service.capabilitiesFor('user-1');
+
       expect(resolved.planKey).toBe(FREE_PLAN_KEY);
       expect(resolved.capabilities).toEqual(['reports']);
     });
@@ -205,6 +213,7 @@ describe('EntitlementService', () => {
         }
       ]);
       const resolved = await service.capabilitiesFor('user-1');
+
       expect(resolved.capabilities).toEqual(['data-export']);
     });
 
@@ -274,11 +283,14 @@ describe('EntitlementService', () => {
       redis = {
         get: jest.fn((key: string) => {
           const value = counters.get(key);
+
           return Promise.resolve(value === undefined ? null : String(value));
         }),
         incr: jest.fn((key: string) => {
           const next = (counters.get(key) ?? 0) + 1;
+
           counters.set(key, next);
+
           return Promise.resolve(next);
         }),
         on: jest.fn()
@@ -287,6 +299,7 @@ describe('EntitlementService', () => {
       // adapter at stores[0].store - a real KeyvRedis is required for the
       // instanceof narrowing, but no connection is opened.
       const adapter = new KeyvRedis('redis://localhost:6379');
+
       // @ts-expect-error stand-in for the node-redis client: only get/incr/on
       // are exercised, and widening the production type for a mock is banned.
       adapter.client = redis;
@@ -306,11 +319,13 @@ describe('EntitlementService', () => {
           { provide: MetricsService, useValue: metrics }
         ]
       }).compile();
+
       return module.get(EntitlementService);
     }
 
     function userCacheVersions(): string[] {
       const prefix = 'entitlements:user:user-1:u';
+
       return cache.set.mock.calls
         .map((c: unknown[]) => c[0] as string)
         .filter((k) => k.startsWith(prefix))
@@ -350,6 +365,7 @@ describe('EntitlementService', () => {
 
     it('reads the counter for the per-user cache key and starts at 0', async () => {
       const svc = await setupRedisBacked();
+
       withProSubscription('active');
 
       await svc.capabilitiesFor('user-1');
@@ -362,6 +378,7 @@ describe('EntitlementService', () => {
 
     it('invalidateUser bumps the counter of that user only', async () => {
       const svc = await setupRedisBacked();
+
       withProSubscription('active');
 
       await svc.invalidateUser('user-1');
@@ -377,6 +394,7 @@ describe('EntitlementService', () => {
 
     it('falls back to the cache-manager counter when Redis rejects', async () => {
       const svc = await setupRedisBacked();
+
       redis.incr.mockRejectedValue(new Error('connection refused'));
       redis.get.mockRejectedValue(new Error('connection refused'));
 

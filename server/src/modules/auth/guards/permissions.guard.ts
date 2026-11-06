@@ -61,6 +61,7 @@ export class PermissionsGuard implements CanActivate {
       user.userId
     );
     const auditContext = extractAuditContext(req);
+
     bindAuditContext(ability, auditContext);
 
     // Attach for downstream instance-level checks via @CurrentAbility()

@@ -90,10 +90,12 @@ function mapSubscriptionStatus(status: string): SubscriptionStatus {
 function usageChargeKeyFrom(txn: TransactionNotification): string | null {
   for (const item of txn.items ?? []) {
     const key: unknown = item.price?.customData?.['usageChargeKey'];
+
     if (typeof key === 'string') {
       return key;
     }
   }
+
   return null;
 }
 
@@ -112,10 +114,12 @@ function isOneTime(
 function inlinePriceProductIdFrom(txn: TransactionNotification): string | null {
   for (const item of txn.items ?? []) {
     const productId: unknown = item.price?.customData?.['productId'];
+
     if (typeof productId === 'string') {
       return productId;
     }
   }
+
   return null;
 }
 
@@ -130,6 +134,7 @@ function refFromCustomData(
 ): NormalizedCustomerRef {
   const customerId = customData?.['customerId'];
   const userId = customData?.['userId'];
+
   return {
     customerId: typeof customerId === 'string' ? customerId : undefined,
     userId: typeof userId === 'string' ? userId : undefined
@@ -181,6 +186,7 @@ export class PaddleProvider implements PaymentProvider {
         'Paddle is not configured'
       );
     }
+
     return this.paddle;
   }
 
@@ -245,6 +251,7 @@ export class PaddleProvider implements PaymentProvider {
       },
       checkout: { url: params.urls.successUrl }
     });
+
     return {
       url: transaction.checkout?.url ?? undefined,
       sessionRef: transaction.id
@@ -288,6 +295,7 @@ export class PaddleProvider implements PaymentProvider {
     { amountMinor, currency, description, chargeKey }: UsageCharge
   ): Promise<void> {
     const paddle = this.requireClient();
+
     await paddle.subscriptions.createOneTimeCharge(providerSubscriptionId, {
       effectiveFrom: 'immediately',
       items: [
@@ -313,23 +321,27 @@ export class PaddleProvider implements PaymentProvider {
     checkout: { url: string | null } | null;
   }): CheckoutSession {
     const url = transaction.checkout?.url;
+
     if (!url) {
       throw new ApiError(
         ErrorKeys.BILLING.PROVIDER_CHECKOUT_FAILED,
         'Paddle did not return a checkout URL'
       );
     }
+
     return { url, sessionRef: transaction.id };
   }
 
   private requirePriceId(plan: Plan): string {
     const priceId = plan.prices.paddle?.providerPriceId;
+
     if (!priceId) {
       throw new ApiError(
         ErrorKeys.BILLING.PLAN_NOT_CONFIGURED,
         `Plan "${plan.key}" has no Paddle price configured`
       );
     }
+
     return priceId;
   }
 
@@ -348,6 +360,7 @@ export class PaddleProvider implements PaymentProvider {
     plan: Plan
   ): Promise<void> {
     const paddle = this.requireClient();
+
     await paddle.subscriptions.update(providerSubscriptionId, {
       items: [{ priceId: this.requirePriceId(plan), quantity: 1 }],
       prorationBillingMode: 'prorated_immediately',
@@ -367,6 +380,7 @@ export class PaddleProvider implements PaymentProvider {
         prorationBillingMode: 'prorated_immediately'
       }
     );
+
     return {
       amountMinor: parseMinor(
         preview.immediateTransaction?.details?.totals?.total
@@ -387,13 +401,16 @@ export class PaddleProvider implements PaymentProvider {
     providerSubscriptionId: string | null
   ): Promise<CheckoutSession> {
     const paddle = this.requireClient();
+
     if (!providerSubscriptionId) {
       throw subscriptionNotLinked();
     }
+
     const transaction =
       await paddle.subscriptions.getPaymentMethodChangeTransaction(
         providerSubscriptionId
       );
+
     return this.checkoutSession(transaction);
   }
 
@@ -402,6 +419,7 @@ export class PaddleProvider implements PaymentProvider {
     mode: CancelMode
   ): Promise<void> {
     const paddle = this.requireClient();
+
     await paddle.subscriptions.cancel(providerSubscriptionId, {
       effectiveFrom:
         mode === 'immediate' ? 'immediately' : 'next_billing_period'
@@ -429,6 +447,7 @@ export class PaddleProvider implements PaymentProvider {
     ) {
       return;
     }
+
     const reason = idempotencyKey ? `Refund ${idempotencyKey}` : 'Refund';
 
     const transaction = await paddle.transactions.get(providerInvoiceRef);
@@ -441,18 +460,21 @@ export class PaddleProvider implements PaymentProvider {
         type: 'full',
         reason
       });
+
       return;
     }
 
     // Our subscription transactions carry a single line item (one plan price),
     // so a partial refund applies the amount to that item.
     const lineItem = transaction.details?.lineItems?.[0];
+
     if (!lineItem) {
       throw new ApiError(
         ErrorKeys.BILLING.PROVIDER_REFUND_FAILED,
         `Transaction ${providerInvoiceRef} has no line item to refund`
       );
     }
+
     await paddle.adjustments.create({
       transactionId: providerInvoiceRef,
       action: 'refund',
@@ -479,11 +501,13 @@ export class PaddleProvider implements PaymentProvider {
       transactionId: [transactionId],
       action: 'refund'
     });
+
     for await (const adjustment of adjustments) {
       if (adjustment.reason.includes(idempotencyKey)) {
         return true;
       }
     }
+
     return false;
   }
 
@@ -494,7 +518,9 @@ export class PaddleProvider implements PaymentProvider {
     if (!this.paddle || !this.webhookSecret) {
       return null;
     }
+
     const signature = firstHeader(headers['paddle-signature']);
+
     if (!signature) {
       return null;
     }
@@ -505,11 +531,13 @@ export class PaddleProvider implements PaymentProvider {
         this.webhookSecret,
         signature
       );
+
       return event ? this.normalize(event) : null;
     } catch (error) {
       this.logger.warn(
         `Paddle webhook verification failed: ${(error as Error).message}`
       );
+
       return null;
     }
   }
@@ -563,11 +591,13 @@ export class PaddleProvider implements PaymentProvider {
         };
       case EventName.TransactionCompleted: {
         const txn = event.data as TransactionNotification;
+
         // A payment-method-change transaction is zero-amount — no money moved,
         // nothing to reduce onto an Invoice (Paddle holds the new method).
         if (txn.origin === 'subscription_payment_method_change') {
           return WEBHOOK_IGNORED;
         }
+
         return {
           ...base,
           type: 'invoice.paid',
@@ -576,6 +606,7 @@ export class PaddleProvider implements PaymentProvider {
       }
       case EventName.TransactionPaymentFailed: {
         const txn = event.data as TransactionNotification;
+
         // An abandoned/declined method change leaves the old method in place —
         // it must not feed the dunning/payment-failed pipeline. Same for a
         // one-time purchase: nothing pending exists locally until it is paid,
@@ -586,11 +617,13 @@ export class PaddleProvider implements PaymentProvider {
         ) {
           return WEBHOOK_IGNORED;
         }
+
         const payload: NormalizedPaymentFailedPayload = {
           ref: refFromCustomData(txn.customData),
           providerSubscriptionId: txn.subscriptionId,
           usageChargeKey: usageChargeKeyFrom(txn)
         };
+
         return { ...base, type: 'payment.failed', payload };
       }
       default:

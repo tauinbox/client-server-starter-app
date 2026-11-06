@@ -51,6 +51,7 @@ describe('condition-builder types', () => {
   describe('jsonToModel', () => {
     it('parses simple equality: { "status": "active" }', () => {
       const group = jsonToModel({ status: 'active' });
+
       expect(group).not.toBeNull();
       expect(group!.logic).toBe('$and');
       expect(group!.children).toHaveLength(1);
@@ -60,6 +61,7 @@ describe('condition-builder types', () => {
         type: 'rule';
         rule: { field: string; operator: string; value: string };
       };
+
       expect(rule.field).toBe('status');
       expect(rule.operator).toBe('$eq');
       expect(rule.value).toBe('active');
@@ -67,12 +69,14 @@ describe('condition-builder types', () => {
 
     it('parses comparison operator: { "age": { "$gt": 18 } }', () => {
       const group = jsonToModel({ age: { $gt: 18 } });
+
       expect(group).not.toBeNull();
 
       const { rule } = group!.children[0] as {
         type: 'rule';
         rule: { field: string; operator: string; value: string };
       };
+
       expect(rule.field).toBe('age');
       expect(rule.operator).toBe('$gt');
       expect(rule.value).toBe('18');
@@ -84,6 +88,7 @@ describe('condition-builder types', () => {
         type: 'rule';
         rule: { field: string; operator: string; value: string };
       };
+
       expect(rule.operator).toBe('$in');
       expect(rule.value).toBe('admin, editor');
     });
@@ -92,6 +97,7 @@ describe('condition-builder types', () => {
       const group = jsonToModel({
         $or: [{ status: 'active' }, { status: 'pending' }]
       });
+
       expect(group!.logic).toBe('$or');
       expect(group!.children).toHaveLength(2);
     });
@@ -100,6 +106,7 @@ describe('condition-builder types', () => {
       const group = jsonToModel({
         $and: [{ status: 'active' }, { age: { $gt: 18 } }]
       });
+
       expect(group!.logic).toBe('$and');
       expect(group!.children).toHaveLength(2);
     });
@@ -111,6 +118,7 @@ describe('condition-builder types', () => {
           { $and: [{ age: { $gt: 18 } }, { role: 'editor' }] }
         ]
       });
+
       expect(group!.logic).toBe('$or');
       expect(group!.children).toHaveLength(2);
       expect(group!.children[1].type).toBe('group');
@@ -121,18 +129,21 @@ describe('condition-builder types', () => {
           group: { logic: string; children: unknown[] };
         }
       ).group;
+
       expect(nested.logic).toBe('$and');
       expect(nested.children).toHaveLength(2);
     });
 
     it('parses multiple top-level fields as implicit $and', () => {
       const group = jsonToModel({ status: 'active', age: { $gte: 21 } });
+
       expect(group!.logic).toBe('$and');
       expect(group!.children).toHaveLength(2);
     });
 
     it('parses empty object', () => {
       const group = jsonToModel({});
+
       expect(group).not.toBeNull();
       expect(group!.children).toHaveLength(0);
     });
@@ -163,6 +174,7 @@ describe('condition-builder types', () => {
     it('never produces a model that serializes to "[object Object]"', () => {
       for (const [, input] of unrepresentable) {
         const model = jsonToModel(input);
+
         if (model !== null) {
           expect(JSON.stringify(modelToJson(model))).not.toContain(
             '[object Object]'
@@ -177,6 +189,7 @@ describe('condition-builder types', () => {
       const group = createGroup('$and', [
         { type: 'rule', rule: createRule('status', '$eq', 'active') }
       ]);
+
       expect(modelToJson(group)).toEqual({ status: 'active' });
     });
 
@@ -184,6 +197,7 @@ describe('condition-builder types', () => {
       const group = createGroup('$and', [
         { type: 'rule', rule: createRule('age', '$gt', '18') }
       ]);
+
       expect(modelToJson(group)).toEqual({ age: { $gt: 18 } });
     });
 
@@ -191,6 +205,7 @@ describe('condition-builder types', () => {
       const group = createGroup('$and', [
         { type: 'rule', rule: createRule('role', '$in', 'admin, editor') }
       ]);
+
       expect(modelToJson(group)).toEqual({
         role: { $in: ['admin', 'editor'] }
       });
@@ -201,6 +216,7 @@ describe('condition-builder types', () => {
         { type: 'rule', rule: createRule('a', '$eq', '1') },
         { type: 'rule', rule: createRule('b', '$eq', '2') }
       ]);
+
       expect(modelToJson(group)).toEqual({
         $or: [{ a: 1 }, { b: 2 }]
       });
@@ -214,6 +230,7 @@ describe('condition-builder types', () => {
         { type: 'rule', rule: createRule('a', '$eq', '1') },
         { type: 'group', group: inner }
       ]);
+
       expect(modelToJson(outer)).toEqual({
         $or: [{ a: 1 }, { x: 'y' }]
       });
@@ -224,6 +241,7 @@ describe('condition-builder types', () => {
         { type: 'rule', rule: createRule('status', '$eq', 'active') },
         { type: 'rule', rule: createRule('age', '$gt', '18') }
       ]);
+
       expect(modelToJson(group)).toEqual({
         status: 'active',
         age: { $gt: 18 }
@@ -236,11 +254,13 @@ describe('condition-builder types', () => {
         { type: 'rule', rule: createRule('status', '$ne', 'deleted') }
       ]);
       const result = modelToJson(group);
+
       expect(result).toHaveProperty('$and');
     });
 
     it('serializes empty group as empty object', () => {
       const group = createGroup('$and', []);
+
       expect(modelToJson(group)).toEqual({});
     });
   });
@@ -254,6 +274,7 @@ describe('condition-builder types', () => {
         { type: 'rule', rule: topRule },
         { type: 'group', group: nested }
       ]);
+
       return { root, nested, nestedRule, topRule };
     }
 
@@ -317,6 +338,7 @@ describe('condition-builder types', () => {
     for (const [name, input] of cases) {
       it(`roundtrips: ${name}`, () => {
         const model = jsonToModel(input);
+
         expect(model).not.toBeNull();
         expect(modelToJson(model!)).toEqual(input);
       });

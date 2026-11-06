@@ -128,6 +128,7 @@ describe('ChangePlanDialogComponent', () => {
         'mat-dialog-actions button'
       )
     );
+
     return buttons.at(-1)!;
   }
 
@@ -142,6 +143,7 @@ describe('ChangePlanDialogComponent', () => {
     const names = optionButtons().map((btn) =>
       btn.querySelector('.option-name')?.textContent?.trim()
     );
+
     expect(names).toEqual(['Free', 'Business']);
     expect(billingMock.previewChange).not.toHaveBeenCalled();
     expect(confirmButton().disabled).toBe(true);
@@ -158,6 +160,7 @@ describe('ChangePlanDialogComponent', () => {
     const credit = ledger.querySelector('.credit').textContent;
     const charge = ledger.querySelector('.charge').textContent;
     const dueNow = ledger.querySelector('.due-now dd').textContent;
+
     expect(credit).toContain('−');
     expect(credit).toContain('430');
     expect(charge).toContain('+');
@@ -183,6 +186,7 @@ describe('ChangePlanDialogComponent', () => {
     fixture.detectChanges();
 
     const ledger = fixture.nativeElement.querySelector('.ledger');
+
     expect(ledger.querySelector('.credit')).toBeNull();
     expect(ledger.querySelector('.charge')).toBeNull();
     expect(ledger.querySelector('.due-now dd').textContent).toContain('17');
@@ -207,6 +211,7 @@ describe('ChangePlanDialogComponent', () => {
     fixture.detectChanges();
 
     const dueNow = fixture.nativeElement.querySelector('.due-now dd');
+
     expect(dueNow.textContent).not.toContain('−');
     expect(dueNow.textContent).toContain('430');
   });
@@ -219,6 +224,7 @@ describe('ChangePlanDialogComponent', () => {
 
     expect(billingMock.previewChange).toHaveBeenCalledWith('usage');
     const options = optionButtons();
+
     expect(options).toHaveLength(1);
     expect(options[0].classList.contains('selected')).toBe(true);
   });

@@ -22,6 +22,7 @@ describe('PlanService', () => {
 
   it('returns only active plans, ordered oldest first', async () => {
     const plans = [{ key: 'free' } as Plan, { key: 'pro' } as Plan];
+
     repo.find.mockResolvedValue(plans);
 
     const result = await service.findActive();

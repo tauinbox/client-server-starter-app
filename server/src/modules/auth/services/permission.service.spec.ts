@@ -103,6 +103,7 @@ describe('PermissionService', () => {
           conditions: null
         }
       ];
+
       mockCacheManager.get.mockResolvedValue(cachedPermissions);
 
       const result = await service.getPermissionsForUser('user-1');
@@ -167,6 +168,7 @@ describe('PermissionService', () => {
           }
         ]
       };
+
       mockUserRepository.findOne.mockResolvedValue(userWithMultipleRoles);
 
       const result = await service.getPermissionsForUser('user-1');
@@ -202,6 +204,7 @@ describe('PermissionService', () => {
           }
         ]
       };
+
       mockUserRepository.findOne.mockResolvedValue(userWithAllowAndDeny);
 
       const result = await service.getPermissionsForUser('user-1');
@@ -232,6 +235,7 @@ describe('PermissionService', () => {
         effect: 'deny',
         custom: '{"email":"b@victim.test"}'
       };
+
       mockUserRepository.findOne.mockResolvedValue({
         id: 'user-1',
         roles: [
@@ -261,6 +265,7 @@ describe('PermissionService', () => {
 
     it('should deduplicate rows whose conditions are equal', async () => {
       const deny = { effect: 'deny', fieldMatch: { status: ['locked'] } };
+
       mockUserRepository.findOne.mockResolvedValue({
         id: 'user-1',
         roles: [
@@ -308,6 +313,7 @@ describe('PermissionService', () => {
 
     it('should return cached roles if available', async () => {
       const cachedRoles = [{ name: 'admin', isSuper: true }];
+
       mockCacheManager.get.mockResolvedValue(cachedRoles);
 
       const result = await service.getRolesForUser('user-1');
@@ -383,6 +389,7 @@ describe('PermissionService', () => {
         number,
         number
       ];
+
       expect(version).toBeGreaterThan(7);
       expect(mockCacheManager.del).not.toHaveBeenCalled();
     });

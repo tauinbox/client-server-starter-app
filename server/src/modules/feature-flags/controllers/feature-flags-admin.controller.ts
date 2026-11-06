@@ -113,7 +113,9 @@ export class FeatureFlagsAdminController {
     @Res({ passthrough: true }) res: Response
   ) {
     const flag = await this.flagService.findOne(id, ability, req.user?.userId);
+
     res.setHeader('ETag', versionEtag(flag.version));
+
     return flag;
   }
 
@@ -134,11 +136,13 @@ export class FeatureFlagsAdminController {
       ability,
       this.auditActor(req)
     );
+
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent()
     );
     res.setHeader('ETag', versionEtag(flag.version));
+
     return flag;
   }
 
@@ -169,11 +173,13 @@ export class FeatureFlagsAdminController {
       ability,
       actor: this.auditActor(req)
     });
+
     this.eventEmitter.emit(
       FeatureFlagChangedEvent.name,
       new FeatureFlagChangedEvent()
     );
     res.setHeader('ETag', versionEtag(flag.version));
+
     return flag;
   }
 
@@ -217,6 +223,7 @@ export class FeatureFlagsAdminController {
     @CurrentAbility() ability: AppAbility
   ) {
     const flag = await this.flagService.findOne(id, ability, req.user?.userId);
+
     return this.flagService.preview(flag, dto);
   }
 
@@ -230,18 +237,21 @@ export class FeatureFlagsAdminController {
 
   private parseIfMatch(header: string | undefined): IfMatchCondition {
     const condition = parseIfMatch(header);
+
     if (condition === 'missing') {
       throw new ApiError(
         ErrorKeys.FEATURE_FLAGS.IF_MATCH_REQUIRED,
         'If-Match header is required for optimistic locking'
       );
     }
+
     if (condition === 'invalid') {
       throw new ApiError(
         ErrorKeys.FEATURE_FLAGS.IF_MATCH_INVALID,
         'If-Match must be "*" or a list of entity tags'
       );
     }
+
     return condition;
   }
 }

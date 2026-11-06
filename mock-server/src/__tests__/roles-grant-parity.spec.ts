@@ -10,6 +10,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -31,8 +32,10 @@ async function loginAsAdmin(): Promise<string> {
       password: 'Password1'
     })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -42,7 +45,9 @@ const UNKNOWN_ID = '00000000-0000-4000-8000-000000000000';
 
 function softDeleteUser(id: string): void {
   const user = getState().users.get(id);
+
   if (!user) throw new Error(`Seed user ${id} is missing`);
+
   user.deletedAt = new Date().toISOString();
 }
 
@@ -58,9 +63,11 @@ function permissionIdFor(resourceId: string, actionId: string): string {
   const permission = getState()
     .permissions.values()
     .find((p) => p.resourceId === resourceId && p.actionId === actionId);
+
   if (!permission) {
     throw new Error(`Seed permission ${resourceId}/${actionId} is missing`);
   }
+
   return permission.id;
 }
 
@@ -103,6 +110,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string; errorKey: string };
+
       expect(body.message).toBe(`Permission ${mockId('perm-nope')} not found`);
       expect(body.errorKey).toBe('errors.roles.unknownPermission');
       expect(editorPermissionIds()).toEqual([]);
@@ -110,6 +118,7 @@ describe('role grant error parity with server', () => {
 
     it('returns 409 UNIQUE_VIOLATION on a duplicate pair without partial writes', async () => {
       const token = await loginAsAdmin();
+
       getState().rolePermissions.push({
         id: 'rp-test',
         roleId: mockId('role-editor'),
@@ -135,6 +144,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(409);
       const body = (await res.json()) as { message: string; errorKey: string };
+
       expect(body.message).toBe('A record with this value already exists');
       expect(body.errorKey).toBe('errors.db.uniqueViolation');
       expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
@@ -144,6 +154,7 @@ describe('role grant error parity with server', () => {
   describe('PUT /api/v1/roles/:id/permissions', () => {
     it('returns 422 UNKNOWN_PERMISSION for an unknown id and leaves the set untouched', async () => {
       const token = await loginAsAdmin();
+
       getState().rolePermissions.push({
         id: 'rp-test',
         roleId: mockId('role-editor'),
@@ -170,6 +181,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string; errorKey: string };
+
       expect(body.message).toBe(`Permission ${mockId('perm-nope')} not found`);
       expect(body.errorKey).toBe('errors.roles.unknownPermission');
       expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
@@ -201,6 +213,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { message: string; errorKey: string };
+
       expect(body.message).toContain('Cannot grant create:User');
       expect(body.errorKey).toBe('errors.roles.conditionNotApplicable');
       expect(editorPermissionIds()).toEqual([]);
@@ -208,6 +221,7 @@ describe('role grant error parity with server', () => {
 
     it('rejects userAttr on a create grant with 422 on PUT and leaves the set untouched', async () => {
       const token = await loginAsAdmin();
+
       getState().rolePermissions.push({
         id: 'rp-test',
         roleId: mockId('role-editor'),
@@ -240,6 +254,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(422);
       const body = (await res.json()) as { errorKey: string };
+
       expect(body.errorKey).toBe('errors.roles.conditionNotApplicable');
       expect(editorPermissionIds()).toEqual([mockId('perm-1')]);
     });
@@ -294,10 +309,12 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(409);
       const body = (await res.json()) as { message: string; errorKey: string };
+
       expect(body.message).toBe('A record with this value already exists');
       expect(body.errorKey).toBe('errors.db.uniqueViolation');
 
       const user = getState().users.get(mockId('user-2'));
+
       expect(user?.roles).toEqual(['user']);
       expect(user?.tokenRevokedAt).toBeNull();
       expect(
@@ -322,6 +339,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(201);
       const user = getState().users.get(mockId('user-2'));
+
       expect(user?.roles).toEqual(['user', 'editor']);
       expect(user?.tokenRevokedAt).not.toBeNull();
       expect(
@@ -343,11 +361,13 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(404);
       const body = (await res.json()) as { errorKey: string };
+
       expect(body.errorKey).toBe('errors.users.notFound');
     });
 
     it('returns 404 USERS.NOT_FOUND for a soft-deleted user without changing roles', async () => {
       const token = await loginAsAdmin();
+
       softDeleteUser(mockId('user-2'));
 
       const res = await fetch(
@@ -364,6 +384,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(404);
       const body = (await res.json()) as { errorKey: string };
+
       expect(body.errorKey).toBe('errors.users.notFound');
       expect(getState().users.get(mockId('user-2'))?.roles).toEqual(['user']);
     });
@@ -383,11 +404,13 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(404);
       const body = (await res.json()) as { errorKey: string };
+
       expect(body.errorKey).toBe('errors.users.notFound');
     });
 
     it('returns 404 USERS.NOT_FOUND for a soft-deleted user without changing roles', async () => {
       const token = await loginAsAdmin();
+
       softDeleteUser(mockId('user-2'));
 
       const res = await fetch(
@@ -400,6 +423,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(404);
       const body = (await res.json()) as { errorKey: string };
+
       expect(body.errorKey).toBe('errors.users.notFound');
       expect(getState().users.get(mockId('user-2'))?.roles).toEqual(['user']);
     });
@@ -417,9 +441,11 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(404);
       const body = (await res.json()) as { message: string; errorKey: string };
+
       expect(body.message).toBe('The user does not hold this role');
       expect(body.errorKey).toBe('errors.roles.roleNotAssigned');
       const user = getState().users.get(mockId('user-2'));
+
       expect(user?.roles).toEqual(['user']);
       expect(user?.tokenRevokedAt).toBeNull();
       expect(
@@ -435,6 +461,7 @@ describe('role grant error parity with server', () => {
       const absent = [...getState().permissions.values()]
         .map((p) => p.id)
         .find((id) => !held.includes(id));
+
       if (!absent) throw new Error('The editor role holds every permission');
 
       const res = await fetch(
@@ -447,6 +474,7 @@ describe('role grant error parity with server', () => {
 
       expect(res.status).toBe(404);
       const body = (await res.json()) as { message: string; errorKey: string };
+
       expect(body.message).toBe('The role does not hold this permission');
       expect(body.errorKey).toBe('errors.roles.permissionNotAssigned');
       expect(editorPermissionIds()).toEqual(held);

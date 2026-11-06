@@ -11,6 +11,7 @@ const email = 'user@example.com';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -33,6 +34,7 @@ function postJson(path: string, body: unknown): Promise<Response> {
 
 function makeUnverified(active: boolean): void {
   const user = findUserByEmail(email);
+
   expect(user).toBeDefined();
   user!.isEmailVerified = false;
   user!.isActive = active;

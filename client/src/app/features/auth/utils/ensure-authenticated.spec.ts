@@ -72,6 +72,7 @@ describe('ensureAuthenticated', () => {
 
     expect(result).toBeInstanceOf(Observable);
     const value = await firstValueFrom(result as Observable<GuardResult>);
+
     expect(value).toBe(true);
   });
 
@@ -91,6 +92,7 @@ describe('ensureAuthenticated', () => {
     const value = await firstValueFrom(
       run('/dashboard') as Observable<GuardResult>
     );
+
     expect(value).toBe(true);
   });
 
@@ -125,6 +127,7 @@ describe('ensureAuthenticated', () => {
     const value = await firstValueFrom(
       run('/dashboard', () => of(true)) as Observable<GuardResult>
     );
+
     expect(value).toBe(true);
   });
 
@@ -136,6 +139,7 @@ describe('ensureAuthenticated', () => {
         router.createUrlTree(['/forbidden'])
       ) as Observable<GuardResult>
     );
+
     expect(String(value)).toBe('/forbidden');
   });
 });

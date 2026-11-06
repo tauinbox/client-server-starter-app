@@ -12,8 +12,10 @@ test.describe('User effective permissions page', () => {
     page
   }) => {
     const rbacRequests: string[] = [];
+
     page.on('request', (req) => {
       const { pathname } = new URL(req.url());
+
       if (pathname.startsWith('/api/v1/rbac/')) rbacRequests.push(pathname);
     });
 
@@ -23,6 +25,7 @@ test.describe('User effective permissions page', () => {
     const catalog = page.waitForResponse(
       (r) => new URL(r.url()).pathname === '/api/v1/rbac/resources'
     );
+
     // A regular user: a super role shows no resource groups.
     await page.goto(`/admin/users/${mockId('user-2')}/permissions`);
     expect((await catalog).status()).toBe(200);

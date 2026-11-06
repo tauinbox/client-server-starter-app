@@ -25,6 +25,7 @@ function account(provider: string): OAuthAccount {
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -59,6 +60,7 @@ async function accessToken(userId: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId })
   });
+
   expect(dataRes.status).toBe(200);
   const { token } = (await dataRes.json()) as { token: string };
 
@@ -66,10 +68,12 @@ async function accessToken(userId: string): Promise<string> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
+
   expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as {
     tokens: { access_token: string };
   };
+
   return body.tokens.access_token;
 }
 
@@ -79,8 +83,10 @@ async function issueProof(userId: string, operation: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId, operation })
   });
+
   expect(res.status).toBe(200);
   const { token } = (await res.json()) as { token: string };
+
   return token;
 }
 
@@ -105,6 +111,7 @@ function unlink(
 describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () => {
   it('refuses an account that holds a password and sends none', async () => {
     const user = passwordUser();
+
     getState().oauthAccounts.set(user.id, [account('google')]);
     const token = await accessToken(user.id);
 
@@ -120,6 +127,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
 
   it('refuses a wrong password and records the refusal', async () => {
     const user = passwordUser();
+
     getState().oauthAccounts.set(user.id, [account('google')]);
     const token = await accessToken(user.id);
 
@@ -133,6 +141,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
     const audit = getState().auditLogs.filter(
       (row) => row.action === 'STEP_UP_FAILURE'
     );
+
     expect(audit).toHaveLength(1);
     expect(audit[0]).toMatchObject({
       actorId: user.id,
@@ -145,6 +154,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
 
   it('accepts the current password', async () => {
     const user = passwordUser();
+
     getState().oauthAccounts.set(user.id, [account('google')]);
     const token = await accessToken(user.id);
 
@@ -175,6 +185,7 @@ describe('DELETE /api/v1/auth/oauth/accounts/:provider demands a step-up', () =>
   it('accepts an authenticator code on an account with no password', async () => {
     seedOAuthOnlyUser(['google', 'facebook']);
     const token = await accessToken(OAUTH_ONLY_ID);
+
     // Enrolled after the sign-in, which would otherwise answer with a challenge.
     getState().users.get(OAUTH_ONLY_ID)!.totpEnabledAt =
       '2025-01-01T00:00:00.000Z';

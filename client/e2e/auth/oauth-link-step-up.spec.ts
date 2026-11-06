@@ -75,6 +75,7 @@ test.describe('Linking a provider demands a step-up', () => {
     await page.goto('/profile');
 
     const linkCalls: number[] = [];
+
     page.on('response', (res) => {
       if (
         res.url().includes('/auth/oauth/link-init') &&
@@ -87,6 +88,7 @@ test.describe('Linking a provider demands a step-up', () => {
     await connectButton(page, 'Google').click();
 
     const prompt = page.locator('.oauth-step-up-confirm');
+
     await expect(prompt).toBeVisible();
     // The prompt is the whole point: nothing is minted before a factor lands.
     expect(linkCalls).toEqual([]);
@@ -116,10 +118,12 @@ test.describe('Linking a provider demands a step-up', () => {
     await connectButton(page, 'Google').click();
 
     const prompt = page.locator('.oauth-step-up-confirm');
+
     await expect(prompt).toBeVisible();
 
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
+
       for (const width of [375, 768, 1366]) {
         await page.setViewportSize({ width, height: 900 });
         const overflow = await page.evaluate(
@@ -127,12 +131,14 @@ test.describe('Linking a provider demands a step-up', () => {
             document.documentElement.scrollWidth -
             document.documentElement.clientWidth
         );
+
         expect(
           overflow,
           `horizontal overflow at ${width}px in ${colorScheme}`
         ).toBeLessThanOrEqual(0);
       }
     }
+
     await page.emulateMedia({ colorScheme: 'light' });
     await page.setViewportSize({ width: 1366, height: 900 });
 
@@ -147,6 +153,7 @@ test.describe('Linking a provider demands a step-up', () => {
     await prompt.getByRole('button', { name: 'Continue' }).click();
 
     const response = await accepted;
+
     expect(response.status()).toBe(201);
     expect(response.request().postDataJSON()).toEqual({
       currentPassword: 'Password1'
@@ -181,9 +188,11 @@ test.describe('Linking a provider demands a step-up', () => {
         res.request().method() === 'POST',
       { timeout: 15_000 }
     );
+
     await connectButton(page, 'Facebook').click();
 
     const response = await initiated;
+
     expect(response.request().postDataJSON()).toEqual({
       operation: STEP_UP_OPERATION.OAUTH_LINK
     });
@@ -206,6 +215,7 @@ test.describe('Linking a provider demands a step-up', () => {
       providerUserId,
       STEP_UP_OPERATION.OAUTH_LINK
     );
+
     await seedProof(page, token);
 
     // Seed before the document runs: the page reads and clears the key during
@@ -227,6 +237,7 @@ test.describe('Linking a provider demands a step-up', () => {
     await page.goto('/profile?reauth=ok');
 
     const response = await accepted;
+
     expect(response.status()).toBe(201);
     await page.waitForURL(/\/api\/v1\/auth\/oauth\/facebook/, {
       timeout: 15_000
@@ -257,6 +268,7 @@ test.describe('Linking a provider demands a step-up', () => {
     await page.goto('/profile?oauth_error=reauth_failed');
 
     const snackbar = page.locator('mat-snack-bar-container');
+
     await expect(snackbar).toBeVisible({ timeout: 5000 });
     await expect(snackbar).toContainText('We could not confirm it is you');
 
@@ -283,6 +295,7 @@ test.describe('Linking a provider demands a step-up', () => {
       providerUserId,
       STEP_UP_OPERATION.MFA_SETUP
     );
+
     await seedProof(page, token);
     await page.addInitScript(() =>
       sessionStorage.setItem(

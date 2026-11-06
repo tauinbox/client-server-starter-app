@@ -46,6 +46,7 @@ async function accessToken(userId: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ userId })
   });
+
   expect(dataRes.status).toBe(200);
   const { token } = (await dataRes.json()) as { token: string };
 
@@ -53,10 +54,12 @@ async function accessToken(userId: string): Promise<string> {
     method: 'POST',
     headers: { cookie: `oauth_data=${token}` }
   });
+
   expect(exchange.status).toBe(201);
   const body = (await exchange.json()) as {
     tokens: { access_token: string };
   };
+
   return body.tokens.access_token;
 }
 

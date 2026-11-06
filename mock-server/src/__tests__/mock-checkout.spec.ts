@@ -27,11 +27,13 @@ async function login(): Promise<{ token: string; userId: string }> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'user@example.com', password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
     tokens: { access_token: string };
     user: { id: string };
   };
+
   return { token: body.tokens.access_token, userId: body.user.id };
 }
 
@@ -59,9 +61,12 @@ async function openSession(
   body: unknown
 ): Promise<CheckoutSessionResponse> {
   const res = await call(token, { method: 'POST', path, body });
+
   expect(res.status).toBe(200);
   const session = (await res.json()) as CheckoutSessionResponse;
+
   expect(session.url).toBe(`/api/__mock-checkout/${session.sessionRef}`);
+
   return session;
 }
 
@@ -82,15 +87,19 @@ describe('mock checkout page', () => {
     const session = await openSession(token, '/checkout', { planKey: 'pro' });
 
     const page = await fetch(`${baseUrl}${session.url}`);
+
     expect(page.status).toBe(200);
     const html = await page.text();
+
     expect(html).toContain('Plan: Pro');
     expect(html).toContain('href="/billing/cancel"');
 
     const paid = await pay(session.url);
+
     await expectReturnTo(paid, '/billing/success');
 
     const subscriptions = [...getState().billingSubscriptions.values()];
+
     expect(subscriptions).toEqual([
       expect.objectContaining({ planKey: 'pro', status: 'active' })
     ]);
@@ -99,6 +108,7 @@ describe('mock checkout page', () => {
 
   it('settles on the provider of the checkout after a region override', async () => {
     const { token } = await login();
+
     expect(
       (
         await call(token, {
@@ -109,11 +119,13 @@ describe('mock checkout page', () => {
       ).status
     ).toBe(200);
     const session = await openSession(token, '/checkout', { planKey: 'pro' });
+
     expect(session.provider).toBe('yookassa');
 
     expect((await pay(session.url)).status).toBe(200);
 
     const state = getState();
+
     expect([...state.billingSubscriptions.values()]).toEqual([
       expect.objectContaining({ provider: 'yookassa', status: 'active' })
     ]);
@@ -125,7 +137,9 @@ describe('mock checkout page', () => {
   describe('a YooKassa first payment that activates nothing is refunded', () => {
     async function ruSession(token: string, planKey: string) {
       const session = await openSession(token, '/checkout', { planKey });
+
       expect(session.provider).toBe('yookassa');
+
       return session;
     }
 
@@ -135,6 +149,7 @@ describe('mock checkout page', () => {
 
     it('when a second tab pays the same plan', async () => {
       const { token } = await login();
+
       await call(token, {
         method: 'PUT',
         path: '/region',
@@ -154,12 +169,14 @@ describe('mock checkout page', () => {
 
     it('when a later checkout moved the row to another plan', async () => {
       const { token } = await login();
+
       await call(token, {
         method: 'PUT',
         path: '/region',
         body: { region: 'ru' }
       });
       const tabA = await ruSession(token, 'pro');
+
       await ruSession(token, 'business');
 
       expect((await pay(tabA.url)).status).toBe(200);
@@ -177,12 +194,14 @@ describe('mock checkout page', () => {
 
     it('when the row was cancelled first', async () => {
       const { token } = await login();
+
       await call(token, {
         method: 'PUT',
         path: '/region',
         body: { region: 'ru' }
       });
       const session = await ruSession(token, 'pro');
+
       for (const sub of getState().billingSubscriptions.values()) {
         sub.status = 'canceled';
       }
@@ -198,9 +217,11 @@ describe('mock checkout page', () => {
 
   it('gives one trial for each customer: a checkout after a cancel pays in full', async () => {
     const { token } = await login();
+
     for (const plan of getState().plans.values()) {
       if (plan.key === 'pro') plan.trialDays = 14;
     }
+
     await call(token, {
       method: 'PUT',
       path: '/region',
@@ -208,11 +229,13 @@ describe('mock checkout page', () => {
     });
 
     const first = await openSession(token, '/checkout', { planKey: 'pro' });
+
     expect((await pay(first.url)).status).toBe(200);
     expect([...getState().billingSubscriptions.values()]).toEqual([
       expect.objectContaining({ status: 'trialing' })
     ]);
     const [customer] = getState().billingCustomers.values();
+
     expect(customer.trialUsedAt).toEqual(expect.any(String));
 
     const cancel = await call(token, {
@@ -222,12 +245,14 @@ describe('mock checkout page', () => {
         mode: 'immediate'
       }
     });
+
     expect(cancel.status).toBe(200);
 
     const second = await openSession(token, '/checkout', { planKey: 'pro' });
     const open = getState()
       .billingSubscriptions.values()
       .find((s) => s.status === 'incomplete');
+
     expect(open?.trialEnd).toBeNull();
     expect((await pay(second.url)).status).toBe(200);
 
@@ -246,10 +271,12 @@ describe('mock checkout page', () => {
     });
 
     const html = await (await fetch(`${baseUrl}${session.url}`)).text();
+
     expect(html).toContain('Report pack');
     expect(html).toContain('$5.00');
 
     const paid = await pay(session.url);
+
     await expectReturnTo(paid, '/billing/success');
     expect([...getState().billingInvoices.values()]).toEqual([
       expect.objectContaining({
@@ -263,6 +290,7 @@ describe('mock checkout page', () => {
 
   it('returns a payment-method update to the settings page', async () => {
     const { token, userId } = await login();
+
     await fetch(`${baseUrl}/__control/billing/activate-subscription`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -271,14 +299,17 @@ describe('mock checkout page', () => {
     const session = await openSession(token, '/payment-method', {});
 
     const html = await (await fetch(`${baseUrl}${session.url}`)).text();
+
     expect(html).toContain('href="/billing/settings"');
 
     const paid = await pay(session.url);
+
     await expectReturnTo(paid, '/billing/settings');
   });
 
   it('answers 404 for an unknown session', async () => {
     const res = await fetch(`${baseUrl}/api/__mock-checkout/unknown`);
+
     expect(res.status).toBe(404);
     expect((await pay('/api/__mock-checkout/unknown')).status).toBe(404);
   });

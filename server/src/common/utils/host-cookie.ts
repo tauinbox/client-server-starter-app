@@ -64,5 +64,6 @@ export function readHostCookie(
   const value = (req.cookies as Record<string, unknown> | undefined)?.[
     cookieName(base, secure)
   ];
+
   return typeof value === 'string' && value !== '' ? value : undefined;
 }

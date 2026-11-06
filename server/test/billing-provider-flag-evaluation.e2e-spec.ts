@@ -38,6 +38,7 @@ runWithInfra('Billing provider kill switch evaluation (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [CoreModule.forRoot()]
     }).compile();
+
     app = moduleRef.createNestApplication();
     await app.init();
 
@@ -55,7 +56,9 @@ runWithInfra('Billing provider kill switch evaluation (e2e)', () => {
       );
       await resolver.invalidateAll();
     }
+
     await app?.close();
+
     for (const [name, value] of savedEnv) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;

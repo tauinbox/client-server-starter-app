@@ -39,6 +39,7 @@ describe('validateRulePayload user and role lists', () => {
 
   it('accepts 100 UUIDs', () => {
     const userIds = Array.from({ length: 100 }, (_, i) => uuid(i));
+
     expect(
       validateRulePayload({ type: 'user', userIds }, noCustomKeys)
     ).toEqual({ type: 'user', userIds });
@@ -62,6 +63,7 @@ describe('validateRulePayload user and role lists', () => {
     const roleNames = Array.from({ length: 32 }, (_, i) =>
       String(i).padEnd(100, 'x')
     );
+
     expect(
       validateRulePayload({ type: 'role', roleNames }, noCustomKeys)
     ).toEqual({ type: 'role', roleNames });
@@ -145,6 +147,7 @@ describe('validateRulePayload attribute value', () => {
 
   function validate(op: string, value: unknown): unknown {
     const field = op === 'before' || op === 'after' ? 'createdAt' : 'email';
+
     return validateRulePayload(
       { type: 'attribute', field, op, value },
       knownCustomKeys
@@ -261,6 +264,7 @@ describe('validateRulePayload attribute value', () => {
             : op === 'before' || op === 'after'
               ? '2026-01-01T00:00:00Z'
               : 'x';
+
         expect(
           validateRulePayload(
             {

@@ -25,5 +25,6 @@ export function catalogText(
 ): string {
   const key = `billing.catalog.${kind}.${item.key}.${field}`;
   const translation = transloco.getTranslation(transloco.getActiveLang());
+
   return key in translation ? transloco.translate(key) : (item[field] ?? '');
 }

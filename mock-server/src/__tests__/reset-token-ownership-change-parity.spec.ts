@@ -16,6 +16,7 @@ const PENDING_TOKEN = 'pending-token-ownership-parity';
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -53,16 +54,21 @@ function adminRequest(
 
 async function login(email: string): Promise<string> {
   const res = await postAuth('login', { email, password: SEED_PASSWORD });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
 async function issueResetToken(email: string): Promise<string> {
   const res = await postAuth('forgot-password', { email });
+
   expect(res.status).toBe(200);
   const [token] = [...getState().passwordResetTokens.keys()];
+
   expect(token).toBeDefined();
+
   return token;
 }
 
@@ -72,6 +78,7 @@ async function expectResetRefused(resetToken: string): Promise<void> {
     token: resetToken,
     password: 'Amber-Signal-42'
   });
+
   expect(reset.status).toBe(422);
   expect(await reset.json()).toMatchObject({
     errorKey: ErrorKeys.AUTH.INVALID_RESET_TOKEN
@@ -82,6 +89,7 @@ describe('a reset link dies with an ownership change', () => {
   it('refuses the link after the owner confirms an email change', async () => {
     const resetToken = await issueResetToken(USER_EMAIL);
     const user = findUserByEmail(USER_EMAIL)!;
+
     user.pendingEmail = MOVED_EMAIL;
     user.pendingEmailToken = PENDING_TOKEN;
     user.pendingEmailExpiresAt = new Date(Date.now() + 86400000).toISOString();
@@ -90,6 +98,7 @@ describe('a reset link dies with an ownership change', () => {
     const confirm = await postAuth('profile/email/confirm', {
       token: PENDING_TOKEN
     });
+
     expect(confirm.status).toBe(200);
     expect(user.email).toBe(MOVED_EMAIL);
 
@@ -108,6 +117,7 @@ describe('a reset link dies with an ownership change', () => {
         currentPassword: SEED_PASSWORD
       }
     });
+
     expect(res.status).toBe(200);
 
     await expectResetRefused(resetToken);
@@ -126,6 +136,7 @@ describe('a reset link dies with an ownership change', () => {
           isActive
         }
       });
+
       expect(res.status).toBe(200);
     }
 
@@ -140,10 +151,12 @@ describe('a reset link dies with an ownership change', () => {
     const removed = await adminRequest('DELETE', userId, {
       accessToken: adminToken
     });
+
     expect(removed.ok).toBe(true);
     const restored = await adminRequest('POST', `${userId}/restore`, {
       accessToken: adminToken
     });
+
     expect(restored.ok).toBe(true);
 
     await expectResetRefused(resetToken);
@@ -160,6 +173,7 @@ describe('a reset link dies with an ownership change', () => {
         name: 'Renamed'
       }
     });
+
     expect(res.status).toBe(200);
 
     expect(getState().passwordResetTokens.has(resetToken)).toBe(true);

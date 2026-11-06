@@ -102,6 +102,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   readonly #dialogRef = inject(
     MatDialogRef<FeatureFlagFormDialogComponent, FeatureFlagResponse>
   );
+
   readonly #store = inject(FeatureFlagsAdminStore);
   readonly #shortcuts = inject(KeyboardShortcutsService);
   readonly #adaptiveDialog = inject(AdaptiveDialogService);
@@ -124,6 +125,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     // long form, so it is brought on screen when it appears.
     afterRenderEffect(() => {
       const el = this.formErrorEl()?.nativeElement as HTMLElement | undefined;
+
       el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }
@@ -202,6 +204,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
       )
       .subscribe((response) => {
         if (response === null) return;
+
         this.#customKeys.set(new Set(response.customKeys));
       });
 
@@ -238,6 +241,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
 
   addRule(): void {
     const next = [...this.rules()];
+
     next.push({
       effect: 'include',
       payload: { type: 'percentage', percent: 0 }
@@ -247,12 +251,14 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
 
   updateRule(index: number, draft: FeatureFlagRuleDraft): void {
     const next = [...this.rules()];
+
     next[index] = draft;
     this.rules.set(next);
   }
 
   removeRule(index: number): void {
     const next = [...this.rules()];
+
     next.splice(index, 1);
     this.rules.set(next);
   }
@@ -260,6 +266,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
   submit(): void {
     if (this.flagForm().invalid() || this.hasRuleErrors() || this.isLoading())
       return;
+
     if (this.enabled() && !hasIncludeRule(this.rules())) {
       confirmEnableForEveryone(
         this.#adaptiveDialog,
@@ -270,8 +277,10 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
         .subscribe((confirmed) => {
           if (confirmed) this.#save();
         });
+
       return;
     }
+
     this.#save();
   }
 
@@ -329,11 +338,13 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
     // expanding the panel adds ~400px of content below the visible fold, so
     // we explicitly reveal the bottom of the panel where the Run button lives.
     const el = this.previewPanelEl()?.nativeElement as HTMLElement | undefined;
+
     el?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }
 
   #rulesChanged(): boolean {
     if (!this.data.flag) return this.rules().length > 0;
+
     const original = this.data.flag.rules.map((r) => ({
       effect: r.effect,
       payload: r.payload
@@ -342,6 +353,7 @@ export class FeatureFlagFormDialogComponent implements OnInit, OnDestroy {
       effect: r.effect,
       payload: r.payload
     }));
+
     return !deepEqual(original, current);
   }
 }

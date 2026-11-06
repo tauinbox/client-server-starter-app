@@ -20,6 +20,7 @@ export class ConfirmBottomSheetComponent implements OnInit, OnDestroy {
   readonly bottomSheetRef = inject(
     MatBottomSheetRef<ConfirmBottomSheetComponent>
   );
+
   readonly data: ConfirmDialogData = inject(MAT_BOTTOM_SHEET_DATA);
   readonly #shortcuts = inject(KeyboardShortcutsService);
 

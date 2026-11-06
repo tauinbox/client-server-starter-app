@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",
     "check:imports": "node ../scripts/check-imports.mjs",
+    "check:versions": "node ../scripts/check-workspace-versions.mjs",
     "audit:ci": "node ../scripts/audit-ci.mjs"
   },
   "dependencies": {
@@ -26,25 +27,27 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
+    "@types/node": "^26.6.6",
     "@types/validator": "^13.15.10",
-    "@typescript-eslint/parser": "^8.71.1",
-    "eslint": "^10.12.0",
+    "@typescript-eslint/parser": "^8.72.1",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-unicorn": "^79.0.0",
     "jest": "^30.5.2",
     "jiti": "^2.7.0",
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "ts-jest": "^29.4.14",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.71.1"
+    "typescript-eslint": "^8.72.1"
   },
   "overrides": {
     "@istanbuljs/load-nyc-config": {

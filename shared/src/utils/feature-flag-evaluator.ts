@@ -104,7 +104,9 @@ function matchesRule(
     case 'percentage': {
       const id =
         payload.bucketBy === 'device' ? ctx.anonId : (ctx.userId ?? ctx.anonId);
+
       if (id === null) return false;
+
       return percentageBucket(id, flagKey) < payload.percent;
     }
     case 'attribute':
@@ -118,8 +120,11 @@ function matchesAttribute(
 ): boolean {
   const fieldKey =
     payload.field === 'custom' ? payload.customKey : payload.field;
+
   if (fieldKey === undefined || fieldKey === '') return false;
+
   const actual = ctx.attributes[fieldKey];
+
   if (payload.field === 'email' || payload.field === 'emailDomain') {
     return matchesAttributeOp(
       foldEmailCase(actual),
@@ -129,6 +134,7 @@ function matchesAttribute(
         : foldEmailCase(payload.value)
     );
   }
+
   return matchesAttributeOp(actual, payload.op, payload.value);
 }
 
@@ -156,11 +162,13 @@ function matchesAttributeOp(
     case 'before': {
       const a = toTimestamp(actual);
       const b = toTimestamp(expected);
+
       return a !== null && b !== null && a < b;
     }
     case 'after': {
       const a = toTimestamp(actual);
       const b = toTimestamp(expected);
+
       return a !== null && b !== null && a > b;
     }
   }
@@ -170,6 +178,7 @@ export function percentageBucket(id: string, flagKey: string): number {
   // `% 100` skews buckets 0..95 by ~2e-8 (2^32 leaves a remainder of 96).
   // Correcting it would re-bucket every existing user for no measurable gain.
   const digest = createHash('sha256').update(`${id}:${flagKey}`).digest();
+
   return digest.readUInt32BE(0) % 100;
 }
 
@@ -181,13 +190,16 @@ export function previewFeatureFlag(
   if (!flag.enabled) {
     return { result: false, reason: 'disabled', matchedRule: null };
   }
+
   if (!matchesEnvironment(flag, ctx.env)) {
     return { result: false, reason: 'env-mismatch', matchedRule: null };
   }
 
   for (let i = 0; i < rules.length; i++) {
     const rule = rules[i];
+
     if (rule.effect !== 'exclude') continue;
+
     if (matchesRule(rule.payload, flag.key, ctx)) {
       return {
         result: false,
@@ -198,13 +210,16 @@ export function previewFeatureFlag(
   }
 
   const hasIncludes = rules.some((r) => r.effect === 'include');
+
   if (!hasIncludes) {
     return { result: true, reason: 'no-rules-default-on', matchedRule: null };
   }
 
   for (let i = 0; i < rules.length; i++) {
     const rule = rules[i];
+
     if (rule.effect !== 'include') continue;
+
     if (matchesRule(rule.payload, flag.key, ctx)) {
       return {
         result: true,

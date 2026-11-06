@@ -127,7 +127,9 @@ export class BillingUserService {
 
   async getCurrentSubscription(userId: string): Promise<Subscription | null> {
     const customer = await this.customerFor(userId);
+
     if (!customer) return null;
+
     return findOpenSubscription(this.subscriptions, customer.id);
   }
 
@@ -136,6 +138,7 @@ export class BillingUserService {
     query: InvoiceCursorQueryDto
   ): Promise<CursorPaginatedResponseDto<Invoice>> {
     const customer = await this.customerFor(userId);
+
     if (!customer) {
       return new CursorPaginatedResponseDto<Invoice>([], null, query.limit);
     }
@@ -143,6 +146,7 @@ export class BillingUserService {
     const qb = this.invoices
       .createQueryBuilder('invoice')
       .where('invoice.customerId = :customerId', { customerId: customer.id });
+
     return applyList(
       qb,
       { spec: INVOICE_LIST_QUERY, columns: INVOICE_LIST_COLUMNS },
@@ -160,15 +164,20 @@ export class BillingUserService {
     userId: string
   ): Promise<UsageSummaryResponseDto | null> {
     const customer = await this.customerFor(userId);
+
     if (!customer) return null;
+
     const subscription = await findOpenSubscription(
       this.subscriptions,
       customer.id
     );
+
     if (!subscription || subscription.billingMode !== 'usage') return null;
+
     const plan = await this.plans.findOne({
       where: { key: subscription.planKey }
     });
+
     if (!plan) return null;
 
     const windowStart = meteredWindowStart(subscription);
@@ -177,6 +186,7 @@ export class BillingUserService {
       plan,
       { start: windowStart, end: subscription.currentPeriodEnd }
     );
+
     return {
       subscriptionId: subscription.id,
       meterKey: plan.meterKey,
@@ -197,13 +207,17 @@ export class BillingUserService {
    */
   async getCredits(userId: string): Promise<CreditBalance | null> {
     const customer = await this.customerFor(userId);
+
     if (!customer) return null;
+
     return this.credits.getBalance(customer.id);
   }
 
   async getDefaultPaymentMethod(userId: string): Promise<PaymentMethod | null> {
     const customer = await this.customerFor(userId);
+
     if (!customer?.defaultPaymentMethodId) return null;
+
     return this.paymentMethods.findOne({
       where: { id: customer.defaultPaymentMethodId, customerId: customer.id }
     });
@@ -227,6 +241,7 @@ export class BillingUserService {
       where: { active: true, type: In([...LISTED_PRODUCT_TYPES]) },
       order: { createdAt: 'ASC' }
     });
+
     return products.filter((product) => product.prices[providerId]);
   }
 
@@ -245,6 +260,7 @@ export class BillingUserService {
     const product = await this.products.findOne({
       where: { key: request.productKey }
     });
+
     if (!product || !product.active) {
       throw new ApiError(
         ErrorKeys.BILLING.PRODUCT_NOT_FOUND,
@@ -256,6 +272,7 @@ export class BillingUserService {
     const provider = await this.billing.resolveProvider(customer);
 
     const price = product.prices[provider.id];
+
     if (!price) {
       throw new ApiError(
         ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER,
@@ -268,6 +285,7 @@ export class BillingUserService {
       price,
       request.amountMinor
     );
+
     // The Paddle webhook grants the product it finds by the paid catalog
     // price id; an inline price would pay for a grant it cannot match.
     if (
@@ -280,6 +298,7 @@ export class BillingUserService {
         `Product "${product.key}" has no Paddle price configured`
       );
     }
+
     const description = this.purchaseDescription(product, request.description);
 
     const session = await provider.createOneTimePayment(customer, {
@@ -294,6 +313,7 @@ export class BillingUserService {
       },
       paddlePriceId: price.paddlePriceId
     });
+
     return {
       provider: provider.id,
       url: session.url ?? null,
@@ -318,10 +338,12 @@ export class BillingUserService {
           `Product "${product.key}" has no price configured`
         );
       }
+
       return price.amountMinor;
     }
 
     const { minAmountMinor, maxAmountMinor } = price;
+
     // `== null`, not falsy: a configured lower bound of 0 (any amount the
     // request DTO already accepts) is a legitimate setting, not "unconfigured".
     if (minAmountMinor == null || maxAmountMinor == null) {
@@ -330,18 +352,21 @@ export class BillingUserService {
         `Product "${product.key}" has no amount bounds configured`
       );
     }
+
     if (requestedMinor === undefined) {
       throw new ApiError(
         ErrorKeys.BILLING.AMOUNT_REQUIRED,
         'amountMinor is required for a custom-amount product'
       );
     }
+
     if (requestedMinor < minAmountMinor || requestedMinor > maxAmountMinor) {
       throw new ApiError(
         ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE,
         `amountMinor must be between ${minAmountMinor} and ${maxAmountMinor}`
       );
     }
+
     return requestedMinor;
   }
 
@@ -353,7 +378,9 @@ export class BillingUserService {
     if (product.type !== 'custom' || !note) {
       return product.name;
     }
+
     const sanitized = sanitizeReceiptText(note);
+
     return sanitized
       ? `${product.name}: ${sanitized}`.slice(0, 128)
       : product.name;
@@ -364,6 +391,7 @@ export class BillingUserService {
     planKey: string
   ): Promise<CheckoutSessionResponse> {
     const plan = await this.plans.findOne({ where: { key: planKey } });
+
     if (!plan || !plan.active) {
       throw planNotFound(planKey);
     }
@@ -377,6 +405,7 @@ export class BillingUserService {
         status: In([...ENTITLED_SUBSCRIPTION_STATUSES])
       }
     });
+
     if (active) {
       throw alreadySubscribed();
     }
@@ -416,6 +445,7 @@ export class BillingUserService {
         providerSubscriptionId: null,
         paymentMethodId: null
       };
+
       if (pending) {
         await this.reuseIncompleteRow(pending, fields);
       } else {
@@ -429,6 +459,7 @@ export class BillingUserService {
           if (isUniqueViolation(error)) {
             throw alreadySubscribed();
           }
+
           throw error;
         }
       }
@@ -445,6 +476,7 @@ export class BillingUserService {
       },
       trial
     });
+
     return {
       provider: provider.id,
       url: session.url,
@@ -470,6 +502,7 @@ export class BillingUserService {
       { id: pending.id, status: 'incomplete' },
       fields
     );
+
     if (applied.affected !== 1) {
       throw onMiss();
     }
@@ -493,13 +526,16 @@ export class BillingUserService {
     );
 
     const provider = this.billing.getProviderById(subscription.provider);
+
     if (provider.managesLifecycle && !subscription.providerSubscriptionId) {
       throw subscriptionNotLinked();
     }
+
     const plan = await this.plans.findOne({
       where: { key: subscription.planKey }
     });
     const price = plan?.prices[subscription.provider];
+
     if (!price) {
       throw currentPlanMissing();
     }
@@ -515,6 +551,7 @@ export class BillingUserService {
         }
       }
     );
+
     return {
       provider: provider.id,
       url: session.url,
@@ -531,6 +568,7 @@ export class BillingUserService {
       userId,
       'No active subscription to cancel'
     );
+
     return cancelOpenSubscription(
       {
         subscriptions: this.subscriptions,
@@ -546,11 +584,13 @@ export class BillingUserService {
 
   async getRegion(userId: string): Promise<BillingRegionResponse> {
     const customer = await this.customerFor(userId);
+
     if (customer) return this.regionView(userId, customer);
 
     // No customer yet: report the geo default derived from the registration
     // locale; nothing is persisted until the first checkout / region change.
     const country = await this.detectCountry(userId);
+
     return this.regionView(userId, { providerOverride: null, country });
   }
 
@@ -582,10 +622,12 @@ export class BillingUserService {
         status: In([...OPEN_SUBSCRIPTION_STATUSES])
       }
     });
+
     if (open && open.provider !== newEffective) {
       if (open.status !== 'incomplete' || open.lifecycleOwner !== 'self') {
         throw regionChangeBlocked();
       }
+
       await this.reuseIncompleteRow(
         open,
         { status: 'canceled' },
@@ -604,6 +646,7 @@ export class BillingUserService {
     const updated =
       (await this.customers.findOne({ where: { id: customer.id } })) ??
       Object.assign(customer, { providerOverride: newOverride });
+
     return this.regionView(userId, updated);
   }
 
@@ -616,6 +659,7 @@ export class BillingUserService {
         this.billing.isProviderAvailable(provider, userId)
       )
     );
+
     return {
       region: regionForOverride(customer.providerOverride),
       detectedProvider: this.billing.geoDefaultFor(customer.country),
@@ -629,13 +673,17 @@ export class BillingUserService {
   /** Finds-or-creates the billing customer for a user (geo from locale). */
   private async getOrCreateCustomer(userId: string): Promise<Customer> {
     const existing = await this.customers.findOne({ where: { userId } });
+
     if (existing) return existing;
 
     const geo = await this.detectGeo(userId);
+
     if (!geo) {
       throw new ApiError(ErrorKeys.USERS.NOT_FOUND, 'User not found');
     }
+
     const { country, currency } = geo;
+
     try {
       return await this.customers.save(
         this.customers.create({
@@ -655,8 +703,10 @@ export class BillingUserService {
       // the row the winner created.
       if (isUniqueViolation(error)) {
         const winner = await this.customers.findOne({ where: { userId } });
+
         if (winner) return winner;
       }
+
       throw error;
     }
   }
@@ -678,6 +728,7 @@ export class BillingUserService {
       where: { id: userId },
       select: { id: true, locale: true }
     });
+
     return user ? geoFromLocale(user.locale) : null;
   }
 
@@ -694,6 +745,7 @@ export class BillingUserService {
   private clientBaseUrl(): string {
     const base =
       this.config.get<string>('CLIENT_URL') ?? 'http://localhost:4200';
+
     return base.replace(/\/$/, '');
   }
 }

@@ -59,6 +59,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
       // oauth_accounts.user_id cascades on delete.
       await dataSource.getRepository(User).delete({ id: In(createdIds) });
     }
+
     await app?.close();
   });
 
@@ -68,6 +69,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
 
   function nextEmail(label: string): string {
     counter += 1;
+
     return `proof-${label}-${counter}-${stamp}@example.com`;
   }
 
@@ -82,7 +84,9 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
         ...fields
       })
     );
+
     createdIds.push(user.id);
+
     return user;
   }
 
@@ -103,6 +107,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
       emailVerificationExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
       ...fields
     });
+
     return { user, rawToken };
   }
 
@@ -128,11 +133,14 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
     const adminEmail = nextEmail('admin');
     const original =
       usersService.findByEmailVerificationToken.bind(usersService);
+
     jest
       .spyOn(usersService, 'findByEmailVerificationToken')
       .mockImplementationOnce(async (hashed) => {
         const read = await original(hashed);
+
         await adminChangesEmail(user.id, adminEmail);
+
         return read;
       });
 
@@ -145,6 +153,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
       errorKey: ErrorKeys.AUTH.INVALID_VERIFICATION_TOKEN
     });
     const after = await reload(user.id);
+
     expect(after.email).toBe(adminEmail);
     expect(after.isEmailVerified).toBe(false);
     // The link mailed to the new address is still the one that verifies it.
@@ -164,6 +173,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
     let injected = false;
     const original: (this: SelectQueryBuilder<User>) => Promise<User | null> =
       SelectQueryBuilder.prototype.getOne;
+
     jest
       .spyOn(SelectQueryBuilder.prototype, 'getOne')
       .mockImplementation(async function (this: SelectQueryBuilder<User>) {
@@ -173,6 +183,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
           injected = true;
           await adminChangesEmail(user.id, adminEmail);
         }
+
         return original.call(this);
       });
 
@@ -186,6 +197,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
       errorKey: ErrorKeys.AUTH.PENDING_EMAIL_TOKEN_EXPIRED
     });
     const after = await reload(user.id);
+
     expect(after.email).toBe(adminEmail);
     expect(after.isEmailVerified).toBe(false);
   }, 30000);
@@ -193,16 +205,20 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
   it('a provider sign-in that races an administrator email change leaves the new address unverified', async () => {
     const user = await createUser({});
     const providerId = `google-proof-${stamp}`;
+
     await dataSource
       .getRepository(OAuthAccount)
       .save({ userId: user.id, provider: 'google', providerId });
     const adminEmail = nextEmail('admin');
     const original = usersService.findOne.bind(usersService);
+
     jest
       .spyOn(usersService, 'findOne')
       .mockImplementationOnce(async (id, ability) => {
         const read = await original(id, ability);
+
         await adminChangesEmail(user.id, adminEmail);
+
         return read;
       });
 
@@ -215,6 +231,7 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
     });
 
     const after = await reload(user.id);
+
     expect(after.email).toBe(adminEmail);
     expect(after.isEmailVerified).toBe(false);
   }, 30000);

@@ -10,6 +10,7 @@ export function base64url(obj: Record<string, unknown>): string {
 export function createMockJwt(): string {
   const header = base64url({ alg: 'HS256', typ: 'JWT' });
   const payload = base64url({ sub: mockId('user-1'), exp: 4102444800 });
+
   return `${header}.${payload}.mock-signature`;
 }
 
@@ -22,5 +23,6 @@ export function createExpiredJwt(): string {
     sub: mockId('user-1'),
     exp: Math.floor(Date.now() / 1000) - 3600
   });
+
   return `${header}.${payload}.mock-signature`;
 }

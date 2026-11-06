@@ -42,6 +42,7 @@ describe('MemoryThrottlerStorage', () => {
 
   it('does not let the expiry timer of a refunded hit widen the next window', async () => {
     const ttl = 50;
+
     await hit(ttl);
     await storage.decrement(KEY);
 
@@ -52,6 +53,7 @@ describe('MemoryThrottlerStorage', () => {
 
   it('keeps the older hits of the window when it refunds the newest', async () => {
     const ttl = 50;
+
     await hit(ttl);
     await new Promise((resolve) => setTimeout(resolve, ttl / 2));
     await hit(ttl);
@@ -72,6 +74,7 @@ describe('MemoryThrottlerStorage', () => {
 
   it('blocks above the limit for the block duration, in seconds', async () => {
     const blockDuration = 30000;
+
     for (let i = 0; i < LIMIT; i++) {
       await storage.increment(KEY, 60000, LIMIT, blockDuration, THROTTLER);
     }
@@ -87,9 +90,11 @@ describe('MemoryThrottlerStorage', () => {
 
   it('stays blocked until the block expires, even after a refund', async () => {
     const blockDuration = 50;
+
     for (let i = 0; i <= LIMIT; i++) {
       await storage.increment(KEY, 60000, LIMIT, blockDuration, THROTTLER);
     }
+
     await storage.decrement(KEY);
     await storage.decrement(KEY);
 

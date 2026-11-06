@@ -27,6 +27,7 @@ function reducible(result: WebhookVerificationResult): NormalizedEvent {
   if (result === null || result === WEBHOOK_IGNORED) {
     throw new Error(`Expected a normalized event, got ${String(result)}`);
   }
+
   return result;
 }
 
@@ -77,6 +78,7 @@ async function build(opts: {
       }
     ]
   }).compile();
+
   return { provider: module.get(PaddleProvider), client };
 }
 
@@ -113,6 +115,7 @@ describe('PaddleProvider', () => {
       const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
         'paddle-signature': 'sig'
       });
+
       expect(result).toBeNull();
     });
 
@@ -122,20 +125,24 @@ describe('PaddleProvider', () => {
         Buffer.from('{}'),
         {}
       );
+
       expect(result).toBeNull();
     });
 
     it('returns null when unmarshal throws (invalid signature)', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockRejectedValue(new Error('bad signature'));
       const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
         'paddle-signature': 'sig'
       });
+
       expect(result).toBeNull();
     });
 
     it('verifies with the raw body, secret and signature', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_1',
         eventType: EventName.SubscriptionActivated,
@@ -162,6 +169,7 @@ describe('PaddleProvider', () => {
       [EventName.SubscriptionCanceled, 'subscription.canceled']
     ])('maps %s to %s', async (eventType, expectedType) => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_1',
         eventType,
@@ -179,6 +187,7 @@ describe('PaddleProvider', () => {
       });
       const payload = reducible(result)
         .payload as NormalizedSubscriptionPayload;
+
       expect(payload).toMatchObject({
         ref: { customerId: 'cust-1', userId: 'user-1' },
         providerSubscriptionId: 'sub_123',
@@ -192,6 +201,7 @@ describe('PaddleProvider', () => {
 
     it('reports the charged price ids and drops a plan key set in custom data', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_1',
         eventType: EventName.SubscriptionCreated,
@@ -211,12 +221,14 @@ describe('PaddleProvider', () => {
 
       const payload = reducible(result)
         .payload as NormalizedSubscriptionPayload;
+
       expect(payload.providerPriceIds).toEqual(['pri_pro']);
       expect(payload).not.toHaveProperty('planKey');
     });
 
     it('flags cancelAtPeriodEnd from a scheduled cancel', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_1',
         eventType: EventName.SubscriptionUpdated,
@@ -229,11 +241,13 @@ describe('PaddleProvider', () => {
 
       const payload = reducible(result)
         .payload as NormalizedSubscriptionPayload;
+
       expect(payload.cancelAtPeriodEnd).toBe(true);
     });
 
     it('maps transaction.completed to invoice.paid', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_2',
         eventType: EventName.TransactionCompleted,
@@ -246,6 +260,7 @@ describe('PaddleProvider', () => {
 
       expect(result).toMatchObject({ type: 'invoice.paid' });
       const payload = reducible(result).payload as NormalizedInvoicePayload;
+
       expect(payload).toMatchObject({
         ref: { customerId: 'cust-1', userId: 'user-1' },
         providerInvoiceRef: 'txn_123',
@@ -258,6 +273,7 @@ describe('PaddleProvider', () => {
 
     it('extracts the usage charge key echoed through the price custom data', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_u1',
         eventType: EventName.TransactionCompleted,
@@ -280,6 +296,7 @@ describe('PaddleProvider', () => {
 
     it('leaves the usage charge key null on ordinary subscription transactions', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_u2',
         eventType: EventName.TransactionCompleted,
@@ -297,6 +314,7 @@ describe('PaddleProvider', () => {
 
     it('ignores a completed payment-method-change transaction (no invoice to reduce)', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_pmc_1',
         eventType: EventName.TransactionCompleted,
@@ -316,6 +334,7 @@ describe('PaddleProvider', () => {
 
     it('ignores a failed payment-method-change transaction (no dunning signal)', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_pmc_2',
         eventType: EventName.TransactionPaymentFailed,
@@ -334,6 +353,7 @@ describe('PaddleProvider', () => {
 
     it('maps a one-time catalog purchase to invoice.paid with the paid price ids, ignoring a custom-data product id', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_ot_1',
         eventType: EventName.TransactionCompleted,
@@ -368,6 +388,7 @@ describe('PaddleProvider', () => {
 
     it('takes the product id of a custom-amount purchase from the inline price', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_ot_3',
         eventType: EventName.TransactionCompleted,
@@ -401,6 +422,7 @@ describe('PaddleProvider', () => {
 
     it('ignores a failed one-time purchase transaction (nothing pending to fail)', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_ot_2',
         eventType: EventName.TransactionPaymentFailed,
@@ -425,6 +447,7 @@ describe('PaddleProvider', () => {
 
     it('maps transaction.payment_failed to payment.failed', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_3',
         eventType: EventName.TransactionPaymentFailed,
@@ -443,6 +466,7 @@ describe('PaddleProvider', () => {
 
     it('ignores an event type it does not reduce (HMAC already passed)', async () => {
       const { provider, client } = await build({});
+
       client!.webhooks.unmarshal.mockResolvedValue({
         eventId: 'evt_4',
         eventType: EventName.SubscriptionPaused,
@@ -514,6 +538,7 @@ describe('PaddleProvider', () => {
 
     it('gives up on a call the SDK never settles', async () => {
       const { provider, client } = await build({});
+
       // The SDK calls global fetch with no signal, so its own ceiling is the
       // runtime default — minutes, far beyond anything the core can wait for.
       client!.transactions.create.mockImplementation(
@@ -534,6 +559,7 @@ describe('PaddleProvider', () => {
 
     it('creates a transaction and returns the checkout url + session ref', async () => {
       const { provider, client } = await build({});
+
       client!.transactions.create.mockResolvedValue({
         id: 'txn_new',
         checkout: { url: 'https://pay.paddle.com/checkout/txn_new' }
@@ -562,6 +588,7 @@ describe('PaddleProvider', () => {
     it('throws when the plan has no Paddle price configured', async () => {
       const { provider } = await build({});
       const planNoPrice = { key: 'pro', prices: {} } as Plan;
+
       await expectApiRejection(
         provider.startCheckout(customer, planNoPrice, {
           urls: {
@@ -588,6 +615,7 @@ describe('PaddleProvider', () => {
 
     it('creates a catalog-price transaction carrying the one-time marker', async () => {
       const { provider, client } = await build({});
+
       client!.transactions.create.mockResolvedValue({
         id: 'txn_ot',
         checkout: { url: 'https://pay.paddle.com/checkout/txn_ot' }
@@ -622,6 +650,7 @@ describe('PaddleProvider', () => {
 
     it('creates an inline-price transaction for a custom amount', async () => {
       const { provider, client } = await build({});
+
       client!.transactions.create.mockResolvedValue({
         id: 'txn_donation',
         checkout: null
@@ -659,6 +688,7 @@ describe('PaddleProvider', () => {
 
     it('rejects when Paddle is not configured', async () => {
       const { provider } = await build({ client: null });
+
       await expectApiRejection(
         provider.createOneTimePayment(customer, {
           amountMinor: 1,
@@ -676,6 +706,7 @@ describe('PaddleProvider', () => {
   describe('updatePaymentMethod', () => {
     it("returns the subscription's payment-method-change checkout", async () => {
       const { provider, client } = await build({});
+
       client!.subscriptions.getPaymentMethodChangeTransaction.mockResolvedValue(
         {
           id: 'txn_pmc',
@@ -696,6 +727,7 @@ describe('PaddleProvider', () => {
 
     it('throws when the subscription is not linked to Paddle', async () => {
       const { provider } = await build({});
+
       await expectApiRejection(
         provider.updatePaymentMethod(null),
         ErrorKeys.BILLING.SUBSCRIPTION_NOT_LINKED
@@ -704,6 +736,7 @@ describe('PaddleProvider', () => {
 
     it('throws when Paddle returns no checkout url (default payment link unset)', async () => {
       const { provider, client } = await build({});
+
       client!.subscriptions.getPaymentMethodChangeTransaction.mockResolvedValue(
         { id: 'txn_pmc', checkout: null }
       );
@@ -715,6 +748,7 @@ describe('PaddleProvider', () => {
 
     it('throws when Paddle is not configured', async () => {
       const { provider } = await build({ client: null });
+
       await expectApiRejection(
         provider.updatePaymentMethod('sub_123'),
         ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
@@ -730,6 +764,7 @@ describe('PaddleProvider', () => {
       'maps %s mode to effectiveFrom %s',
       async (mode, effectiveFrom) => {
         const { provider, client } = await build({});
+
         client!.subscriptions.cancel.mockResolvedValue({});
 
         await provider.cancel('sub_123', mode);
@@ -760,6 +795,7 @@ describe('PaddleProvider', () => {
 
     it('swaps the item to the new catalog price with immediate proration and re-plants custom data', async () => {
       const { provider, client } = await build({});
+
       client!.subscriptions.update.mockResolvedValue({});
 
       await provider.changePlan('sub_ext', customer, plan);
@@ -783,6 +819,7 @@ describe('PaddleProvider', () => {
 
     it('previews the update and returns the immediate net amount', async () => {
       const { provider, client } = await build({});
+
       client!.subscriptions.previewUpdate.mockResolvedValue({
         currencyCode: 'USD',
         immediateTransaction: { details: { totals: { total: '1700' } } }
@@ -802,6 +839,7 @@ describe('PaddleProvider', () => {
 
     it('previews zero when no immediate transaction results', async () => {
       const { provider, client } = await build({});
+
       client!.subscriptions.previewUpdate.mockResolvedValue({
         currencyCode: 'USD',
         immediateTransaction: null
@@ -861,6 +899,7 @@ describe('PaddleProvider', () => {
   describe('findOffSessionCharge', () => {
     it('is not applicable (provider-managed lifecycle)', async () => {
       const { provider } = await build({});
+
       expect(() => provider.findOffSessionCharge()).toThrow(
         NotImplementedException
       );
@@ -870,6 +909,7 @@ describe('PaddleProvider', () => {
   describe('getOffSessionCharge', () => {
     it('is not applicable (provider-managed lifecycle)', async () => {
       const { provider } = await build({});
+
       expect(() => provider.getOffSessionCharge()).toThrow(
         NotImplementedException
       );
@@ -879,6 +919,7 @@ describe('PaddleProvider', () => {
   describe('refund', () => {
     it('issues a full refund when the amount covers the transaction total', async () => {
       const { provider, client } = await build({});
+
       client!.transactions.get.mockResolvedValue({
         details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
       });
@@ -896,6 +937,7 @@ describe('PaddleProvider', () => {
 
     it('issues a partial refund against the line item for a lesser amount', async () => {
       const { provider, client } = await build({});
+
       client!.transactions.get.mockResolvedValue({
         details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
       });
@@ -914,6 +956,7 @@ describe('PaddleProvider', () => {
 
     it('does not consult existing adjustments when no idempotency key is given', async () => {
       const { provider, client } = await build({});
+
       client!.transactions.get.mockResolvedValue({
         details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
       });
@@ -928,6 +971,7 @@ describe('PaddleProvider', () => {
 
     it('embeds the idempotency key in the adjustment reason', async () => {
       const { provider, client } = await build({});
+
       client!.transactions.get.mockResolvedValue({
         details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
       });
@@ -948,6 +992,7 @@ describe('PaddleProvider', () => {
 
     it('retrying with the same key is a no-op once the adjustment exists', async () => {
       const { provider, client } = await build({});
+
       client!.transactions.get.mockResolvedValue({
         details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
       });
@@ -962,6 +1007,7 @@ describe('PaddleProvider', () => {
 
     it('a partial-refund retry with the same key is also a no-op', async () => {
       const { provider, client } = await build({});
+
       client!.transactions.get.mockResolvedValue({
         details: { totals: { total: '1200' }, lineItems: [{ id: 'txnitm_1' }] }
       });

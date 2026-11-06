@@ -27,6 +27,7 @@ test.describe('Error translation: login component errors', () => {
 
     await page.goto('/login');
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
@@ -44,6 +45,7 @@ test.describe('Error translation: login component errors', () => {
     _mockServer
   }) => {
     const lockedUntil = new Date(Date.now() + 60_000).toISOString();
+
     await page.route('**/api/v1/auth/login', (route) =>
       route.fulfill({
         status: 423,
@@ -59,6 +61,7 @@ test.describe('Error translation: login component errors', () => {
 
     await page.goto('/login');
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
@@ -97,6 +100,7 @@ test.describe('Error translation: login component errors', () => {
 
     await page.goto('/login');
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
@@ -129,6 +133,7 @@ test.describe('Error translation: register component errors', () => {
 
     await page.goto('/register');
     const main = page.getByRole('main');
+
     await page.getByLabel('Email').fill('test@example.com');
     await page.getByLabel('Email').blur();
     await page.getByLabel('Full name').fill('John Doe');
@@ -169,6 +174,7 @@ test.describe('Error translation: global error interceptor → snackbar', () => 
     await page.reload();
 
     const snackbar = page.locator('mat-snack-bar-container');
+
     await expect(snackbar).toBeVisible({ timeout: 5000 });
     await expect(snackbar).toContainText('Internal server error');
     // The snackbar must show the translated key, not the raw server message.

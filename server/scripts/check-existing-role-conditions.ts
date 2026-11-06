@@ -68,7 +68,9 @@ function checkConditionsNode(node: unknown, path = ''): CheckResult {
 
     if (SUPPORTED_LOGICAL_OPS.has(key)) {
       const sub = checkLogicalOp(key, value, childPath);
+
       if (!sub.ok) return sub;
+
       continue;
     }
 
@@ -84,6 +86,7 @@ function checkConditionsNode(node: unknown, path = ''): CheckResult {
     }
 
     const sub = checkFieldValue(value, childPath);
+
     if (!sub.ok) return sub;
   }
 
@@ -94,13 +97,17 @@ function checkLogicalOp(op: string, value: unknown, path: string): CheckResult {
   if (op === '$not') {
     return checkConditionsNode(value, path);
   }
+
   if (!Array.isArray(value)) {
     return { ok: false, reason: `${path} → ${op} value must be array` };
   }
+
   for (let i = 0; i < value.length; i++) {
     const sub = checkConditionsNode(value[i], `${path}[${i}]`);
+
     if (!sub.ok) return sub;
   }
+
   return { ok: true };
 }
 
@@ -117,12 +124,14 @@ function checkFieldValue(value: unknown, path: string): CheckResult {
   ) {
     return { ok: true };
   }
+
   if (typeof value !== 'object' || Array.isArray(value)) {
     return { ok: false, reason: `${path} → unsupported value shape` };
   }
 
   for (const [op, opVal] of Object.entries(value)) {
     const childPath = `${path}.${op}`;
+
     if (SUPPORTED_COMPARISON_OPS.has(op)) {
       if (typeof opVal === 'object' && opVal !== null) {
         return {
@@ -130,8 +139,10 @@ function checkFieldValue(value: unknown, path: string): CheckResult {
           reason: `${childPath} → ${op} value must be a scalar`
         };
       }
+
       continue;
     }
+
     if (SUPPORTED_LIST_OPS.has(op)) {
       if (!Array.isArray(opVal)) {
         return {
@@ -139,16 +150,20 @@ function checkFieldValue(value: unknown, path: string): CheckResult {
           reason: `${childPath} → ${op} value must be array`
         };
       }
+
       if (opVal.some((el) => typeof el === 'object' && el !== null)) {
         return {
           ok: false,
           reason: `${childPath} → ${op} array element must be a scalar`
         };
       }
+
       continue;
     }
+
     return { ok: false, reason: `${childPath} → unknown operator "${op}"` };
   }
+
   return { ok: true };
 }
 
@@ -169,6 +184,7 @@ async function main(): Promise<void> {
     synchronize: false,
     logging: false
   });
+
   await ds.initialize();
 
   const rows = await ds.query<ConditionsRow[]>(`
@@ -196,11 +212,14 @@ async function main(): Promise<void> {
         : row.permission_id;
     const label = `${row.role_name ?? row.role_id} → ${permissionLabel}`;
     const cond = row.conditions as Record<string, unknown> | null;
+
     if (!cond) continue;
 
     const { custom } = cond;
+
     if (typeof custom === 'string' && custom.trim().length > 0) {
       let parsed: unknown;
+
       try {
         parsed = JSON.parse(custom);
       } catch {
@@ -211,7 +230,9 @@ async function main(): Promise<void> {
         });
         continue;
       }
+
       const result = checkConditionsNode(parsed);
+
       if (!result.ok) {
         issues.push({
           rolePermission: label,
@@ -231,17 +252,20 @@ async function main(): Promise<void> {
     console.log(
       `✓ Checked ${rows.length} role_permissions row(s) — all conditions are translatable.`
     );
+
     return;
   }
 
   console.error(
     `✗ Found ${issues.length} role_permission row(s) with conditions that the new fail-closed translator will DROP:\n`
   );
+
   for (const issue of issues) {
     console.error(`  • ${issue.rolePermission}`);
     console.error(`      reason : ${issue.reason}`);
     console.error(`      custom : ${issue.excerpt}\n`);
   }
+
   console.error(
     'These rules were being mistranslated by the pre-fix translator (silently over-sharing).\n' +
       'Either rewrite them using only supported operators ($eq/$ne/$in/$nin/$gt/$gte/$lt/$lte/$and/$or/$nor/$not)\n' +

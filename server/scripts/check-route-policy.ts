@@ -86,9 +86,11 @@ function find(
 function propertyNames(node: ts.ObjectLiteralExpression): string[] {
   return node.properties.flatMap((p) => {
     if (!p.name) return [];
+
     if (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) {
       return [p.name.text];
     }
+
     return [];
   });
 }
@@ -97,8 +99,10 @@ function propertyNames(node: ts.ObjectLiteralExpression): string[] {
 export function objectConstants(source: string): Map<string, string[]> {
   const sf = ts.createSourceFile('c.ts', source, ts.ScriptTarget.Latest, true);
   const result = new Map<string, string[]>();
+
   for (const stmt of sf.statements) {
     if (!ts.isVariableStatement(stmt)) continue;
+
     for (const decl of stmt.declarationList.declarations) {
       if (
         ts.isIdentifier(decl.name) &&
@@ -109,6 +113,7 @@ export function objectConstants(source: string): Map<string, string[]> {
       }
     }
   }
+
   return result;
 }
 
@@ -117,10 +122,13 @@ function throttleNames(
   constants: Map<string, string[]>
 ): string[] {
   if (!arg) return [];
+
   if (ts.isObjectLiteralExpression(arg)) return propertyNames(arg);
+
   if (ts.isIdentifier(arg) && constants.has(arg.text)) {
     return constants.get(arg.text) ?? [];
   }
+
   throw new Error(`cannot read the throttle names of "${arg.getText()}"`);
 }
 
@@ -145,32 +153,39 @@ export function derivePolicy(
   const either = (name: string) => find(own, name) ?? find(cls, name);
 
   let access = 'signed-in';
+
   if (either('Public')) access = 'public';
   else if (either('OptionalAuth')) access = 'optional';
   else {
     const authorize = either('Authorize');
+
     if (authorize) access = accessOf(authorize);
   }
 
   const stepUp = find(own, 'StepUpRoute');
   let throttle: Throttle = null;
+
   if (either('SkipThrottle')) {
     throttle = 'skip';
   } else {
     const names = new Set<string>();
+
     for (const d of [find(cls, 'Throttle'), find(own, 'Throttle')]) {
       if (d)
         throttleNames(decoratorArgs(d)?.[0], constants).forEach((n) =>
           names.add(n)
         );
     }
+
     if (stepUp) {
       const arg = decoratorArgs(stepUp)?.[1];
       const fromStepUp = arg
         ? throttleNames(arg, constants)
         : (constants.get('CHALLENGE_THROTTLE') ?? []);
+
       fromStepUp.forEach((n) => names.add(n));
     }
+
     if (names.size > 0) throttle = [...names].toSorted();
   }
 
@@ -192,15 +207,18 @@ function pathSegments(p: string): string[] {
 
 function literalPath(node: ts.Expression | undefined): string | undefined {
   if (!node) return undefined;
+
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
     return node.text;
   }
+
   if (ts.isTemplateExpression(node)) {
     return (
       node.head.text +
       node.templateSpans.map((s) => '*' + s.literal.text).join('')
     );
   }
+
   return undefined;
 }
 
@@ -209,6 +227,7 @@ function gateOf(args: readonly ts.Expression[]): MockGate {
     if (ts.isIdentifier(arg) && arg.text === 'authGuard') {
       return { kind: 'signed-in' };
     }
+
     if (
       ts.isCallExpression(arg) &&
       ts.isIdentifier(arg.expression) &&
@@ -226,6 +245,7 @@ function gateOf(args: readonly ts.Expression[]): MockGate {
         );
       const text = (e: ts.Expression | undefined) =>
         e && ts.isStringLiteral(e) ? e.text : (e?.getText() ?? '');
+
       return {
         kind: 'permission',
         access: `${text(action)}:${text(subject)}`,
@@ -233,6 +253,7 @@ function gateOf(args: readonly ts.Expression[]): MockGate {
       };
     }
   }
+
   return { kind: 'public' };
 }
 
@@ -252,15 +273,20 @@ export function parseMockRoutes(
     true
   );
   const imported = new Map<string, { file: string; name: string }>();
+
   for (const stmt of index.statements) {
     if (!ts.isImportDeclaration(stmt) || !stmt.importClause) continue;
+
     if (!ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+
     const file = path.resolve(
       path.dirname(indexFile),
       `${stmt.moduleSpecifier.text}.ts`
     );
     const clause = stmt.importClause;
+
     if (clause.name) imported.set(clause.name.text, { file, name: 'default' });
+
     if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
       for (const el of clause.namedBindings.elements) {
         imported.set(el.name.text, {
@@ -286,14 +312,19 @@ export function parseMockRoutes(
         ident: node.arguments[1].text
       });
     }
+
     ts.forEachChild(node, visitIndex);
   };
+
   visitIndex(index);
 
   const routes: MockRoute[] = [];
+
   for (const mount of mounts) {
     const target = imported.get(mount.ident);
+
     if (!target) continue;
+
     const sf = ts.createSourceFile(
       target.file,
       read(target.file),
@@ -312,8 +343,10 @@ export function parseMockRoutes(
         )
       ) {
         const routePath = literalPath(node.arguments[0]);
+
         if (routePath !== undefined) {
           const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+
           routes.push({
             method: node.expression.name.text.toUpperCase(),
             segments: pathSegments(`${mount.prefix}/${routePath}`),
@@ -322,10 +355,13 @@ export function parseMockRoutes(
           });
         }
       }
+
       ts.forEachChild(node, visit);
     };
+
     visit(sf);
   }
+
   return routes;
 }
 
@@ -338,6 +374,7 @@ function localExportName(sf: ts.SourceFile, exported: string): string {
     ) {
       return stmt.expression.text;
     }
+
     if (
       ts.isExportDeclaration(stmt) &&
       stmt.exportClause &&
@@ -348,16 +385,20 @@ function localExportName(sf: ts.SourceFile, exported: string): string {
       }
     }
   }
+
   return exported;
 }
 
 function segmentMatches(mock: string, sample: string): boolean {
   if (mock.startsWith(':')) return true;
+
   if (!mock.includes('*')) return mock === sample;
+
   const pattern = mock
     .split('*')
     .map((s) => RegExp.escape(s))
     .join('.+');
+
   return new RegExp(`^${pattern}$`).test(sample);
 }
 
@@ -367,6 +408,7 @@ function findMockRoute(
   samplePath: string
 ): MockRoute | undefined {
   const want = pathSegments(samplePath);
+
   return mock.find(
     (r) =>
       r.method === method &&
@@ -387,12 +429,14 @@ const POLICY_FIELDS = [
 
 function validPolicy(p: unknown): p is Policy {
   if (typeof p !== 'object' || p === null) return false;
+
   const v: Partial<Record<keyof Policy, unknown>> = p;
   const throttleOk =
     v.throttle === null ||
     v.throttle === 'skip' ||
     (Array.isArray(v.throttle) &&
       v.throttle.every((n) => typeof n === 'string'));
+
   return (
     typeof v.access === 'string' &&
     (v.writes === null || typeof v.writes === 'string') &&
@@ -416,15 +460,19 @@ export function evaluate(input: Input): string[] {
   for (const entry of input.contract) {
     const key = `${entry.method} ${entry.path}`;
     const route = byKey.get(key);
+
     if (!route) continue; // check:routes reports a stale entry
+
     const where = `${key} (${entry.file})`;
 
     if (!validPolicy(entry.policy)) {
       problems.push(`[rule 1] ${where}: no valid "policy" field`);
       continue;
     }
+
     const { policy } = entry;
     const actual = derivePolicy(route, input.throttleConstants);
+
     for (const field of POLICY_FIELDS) {
       if (show(policy[field]) !== show(actual[field])) {
         problems.push(
@@ -444,6 +492,7 @@ export function evaluate(input: Input): string[] {
     }
 
     const mock = findMockRoute(input.mock, entry.method, entry.path);
+
     if (!mock) {
       problems.push(`[rule 4] ${where}: no mock-server route`);
     } else {
@@ -456,6 +505,7 @@ export function evaluate(input: Input): string[] {
             : gate.kind === 'permission' &&
               gate.access === policy.access &&
               gate.skipMfaEnrolmentGate === policy.skipMfaEnrolmentGate;
+
       if (!ok) {
         problems.push(
           `[rule 4] ${where}: the mock gate at ${mock.site} is ${show(gate)}, the policy access is ${show(policy.access)}`
@@ -465,13 +515,18 @@ export function evaluate(input: Input): string[] {
   }
 
   const byWrites = new Map<string, ContractEntry[]>();
+
   for (const entry of input.contract) {
     const writes = entry.policy?.writes;
+
     if (!writes || entry.policy?.accessExempt) continue;
+
     byWrites.set(writes, [...(byWrites.get(writes) ?? []), entry]);
   }
+
   for (const [writes, entries] of byWrites) {
     const accesses = new Set(entries.map((e) => e.policy?.access));
+
     if (accesses.size > 1) {
       problems.push(
         `[rule 2] routes that write ${writes} have different access: ` +
@@ -496,6 +551,7 @@ function loadContract(): ContractEntry[] {
       const { routes } = JSON.parse(
         fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')
       ) as { routes: Omit<ContractEntry, 'file'>[] };
+
       return routes.map((r) => ({ ...r, file: `contracts/routes/${f}` }));
     });
 }
@@ -558,7 +614,9 @@ function selfTest(): void {
   ]);
   const mock = parseMockRoutes(path.resolve('fixture/index.ts'), (f) => {
     const text = files.get(f);
+
     if (text === undefined) throw new Error(`no fixture ${f}`);
+
     return text;
   });
   const file = 'fixture.json';
@@ -609,6 +667,7 @@ function selfTest(): void {
     ([rule, text]) =>
       !problems.some((p) => p.startsWith(rule) && p.includes(text))
   );
+
   if (missing.length > 0 || problems.length !== expected.length) {
     console.error('✗ check-route-policy self-test failed. Reported:');
     problems.forEach((p) => console.error(`    ${p}`));
@@ -617,6 +676,7 @@ function selfTest(): void {
     );
     process.exit(1);
   }
+
   console.log('✓ check-route-policy self-test: all four rules report');
 }
 
@@ -633,8 +693,10 @@ function main(): void {
 
   if (problems.length === 0) {
     console.log(`✓ Route policies match the code (${routes.length} routes)`);
+
     return;
   }
+
   console.error('✗ Route policy drift:\n');
   problems.forEach((p) => console.error(`  ${p}`));
   console.error(

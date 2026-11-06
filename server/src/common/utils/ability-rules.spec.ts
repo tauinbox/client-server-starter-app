@@ -251,6 +251,7 @@ describe('compileAbilityRules', () => {
     ]);
 
     const [rule, ...rest] = ability.rules;
+
     expect(rest).toHaveLength(0);
     expect(rule.inverted).toBe(true);
     expect(rule.action).toBe('read');
@@ -685,8 +686,10 @@ describe('compileAbilityRules', () => {
   describe('a condition stored as an array', () => {
     const storedArray = (entries: unknown[]): ResolvedPermission => {
       const permission = grant('users', 'update');
+
       // @ts-expect-error -- a stored row can hold what the type forbids
       permission.conditions = entries;
+
       return permission;
     };
     const otherUser = { __caslSubjectType__: 'User', id: 'user-2' } as never;

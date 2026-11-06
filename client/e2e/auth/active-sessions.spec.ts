@@ -13,6 +13,7 @@ const PASSWORD = 'Password1';
 async function expectNoOverflow(page: Page): Promise<void> {
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme });
+
     for (const width of [375, 768, 1366]) {
       await page.setViewportSize({ width, height: 900 });
       const overflow = await page.evaluate(
@@ -20,12 +21,14 @@ async function expectNoOverflow(page: Page): Promise<void> {
           document.documentElement.scrollWidth -
           document.documentElement.clientWidth
       );
+
       expect(
         overflow,
         `horizontal overflow at ${width}px in ${colorScheme}`
       ).toBeLessThanOrEqual(0);
     }
   }
+
   await page.setViewportSize({ width: 1366, height: 900 });
 }
 
@@ -40,17 +43,20 @@ test.describe('Signed-in devices', () => {
 
     const otherDevice = await browser.newContext();
     const otherPage = await otherDevice.newPage();
+
     await routeApiToMockServer(otherPage, _mockServer.url);
     await loginViaUi(otherPage, _mockServer.url);
 
     await page.reload();
     const card = page.locator('nxs-active-sessions');
+
     await expect(card.locator('.sessions-item')).toHaveCount(2);
     await expect(card.getByText('This device')).toHaveCount(1);
 
     const other = card
       .locator('.sessions-item')
       .filter({ hasNot: page.locator('.sessions-badge') });
+
     await other.getByRole('button', { name: 'Sign out' }).click();
 
     await card.getByLabel('Current password').fill(PASSWORD);
@@ -86,15 +92,18 @@ test.describe('Signed-in devices', () => {
 
     const otherDevice = await browser.newContext();
     const otherPage = await otherDevice.newPage();
+
     await routeApiToMockServer(otherPage, _mockServer.url);
     await loginViaUi(otherPage, _mockServer.url);
 
     await page.reload();
     const sessions = page.locator('nxs-active-sessions');
+
     await expect(sessions.locator('.sessions-item')).toHaveCount(2);
     await expect(sessions.locator('.sessions-offer')).toHaveCount(0);
 
     const twoFactor = page.locator('nxs-two-factor');
+
     await twoFactor.getByRole('button', { name: 'Turn on' }).click();
     await twoFactor.getByLabel('Current password').fill(PASSWORD);
     await twoFactor.getByRole('button', { name: 'Continue' }).click();

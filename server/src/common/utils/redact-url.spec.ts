@@ -21,6 +21,7 @@ describe('redactSensitiveQuery', () => {
 
   it('returns a URL with no sensitive parameter unchanged, encoding included', () => {
     const url = '/api/v1/users/cursor?q=a%20b&limit=20';
+
     expect(redactSensitiveQuery(url)).toBe(url);
   });
 

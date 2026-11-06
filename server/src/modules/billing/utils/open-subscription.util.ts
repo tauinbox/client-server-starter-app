@@ -32,11 +32,13 @@ export async function requireOpenSubscription(
   const subscription = customer
     ? await findOpenSubscription(repos.subscriptions, customer.id)
     : null;
+
   if (!customer || !subscription) {
     throw new ApiError(
       ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION,
       notFoundMessage
     );
   }
+
   return { customer, subscription };
 }

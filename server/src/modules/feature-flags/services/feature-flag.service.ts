@@ -55,6 +55,7 @@ const FEATURE_FLAG_LIST_COLUMNS: ListColumns<typeof FEATURE_FLAG_LIST_QUERY> = {
   sort: { createdAt: 'flag.createdAt', key: 'flag.key' },
   id: 'flag.id'
 };
+
 import { AttributeRegistryService } from './attribute-registry.service';
 
 function keyExistsConflict(): ApiError {
@@ -127,29 +128,36 @@ export class FeatureFlagService {
     ability: AppAbility
   ): Promise<CursorPaginatedResponseDto<FeatureFlag>> {
     const qb = this.flagRepo.createQueryBuilder('flag');
+
     applyAbilityToFeatureFlagQuery(qb, ability, 'search');
     const page = await applyList(
       qb,
       { spec: FEATURE_FLAG_LIST_QUERY, columns: FEATURE_FLAG_LIST_COLUMNS },
       query
     );
+
     await this.#attachRules(page.data);
+
     return page;
   }
 
   /** Loads every rule of the given flags in one query and attaches them. */
   async #attachRules(flags: FeatureFlag[]): Promise<void> {
     if (flags.length === 0) return;
+
     const rules = await this.ruleRepo.find({
       where: { flagId: In(flags.map((f) => f.id)) },
       order: { createdAt: 'ASC', id: 'ASC' }
     });
     const byFlag = new Map<string, FeatureFlagRule[]>();
+
     for (const r of rules) {
       const list = byFlag.get(r.flagId) ?? [];
+
       list.push(r);
       byFlag.set(r.flagId, list);
     }
+
     for (const f of flags) f.rules = byFlag.get(f.id) ?? [];
   }
 
@@ -159,11 +167,13 @@ export class FeatureFlagService {
     actorId?: string | null
   ): Promise<FeatureFlag> {
     const flag = await this.#load(id);
+
     this.#assertCan(ability, {
       action: 'read',
       record: flag,
       actorId
     });
+
     return flag;
   }
 
@@ -180,6 +190,7 @@ export class FeatureFlagService {
     }
   ): void {
     if (ability === SYSTEM_ABILITY) return;
+
     this.accessRefusals.assertCan(ability, {
       action: check.action,
       subject: subject('FeatureFlag', check.record),
@@ -191,11 +202,14 @@ export class FeatureFlagService {
 
   async #load(id: string): Promise<FeatureFlag> {
     const flag = await this.flagRepo.findOne({ where: { id } });
+
     if (!flag) throw flagNotFound();
+
     flag.rules = await this.ruleRepo.find({
       where: { flagId: id },
       order: { createdAt: 'ASC', id: 'ASC' }
     });
+
     return flag;
   }
 
@@ -222,14 +236,17 @@ export class FeatureFlagService {
       actorId: actor.actorId
     });
     const existing = await this.flagRepo.findOne({ where: { key: dto.key } });
+
     if (existing) {
       throw keyExistsConflict();
     }
+
     const rules = this.#validateRules(dto.rules);
     // The check above races a concurrent create against UQ_feature_flags_key.
     // The loser gets a unique violation, which the global filter would report
     // as a generic conflict - map it to the flag-specific key instead.
     let saved: FeatureFlag;
+
     try {
       saved = await this.dataSource.transaction(async (em) => {
         const flag = await em.save(
@@ -240,7 +257,9 @@ export class FeatureFlagService {
             updatedByUserId: actor.actorId
           })
         );
+
         if (rules) await this.#writeRules(em, flag.id, rules);
+
         await this.#audit(em, actor, {
           action: AuditAction.FEATURE_FLAG_CREATE,
           flagId: flag.id,
@@ -250,12 +269,15 @@ export class FeatureFlagService {
             ...(rules ? { ruleCount: rules.length } : {})
           }
         });
+
         return flag;
       });
     } catch (error: unknown) {
       if (isUniqueViolation(error)) throw keyExistsConflict();
+
       throw error;
     }
+
     return this.#load(saved.id);
   }
 
@@ -266,6 +288,7 @@ export class FeatureFlagService {
     { ifMatch, ability, actor }: FlagUpdateOptions
   ): Promise<FeatureFlag> {
     const current = await this.#load(id);
+
     // The record after the write is checked too: else a grant scoped by a
     // writable field lets the caller move a flag out of its own scope.
     this.#assertCan(ability, {
@@ -280,8 +303,10 @@ export class FeatureFlagService {
     });
     const { rules: ruleDtos, ...fields } = dto;
     const rules = this.#validateRules(ruleDtos);
+
     // A successful write then replaced exactly `current`, the audit diff base.
     if (!ifMatchHolds(ifMatch, current.version)) throw versionConflict();
+
     await this.dataSource.transaction(async (em) => {
       const result = await em
         .createQueryBuilder()
@@ -305,7 +330,9 @@ export class FeatureFlagService {
         .execute();
 
       if (result.affected === 0) throw versionConflict();
+
       if (rules) await this.#writeRules(em, id, rules);
+
       // Rule rows and rule DTOs do not compare field by field: count them.
       await this.#audit(em, actor, {
         action: AuditAction.FEATURE_FLAG_UPDATE,
@@ -316,6 +343,7 @@ export class FeatureFlagService {
         }
       });
     });
+
     return this.#load(id);
   }
 
@@ -330,6 +358,7 @@ export class FeatureFlagService {
         record,
         actorId: actor.actorId
       });
+
     // Checked here to answer early, and again on the locked row.
     check(await this.#load(id));
     await this.dataSource.transaction(async (em) => {
@@ -337,14 +366,18 @@ export class FeatureFlagService {
         where: { id },
         lock: { mode: 'pessimistic_write' }
       });
+
       if (!locked) throw flagNotFound();
+
       check(locked);
       // The row is gone after the delete, so the key is recorded: a bare
       // targetId resolves to nothing once the flag no longer exists.
       const { key } = locked;
       // The rule rows go by ON DELETE CASCADE.
       const { affected } = await em.delete(FeatureFlag, { id });
+
       if (!affected) throw flagNotFound();
+
       await this.#audit(em, actor, {
         action: AuditAction.FEATURE_FLAG_DELETE,
         flagId: id,
@@ -411,6 +444,7 @@ export class FeatureFlagService {
       attributes: dto.attributes ?? {},
       env
     };
+
     return previewFeatureFlag(evalFlag, evalRules, ctx);
   }
 
@@ -422,7 +456,9 @@ export class FeatureFlagService {
     rules: FeatureFlagRuleDto[] | undefined
   ): FeatureFlagRuleDto[] | undefined {
     if (!rules) return undefined;
+
     const customKeys = this.attributeRegistry.getKnownCustomKeys();
+
     return rules.map((r) => ({
       effect: r.effect,
       payload: validateRulePayload(r.payload, customKeys)
@@ -435,6 +471,7 @@ export class FeatureFlagService {
     rules: FeatureFlagRuleDto[]
   ): Promise<void> {
     await em.delete(FeatureFlagRule, { flagId });
+
     // Insert sequentially so clock_timestamp() advances per row and
     // preserves request-array order via the created_at column.
     for (const r of rules) {
@@ -486,7 +523,9 @@ export class FeatureFlagService {
     const flagIds = [
       ...new Set((rules.raw as { flag_id: string }[]).map((r) => r.flag_id))
     ];
+
     if (flagIds.length === 0) return [];
+
     const flags = await em
       .createQueryBuilder()
       .update(FeatureFlag)
@@ -494,6 +533,7 @@ export class FeatureFlagService {
       .whereInIds(flagIds)
       .returning('key')
       .execute();
+
     return (flags.raw as { key: string }[]).map((f) => f.key);
   }
 }

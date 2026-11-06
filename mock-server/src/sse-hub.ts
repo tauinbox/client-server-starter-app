@@ -12,6 +12,7 @@ export function registerSseConnection(
   if (!connections.has(userId)) {
     connections.set(userId, new Map());
   }
+
   connections.get(userId)!.set(connectionId, res);
 }
 
@@ -24,8 +25,11 @@ export function removeSseConnection(
   connectionId: string
 ): void {
   const userConns = connections.get(userId);
+
   if (!userConns) return;
+
   userConns.delete(connectionId);
+
   if (userConns.size === 0) {
     connections.delete(userId);
   }
@@ -41,7 +45,9 @@ function sendEvent(res: Response, event: NotificationEvent): void {
 
 export function pushToUser(userId: string, event: NotificationEvent): void {
   const userConns = connections.get(userId);
+
   if (!userConns) return;
+
   for (const res of userConns.values()) {
     sendEvent(res, event);
   }
@@ -54,6 +60,7 @@ export function pushToUsersMatching(
 ): void {
   for (const [userId, userConns] of connections) {
     if (!predicate(userId)) continue;
+
     for (const res of userConns.values()) {
       sendEvent(res, event);
     }

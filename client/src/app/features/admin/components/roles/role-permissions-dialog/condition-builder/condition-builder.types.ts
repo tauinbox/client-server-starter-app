@@ -73,9 +73,13 @@ export function updateGroup(
   let changed = false;
   const children: ConditionNode[] = root.children.map((child) => {
     if (child.type !== 'group') return child;
+
     const group = updateGroup(child.group, target, update);
+
     if (group === child.group) return child;
+
     changed = true;
+
     return { type: 'group', group };
   });
 
@@ -92,12 +96,18 @@ export function updateRule(
   const children: ConditionNode[] = root.children.map((child) => {
     if (child.type === 'rule') {
       if (child.rule !== target) return child;
+
       changed = true;
+
       return { type: 'rule', rule: { ...child.rule, ...patch } };
     }
+
     const group = updateRule(child.group, target, patch);
+
     if (group === child.group) return child;
+
     changed = true;
+
     return { type: 'group', group };
   });
 
@@ -110,10 +120,15 @@ export function updateRule(
  */
 export function parseValue(raw: string): unknown {
   const trimmed = raw.trim();
+
   if (trimmed === 'true') return true;
+
   if (trimmed === 'false') return false;
+
   if (trimmed === 'null') return null;
+
   if (trimmed !== '' && !isNaN(Number(trimmed))) return Number(trimmed);
+
   return trimmed;
 }
 
@@ -140,6 +155,7 @@ class UnrepresentableConditionError extends Error {}
 /** Convert a JS value back to a display string. */
 function valueToString(val: unknown): string {
   if (val === null) return 'null';
+
   if (typeof val === 'object') {
     // Objects and arrays would stringify to "[object Object]" / "a,b" and be
     // persisted as that literal string on save
@@ -147,6 +163,7 @@ function valueToString(val: unknown): string {
       'Object values cannot be represented in the visual builder'
     );
   }
+
   return String(val);
 }
 
@@ -170,6 +187,7 @@ function parseGroup(obj: Record<string, unknown>): ConditionGroup {
   const logicKey = ['$or', '$and'].find(
     (key) => key in obj && Array.isArray(obj[key])
   ) as '$or' | '$and' | undefined;
+
   if (logicKey) {
     if (Object.keys(obj).length > 1) {
       // A logical group with sibling keys (another logic key or field rules)
@@ -178,15 +196,18 @@ function parseGroup(obj: Record<string, unknown>): ConditionGroup {
         `Keys next to ${logicKey} cannot be represented in the visual builder`
       );
     }
+
     return createGroup(
       logicKey,
       (obj[logicKey] as Record<string, unknown>[]).map(parseNode)
     );
   }
+
   // Treat each key as a field rule, wrapped in implicit $and
   const children = Object.entries(obj).map(([field, val]) =>
     parseFieldNode(field, val)
   );
+
   return createGroup('$and', children);
 }
 
@@ -195,19 +216,24 @@ function parseNode(item: Record<string, unknown>): ConditionNode {
   if ('$or' in item || '$and' in item) {
     return { type: 'group', group: parseGroup(item) };
   }
+
   // Otherwise it's one or more field rules — for simplicity take the first key
   const entries = Object.entries(item);
+
   if (entries.length === 1) {
     return parseFieldNode(entries[0][0], entries[0][1]);
   }
+
   // Multiple fields in one object → wrap in $and
   const children = entries.map(([field, val]) => parseFieldNode(field, val));
+
   return { type: 'group', group: createGroup('$and', children) };
 }
 
 function parseFieldNode(field: string, val: unknown): ConditionNode {
   if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
     const opEntries = Object.entries(val as Record<string, unknown>);
+
     if (
       opEntries.length !== 1 ||
       !CONDITION_OPERATORS.includes(opEntries[0][0] as ConditionOperator)
@@ -219,15 +245,18 @@ function parseFieldNode(field: string, val: unknown): ConditionNode {
         `Value of field "${field}" cannot be represented in the visual builder`
       );
     }
+
     const [[op, opVal]] = opEntries;
     const value = Array.isArray(opVal)
       ? opVal.map(valueToString).join(', ')
       : valueToString(opVal);
+
     return {
       type: 'rule',
       rule: createRule(field, op as ConditionOperator, value)
     };
   }
+
   // Simple equality: { field: value }
   return { type: 'rule', rule: createRule(field, '$eq', valueToString(val)) };
 }
@@ -247,12 +276,16 @@ export function modelToJson(group: ConditionGroup): Record<string, unknown> {
       (c) => (c as { rule: ConditionRule }).rule.field
     );
     const hasDuplicates = new Set(fields).size !== fields.length;
+
     if (!hasDuplicates) {
       const obj: Record<string, unknown> = {};
+
       for (const child of group.children) {
         const { rule } = child as { rule: ConditionRule };
+
         obj[rule.field] = ruleToValue(rule);
       }
+
       return obj;
     }
   }
@@ -266,15 +299,20 @@ function nodeToJson(node: ConditionNode): Record<string, unknown> {
   if (node.type === 'group') {
     return modelToJson(node.group);
   }
+
   const { rule } = node;
+
   return { [rule.field]: ruleToValue(rule) };
 }
 
 function ruleToValue(rule: ConditionRule): unknown {
   const { operator, value } = rule;
+
   if (operator === '$eq') return parseValue(value);
+
   if (operator === '$in' || operator === '$nin') {
     return { [operator]: parseArrayValue(value) };
   }
+
   return { [operator]: parseValue(value) };
 }

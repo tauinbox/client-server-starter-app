@@ -99,12 +99,15 @@ describe('ActiveSessionsComponent', () => {
     fixture = TestBed.createComponent(ActiveSessionsComponent);
     component = fixture.componentInstance;
     fixture.componentRef.setInput('user', user);
+
     for (const [name, value] of Object.entries(inputs)) {
       fixture.componentRef.setInput(name, value);
     }
+
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
+
     return fixture.nativeElement as HTMLElement;
   }
 
@@ -112,7 +115,9 @@ describe('ActiveSessionsComponent', () => {
     const button = Array.from(host.querySelectorAll('button')).find(
       (b) => b.textContent?.trim() === label
     );
+
     if (!button) throw new Error(`no button "${label}"`);
+
     return button;
   }
 
@@ -142,6 +147,7 @@ describe('ActiveSessionsComponent', () => {
     const host = await create();
 
     const items = host.querySelectorAll('.sessions-item');
+
     expect(items).toHaveLength(3);
     expect(items[0].textContent).toContain('Chrome on Windows');
     expect(items[0].querySelector('.sessions-badge')).not.toBeNull();
@@ -158,6 +164,7 @@ describe('ActiveSessionsComponent', () => {
           s.textContent?.trim()
         )
     );
+
     expect(origins).toEqual([
       ['203.0.113.7', 'Berlin, Germany'],
       ['198.51.100.4'],
@@ -192,6 +199,7 @@ describe('ActiveSessionsComponent', () => {
     const host = await create();
 
     const [, device] = host.querySelectorAll('.sessions-device');
+
     expect(device.querySelector('img')).toBeNull();
     expect(device.textContent).toContain('<img src=x onerror=alert(1)>');
   });
@@ -202,6 +210,7 @@ describe('ActiveSessionsComponent', () => {
     const endButtons = host.querySelectorAll<HTMLButtonElement>(
       '.sessions-item button'
     );
+
     endButtons[0].click();
     fixture.detectChanges();
     component.passwordModel.set({ currentPassword: 'secret' });
@@ -239,6 +248,7 @@ describe('ActiveSessionsComponent', () => {
       reauthProviderLabel: 'Google'
     });
     const emitted: SessionRevokeTarget[] = [];
+
     component.reauthRequested.subscribe((target) => emitted.push(target));
 
     buttonNamed(host, 'Sign out all other devices').click();

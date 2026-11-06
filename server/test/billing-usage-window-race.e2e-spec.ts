@@ -114,6 +114,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
   afterEach(async () => {
     insertGate?.release();
     insertGate = null;
+
     if (customerId) {
       // Invoices and ledger rows hold the customer under RESTRICT, so they go
       // first; the rest cascades from the user.
@@ -128,6 +129,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
       await ds.getRepository(PaymentMethod).delete({ customerId });
       customerId = undefined;
     }
+
     if (userId) {
       await ds.getRepository(User).delete({ id: userId });
       userId = undefined;
@@ -144,6 +146,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
     const { promise: released, resolve: release } =
       Promise.withResolvers<void>();
     const { promise: entered, resolve: enter } = Promise.withResolvers<void>();
+
     return { release, released, enter, entered };
   }
 
@@ -164,6 +167,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
         password: 'hashed'
       })
     );
+
     userId = user.id;
 
     const customer = await ds.getRepository(Customer).save(
@@ -177,9 +181,11 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
         defaultPaymentMethodId: null
       })
     );
+
     customerId = customer.id;
 
     const selfManaged = opts.provider === 'yookassa';
+
     subscription = await ds.getRepository(Subscription).save(
       ds.getRepository(Subscription).create({
         customerId: customer.id,
@@ -230,6 +236,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
         receiptRef: null
       })
     );
+
     await ds.transaction((m) =>
       new CreditService(ds.getRepository(CreditBalance)).addPurchase(
         m,
@@ -254,21 +261,25 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
       chargeOffSession: jest.fn(
         async (_customer: Customer, { amountMinor }: OffSessionCharge) => {
           recordAmount(amountMinor);
+
           if (calls === 1) {
             charge.enter();
             await charge.released;
           }
+
           return { providerInvoiceRef: `pay_${calls}`, status: 'captured' };
         }
       ),
       chargeUsage: jest.fn((_ref: string, { amountMinor }: UsageCharge) => {
         recordAmount(amountMinor);
+
         return Promise.resolve(undefined);
       }),
       findOffSessionCharge: jest.fn(() => Promise.resolve(null)),
       getOffSessionCharge: jest.fn(() => Promise.resolve(null)),
       cancel: jest.fn(() => Promise.resolve(undefined))
     };
+
     return { value, amounts, charge };
   }
 
@@ -278,12 +289,15 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
    */
   function scopedSubscriptions() {
     const subscriptions = ds.getRepository(Subscription);
+
     return subscriptions.extend({
       createQueryBuilder(alias: string) {
         const qb = subscriptions.createQueryBuilder(alias);
         const getMany = qb.getMany.bind(qb);
+
         qb.getMany = async () =>
           (await getMany()).filter((s) => s.id === subscription.id);
+
         return qb;
       }
     });
@@ -338,6 +352,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();
+
     return {
       renewals: module.get(RenewalService),
       admin: module.get(BillingAdminService),
@@ -359,6 +374,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
   /** True once an UPDATE whose text contains `marker` waits on a row lock. */
   async function updateBlockedOn(marker: string): Promise<boolean> {
     const deadline = Date.now() + 5000;
+
     while (Date.now() < deadline) {
       const rows: unknown[] = await ds.query(
         `SELECT 1 FROM pg_stat_activity
@@ -368,9 +384,12 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
             AND query LIKE $1`,
         [`%${marker}%`]
       );
+
       if (rows.length > 0) return true;
+
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+
     return false;
   }
 
@@ -382,20 +401,24 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
 
   it('a renewal waits for an ingest that passed its check, and bills the record', async () => {
     const periodEnd = new Date(Date.now() - DAY_MS);
+
     await seed({
       provider: 'yookassa',
       periodStart: new Date(periodEnd.getTime() - 30 * DAY_MS),
       periodEnd
     });
     const p = provider('yookassa');
+
     p.charge.release();
     const { renewals, usage } = await build(p.value);
 
     insertGate = gate();
     const ingest = recordLate(usage, new Date(periodEnd.getTime() - 60_000));
+
     await insertGate.entered;
     const scan = renewals.runDueRenewals(new Date());
     const blocked = await updateBlockedOn('usage_sealed_until');
+
     insertGate.release();
     await ingest;
     await scan;
@@ -406,6 +429,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
 
   it('an ingest after a renewal sealed the window is refused, not stored', async () => {
     const periodEnd = new Date(Date.now() - DAY_MS);
+
     await seed({
       provider: 'yookassa',
       periodStart: new Date(periodEnd.getTime() - 30 * DAY_MS),
@@ -415,11 +439,13 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
     const { renewals, usage } = await build(p.value);
 
     const scan = renewals.runDueRenewals(new Date());
+
     await p.charge.entered;
     const refused = await recordLate(
       usage,
       new Date(periodEnd.getTime() - 60_000)
     ).catch((error: unknown) => error);
+
     p.charge.release();
     await scan;
 
@@ -430,20 +456,24 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
 
   it('an immediate cancel waits for an ingest that passed its check, and bills the record', async () => {
     const now = Date.now();
+
     await seed({
       provider: 'yookassa',
       periodStart: new Date(now - 10 * DAY_MS),
       periodEnd: new Date(now + 20 * DAY_MS)
     });
     const p = provider('yookassa');
+
     p.charge.release();
     const { admin, usage } = await build(p.value);
 
     insertGate = gate();
     const ingest = recordLate(usage, new Date(now - 60_000));
+
     await insertGate.entered;
     const cancel = admin.cancelSubscription(subscription.id, 'immediate');
     const blocked = await updateBlockedOn('usage_sealed_until');
+
     insertGate.release();
     await ingest;
     const canceled = await cancel;
@@ -456,12 +486,14 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
   it('a provider period close waits for an ingest that passed its check, and bills the record', async () => {
     const periodEnd = new Date(Date.now() - 60_000);
     const periodStart = new Date(periodEnd.getTime() - 30 * DAY_MS);
+
     await seed({ provider: 'paddle', periodStart, periodEnd });
     const p = provider('paddle');
     const { usage, invoicing } = await build(p.value);
 
     insertGate = gate();
     const ingest = recordLate(usage, new Date(periodEnd.getTime() - 60_000));
+
     await insertGate.entered;
     // The rollover write of the webhook reducer moves the stored window to the
     // next period, and the close event it emits then rates the old window.
@@ -489,6 +521,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
         )
       );
     const blocked = await updateBlockedOn('window-race-rollover');
+
     insertGate.release();
     await ingest;
     await close;

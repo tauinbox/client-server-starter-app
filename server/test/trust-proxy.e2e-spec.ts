@@ -31,8 +31,10 @@ async function createApp(
   }).compile();
 
   const app = moduleRef.createNestApplication<NestExpressApplication>();
+
   applyTrustProxy(app, trustedProxies);
   await app.init();
+
   return app;
 }
 
@@ -47,6 +49,7 @@ async function whoami(
   const res = await request(httpServer(app))
     .get('/whoami')
     .set('X-Forwarded-For', xForwardedFor);
+
   return { status: res.status, body: res.body as WhoAmIBody };
 }
 

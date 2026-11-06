@@ -18,10 +18,12 @@ export class FeatureFlagChangedListener implements OnModuleDestroy {
   @OnEvent(FeatureFlagChangedEvent.name)
   async handleFeatureFlagChanged(): Promise<void> {
     await this.resolver.invalidateAll();
+
     // Every broadcast makes all connected clients refetch their flag set at
     // once, so a burst of changes (e.g. several saves in quick succession)
     // must collapse into a single delayed push, not N.
     if (this.#broadcastTimer) return;
+
     this.#broadcastTimer = setTimeout(() => {
       this.#broadcastTimer = null;
       this.notificationsService.pushToAll({ type: 'feature_flags_updated' });

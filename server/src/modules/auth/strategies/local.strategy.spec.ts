@@ -76,6 +76,7 @@ describe('LocalStrategy', () => {
 
     it('collapses an address over 255 characters to an ordinary failed credential', async () => {
       const address = `${'a'.repeat(250)}@x.com`;
+
       expect(address).toHaveLength(256);
 
       await strategy.validate(address, 'Password1');
@@ -113,6 +114,7 @@ describe('LocalStrategy', () => {
     // character, so a password of 128 emoji passed the DTO when it was set.
     it(`keeps a password of ${MAX_PASSWORD_LENGTH} astral characters`, async () => {
       const password = '\u{1F600}'.repeat(MAX_PASSWORD_LENGTH);
+
       expect(password.length).toBeGreaterThan(MAX_PASSWORD_LENGTH);
 
       await strategy.validate('test@example.com', password);

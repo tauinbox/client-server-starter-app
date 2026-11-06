@@ -28,6 +28,7 @@ describe('dependency-up gauge', () => {
     it('maps each recorded dependency to 1 (healthy) or 0 (degraded)', async () => {
       const ref = createDependencyHealthRef();
       const gauge = createDependencyUpGauge(ref);
+
       ref.statuses.set('smtp', false);
       ref.statuses.set('redis', true);
 
@@ -46,6 +47,7 @@ describe('dependency-up gauge', () => {
 
       ref.statuses.set('smtp', false);
       const degraded = await gauge.get();
+
       ref.statuses.set('smtp', true);
       const recovered = await gauge.get();
 
@@ -71,6 +73,7 @@ describe('dependency-up gauge', () => {
       mailService = { verifySmtp: jest.fn() };
       jest.spyOn(Logger.prototype, 'warn').mockImplementation();
       const ref = createDependencyHealthRef();
+
       createDependencyUpGauge(ref);
 
       const module: TestingModule = await Test.createTestingModule({

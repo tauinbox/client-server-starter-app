@@ -122,7 +122,9 @@ describe('FeatureFlagFormDialogComponent', () => {
       ]
     }).compileComponents();
     const fixture = TestBed.createComponent(FeatureFlagFormDialogComponent);
+
     fixture.detectChanges();
+
     return fixture;
   };
 
@@ -165,6 +167,7 @@ describe('FeatureFlagFormDialogComponent', () => {
     const title = (fixture.nativeElement as HTMLElement)
       .querySelector('[mat-dialog-title]')
       ?.textContent?.trim();
+
     expect(title).toContain('Create');
     expect(fixture.componentInstance.model().key).toBe('');
     expect(fixture.componentInstance.enabled()).toBe(false);
@@ -199,6 +202,7 @@ describe('FeatureFlagFormDialogComponent', () => {
     const title = (fixture.nativeElement as HTMLElement)
       .querySelector('[mat-dialog-title]')
       ?.textContent?.trim();
+
     expect(title).toContain('Edit');
     expect(fixture.componentInstance.model().key).toBe('new-dashboard');
     expect(fixture.componentInstance.enabled()).toBe(true);
@@ -216,12 +220,14 @@ describe('FeatureFlagFormDialogComponent', () => {
     const opts = fixture.componentInstance['environmentOptions'].map(
       (c) => c.value
     );
+
     expect(opts).toEqual([...APP_ENVIRONMENTS]);
   });
 
   it('addRule + removeRule mutate the rules signal', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.addRule();
     cmp.addRule();
     expect(cmp.rules().length).toBe(2);
@@ -244,6 +250,7 @@ describe('FeatureFlagFormDialogComponent', () => {
     ];
     const fixture = await setup({}, undefined, of(roles));
     const cmp = fixture.componentInstance;
+
     cmp.addRule();
     cmp.addRule();
     cmp.addRule();
@@ -252,8 +259,10 @@ describe('FeatureFlagFormDialogComponent', () => {
     const rows = fixture.debugElement
       .queryAll(By.directive(FeatureFlagRuleRowComponent))
       .map((el) => el.componentInstance as FeatureFlagRuleRowComponent);
+
     expect(rows.length).toBe(3);
     expect(getAllRolesSpy).toHaveBeenCalledTimes(1);
+
     for (const row of rows) {
       expect(row.roleOptions()).toEqual([
         {
@@ -267,14 +276,17 @@ describe('FeatureFlagFormDialogComponent', () => {
 
   it('gives the rule rows no roles, and reports no error, when the role catalog is refused', async () => {
     const unhandled = vi.fn();
+
     config.onUnhandledError = unhandled;
     vi.useFakeTimers();
+
     try {
       const fixture = await setup(
         {},
         undefined,
         throwError(() => new Error('503'))
       );
+
       fixture.componentInstance.addRule();
       fixture.detectChanges();
       vi.runOnlyPendingTimers();
@@ -282,6 +294,7 @@ describe('FeatureFlagFormDialogComponent', () => {
       const row = fixture.debugElement.query(
         By.directive(FeatureFlagRuleRowComponent)
       ).componentInstance as FeatureFlagRuleRowComponent;
+
       expect(row.roleOptions()).toEqual([]);
       expect(unhandled).not.toHaveBeenCalled();
     } finally {
@@ -293,6 +306,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('submit serialises environments as a string array (not CSV)', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'new-dashboard', description: '' });
     cmp.environments.set([
       { value: 'production', label: 'production' },
@@ -305,9 +319,11 @@ describe('FeatureFlagFormDialogComponent', () => {
 
   it('renders rules without drag handles', async () => {
     const fixture = await setup({});
+
     fixture.componentInstance.addRule();
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
+
     expect(root.querySelector('[cdkDropList]')).toBeNull();
     expect(root.querySelector('[cdkDrag]')).toBeNull();
     expect(root.querySelector('.drag-handle')).toBeNull();
@@ -316,6 +332,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('submit() creates the flag and closes with the saved flag', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'new-dashboard', description: 'rollout' });
     cmp.onEnabledChange(true);
     cmp.submit();
@@ -332,6 +349,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('submit() sends each rule as effect and payload only', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'new-dashboard', description: '' });
     cmp.addRule();
     cmp.submit();
@@ -342,6 +360,7 @@ describe('FeatureFlagFormDialogComponent', () => {
 
   it('keeps the dialog open with the input and shows the error when the save fails', async () => {
     const fixture = await setup(flagWithAttributeRule());
+
     updateSpy.mockReturnValue(
       throwError(
         () =>
@@ -355,6 +374,7 @@ describe('FeatureFlagFormDialogComponent', () => {
       )
     );
     const cmp = fixture.componentInstance;
+
     cmp.model.update((m) => ({ ...m, description: 'paused' }));
     cmp.addRule();
     await fixture.whenStable();
@@ -368,6 +388,7 @@ describe('FeatureFlagFormDialogComponent', () => {
     expect(cmp.rules().length).toBe(2);
     const host = fixture.nativeElement as HTMLElement;
     const error = host.querySelector('.form-error');
+
     expect(error?.textContent?.trim()).toBe(
       'Feature flag was modified by another request. Reload and retry.'
     );
@@ -376,13 +397,16 @@ describe('FeatureFlagFormDialogComponent', () => {
     const save = host.querySelector<HTMLButtonElement>(
       'mat-dialog-actions button[matButton="filled"]'
     );
+
     expect(save?.disabled).toBe(false);
   });
 
   it('sends one request while a save is in flight', async () => {
     const fixture = await setup({});
+
     createSpy.mockReturnValue(NEVER);
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'new-dashboard', description: '' });
     cmp.submit();
     cmp.submit();
@@ -392,6 +416,7 @@ describe('FeatureFlagFormDialogComponent', () => {
     const buttons = (fixture.nativeElement as HTMLElement).querySelectorAll(
       'mat-dialog-actions button'
     );
+
     expect(Array.from(buttons).every((b) => b.hasAttribute('disabled'))).toBe(
       true
     );
@@ -416,6 +441,7 @@ describe('FeatureFlagFormDialogComponent', () => {
         }
       });
       const cmp = fixture.componentInstance;
+
       cmp.model.update((m) => ({ ...m, description: 'paused' }));
       await fixture.whenStable();
       cmp.submit();
@@ -428,13 +454,16 @@ describe('FeatureFlagFormDialogComponent', () => {
 
   it('shows the key read-only on edit and sends no key in the update body', async () => {
     const fixture = await setup(flagWithAttributeRule());
+
     await fixture.whenStable();
     const input = (fixture.nativeElement as HTMLElement).querySelector(
       'nxs-form-field input'
     ) as HTMLInputElement;
+
     expect(input.readOnly).toBe(true);
 
     const cmp = fixture.componentInstance;
+
     cmp.model.update((m) => ({ ...m, description: 'paused' }));
     await fixture.whenStable();
     cmp.submit();
@@ -452,16 +481,19 @@ describe('FeatureFlagFormDialogComponent', () => {
 
   it('keeps the key editable on create', async () => {
     const fixture = await setup({});
+
     await fixture.whenStable();
     const input = (fixture.nativeElement as HTMLElement).querySelector(
       'nxs-form-field input'
     ) as HTMLInputElement;
+
     expect(input.readOnly).toBe(false);
   });
 
   it('submit() is a no-op when the key fails validation', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'INVALID_KEY', description: '' });
     cmp.submit();
     expect(closeSpy).not.toHaveBeenCalled();
@@ -470,6 +502,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('submit() confirms before saving an enabled flag with no include rules', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'new-dashboard', description: '' });
     cmp.onEnabledChange(true);
     cmp.submit();
@@ -479,8 +512,10 @@ describe('FeatureFlagFormDialogComponent', () => {
 
   it('submit() does not close when the enable confirmation is cancelled', async () => {
     const fixture = await setup({});
+
     confirmSpy.mockReturnValue(of(false));
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'new-dashboard', description: '' });
     cmp.onEnabledChange(true);
     cmp.submit();
@@ -491,6 +526,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('submit() skips the confirmation when an include rule exists', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'new-dashboard', description: '' });
     cmp.onEnabledChange(true);
     cmp.addRule(); // defaults to effect 'include'
@@ -502,6 +538,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('leaves the rules out of the request when a payload only differs in key order', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
+
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
@@ -519,6 +556,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('sends the full rule set when a payload value differs', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
+
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
@@ -546,6 +584,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('sends an empty rule set when every rule was removed', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
+
     cmp.removeRule(0);
     cmp.submit();
     expect(sentFlag()?.rules).toEqual([]);
@@ -554,6 +593,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('leaves the rules out of a new flag that has none', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'new-dashboard', description: '' });
     cmp.submit();
     expect(sentFlag()).not.toHaveProperty('rules');
@@ -562,6 +602,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('submit() is a no-op while a rule the server would reject is present', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
+
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
@@ -583,6 +624,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('marks the offending row and disables the save button', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
+
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
@@ -597,18 +639,21 @@ describe('FeatureFlagFormDialogComponent', () => {
     fixture.detectChanges();
 
     const host = fixture.nativeElement as HTMLElement;
+
     expect(host.querySelector('.rule-error')?.textContent?.trim()).toBe(
       'Enter the custom attribute key.'
     );
     const save = host.querySelector<HTMLButtonElement>(
       'mat-dialog-actions button[matButton="filled"]'
     );
+
     expect(save?.disabled).toBe(true);
   });
 
   it('submit() proceeds once the rule is completed', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
+
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
@@ -629,6 +674,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('blocks a custom key the server has not registered', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
+
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
@@ -652,6 +698,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('accepts a custom key the server reports', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
+
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
@@ -674,6 +721,7 @@ describe('FeatureFlagFormDialogComponent', () => {
       throwError(() => new Error('offline'))
     );
     const cmp = fixture.componentInstance;
+
     cmp.updateRule(0, {
       id: 'rule-1',
       effect: 'include',
@@ -692,6 +740,7 @@ describe('FeatureFlagFormDialogComponent', () => {
 
   it('offers the reported keys to the rule rows', async () => {
     const fixture = await setup(flagWithAttributeRule());
+
     expect(fixture.componentInstance['customKeyOptions']()).toEqual([
       'billingConfigured',
       'oauthGoogleConfigured'
@@ -701,6 +750,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('previewDraft() reports the unsaved editor state, not the stored flag', async () => {
     const fixture = await setup(flagWithAttributeRule());
     const cmp = fixture.componentInstance;
+
     expect(cmp.previewDraft()).toEqual({
       rules: [
         {
@@ -732,6 +782,7 @@ describe('FeatureFlagFormDialogComponent', () => {
   it('submit() skips the confirmation when the flag is disabled', async () => {
     const fixture = await setup({});
     const cmp = fixture.componentInstance;
+
     cmp.model.set({ key: 'new-dashboard', description: '' });
     cmp.onEnabledChange(false);
     cmp.submit();

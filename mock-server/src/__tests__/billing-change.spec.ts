@@ -14,6 +14,7 @@ let baseUrl: string;
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -32,8 +33,10 @@ async function login(email: string): Promise<string> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: 'Password1' })
   });
+
   expect(res.status).toBe(200);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -47,15 +50,19 @@ async function activateSubscription(planKey: string): Promise<string> {
       body: JSON.stringify({ userId: mockId('user-2'), planKey })
     }
   );
+
   expect(res.status).toBe(200);
   const sub = (await res.json()) as { id: string };
+
   return sub.id;
 }
 
 /** The ru locale routes user@example.com to YooKassa, a self-managed provider. */
 function useRussianLocale(): void {
   const user = getState().users.get(mockId('user-2'));
+
   if (!user) throw new Error('user not seeded');
+
   user.locale = 'ru';
 }
 
@@ -64,7 +71,9 @@ function periodInvoice(subId: string): MockInvoice {
   const source = getState()
     .billingInvoices.values()
     .find((i) => i.subscriptionId === subId && i.status === 'paid');
+
   if (!source) throw new Error('period invoice not seeded');
+
   return source;
 }
 
@@ -89,8 +98,10 @@ describe('POST /billing/subscription/change', () => {
     const res = await post(token, 'subscription/change', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(200);
     const sub = (await res.json()) as { planKey: string; billingMode: string };
+
     expect(sub.planKey).toBe('business');
     expect(sub.billingMode).toBe('fixed');
 
@@ -99,6 +110,7 @@ describe('POST /billing/subscription/change', () => {
     );
     const charge = invoices.find((i) => i.status === 'paid');
     const refund = invoices.find((i) => i.status === 'refunded');
+
     // A freshly-activated monthly period has its full remainder ahead, so the
     // legs equal the full plan prices (pro 990 RUB back, business 2900 RUB due).
     expect(charge?.amountMinor).toBe(290000);
@@ -109,14 +121,17 @@ describe('POST /billing/subscription/change', () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const source = periodInvoice(subId);
+
     expect(source.provider).toBe('paddle');
     const invoicesBefore = getState().billingInvoices.size;
 
     const res = await post(token, 'subscription/change', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(200);
     const sub = (await res.json()) as { planKey: string };
+
     expect(sub.planKey).toBe('business');
 
     expect(getState().billingInvoices.size).toBe(invoicesBefore);
@@ -129,11 +144,13 @@ describe('POST /billing/subscription/change', () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const source = periodInvoice(subId);
+
     expect(source.provider).toBe('yookassa');
 
     const res = await post(token, 'subscription/change', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(200);
 
     // Refunded in full, so the admin console offers no second refund of it.
@@ -147,14 +164,18 @@ describe('POST /billing/subscription/change', () => {
     const subId = await activateSubscription('pro');
     const source = periodInvoice(subId);
     const sub = getState().billingSubscriptions.get(subId);
+
     if (!sub) throw new Error('subscription not seeded');
+
     const day = 86_400_000;
+
     sub.currentPeriodStart = new Date(Date.now() - 15 * day).toISOString();
     sub.currentPeriodEnd = new Date(Date.now() + 15 * day).toISOString();
 
     const res = await post(token, 'subscription/change', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(200);
 
     expect(source.status).toBe('paid');
@@ -168,13 +189,16 @@ describe('POST /billing/subscription/change', () => {
     const subId = await activateSubscription('pro');
 
     const res = await post(token, 'subscription/change', { planKey: 'usage' });
+
     expect(res.status).toBe(200);
     const sub = (await res.json()) as { planKey: string; billingMode: string };
+
     expect(sub.billingMode).toBe('usage');
 
     const invoices = [...getState().billingInvoices.values()].filter(
       (i) => i.subscriptionId === subId
     );
+
     expect(invoices.some((i) => i.status === 'refunded')).toBe(true);
     // No new paid invoice beyond the activation one (990 RUB).
     expect(
@@ -184,9 +208,11 @@ describe('POST /billing/subscription/change', () => {
 
   it('rejects switching to the current plan', async () => {
     const token = await login('user@example.com');
+
     await activateSubscription('pro');
 
     const res = await post(token, 'subscription/change', { planKey: 'pro' });
+
     expect(res.status).toBe(409);
   });
 
@@ -196,6 +222,7 @@ describe('POST /billing/subscription/change', () => {
     const res = await post(token, 'subscription/change', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(404);
   });
 
@@ -203,19 +230,23 @@ describe('POST /billing/subscription/change', () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const sub = getState().billingSubscriptions.get(subId);
+
     if (!sub) throw new Error('subscription not seeded');
+
     sub.lifecycleOwner = 'self';
     sub.currentPeriodEnd = new Date(Date.now() - 1000).toISOString();
     const invoicesBefore = getState().billingInvoices.size;
 
     for (const path of ['subscription/change', 'subscription/change/preview']) {
       const res = await post(token, path, { planKey: 'business' });
+
       expect(res.status).toBe(409);
       expect(await res.json()).toMatchObject({
         message:
           'The billing period has ended and its renewal is in progress. Try again shortly.'
       });
     }
+
     expect(sub.planKey).toBe('pro');
     expect(getState().billingInvoices.size).toBe(invoicesBefore);
   });
@@ -224,24 +255,30 @@ describe('POST /billing/subscription/change', () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const sub = getState().billingSubscriptions.get(subId);
+
     if (!sub) throw new Error('subscription not seeded');
+
     sub.currentPeriodEnd = new Date(Date.now() - 1000).toISOString();
 
     const res = await post(token, 'subscription/change', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(200);
   });
 
   it('rejects a change while a cancellation is scheduled', async () => {
     const token = await login('user@example.com');
+
     await activateSubscription('pro');
     const cancel = await post(token, 'subscription/cancel', {});
+
     expect(cancel.status).toBe(200);
 
     const res = await post(token, 'subscription/change', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(409);
   });
 });
@@ -253,7 +290,9 @@ describe('POST /billing/subscription/change - metered window', () => {
   // land on the same millisecond as the period start.
   function backdatePeriod(subId: string): void {
     const sub = getState().billingSubscriptions.get(subId);
+
     if (!sub) throw new Error('subscription not seeded');
+
     sub.currentPeriodStart = new Date(Date.now() - 10 * DAY_MS).toISOString();
   }
 
@@ -269,6 +308,7 @@ describe('POST /billing/subscription/change - metered window', () => {
         occurredAt: new Date(Date.now() - 5 * DAY_MS).toISOString()
       })
     });
+
     expect(res.status).toBe(200);
   }
 
@@ -281,10 +321,12 @@ describe('POST /billing/subscription/change - metered window', () => {
   it('fixed → usage never rates the units consumed on the fixed plan', async () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
+
     backdatePeriod(subId);
     await seedUsage(subId);
 
     const res = await post(token, 'subscription/change', { planKey: 'usage' });
+
     expect(res.status).toBe(200);
 
     const usage = await fetch(`${baseUrl}/api/v1/billing/usage`, {
@@ -294,6 +336,7 @@ describe('POST /billing/subscription/change - metered window', () => {
       totalUnits: number;
       periodStart: string;
     };
+
     expect(summary.totalUnits).toBe(0);
     expect(summary.periodStart).toBe(
       getState().billingSubscriptions.get(subId)?.meteredFrom
@@ -307,8 +350,10 @@ describe('POST /billing/subscription/change - metered window', () => {
         body: JSON.stringify({ subscriptionId: subId, outcome: 'success' })
       }
     );
+
     expect(renewal.status).toBe(200);
     const [closed] = usageInvoices(subId);
+
     expect(closed.amountMinor).toBe(0);
     expect(getState().billingSubscriptions.get(subId)?.meteredFrom).toBe(
       undefined
@@ -318,14 +363,17 @@ describe('POST /billing/subscription/change - metered window', () => {
   it('usage → fixed bills the closing window under the usage plan', async () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('usage');
+
     backdatePeriod(subId);
     await seedUsage(subId);
     const before = new Set(usageInvoices(subId).map((i) => i.id));
 
     const res = await post(token, 'subscription/change', { planKey: 'pro' });
+
     expect(res.status).toBe(200);
 
     const added = usageInvoices(subId).filter((i) => !before.has(i.id));
+
     expect(added).toHaveLength(1);
     // 100 units at the Paddle unit price of 2 minor.
     expect(added[0]).toMatchObject({ amountMinor: 200, status: 'paid' });
@@ -335,11 +383,13 @@ describe('POST /billing/subscription/change - metered window', () => {
 describe('POST /billing/subscription/change/preview', () => {
   it('returns the delegated net for a provider-managed subscription', async () => {
     const token = await login('user@example.com');
+
     await activateSubscription('pro');
 
     const res = await post(token, 'subscription/change/preview', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(200);
     const preview = (await res.json()) as ProrationPreviewResponse;
 
@@ -353,20 +403,25 @@ describe('POST /billing/subscription/change/preview', () => {
 
   it('caps a self-managed credit by the unrefunded remainder, as the change does', async () => {
     const user = getState().users.get(mockId('user-2'));
+
     if (!user) throw new Error('user not seeded');
+
     user.locale = 'ru';
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const source = getState()
       .billingInvoices.values()
       .find((i) => i.subscriptionId === subId && i.status === 'paid');
+
     if (!source) throw new Error('period invoice not seeded');
+
     expect(source.amountMinor).toBe(99000);
     source.refundedMinor = 90000;
 
     const res = await post(token, 'subscription/change/preview', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(200);
     const preview = (await res.json()) as ProrationPreviewResponse;
 
@@ -377,6 +432,7 @@ describe('POST /billing/subscription/change/preview', () => {
     const change = await post(token, 'subscription/change', {
       planKey: 'business'
     });
+
     expect(change.status).toBe(200);
     const refund = getState()
       .billingInvoices.values()
@@ -386,6 +442,7 @@ describe('POST /billing/subscription/change/preview', () => {
           i.status === 'refunded' &&
           i.id !== source.id
       );
+
     expect(refund?.amountMinor).toBe(preview.creditMinor);
     // The earlier refund and this leg add up to the whole invoice.
     expect(source.status).toBe('refunded');
@@ -399,6 +456,7 @@ describe('POST /billing/subscription/change/preview', () => {
     await post(token, 'subscription/change/preview', { planKey: 'business' });
 
     const sub = getState().billingSubscriptions.get(subId);
+
     expect(sub?.planKey).toBe('pro');
     expect(getState().billingInvoices.size).toBe(invoicesBefore);
   });
@@ -415,15 +473,19 @@ describe('a plan with no Paddle price id (server parity)', () => {
     const plan = getState()
       .plans.values()
       .find((p) => p.key === planKey);
+
     if (!plan?.prices.paddle) throw new Error('plan not seeded');
+
     delete plan.prices.paddle.providerPriceId;
   }
 
   it('answers 500 on a Paddle checkout', async () => {
     const token = await login('user@example.com');
+
     removePaddlePriceId('business');
 
     const res = await post(token, 'checkout', { planKey: 'business' });
+
     expect(res.status).toBe(500);
     expect(await readErrorBody(res)).toEqual(NO_PRICE_BODY);
   });
@@ -431,20 +493,24 @@ describe('a plan with no Paddle price id (server parity)', () => {
   it('answers 500 on a Paddle change and preview, with nothing changed', async () => {
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
+
     removePaddlePriceId('business');
     const invoicesBefore = getState().billingInvoices.size;
 
     for (const path of ['subscription/change', 'subscription/change/preview']) {
       const res = await post(token, path, { planKey: 'business' });
+
       expect(res.status).toBe(500);
       expect(await readErrorBody(res)).toEqual(NO_PRICE_BODY);
     }
+
     expect(getState().billingSubscriptions.get(subId)?.planKey).toBe('pro');
     expect(getState().billingInvoices.size).toBe(invoicesBefore);
   });
 
   it('leaves a YooKassa change unaffected', async () => {
     const token = await login('user@example.com');
+
     useRussianLocale();
     await activateSubscription('pro');
     removePaddlePriceId('business');
@@ -452,6 +518,7 @@ describe('a plan with no Paddle price id (server parity)', () => {
     const res = await post(token, 'subscription/change', {
       planKey: 'business'
     });
+
     expect(res.status).toBe(200);
   });
 });
@@ -459,11 +526,14 @@ describe('a plan with no Paddle price id (server parity)', () => {
 describe('POST /billing/payment-method', () => {
   it('refuses the re-bind when the plan of the subscription is missing from the catalog', async () => {
     const token = await login('user@example.com');
+
     await activateSubscription('pro');
     const { plans } = getState();
+
     for (const [id, plan] of plans) {
       if (plan.key === 'pro') plans.delete(id);
     }
+
     const methodsBefore = getState().billingPaymentMethods.size;
 
     const res = await post(token, 'payment-method', {});

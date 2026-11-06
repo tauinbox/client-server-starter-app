@@ -60,21 +60,28 @@ export class SingleUseTokenLedger {
           condition: 'NX',
           expiration: { type: 'PX', value: ttlMs }
         });
+
         return reply !== null;
       } catch (error: unknown) {
         this.#failureLog.log(error);
+
         return true;
       }
     }
 
     if (this.#inFlight.has(key)) return false;
+
     this.#inFlight.add(key);
+
     try {
       if (await this.#cache.get(key)) return false;
+
       await this.#cache.set(key, true, ttlMs);
+
       return true;
     } catch (error: unknown) {
       this.#failureLog.log(error);
+
       return true;
     } finally {
       // The cache holds the claim from here on, so the reservation is only

@@ -13,6 +13,7 @@ const USER = { email: 'user@example.com', password: 'Password1' };
 beforeAll(async () => {
   resetState();
   const app = createApp();
+
   server = await listenOnUnblockedPort(app);
   baseUrl = baseUrlOf(server);
 });
@@ -53,6 +54,7 @@ function get(path: string, accessToken: string): Promise<Response> {
 async function accessToken(credentials: typeof ADMIN = ADMIN): Promise<string> {
   const res = await post('/auth/login', credentials);
   const body = (await res.json()) as { tokens: { access_token: string } };
+
   return body.tokens.access_token;
 }
 
@@ -62,12 +64,14 @@ async function enrol(token: string): Promise<void> {
     { currentPassword: ADMIN.password },
     token
   );
+
   expect(setup.status).toBe(200);
   const enable = await post(
     '/auth/mfa/enable',
     { code: MOCK_TOTP_CODE },
     token
   );
+
   expect(enable.status).toBe(200);
 }
 
@@ -122,6 +126,7 @@ describe('two-factor requirement for a super role', () => {
   it('opens the surface once the enrolment is complete', async () => {
     process.env['MFA_REQUIRED_FOR_ADMINS'] = 'true';
     const token = await accessToken();
+
     await enrol(token);
 
     const res = await get('/roles', token);

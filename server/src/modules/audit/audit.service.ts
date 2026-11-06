@@ -16,6 +16,7 @@ export const AUDIT_FIELD_MAX_LENGTH = 255;
 
 function capAuditField(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
+
   return value.length > AUDIT_FIELD_MAX_LENGTH
     ? value.slice(0, AUDIT_FIELD_MAX_LENGTH)
     : value;
@@ -60,6 +61,7 @@ export class AuditService {
       ipAddress: capAuditField(params.context?.ip),
       requestId: capAuditField(params.context?.requestId)
     });
+
     await repository.save(entry);
   }
 

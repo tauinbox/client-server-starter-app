@@ -112,6 +112,7 @@ export default class BillingPlansSeeder extends Seeder {
       (await planRepo.find()).map((plan) => plan.key)
     );
     const toCreate = PLANS.filter((plan) => !existingKeys.has(plan.key));
+
     if (toCreate.length === 0) return;
 
     await planRepo.save(toCreate.map((plan) => planRepo.create(plan)));

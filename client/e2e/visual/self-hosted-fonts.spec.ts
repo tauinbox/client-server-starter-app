@@ -11,6 +11,7 @@ test('fonts load from the bundle and icons render as glyphs', async ({
   page
 }) => {
   const fontHostRequests: string[] = [];
+
   page.on('request', (request) => {
     if (FONT_HOSTS.includes(new URL(request.url()).hostname)) {
       fontHostRequests.push(request.url());
@@ -23,23 +24,29 @@ test('fonts load from the bundle and icons render as glyphs', async ({
 
   const faces = await page.evaluate(async () => {
     await document.fonts.ready;
+
     return [...document.fonts]
       .filter((face) => face.status === 'loaded')
       .map((face) => face.family.replaceAll('"', ''));
   });
+
   expect(faces).toContain('Roboto');
   expect(faces).toContain('Material Icons');
 
   // A ligature that renders as text is several times wider than one glyph.
   const iconWidth = await page.evaluate(() => {
     const icon = document.createElement('span');
+
     icon.className = 'material-icons';
     icon.textContent = 'account_circle';
     document.body.appendChild(icon);
     const { width } = icon.getBoundingClientRect();
+
     icon.remove();
+
     return width;
   });
+
   expect(iconWidth).toBe(24);
 
   expect(fontHostRequests).toEqual([]);

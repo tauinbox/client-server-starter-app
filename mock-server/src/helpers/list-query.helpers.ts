@@ -25,7 +25,9 @@ import {
 /** Mirrors the boolean @Transform: an empty param reads as unset. */
 export function parseOptionalBoolean(value: unknown): boolean | undefined {
   if (value === 'true' || value === true) return true;
+
   if (value === 'false' || value === false) return false;
+
   return undefined;
 }
 
@@ -54,6 +56,7 @@ function textErrors(name: string, value: unknown): string[] {
         ]
       : [];
   }
+
   return [
     `${name} must be shorter than or equal to ${MAX_LIST_FILTER_LENGTH} characters`,
     `${name} must be a string`
@@ -63,6 +66,7 @@ function textErrors(name: string, value: unknown): string[] {
 /** Postgres `ILIKE '%x%'`: a NULL column never matches. */
 function containsText(fieldValue: unknown, wanted: string): boolean {
   if (fieldValue === null || fieldValue === undefined) return false;
+
   return String(fieldValue).toLowerCase().includes(wanted.toLowerCase());
 }
 
@@ -113,16 +117,21 @@ const FILTER_KINDS: { [K in ListFilterKind]: FilterKindHandler<K> } = {
   uuidList: {
     errors: (name, value) => {
       const ids = parseIdList(value);
+
       if (!Array.isArray(ids)) return [`${name} must be an array`];
+
       const errors: string[] = [];
+
       if (!ids.every((id) => typeof id === 'string' && UUID_PATTERN.test(id))) {
         errors.push(`each value in ${name} must be a UUID`);
       }
+
       if (ids.length > MAX_PAGE_SIZE) {
         errors.push(
           `${name} must contain no more than ${MAX_PAGE_SIZE} elements`
         );
       }
+
       return errors;
     },
     parse: (value) => (parseIdList(value) as string[]).map(String),
@@ -181,14 +190,19 @@ export function parseListQuery<S extends ListQuerySpec>(
   spec: S
 ): ListFilters<S> {
   const parsed: Record<string, unknown> = {};
+
   if (typeof query['q'] === 'string' && query['q'] !== '') {
     parsed['q'] = query['q'];
   }
+
   const definitions = { ...spec.filters, ...spec.params };
+
   for (const [name, definition] of Object.entries(definitions)) {
     if (query[name] === undefined) continue;
+
     parsed[name] = FILTER_KINDS[definition.kind].parse(query[name]);
   }
+
   // Each key was parsed by the handler of the kind that `spec` gives it.
   return parsed as ListFilters<S>;
 }
@@ -216,6 +230,7 @@ export function filterByListQuery<T extends object, S extends ListQuerySpec>(
 ): T[] {
   const values: Readonly<Record<string, unknown>> = query;
   const { q } = query;
+
   return items.filter((item) => {
     if (
       q &&
@@ -223,9 +238,12 @@ export function filterByListQuery<T extends object, S extends ListQuerySpec>(
     ) {
       return false;
     }
+
     return Object.entries(spec.filters).every(([name, definition]) => {
       const wanted = values[name];
+
       if (wanted === undefined) return true;
+
       return matchesFilter(
         definition.kind,
         Reflect.get(item, definition.field ?? name),
@@ -244,8 +262,11 @@ export function rejectInvalidCursor(
   query: Record<string, unknown>
 ): boolean {
   const { cursor } = parseCursorQuery(query);
+
   if (!cursor || parseCursor(cursor)) return false;
+
   sendError(res, ErrorKeys.GENERAL.INVALID_CURSOR, 'Invalid cursor');
+
   return true;
 }
 

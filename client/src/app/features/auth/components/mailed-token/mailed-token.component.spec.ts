@@ -108,6 +108,7 @@ describe.each<{
         expect(call()).toHaveBeenCalledWith('my-token');
         const other: MailedTokenAction =
           action === 'verifyEmail' ? 'confirmEmailChange' : 'verifyEmail';
+
         expect(authServiceMock[other]).not.toHaveBeenCalled();
       });
 
@@ -125,6 +126,7 @@ describe.each<{
           error: { errorKey, message: 'Token expired' },
           status: 400
         });
+
         call().mockReturnValue(throwError(() => httpError));
         createComponent('expired-token');
 
@@ -135,6 +137,7 @@ describe.each<{
 
       it('should show fallback error when no server message on failure', () => {
         const httpError = new HttpErrorResponse({ error: null, status: 500 });
+
         call().mockReturnValue(throwError(() => httpError));
         createComponent('some-token');
 

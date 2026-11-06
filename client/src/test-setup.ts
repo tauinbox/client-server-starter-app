@@ -26,12 +26,15 @@ class NoopIntersectionObserver {
   observe(): void {
     // Intentionally inert: the sentinel never reports an intersection in tests.
   }
+
   unobserve(): void {
     // Intentionally inert.
   }
+
   disconnect(): void {
     // Intentionally inert.
   }
+
   takeRecords(): IntersectionObserverEntry[] {
     return [];
   }

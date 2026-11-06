@@ -24,6 +24,7 @@ export const FeatureFlagsStore = signalStore(
       const request = firstValueFrom(service.getEvaluatedFlags())
         .then((response) => {
           if (epoch !== fetchEpoch) return;
+
           patchState(store, { flags: response.flags, loaded: true });
         })
         .catch(() => {
@@ -34,7 +35,9 @@ export const FeatureFlagsStore = signalStore(
         .finally(() => {
           if (inFlight === request) inFlight = null;
         });
+
       inFlight = request;
+
       return request;
     }
 
@@ -46,7 +49,9 @@ export const FeatureFlagsStore = signalStore(
      */
     function load(): Promise<void> {
       if (inFlight) return inFlight;
+
       if (store.loaded()) return Promise.resolve();
+
       return fetchFlags();
     }
 

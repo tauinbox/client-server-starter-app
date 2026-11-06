@@ -126,6 +126,7 @@ describe('Billing user self-service (e2e)', () => {
     // Inject the authenticated user (set by the global JwtAuthGuard in prod).
     app.use((req: Request, _res: Response, next: NextFunction) => {
       const userId = (req.headers['x-test-user'] as string) ?? 'user-1';
+
       (req as Request & { user: { userId: string } }).user = { userId };
       next();
     });
@@ -145,6 +146,7 @@ describe('Billing user self-service (e2e)', () => {
       .expect(200);
 
     const body = res.body as { provider: string; status: string };
+
     expect(body.provider).toBe('yookassa');
     expect(body.status).toBe('active');
     expect(res.body).not.toHaveProperty('providerSubscriptionId');
@@ -174,6 +176,7 @@ describe('Billing user self-service (e2e)', () => {
       data: Array<{ providerInvoiceRef: string }>;
       meta: { nextCursor: string | null; hasMore: boolean };
     };
+
     expect(body.data).toHaveLength(1);
     expect(body.data[0].providerInvoiceRef).toBe('pay_1');
     expect(body.data[0]).not.toHaveProperty('providerEventId');

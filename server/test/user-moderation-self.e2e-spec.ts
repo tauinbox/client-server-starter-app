@@ -46,6 +46,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
       HTTP_BODY_APP_OPTIONS
     );
+
     applyBodyParsers(expressApp);
     app = expressApp;
     app.useGlobalPipes(new ApiValidationPipe());
@@ -68,6 +69,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     const updateUser = (await dataSource.getRepository(Permission).find()).find(
       (p) => p.action.name === 'update' && p.resource.subject === 'User'
     );
+
     if (!updateUser) throw new Error('Permission update:User missing');
 
     // The seeded grant of the `user` role: update, on the own record only.
@@ -75,6 +77,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
       { name: selfEditRoleName },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.setPermissionsForRole(
       selfEdit.id,
       [
@@ -93,6 +96,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
       { name: moderatorRoleName },
       { ability: SYSTEM_ABILITY }
     );
+
     await roleService.setPermissionsForRole(
       moderator.id,
       [{ permissionId: updateUser.id }],
@@ -123,6 +127,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     const found = await dataSource
       .getRepository(User)
       .findOneOrFail({ where: { email } });
+
     return found.id;
   }
 
@@ -135,6 +140,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
       userAgent: 'moderation-self-e2e',
       ipAddress: null
     });
+
     return tokens.access_token;
   }
 
@@ -167,6 +173,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     const id = await userId(ownerEmail);
     const token = await tokenFor(ownerEmail);
     const lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+
     await dataSource
       .getRepository(User)
       .update(id, { failedLoginAttempts: 5, lockedUntil });
@@ -178,6 +185,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
       ErrorKeys.USERS.MODERATION_SELF
     );
     const after = await row(id);
+
     expect(after.failedLoginAttempts).toBe(5);
     expect(after.lockedUntil?.getTime()).toBe(lockedUntil.getTime());
 

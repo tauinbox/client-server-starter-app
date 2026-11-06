@@ -20,9 +20,11 @@ export class InternalNetworkGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<Request>();
+
     if (req.ip && isInternal(req.ip)) {
       return true;
     }
+
     this.logger.warn(
       `Rejected request from non-internal IP ${req.ip ?? '<unknown>'} on ${req.method} ${redactSensitiveQuery(req.originalUrl)}`
     );
@@ -35,6 +37,7 @@ function isInternal(ip: string): boolean {
   if (!ipaddr.isValid(ip)) {
     return false;
   }
+
   // process() unwraps IPv4-mapped IPv6 (::ffff:a.b.c.d)
   return INTERNAL_RANGES.has(ipaddr.process(ip).range());
 }

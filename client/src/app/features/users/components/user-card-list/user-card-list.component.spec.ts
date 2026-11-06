@@ -102,6 +102,7 @@ describe('UserCardListComponent', () => {
       fixture.detectChanges();
 
       const chip = fixture.nativeElement.querySelector('.role-chips mat-chip');
+
       expect(chip.querySelector('mat-icon')?.textContent?.trim()).toBe(
         'admin_panel_settings'
       );
@@ -115,12 +116,14 @@ describe('UserCardListComponent', () => {
         id: 'multi',
         roles: [userRole, adminRole]
       };
+
       componentRef.setInput('users', [multi]);
       fixture.detectChanges();
 
       const chips = fixture.nativeElement.querySelectorAll(
         '.role-chips mat-chip'
       );
+
       expect(chips.length).toBe(2);
       expect(chips[0].textContent).toContain(SYSTEM_ROLES.ADMIN);
       expect(chips[1].textContent).toContain(SYSTEM_ROLES.USER);
@@ -134,6 +137,7 @@ describe('UserCardListComponent', () => {
 
       const cards =
         fixture.nativeElement.querySelectorAll('mat-card.user-card');
+
       expect(cards.length).toBe(2);
     });
 
@@ -143,6 +147,7 @@ describe('UserCardListComponent', () => {
 
       const cards =
         fixture.nativeElement.querySelectorAll('mat-card.user-card');
+
       expect(cards.length).toBe(0);
     });
 
@@ -151,6 +156,7 @@ describe('UserCardListComponent', () => {
       fixture.detectChanges();
 
       const text = fixture.nativeElement.textContent as string;
+
       expect(text).toContain('Test User');
       expect(text).toContain('test@example.com');
     });
@@ -164,6 +170,7 @@ describe('UserCardListComponent', () => {
       const chip = fixture.nativeElement.querySelector(
         'dd mat-chip.app-chip-danger'
       );
+
       expect(chip.textContent.trim()).toBe('Deleted');
     });
   });

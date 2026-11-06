@@ -91,10 +91,14 @@ export function withCursorList<Entity extends { id: string }>(config: {
         fetcher: CursorListFetcher<Entity>
       ): Promise<void> {
         const token = ++sequence;
+
         patchState(store, { loading: true });
+
         try {
           const page = await firstValueFrom(fetcher(request(null)));
+
           if (token !== sequence) return;
+
           patchState(store, setAllEntities(page.data));
           patchState(store, {
             nextCursor: page.meta.nextCursor,
@@ -103,6 +107,7 @@ export function withCursorList<Entity extends { id: string }>(config: {
           });
         } catch (error) {
           if (token !== sequence) return;
+
           notify.error(error as HttpErrorResponse, config.fallbackKey);
         } finally {
           if (token === sequence) patchState(store, { loading: false });
@@ -118,6 +123,7 @@ export function withCursorList<Entity extends { id: string }>(config: {
         fetcher: CursorListFetcher<Entity>
       ): Promise<void> {
         const cursor = store.nextCursor();
+
         if (
           !cursor ||
           !store.hasMore() ||
@@ -128,10 +134,14 @@ export function withCursorList<Entity extends { id: string }>(config: {
         }
 
         const token = sequence;
+
         patchState(store, { isLoadingMore: true });
+
         try {
           const page = await firstValueFrom(fetcher(request(cursor)));
+
           if (token !== sequence) return;
+
           patchState(store, upsertEntities(page.data));
           patchState(store, {
             nextCursor: page.meta.nextCursor,
@@ -139,6 +149,7 @@ export function withCursorList<Entity extends { id: string }>(config: {
           });
         } catch (error) {
           if (token !== sequence) return;
+
           notify.error(error as HttpErrorResponse, config.fallbackKey);
         } finally {
           if (token === sequence) patchState(store, { isLoadingMore: false });

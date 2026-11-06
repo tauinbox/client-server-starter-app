@@ -54,6 +54,7 @@ export class RoleFormDialogComponent implements OnInit, OnDestroy {
   readonly #dialogRef = inject(
     MatDialogRef<RoleFormDialogComponent, RoleAdminResponse>
   );
+
   readonly #rolesStore = inject(RolesStore);
   readonly #shortcuts = inject(KeyboardShortcutsService);
   readonly #translocoService = inject(TranslocoService);
@@ -75,6 +76,7 @@ export class RoleFormDialogComponent implements OnInit, OnDestroy {
     requiredNotBlank(path.name);
     maxLength(path.name, 50);
     maxLength(path.description, 255);
+
     if (this.isSystemRole) {
       readonlyField(path.name);
       readonlyField(path.description);
@@ -86,7 +88,9 @@ export class RoleFormDialogComponent implements OnInit, OnDestroy {
   protected get formChanged(): boolean {
     const current = this.roleModel();
     const { role } = this.data;
+
     if (!role) return true;
+
     return (
       current.name !== role.name ||
       current.description !== (role.description ?? '')
