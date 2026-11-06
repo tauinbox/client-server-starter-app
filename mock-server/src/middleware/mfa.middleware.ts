@@ -20,11 +20,13 @@ import {
   recordFailure,
   sendWithRetryAfter,
   stepUpError,
-  stepUpFactorsBodyErrors,
   totpCodeErrors,
   type StepUpErrorEnvelope
 } from '../helpers/reauth.helpers';
-import { sendValidationError } from '../helpers/validation-error.helpers';
+import {
+  requireStepUpBody,
+  sendValidationError
+} from '../helpers/validation-error.helpers';
 import { sendError } from '../helpers/error-envelope.helpers';
 import {
   matchesErrors,
@@ -240,15 +242,9 @@ router.post('/enable', authGuard, (req, res) => {
 });
 
 // POST /api/v1/auth/mfa/disable
-router.post('/disable', authGuard, (req, res) => {
+router.post('/disable', authGuard, requireStepUpBody(), (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = req.body;
-
-  const bodyErrors = stepUpFactorsBodyErrors(req.body);
-  if (bodyErrors.length > 0) {
-    sendValidationError(res, 'body', bodyErrors);
-    return;
-  }
 
   const stepUp = stepUpError(req, user, {
     currentPassword,
@@ -290,15 +286,9 @@ router.post('/disable', authGuard, (req, res) => {
 });
 
 // POST /api/v1/auth/mfa/recovery-codes
-router.post('/recovery-codes', authGuard, (req, res) => {
+router.post('/recovery-codes', authGuard, requireStepUpBody(), (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = req.body;
-
-  const bodyErrors = stepUpFactorsBodyErrors(req.body);
-  if (bodyErrors.length > 0) {
-    sendValidationError(res, 'body', bodyErrors);
-    return;
-  }
 
   const stepUp = stepUpError(req, user, {
     currentPassword,

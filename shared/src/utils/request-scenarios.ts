@@ -31,7 +31,10 @@ export type ActorFixture = (typeof ACTOR_FIXTURES)[number];
 export const STATE_FIXTURES = [
   /** The request carries the refresh cookie of the session of the bearer. */
   'refresh-cookie',
-  /** A second session of the actor; `$otherSessionId` is its id. */
+  /**
+   * A second session of the actor; `$otherSessionId` is its id and
+   * `$currentSessionId` is the id of the session of the bearer.
+   */
   'second-session',
   /** A mailed verification link; `$verificationToken`. */
   'verification-token',
@@ -108,6 +111,7 @@ export const SCENARIO_PLACEHOLDERS = [
   '$setupCode',
   '$mfaToken',
   '$otherSessionId',
+  '$currentSessionId',
   '$actorId',
   '$targetId',
   /** A role name that no role has before the request. */

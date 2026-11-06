@@ -12,10 +12,12 @@ import { authGuard } from '../helpers/auth.helpers';
 import {
   clearReauthProofCookie,
   sendWithRetryAfter,
-  stepUpError,
-  stepUpFactorsBodyErrors
+  stepUpError
 } from '../helpers/reauth.helpers';
-import { sendValidationError } from '../helpers/validation-error.helpers';
+import {
+  requireStepUpBody,
+  sendValidationError
+} from '../helpers/validation-error.helpers';
 import { sendError } from '../helpers/error-envelope.helpers';
 import {
   AUTH_COOKIE_PATH,
@@ -41,82 +43,85 @@ router.get('/accounts', authGuard, (req, res) => {
 // DELETE /api/v1/auth/oauth/accounts/:provider
 // Removing a provider is a credential change in the same way that adding one
 // is, so the route demands the same fresh proof of identity the link route
-// demands. The provider name is validated first, so a typo costs no step-up.
-router.delete('/accounts/:provider', authGuard, (req, res) => {
-  const { user } = req as AuthenticatedRequest;
-  const provider = req.params['provider'] as string;
-  if (!OAUTH_PROVIDERS.includes(provider)) {
-    sendError(
-      res,
-      ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER,
-      `Invalid OAuth provider: ${provider}`
+// demands. The provider name is checked before the step-up, so a typo costs no
+// step-up.
+router.delete(
+  '/accounts/:provider',
+  authGuard,
+  requireStepUpBody(),
+  (req, res) => {
+    const { user } = req as AuthenticatedRequest;
+    const provider = req.params['provider'] as string;
+    if (!OAUTH_PROVIDERS.includes(provider)) {
+      sendError(
+        res,
+        ErrorKeys.AUTH.INVALID_OAUTH_PROVIDER,
+        `Invalid OAuth provider: ${provider}`
+      );
+      return;
+    }
+
+    const { currentPassword, code } = (req.body ?? {}) as Record<
+      string,
+      unknown
+    >;
+
+    const stepUp = stepUpError(req, user, {
+      currentPassword,
+      code,
+      operation: STEP_UP_OPERATION.OAUTH_UNLINK
+    });
+    if (stepUp) {
+      sendWithRetryAfter(res, stepUp);
+      return;
+    }
+
+    const state = getState();
+    const accounts = state.oauthAccounts.get(user.id) || [];
+
+    if (!accounts.some((a) => a.provider === provider)) {
+      sendError(
+        res,
+        ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED,
+        `No linked ${provider} account found`
+      );
+      return;
+    }
+
+    const otherOAuth = accounts.filter((a) => a.provider !== provider).length;
+
+    if (!user.password && otherOAuth === 0) {
+      sendError(
+        res,
+        ErrorKeys.AUTH.UNLINK_LAST_PROVIDER,
+        'This is the only way you can sign in. Link another provider first, or set a password through the forgot-password link.'
+      );
+      return;
+    }
+
+    state.oauthAccounts.set(
+      user.id,
+      accounts.filter((a) => a.provider !== provider)
     );
-    return;
-  }
 
-  const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
+    clearReauthProofCookie(res);
 
-  const bodyErrors = stepUpFactorsBodyErrors(req.body);
-  if (bodyErrors.length > 0) {
-    sendValidationError(res, 'body', bodyErrors);
-    return;
-  }
+    logAudit('OAUTH_UNLINK', {
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { provider },
+      ip: req.ip
+    });
 
-  const stepUp = stepUpError(req, user, {
-    currentPassword,
-    code,
-    operation: STEP_UP_OPERATION.OAUTH_UNLINK
-  });
-  if (stepUp) {
-    sendWithRetryAfter(res, stepUp);
-    return;
-  }
-
-  const state = getState();
-  const accounts = state.oauthAccounts.get(user.id) || [];
-
-  if (!accounts.some((a) => a.provider === provider)) {
-    sendError(
-      res,
-      ErrorKeys.AUTH.OAUTH_PROVIDER_NOT_LINKED,
-      `No linked ${provider} account found`
+    console.log(
+      `[PROVIDER UNLINKED] To: ${user.email}\n  Provider: ${provider} | IP: ${req.ip}`
     );
-    return;
+
+    res.json({ message: `${provider} account unlinked successfully` });
   }
-
-  const otherOAuth = accounts.filter((a) => a.provider !== provider).length;
-
-  if (!user.password && otherOAuth === 0) {
-    sendError(
-      res,
-      ErrorKeys.AUTH.UNLINK_LAST_PROVIDER,
-      'This is the only way you can sign in. Link another provider first, or set a password through the forgot-password link.'
-    );
-    return;
-  }
-
-  state.oauthAccounts.set(
-    user.id,
-    accounts.filter((a) => a.provider !== provider)
-  );
-
-  clearReauthProofCookie(res);
-
-  logAudit('OAUTH_UNLINK', {
-    actorId: user.id,
-    actorEmail: user.email,
-    targetId: user.id,
-    targetType: 'User',
-    details: { provider },
-    ip: req.ip
-  });
-
-  console.log(
-    `[PROVIDER UNLINKED] To: ${user.email}\n  Provider: ${provider} | IP: ${req.ip}`
-  );
-
-  res.json({ message: `${provider} account unlinked successfully` });
-});
+);
 
 // The provider round trip needs a real identity provider, so both halves stay
 // stubs. What the round trip *produces* - the `oauth_data` cookie - is minted
@@ -196,15 +201,9 @@ router.post('/exchange', (req, res) => {
 // provider callback consumes. Both provider halves are Not Implemented here, so
 // only the step-up the route now demands is reproduced: a linked provider is a
 // credential that outlives every session.
-router.post('/link-init', authGuard, (req, res) => {
+router.post('/link-init', authGuard, requireStepUpBody(), (req, res) => {
   const { user } = req as AuthenticatedRequest;
   const { currentPassword, code } = (req.body ?? {}) as Record<string, unknown>;
-
-  const bodyErrors = stepUpFactorsBodyErrors(req.body);
-  if (bodyErrors.length > 0) {
-    sendValidationError(res, 'body', bodyErrors);
-    return;
-  }
 
   const stepUp = stepUpError(req, user, {
     currentPassword,

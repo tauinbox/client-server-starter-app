@@ -65,7 +65,10 @@ import {
 } from '../helpers/captcha.helpers';
 import type { AuthenticatedRequest } from '../types';
 import { pushUserCrudEvent } from '../helpers/user-list-events.helpers';
-import { sendValidationError } from '../helpers/validation-error.helpers';
+import {
+  requireStepUpBody,
+  sendValidationError
+} from '../helpers/validation-error.helpers';
 import { sendError } from '../helpers/error-envelope.helpers';
 import {
   AUTH_COOKIE_PATH,
@@ -81,8 +84,7 @@ import {
   clearReauthProofCookie,
   lockedEnvelope,
   sendWithRetryAfter,
-  stepUpError,
-  stepUpFactorsBodyErrors
+  stepUpError
 } from '../helpers/reauth.helpers';
 
 /** The own fields of `UpdateProfileDto`, beside the step-up factors. */
@@ -831,6 +833,22 @@ router.get('/permissions', authGuard, (req, res) => {
 router.patch(
   '/profile',
   permissionGuard('update', 'Profile', { skipMfaEnrolmentGate: true }),
+  requireStepUpBody({
+    fields: PROFILE_FIELDS,
+    fieldErrors: (body) => [
+      ...nameErrors(trimName(body['name']), 'definedOnly'),
+      ...newPasswordErrors(body['password'], 'definedOnly'),
+      ...booleanErrors(
+        'removeLinkedProviders',
+        body['removeLinkedProviders'],
+        'definedOnly'
+      ),
+      ...oneOfErrors('locale', body['locale'], {
+        values: SUPPORTED_LOCALES,
+        optional: 'definedOnly'
+      })
+    ]
+  }),
   (req, res) => {
     const {
       password,
@@ -841,20 +859,6 @@ router.patch(
     } = req.body;
     const name = trimName(req.body['name']);
     const { user } = req as AuthenticatedRequest;
-
-    const bodyErrors = stepUpFactorsBodyErrors(req.body, PROFILE_FIELDS, [
-      ...nameErrors(name, 'definedOnly'),
-      ...newPasswordErrors(password, 'definedOnly'),
-      ...booleanErrors('removeLinkedProviders', unlinkRequested, 'definedOnly'),
-      ...oneOfErrors('locale', locale, {
-        values: SUPPORTED_LOCALES,
-        optional: 'definedOnly'
-      })
-    ]);
-    if (bodyErrors.length > 0) {
-      sendValidationError(res, 'body', bodyErrors);
-      return;
-    }
 
     if (password !== undefined) {
       // A first password binds a credential that outlives the session, so it
@@ -937,21 +941,15 @@ router.patch(
 router.post(
   '/profile/email/initiate',
   permissionGuard('update', 'Profile', { skipMfaEnrolmentGate: true }),
+  requireStepUpBody({
+    fields: ['newEmail'],
+    fieldErrors: (body) => emailErrors('newEmail', body['newEmail'])
+  }),
   (req, res) => {
     const { user } = req as AuthenticatedRequest;
     const { currentPassword, code } = req.body;
     const successMessage =
       'If the new email is available, a confirmation link has been sent to it.';
-
-    const bodyErrors = stepUpFactorsBodyErrors(
-      req.body,
-      ['newEmail'],
-      emailErrors('newEmail', req.body?.newEmail)
-    );
-    if (bodyErrors.length > 0) {
-      sendValidationError(res, 'body', bodyErrors);
-      return;
-    }
 
     const newEmail = normalizeEmail(req.body.newEmail) ?? '';
 

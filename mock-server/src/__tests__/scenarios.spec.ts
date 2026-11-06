@@ -225,6 +225,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       await call('GET', '/api/v1/auth/sessions', { bearer: ctx.bearer })
     );
     ctx.values.$otherSessionId = sessions.find((s) => !s.current)!.id;
+    ctx.values.$currentSessionId = sessions.find((s) => s.current)!.id;
   },
   'verification-token': async (ctx) => {
     await json(
