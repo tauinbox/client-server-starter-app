@@ -75,7 +75,7 @@ export class FailedAttemptCounter {
    */
   async record(id: string, windowMs: number): Promise<AttemptWindow> {
     const key = this.#key(id);
-    const redis = redisClientOf(this.#cache);
+    const redis = await redisClientOf(this.#cache);
 
     if (redis) {
       try {
@@ -110,7 +110,7 @@ export class FailedAttemptCounter {
   /** Closes the window for `id`, which a caller does once the subject passes. */
   async clear(id: string): Promise<void> {
     const key = this.#key(id);
-    const redis = redisClientOf(this.#cache);
+    const redis = await redisClientOf(this.#cache);
 
     if (redis) {
       try {

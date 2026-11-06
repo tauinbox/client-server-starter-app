@@ -52,7 +52,7 @@ export class SingleUseTokenLedger {
    */
   async claim(id: string, ttlMs: number): Promise<boolean> {
     const key = `${this.#keyPrefix}${id}`;
-    const redis = redisClientOf(this.#cache);
+    const redis = await redisClientOf(this.#cache);
 
     if (redis) {
       try {

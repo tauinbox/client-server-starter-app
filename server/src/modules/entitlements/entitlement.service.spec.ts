@@ -275,7 +275,12 @@ describe('EntitlementService', () => {
   });
 
   describe('version counter with a Redis-backed cache', () => {
-    let redis: { get: jest.Mock; incr: jest.Mock; on: jest.Mock };
+    let redis: {
+      get: jest.Mock;
+      incr: jest.Mock;
+      on: jest.Mock;
+      isOpen: boolean;
+    };
     let counters: Map<string, number>;
 
     async function setupRedisBacked(): Promise<EntitlementService> {
@@ -293,7 +298,8 @@ describe('EntitlementService', () => {
 
           return Promise.resolve(next);
         }),
-        on: jest.fn()
+        on: jest.fn(),
+        isOpen: true
       };
       // Nest wraps the configured adapter in a Keyv, so the counter reaches the
       // adapter at stores[0].store - a real KeyvRedis is required for the
@@ -301,7 +307,7 @@ describe('EntitlementService', () => {
       const adapter = new KeyvRedis('redis://localhost:6379');
 
       // @ts-expect-error stand-in for the node-redis client: only get/incr/on
-      // are exercised, and widening the production type for a mock is banned.
+      // and isOpen are exercised, and widening the production type for a mock is banned.
       adapter.client = redis;
       const redisCache = { ...cache, stores: [{ store: adapter }] };
 

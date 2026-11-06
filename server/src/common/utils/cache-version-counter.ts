@@ -54,7 +54,7 @@ export class CacheVersionCounter {
   async read(scope?: string): Promise<number> {
     const counterKey = this.#scoped(this.#counterKey, scope);
     const fallbackKey = this.#scoped(this.#fallbackKey, scope);
-    const redis = redisClientOf(this.#cache);
+    const redis = await redisClientOf(this.#cache);
 
     if (redis) {
       try {
@@ -104,7 +104,7 @@ export class CacheVersionCounter {
   async bump(scope?: string): Promise<void> {
     const counterKey = this.#scoped(this.#counterKey, scope);
     const fallbackKey = this.#scoped(this.#fallbackKey, scope);
-    const redis = redisClientOf(this.#cache);
+    const redis = await redisClientOf(this.#cache);
 
     if (redis) {
       try {
