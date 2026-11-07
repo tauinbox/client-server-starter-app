@@ -633,7 +633,10 @@ the ability stays `null`. Each `permissionGuard` then goes to `/forbidden`, whic
 true denial.
 
 The fallback key is a root key and not a key of the `features/auth` scope. `fetchPermissions()` also
-runs from the app initializer and from `features/admin`, where that scope is not loaded.
+runs from the app initializer and from `features/admin`, where that scope is not loaded. In the app
+initializer the root translation is not loaded either, so before the report the failure path waits
+for `TranslocoService.load()` of the active language. A failed load does not reject: a rejection
+would reach `restoreSession` and end the session.
 
 A session start loads no resource catalog. The one screen that needs it, the user permissions page
 (`/admin/users/:id/permissions`), reads `GET /rbac/resources` through

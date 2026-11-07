@@ -7,8 +7,10 @@ import {
   HttpTestingController,
   provideHttpClientTesting
 } from '@angular/common/http/testing';
-import { firstValueFrom, of, Subject } from 'rxjs';
+import { firstValueFrom, of, Subject, throwError } from 'rxjs';
 import type { Observable } from 'rxjs';
+import { TranslocoService } from '@jsverse/transloco';
+import type { Translation } from '@jsverse/transloco';
 import { AuthService } from './auth.service';
 import { AuthStore } from '../store/auth.store';
 import { TokenService } from './token.service';
@@ -107,6 +109,7 @@ describe('AuthService', () => {
   let reconnected$: Subject<void>;
   let notificationsConnect: ReturnType<typeof vi.fn>;
   let notifyMock: { error: ReturnType<typeof vi.fn> };
+  let translocoLoad: ReturnType<typeof vi.fn<() => Observable<Translation>>>;
 
   beforeEach(() => {
     authStoreMock = {
@@ -149,6 +152,7 @@ describe('AuthService', () => {
     reconnected$ = new Subject<void>();
     notificationsConnect = vi.fn();
     notifyMock = { error: vi.fn() };
+    translocoLoad = vi.fn<() => Observable<Translation>>(() => of({}));
 
     TestBed.configureTestingModule({
       providers: [
@@ -171,7 +175,11 @@ describe('AuthService', () => {
         },
         { provide: FeatureFlagsStore, useValue: featureFlagsStoreMock },
         { provide: EntitlementsStore, useValue: entitlementsStoreMock },
-        { provide: NotifyService, useValue: notifyMock }
+        { provide: NotifyService, useValue: notifyMock },
+        {
+          provide: TranslocoService,
+          useValue: { getActiveLang: () => 'en', load: translocoLoad }
+        }
       ]
     });
 
@@ -365,6 +373,44 @@ describe('AuthService', () => {
       // Fail closed: no rules are written, so the ability stays null and every
       // permission-guarded route keeps denying.
       expect(authStoreMock.setRules).not.toHaveBeenCalled();
+    });
+
+    it('shows the message only after the active language has loaded', async () => {
+      const translation$ = new Subject<Translation>();
+
+      translocoLoad.mockReturnValue(translation$);
+      const promise = service.fetchPermissions();
+
+      httpMock
+        .expectOne(AuthApiEnum.Permissions)
+        .flush(null, { status: 503, statusText: 'Service Unavailable' });
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(translocoLoad).toHaveBeenCalledWith('en');
+      expect(notifyMock.error).not.toHaveBeenCalled();
+
+      translation$.next({});
+      await promise;
+
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 503 }),
+        'errors.general.permissionsUnavailable'
+      );
+    });
+
+    it('still resolves and shows the message when the language fails to load', async () => {
+      translocoLoad.mockReturnValue(throwError(() => new Error('offline')));
+      const promise = service.fetchPermissions();
+
+      httpMock
+        .expectOne(AuthApiEnum.Permissions)
+        .flush(null, { status: 503, statusText: 'Service Unavailable' });
+
+      await expect(promise).resolves.toBeUndefined();
+      expect(notifyMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 503 }),
+        'errors.general.permissionsUnavailable'
+      );
     });
   });
 

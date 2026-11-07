@@ -5,17 +5,20 @@ import { HttpClient } from '@angular/common/http';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import {
+  catchError,
   EMPTY,
   filter,
   finalize,
   firstValueFrom,
   from,
+  of,
   switchMap,
   tap,
   throwError,
   timer
 } from 'rxjs';
 import { Router } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import type { User } from '@shared/models/user.types';
 import type {
   ActiveSessionResponse,
@@ -68,6 +71,7 @@ export class AuthService {
   readonly #storage = inject(LocalStorageService);
   readonly #notificationsService = inject(NotificationsService);
   readonly #notify = inject(NotifyService);
+  readonly #transloco = inject(TranslocoService);
   readonly #featureFlagsStore = inject(FeatureFlagsStore);
   readonly #entitlementsStore = inject(EntitlementsStore);
   readonly #destroyRef = inject(DestroyRef);
@@ -593,7 +597,14 @@ export class AuthService {
         this.#authStore.setRules(response.rules);
         this.#authStore.setMfaMandatory(response.mfaMandatory);
       })
-      .catch((error: HttpErrorResponse) => {
+      .catch(async (error: HttpErrorResponse) => {
+        // On a reload this runs before the root translation loads. A rejected
+        // load must not escape: the bootstrap would end the session.
+        await firstValueFrom(
+          this.#transloco
+            .load(this.#transloco.getActiveLang())
+            .pipe(catchError(() => of(null)))
+        );
         // Fail closed: the ability stays null and every guarded route denies,
         // so the user must be told the denial comes from a failed request.
         this.#notify.error(error, 'errors.general.permissionsUnavailable');
