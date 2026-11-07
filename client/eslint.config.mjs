@@ -11,7 +11,7 @@ import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 import baseRules, { errorKeyLiteralSyntax } from '../eslint.base.config.mjs';
 
 const restrictedSyntax = [
-  // Never compare a role.name against the raw 'admin' literal —
+  // Never compare a role.name against the raw 'admin' literal:
   // always go through SYSTEM_ROLES.ADMIN from @app/shared/constants so the
   // system role can be renamed without breaking client RBAC checks.
   {
