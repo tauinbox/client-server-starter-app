@@ -158,6 +158,9 @@ export default tseslint.config(
   },
   {
     // Production literals are resolved by `npm run check:i18n-keys`.
+    // `basePath` keeps `e2e/**` relative to this workspace when the
+    // pre-commit hook runs ESLint from the repository root.
+    basePath: import.meta.dirname,
     files: ['**/*.spec.ts', 'e2e/**/*.ts'],
     rules: {
       'no-restricted-syntax': [
