@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
@@ -101,7 +102,7 @@ describe('two-factor requirement for a super role', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(403);
-    expect(body['errorKey']).toBe('errors.auth.mfaEnrolmentRequired');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_ENROLMENT_REQUIRED);
   });
 
   it('still signs the account in and still serves its profile', async () => {

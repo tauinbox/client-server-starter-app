@@ -786,6 +786,13 @@ also bans an `errorKey` as a `NotifyService` message key. `http-error.utils.ts` 
 `eslint-disable-next-line` for the funnel itself. This is permitted, because the funnel compares the
 result with the key and continues when no translation was found.
 
+A spec file or an `e2e/` file writes a server error key as `ErrorKeys.*`, never as a string. The
+selector `errorKeyLiteralSyntax` of `eslint.base.config.mjs` refuses the string form there, because
+a test with a wrong key passes on the fallback message. Production files are not in its scope:
+`npm run check:i18n-keys` already resolves each key literal in them. A test that needs a key that
+`ErrorKeys` does not hold (a client key in the `errors` group, or a key the client does not know
+yet) keeps the string with an `eslint-disable-next-line` and the reason.
+
 A client-owned fallback key has the name `fallbackKey` and never the name `errorKey`. Thus the word
 has exactly one meaning.
 

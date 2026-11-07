@@ -6,10 +6,11 @@ import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescrip
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
 import stylistic from '@stylistic/eslint-plugin';
-import baseRules from '../eslint.base.config.mjs';
+import baseRules, { errorKeyLiteralSyntax } from '../eslint.base.config.mjs';
 
 // Flat config replaces rule options, so the base selectors are re-added.
 const [, ...baseRestrictedSyntax] = baseRules['no-restricted-syntax'];
+const restrictedSyntax = [...baseRestrictedSyntax, errorKeyLiteralSyntax];
 
 const KEYLESS_BODY_MESSAGE =
   'Send an error body with an errorKey, as the server does. If the server sends this body with no key, disable this line and give the reason.';
@@ -34,7 +35,10 @@ export default defineConfig(
   },
   {
     plugins: { unicorn, '@stylistic': stylistic },
-    rules: baseRules
+    rules: {
+      ...baseRules,
+      'no-restricted-syntax': ['error', ...restrictedSyntax]
+    }
   },
   // `basePath` keeps `src/**` relative to this workspace. The pre-commit hook
   // runs ESLint from the repository root, where `src/**` matches nothing; the
@@ -47,7 +51,7 @@ export default defineConfig(
     rules: {
       'no-restricted-syntax': [
         'error',
-        ...baseRestrictedSyntax,
+        ...restrictedSyntax,
         {
           // Mirrors the keyless-exception check of the server config.
           selector:

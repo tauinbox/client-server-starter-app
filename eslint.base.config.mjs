@@ -34,6 +34,14 @@ const promiseResolverSyntax = {
     'Do not take the resolve function out of a Promise executor. Use Promise.withResolvers().'
 };
 
+// Not in the default rules: `npm run lint:shared` reads `error-keys.ts`,
+// which defines the keys as strings.
+export const errorKeyLiteralSyntax = {
+  selector: 'Literal[value=/^errors\\.[a-z][A-Za-z0-9]*\\.[A-Za-z]/]',
+  message:
+    'Do not write an error key as a string. Use ErrorKeys.* from @app/shared/constants.'
+};
+
 // Prettier keeps blank lines but never adds one. These rules add the blank
 // lines that separate the steps of a function. The `@stylistic` plugin must be
 // registered in the config block that spreads these rules.

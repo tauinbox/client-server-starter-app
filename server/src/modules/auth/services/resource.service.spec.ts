@@ -12,6 +12,7 @@ import { Resource } from '../entities/resource.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { ErrorKeys } from '@app/shared/constants';
 import { bindAuditContext } from '../casl/ability-context';
 import {
   AbilityBuilder,
@@ -246,7 +247,7 @@ describe('ResourceService', () => {
     );
     const refused = {
       status: 403,
-      response: { errorKey: 'errors.general.insufficientPermissions' }
+      response: { errorKey: ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS }
     };
 
     it('refuses an update of a record outside the grant', async () => {
@@ -385,7 +386,7 @@ describe('ResourceService', () => {
           }
         )
       ).rejects.toMatchObject({
-        response: { errorKey: 'errors.resources.notFound' }
+        response: { errorKey: ErrorKeys.RESOURCES.NOT_FOUND }
       });
       expect(mockAudit.log).not.toHaveBeenCalled();
       expect(mockCacheManager.set).not.toHaveBeenCalled();
@@ -450,7 +451,7 @@ describe('ResourceService', () => {
           { ability: superAbility }
         )
       ).rejects.toMatchObject({
-        response: { errorKey: 'errors.resources.actionNotDeclared' }
+        response: { errorKey: ErrorKeys.RESOURCES.ACTION_NOT_DECLARED }
       });
       expect(mockResourceRepo.update).not.toHaveBeenCalled();
     });
@@ -584,7 +585,7 @@ describe('ResourceService', () => {
     });
     const widenRefused = {
       status: 403,
-      response: { errorKey: 'errors.resources.cannotWiden' }
+      response: { errorKey: ErrorKeys.RESOURCES.CANNOT_WIDEN }
     };
 
     it.each([
@@ -1040,7 +1041,7 @@ describe('ResourceService', () => {
         service.restore('res-1', { ability: superAbility, audit })
       ).rejects.toMatchObject({
         status: 409,
-        response: { errorKey: 'errors.resources.notOrphaned' }
+        response: { errorKey: ErrorKeys.RESOURCES.NOT_ORPHANED }
       });
       expect(mockResourceRepo.manager.transaction).not.toHaveBeenCalled();
       expect(mockAudit.log).not.toHaveBeenCalled();
@@ -1060,7 +1061,7 @@ describe('ResourceService', () => {
         service.restore('res-3', { ability: superAbility, audit })
       ).rejects.toMatchObject({
         status: 409,
-        response: { errorKey: 'errors.resources.notOrphaned' }
+        response: { errorKey: ErrorKeys.RESOURCES.NOT_ORPHANED }
       });
       expect(mockAudit.log).not.toHaveBeenCalled();
       expect(mockCacheManager.set).not.toHaveBeenCalled();
@@ -1101,7 +1102,7 @@ describe('ResourceService', () => {
         service.restore('res-3', { ability: delegatedAbility })
       ).rejects.toMatchObject({
         status: 403,
-        response: { errorKey: 'errors.resources.cannotWiden' }
+        response: { errorKey: ErrorKeys.RESOURCES.CANNOT_WIDEN }
       });
       expect(mockResourceRepo.save).not.toHaveBeenCalled();
       expect(mockAudit.logFireAndForget).toHaveBeenCalledWith({

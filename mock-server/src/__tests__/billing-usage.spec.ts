@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -345,7 +346,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(await res.json()).toMatchObject({
       message: 'occurredAt is before the open metered window',
       statusCode: 422,
-      errorKey: 'errors.billing.usageBeforeOpenWindow'
+      errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
     });
     expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
   });
@@ -422,7 +423,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
 
     expect(refused.status).toBe(422);
     expect(await refused.json()).toMatchObject({
-      errorKey: 'errors.billing.usageBeforeOpenWindow'
+      errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
     });
     expect(accepted.status).toBe(201);
   });
@@ -446,7 +447,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(await res.json()).toMatchObject({
       message: 'occurredAt is in the future',
       statusCode: 422,
-      errorKey: 'errors.billing.usageInFuture'
+      errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE
     });
     expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
   });

@@ -1062,7 +1062,7 @@ describe('AuthController', () => {
       const res = mockResponse();
       const dto = { password: 'NewPassword1', currentPassword: 'WrongPass1' };
       const httpErr = new HttpException(
-        { errorKey: 'errors.auth.invalidCurrentPassword' },
+        { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD },
         400
       );
 
@@ -1124,7 +1124,7 @@ describe('AuthController', () => {
       const res = mockResponse();
 
       authServiceMock.assertStepUpForUser.mockRejectedValueOnce(
-        new HttpException({ errorKey: 'errors.auth.reauthRequired' }, 400)
+        new HttpException({ errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }, 400)
       );
 
       await expect(

@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -52,7 +53,7 @@ describe('register conflict audit parity', () => {
     expect(await readErrorBody(conflict)).toEqual({
       message: 'User with this email already exists',
       statusCode: 409,
-      errorKey: 'errors.users.emailExists'
+      errorKey: ErrorKeys.USERS.EMAIL_EXISTS
     });
 
     const rows = auditRows('USER_REGISTER_CONFLICT');

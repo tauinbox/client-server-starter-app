@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -72,7 +73,7 @@ describe('restore of a record that is not removed', () => {
   it('refuses a resource that is not orphaned with no audit row', async () => {
     expect(await restore(`rbac/resources/${USERS_RESOURCE_ID}`)).toEqual({
       status: 409,
-      errorKey: 'errors.resources.notOrphaned'
+      errorKey: ErrorKeys.RESOURCES.NOT_ORPHANED
     });
     expect(auditCount('RESOURCE_RESTORE', USERS_RESOURCE_ID)).toBe(0);
   });
@@ -82,7 +83,7 @@ describe('restore of a record that is not removed', () => {
 
     expect(await restore(`users/${user.id}`)).toEqual({
       status: 409,
-      errorKey: 'errors.users.notDeleted'
+      errorKey: ErrorKeys.USERS.NOT_DELETED
     });
     expect(auditCount('USER_RESTORE', user.id)).toBe(0);
   });

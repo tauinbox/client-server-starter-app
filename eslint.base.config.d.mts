@@ -6,4 +6,6 @@ declare const baseRules: {
   'no-restricted-syntax': ['error', ...RestrictedSyntax[]];
 };
 
+export declare const errorKeyLiteralSyntax: RestrictedSyntax;
+
 export default baseRules;

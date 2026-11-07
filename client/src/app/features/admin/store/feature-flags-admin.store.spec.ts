@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ErrorKeys } from '@app/shared/constants';
 import { storeOverrideWarnings } from '../../../../test-utils/store-override-warnings';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { NotifyService } from '@core/services/notify.service';
@@ -133,7 +134,7 @@ describe('FeatureFlagsAdminStore', () => {
       status: 412,
       error: {
         message: 'Feature flag was modified by another request',
-        errorKey: 'errors.featureFlags.versionConflict'
+        errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
       }
     });
 

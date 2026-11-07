@@ -8,6 +8,7 @@ import type { Provider } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { ErrorKeys } from '@app/shared/constants';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
@@ -501,7 +502,7 @@ runWithInfra('billing write paths (e2e)', () => {
         })
       ).rejects.toMatchObject({
         status: 422,
-        response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
+        response: { errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW }
       });
       await expect(
         usage.record({
@@ -513,7 +514,7 @@ runWithInfra('billing write paths (e2e)', () => {
         })
       ).rejects.toMatchObject({
         status: 422,
-        response: { errorKey: 'errors.billing.usageInFuture' }
+        response: { errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE }
       });
 
       const rows = await ds.getRepository(UsageRecord).find({

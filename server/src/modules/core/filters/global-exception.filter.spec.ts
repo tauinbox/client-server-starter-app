@@ -154,7 +154,7 @@ describe('GlobalExceptionFilter', () => {
       new HttpException(
         {
           message: 'Account is temporarily locked',
-          errorKey: 'errors.auth.accountLocked',
+          errorKey: ErrorKeys.AUTH.ACCOUNT_LOCKED,
           lockedUntil,
           retryAfter: 600
         },

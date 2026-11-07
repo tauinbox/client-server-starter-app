@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -87,7 +88,7 @@ describe('PATCH /api/v1/users/:id email-change parity with server', () => {
       message: string;
     };
 
-    expect(body.errorKey).toBe('errors.users.emailExists');
+    expect(body.errorKey).toBe(ErrorKeys.USERS.EMAIL_EXISTS);
     // The server envelope is closed and never carried this key on the wire.
     expect(body.field).toBeUndefined();
   });

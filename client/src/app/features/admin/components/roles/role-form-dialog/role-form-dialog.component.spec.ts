@@ -1,6 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ErrorKeys } from '@app/shared/constants';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import { of, throwError } from 'rxjs';
@@ -85,7 +86,7 @@ describe('RoleFormDialogComponent', () => {
             status: 400,
             error: {
               message: 'Role with this name already exists',
-              errorKey: 'errors.roles.nameExists'
+              errorKey: ErrorKeys.ROLES.NAME_EXISTS
             }
           })
       )

@@ -412,7 +412,7 @@ describe('UsageService', () => {
         })
       ).rejects.toMatchObject({
         status: 422,
-        response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
+        response: { errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW }
       });
       expect(usageRecords.save).not.toHaveBeenCalled();
     });
@@ -436,7 +436,7 @@ describe('UsageService', () => {
       await expect(
         service.record({ ...INPUT, occurredAt: '2026-01-05T00:00:00.000Z' })
       ).rejects.toMatchObject({
-        response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
+        response: { errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW }
       });
       await service.record({
         ...INPUT,
@@ -459,7 +459,7 @@ describe('UsageService', () => {
         })
       ).rejects.toMatchObject({
         status: 422,
-        response: { errorKey: 'errors.billing.usageBeforeOpenWindow' }
+        response: { errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW }
       });
       await service.record({
         ...INPUT,
@@ -491,7 +491,7 @@ describe('UsageService', () => {
         })
       ).rejects.toMatchObject({
         status: 422,
-        response: { errorKey: 'errors.billing.usageInFuture' }
+        response: { errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE }
       });
       expect(usageRecords.save).not.toHaveBeenCalled();
     });

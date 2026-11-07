@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { ErrorKeys } from '@app/shared/constants';
 import type { PermissionCondition } from '@app/shared/types';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
@@ -142,10 +143,10 @@ const userId = (email: string): string => {
   return user.id;
 };
 
-const liftRefused = { status: 403, errorKey: 'errors.roles.cannotLiftDeny' };
+const liftRefused = { status: 403, errorKey: ErrorKeys.ROLES.CANNOT_LIFT_DENY };
 const grantRefused = {
   status: 403,
-  errorKey: 'errors.roles.cannotGrantPermission'
+  errorKey: ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION
 };
 
 const restrictRowCount = (): number =>

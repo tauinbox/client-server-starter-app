@@ -1,6 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { ErrorKeys } from '@app/shared/constants';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -237,7 +238,7 @@ describe('TwoFactorComponent', () => {
         () =>
           new HttpErrorResponse({
             status: 401,
-            error: { errorKey: 'errors.auth.mfaInvalidCode' }
+            error: { errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE }
           })
       )
     );
@@ -321,7 +322,7 @@ describe('TwoFactorComponent', () => {
         () =>
           new HttpErrorResponse({
             status: 400,
-            error: { errorKey: 'errors.auth.invalidCurrentPassword' }
+            error: { errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD }
           })
       )
     );

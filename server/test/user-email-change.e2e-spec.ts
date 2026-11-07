@@ -5,6 +5,7 @@
 import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { ErrorKeys } from '@app/shared/constants';
 import { HttpStatus, HttpException } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
@@ -275,7 +276,7 @@ describe('UsersService.update — email change side effects', () => {
     expect(caught).toBeInstanceOf(HttpException);
     expect((caught as HttpException).getStatus()).toBe(HttpStatus.CONFLICT);
     expect((caught as HttpException).getResponse()).toMatchObject({
-      errorKey: 'errors.users.emailExists'
+      errorKey: ErrorKeys.USERS.EMAIL_EXISTS
     });
     expect(mailService.sendEmailVerification).not.toHaveBeenCalled();
 

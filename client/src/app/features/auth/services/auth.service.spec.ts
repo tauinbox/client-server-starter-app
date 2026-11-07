@@ -360,6 +360,7 @@ describe('AuthService', () => {
       await expect(promise).resolves.toBeUndefined();
       expect(notifyMock.error).toHaveBeenCalledWith(
         expect.objectContaining({ status: 503 }),
+        // eslint-disable-next-line no-restricted-syntax -- a client key, not in ErrorKeys
         'errors.general.permissionsUnavailable'
       );
       // Fail closed: no rules are written, so the ability stays null and every

@@ -11,7 +11,11 @@ import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { JwtService } from '@nestjs/jwt';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
-import { STEP_UP_OPERATION, TOKEN_PURPOSE } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  STEP_UP_OPERATION,
+  TOKEN_PURPOSE
+} from '@app/shared/constants';
 
 // The rotation cut-off compares a stored `created_at`, and the reuse detector
 // reads the rows the refusal leaves behind, so only a real Postgres proves it.
@@ -121,12 +125,14 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
     expect(
       await errorKeyOf(authService.refreshTokens(preRotation.raw, null))
     ).toEqual(
-      expect.objectContaining({ errorKey: 'errors.auth.sessionInvalidated' })
+      expect.objectContaining({ errorKey: ErrorKeys.AUTH.SESSION_INVALIDATED })
     );
     expect(
       await errorKeyOf(authService.refreshTokens(preRotation.raw, null))
     ).toEqual(
-      expect.objectContaining({ errorKey: 'errors.auth.invalidRefreshToken' })
+      expect.objectContaining({
+        errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+      })
     );
 
     expect(await rowsOf(preRotation.sessionId)).toBe(0);
@@ -174,7 +180,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
         )
       ).toEqual(
         expect.objectContaining({
-          errorKey: 'errors.auth.mfaInvalidPendingToken'
+          errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN
         })
       );
       expect(
@@ -185,7 +191,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
           )
         )
       ).toEqual(
-        expect.objectContaining({ errorKey: 'errors.auth.mfaInvalidCode' })
+        expect.objectContaining({ errorKey: ErrorKeys.AUTH.MFA_INVALID_CODE })
       );
     } finally {
       await dataSource.getRepository(User).delete({ email: mfaEmail });
@@ -215,7 +221,7 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
         })
       )
     ).toEqual(
-      expect.objectContaining({ errorKey: 'errors.auth.reauthRequired' })
+      expect.objectContaining({ errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED })
     );
     expect(
       await errorKeyOf(
