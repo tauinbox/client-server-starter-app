@@ -51,7 +51,7 @@ import {
 import type { UpdateUser, User } from '../../models/user.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { catchError, forkJoin, of, take, tap } from 'rxjs';
+import { catchError, forkJoin, of, tap } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -316,14 +316,7 @@ export class UserEditComponent implements OnInit, OnDestroy {
       user: this.#userService.getById(this.id()),
       roles: this.#authStore.hasPermissions({ action: 'read', subject: 'Role' })
         ? this.#roleCatalog.getAll().pipe(catchError(() => of([])))
-        : of([]),
-      // The refusal notice must not show a raw key on a fresh page load.
-      i18n: this.#translocoService
-        .load(`users/${this.#translocoService.getActiveLang()}`)
-        .pipe(
-          take(1),
-          catchError(() => of(null))
-        )
+        : of([])
     })
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({

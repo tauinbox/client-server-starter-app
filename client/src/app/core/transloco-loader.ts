@@ -9,6 +9,10 @@ const SCOPE_PATH_MAP: Record<string, string> = {
   billing: 'app/features/billing/i18n'
 };
 
+export const TRANSLATION_SCOPES: ReadonlySet<string> = new Set(
+  Object.keys(SCOPE_PATH_MAP)
+);
+
 @Injectable({ providedIn: 'root' })
 export class TranslocoHttpLoader implements TranslocoLoader {
   readonly #http = inject(HttpClient);

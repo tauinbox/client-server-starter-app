@@ -634,9 +634,9 @@ true denial.
 
 The fallback key is a root key and not a key of the `features/auth` scope. `fetchPermissions()` also
 runs from the app initializer and from `features/admin`, where that scope is not loaded. In the app
-initializer the root translation is not loaded either, so before the report the failure path waits
-for `TranslocoService.load()` of the active language. A failed load does not reject: a rejection
-would reach `restoreSession` and end the session.
+initializer the root translation is not loaded either; `NotifyService` waits for it before it opens
+the message (see NotifyService). The failure path does not wait, so a failed translation load cannot
+reach `restoreSession` and end the session.
 
 A session start loads no resource catalog. The one screen that needs it, the user permissions page
 (`/admin/users/:id/permissions`), reads `GET /rbac/resources` through
@@ -759,15 +759,17 @@ The service translates the message with `TranslocoService`. It uses the translat
 action. It takes the duration and the position from `MAT_SNACK_BAR_DEFAULT_OPTIONS`. Thus a call site
 does not repeat the configuration.
 
-**A call site inside a feature must know that its scope is loaded.** The service translates at once,
-and a feature translation file is a lazily fetched scope. A call from `ngOnInit` therefore can run
-before the file lands, and `translate()` then answers with the key, which puts a raw dot-path on the
-screen. A template gets the scope through `*transloco="let t; scope: '<name>'"`, but that directive
-runs after `ngOnInit`. An init-time notification must wait for the scope first, as
-`ProfileComponent.ngOnInit` does with `TranslocoService.load('auth/<lang>')`. A scope that is already
-in the cache emits at once, so the wait costs nothing on the ordinary load.
-`e2e/auth/profile-init-toast-i18n.spec.ts` holds that behaviour: it delays the scope file and asserts
-that the key never reaches the screen.
+**A message opens after its translations load.** The root file and a feature translation file
+are fetched lazily, so a call from an app initializer or from `ngOnInit` can run before the file
+lands, and `translate()` then answers with the key. The service therefore loads the active language
+and, when the first segment of the key is a scope (`TRANSLATION_SCOPES` of `transloco-loader.ts`),
+that scope, and opens the snackbar after both. For `error(httpError, fallbackKey)` the scope comes
+from the fallback key; a server `errorKey` is a root key. A loaded file emits from the Transloco cache
+at once, so the wait costs nothing on the ordinary load. A failed load still opens the message. A
+sequence counter keeps the order of the calls: an earlier message that waits for its scope does not
+cover a later one. A call site does not wait for a translation itself.
+`e2e/auth/profile-init-toast-i18n.spec.ts` and `e2e/auth/permissions-unavailable-message.spec.ts`
+delay a translation file and assert that the key never reaches the screen.
 
 The `HttpErrorResponse` overload goes through `parseHttpErrorMessage`. It uses the translated
 `errorKey` first. A 429 then gets `errors.general.tooManyRequests`, because the throttle sends no key
