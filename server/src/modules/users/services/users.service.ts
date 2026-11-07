@@ -25,6 +25,7 @@ import { withChanges } from '@app/shared/utils/changed-fields';
 import { User } from '../entities/user.entity';
 import { addressTakenWhere, emailExistsConflict } from '../utils/email-taken';
 import { lockUserWithRoles } from '../utils/lock-user';
+import { userNotFound } from '../utils/user-not-found';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import type { CursorPaginatedResponseDto } from '../../../common/dtos';
@@ -740,12 +741,5 @@ function notDeleted(id: string): ApiError {
   return new ApiError(
     ErrorKeys.USERS.NOT_DELETED,
     `User with ID ${id} is not deleted, so there is nothing to restore`
-  );
-}
-
-function userNotFound(id: string): ApiError {
-  return new ApiError(
-    ErrorKeys.USERS.NOT_FOUND,
-    `User with ID ${id} not found`
   );
 }

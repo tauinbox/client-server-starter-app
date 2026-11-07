@@ -34,6 +34,7 @@ import { normalizeOtpCode } from '@app/shared/utils/otp-code';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { User } from '../../users/entities/user.entity';
 import { lockUserWithRoles } from '../../users/utils/lock-user';
+import { userNotFound } from '../../users/utils/user-not-found';
 import { AuditContext, AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
 import {
@@ -359,12 +360,7 @@ export class MfaService {
     await withTransaction(this.dataSource, async (manager) => {
       const locked = await lockUserWithRoles(manager, { id: target.id });
 
-      if (!locked) {
-        throw new ApiError(
-          ErrorKeys.USERS.NOT_FOUND,
-          `User with ID ${target.id} not found`
-        );
-      }
+      if (!locked) throw userNotFound(target.id);
 
       check(locked);
       const { affected } = await manager.update(

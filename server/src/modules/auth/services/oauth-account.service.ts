@@ -5,6 +5,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import { ApiError } from '../../../common/errors/api-error';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { User } from '../../users/entities/user.entity';
+import { userNotFound } from '../../users/utils/user-not-found';
 
 @Injectable()
 export class OAuthAccountService {
@@ -68,12 +69,7 @@ export class OAuthAccountService {
         lock: { mode: 'pessimistic_write' }
       });
 
-      if (!user) {
-        throw new ApiError(
-          ErrorKeys.USERS.NOT_FOUND,
-          `User with ID ${userId} not found`
-        );
-      }
+      if (!user) throw userNotFound(userId);
 
       const accounts = await manager.find(OAuthAccount, { where: { userId } });
 

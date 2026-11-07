@@ -51,7 +51,7 @@ import {
   requireUuid,
   sendValidationError
 } from '../helpers/validation-error.helpers';
-import { sendError } from '../helpers/error-envelope.helpers';
+import { sendError, sendUserNotFound } from '../helpers/error-envelope.helpers';
 import {
   isUuidV4,
   nestedErrors,
@@ -1148,11 +1148,7 @@ router.post(
     const user = findUserById(userId);
 
     if (!user) {
-      sendError(
-        res,
-        ErrorKeys.USERS.NOT_FOUND,
-        `User with ID ${userId} not found`
-      );
+      sendUserNotFound(res, userId);
 
       return;
     }
@@ -1249,11 +1245,7 @@ router.delete(
     const user = findUserById(userId);
 
     if (!user) {
-      sendError(
-        res,
-        ErrorKeys.USERS.NOT_FOUND,
-        `User with ID ${userId} not found`
-      );
+      sendUserNotFound(res, userId);
 
       return;
     }

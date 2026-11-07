@@ -34,6 +34,11 @@ export function sendError(
   res.status(ERROR_STATUS[errorKey]).json({ message, errorKey });
 }
 
+/** Mirrors `userNotFound` of the server. */
+export function sendUserNotFound(res: Response, id: string): void {
+  sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+}
+
 /**
  * Mirrors `GlobalExceptionFilter`: each error answer carries the same closed
  * envelope, whatever body the route wrote. A body with an error key gets the
