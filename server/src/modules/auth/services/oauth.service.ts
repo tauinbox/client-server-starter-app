@@ -5,6 +5,7 @@ import { UsersService } from '../../users/services/users.service';
 import { User } from '../../users/entities/user.entity';
 import { UserCreatedEvent } from '../../users/events/user-created.event';
 import { addressTakenWhere } from '../../users/utils/email-taken';
+import { userNotFound } from '../../users/utils/user-not-found';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
@@ -272,12 +273,7 @@ export class OAuthService {
           lock: { mode: 'pessimistic_read' }
         });
 
-        if (!user) {
-          throw new ApiError(
-            ErrorKeys.USERS.NOT_FOUND,
-            `User with ID ${userId} not found`
-          );
-        }
+        if (!user) throw userNotFound(userId);
 
         this.assertIntentValid(user, linkTokenIssuedAt);
         await manager.insert(OAuthAccount, { userId, provider, providerId });

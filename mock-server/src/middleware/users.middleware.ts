@@ -56,7 +56,7 @@ import {
   requireUuid,
   sendValidationError
 } from '../helpers/validation-error.helpers';
-import { sendError } from '../helpers/error-envelope.helpers';
+import { sendError, sendUserNotFound } from '../helpers/error-envelope.helpers';
 
 /**
  * Both list routes share one DTO and one query on the server, so both apply
@@ -169,7 +169,7 @@ router.get(
     const user = findUserById(id);
 
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+      sendUserNotFound(res, id);
 
       return;
     }
@@ -199,7 +199,7 @@ router.get(
     const user = findUserById(id);
 
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+      sendUserNotFound(res, id);
 
       return;
     }
@@ -280,7 +280,7 @@ router.patch(
     const user = findUserById(id);
 
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+      sendUserNotFound(res, id);
 
       return;
     }
@@ -496,7 +496,7 @@ router.delete(
     const targetUser = findUserById(id);
 
     if (!targetUser) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+      sendUserNotFound(res, id);
 
       return;
     }
@@ -547,7 +547,7 @@ router.post(
     const targetUser = findUserByIdWithDeleted(id);
 
     if (!targetUser) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+      sendUserNotFound(res, id);
 
       return;
     }
@@ -616,7 +616,7 @@ router.post(
     const user = findUserById(id);
 
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+      sendUserNotFound(res, id);
 
       return;
     }
@@ -693,7 +693,7 @@ router.post(
     const user = findUserById(id);
 
     if (!user) {
-      sendError(res, ErrorKeys.USERS.NOT_FOUND, `User with ID ${id} not found`);
+      sendUserNotFound(res, id);
 
       return;
     }

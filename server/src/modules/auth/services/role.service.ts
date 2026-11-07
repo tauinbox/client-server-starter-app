@@ -18,6 +18,7 @@ import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
 import { lockUserWithRoles } from '../../users/utils/lock-user';
+import { userNotFound } from '../../users/utils/user-not-found';
 import { PermissionService } from './permission.service';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import { PermissionCondition } from '@app/shared/types';
@@ -764,7 +765,7 @@ export class RoleService {
       relations: { roles: true }
     });
 
-    if (!targetUser) throw this.userNotFound(userId);
+    if (!targetUser) throw userNotFound(userId);
 
     return targetUser;
   }
@@ -776,16 +777,9 @@ export class RoleService {
   ): Promise<User> {
     const targetUser = await lockUserWithRoles(em, { id: userId });
 
-    if (!targetUser) throw this.userNotFound(userId);
+    if (!targetUser) throw userNotFound(userId);
 
     return targetUser;
-  }
-
-  private userNotFound(userId: string): ApiError {
-    return new ApiError(
-      ErrorKeys.USERS.NOT_FOUND,
-      `User with ID ${userId} not found`
-    );
   }
 
   // The role id comes from the body, so a missing role is not a missing
