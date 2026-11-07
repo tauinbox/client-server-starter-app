@@ -1,6 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslocoService } from '@jsverse/transloco';
+import type { Translation } from '@jsverse/transloco';
+import { Subject } from 'rxjs';
+import type { MockInstance } from 'vitest';
 import { TranslocoTestingModuleWithLangs } from '../../../test-utils/transloco-testing';
 
 import { NotifyService } from './notify.service';
@@ -153,6 +157,80 @@ describe('NotifyService', () => {
         'Server explanation',
         'Close'
       );
+    });
+  });
+
+  describe('translation loading', () => {
+    let transloco: TranslocoService;
+    let authScope$: Subject<Translation>;
+    let load: MockInstance<TranslocoService['load']>;
+
+    beforeEach(() => {
+      transloco = TestBed.inject(TranslocoService);
+      authScope$ = new Subject<Translation>();
+      const original = transloco.load.bind(transloco);
+
+      load = vi
+        .spyOn(transloco, 'load')
+        .mockImplementation((path, options) =>
+          path === 'auth/en' ? authScope$ : original(path, options)
+        );
+    });
+
+    it('opens a scoped message only after its scope has loaded', () => {
+      service.success('auth.profile.successUpdated');
+
+      expect(load).toHaveBeenCalledWith('en');
+      expect(load).toHaveBeenCalledWith('auth/en');
+      expect(snackBarMock.open).not.toHaveBeenCalled();
+
+      authScope$.next({});
+
+      expect(snackBarMock.open).toHaveBeenCalledWith(
+        'Profile updated successfully',
+        'Close'
+      );
+    });
+
+    it('waits for the scope of the fallback key of an HTTP error', () => {
+      service.error(
+        new HttpErrorResponse({ error: null, status: 500 }),
+        'auth.profile.errorLinkFailed'
+      );
+
+      expect(snackBarMock.open).not.toHaveBeenCalled();
+
+      authScope$.next({});
+
+      expect(snackBarMock.open).toHaveBeenCalledWith(
+        'Failed to link OAuth account. Please try again.',
+        'Close'
+      );
+    });
+
+    it('loads no scope for a root key', () => {
+      service.info('common.cancel');
+
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(load).toHaveBeenCalledWith('en');
+      expect(snackBarMock.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('still opens the message when the scope fails to load', () => {
+      service.success('auth.profile.successUpdated');
+
+      authScope$.error(new Error('offline'));
+
+      expect(snackBarMock.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the later message when an earlier one waits for its scope', () => {
+      service.success('auth.profile.successUpdated');
+      service.info('common.cancel');
+      authScope$.next({});
+
+      expect(snackBarMock.open).toHaveBeenCalledTimes(1);
+      expect(snackBarMock.open).toHaveBeenCalledWith('Cancel', 'Close');
     });
   });
 

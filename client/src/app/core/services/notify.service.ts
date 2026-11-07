@@ -1,17 +1,21 @@
 import { inject, Injectable } from '@angular/core';
-import { MatSnackBar, type MatSnackBarRef } from '@angular/material/snack-bar';
-import type { TextOnlySnackBar } from '@angular/material/snack-bar';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoService } from '@jsverse/transloco';
+import { catchError, forkJoin, of, take } from 'rxjs';
+import { TRANSLATION_SCOPES } from '@core/transloco-loader';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 
 type TranslationParams = Record<string, unknown>;
-type NotifyRef = MatSnackBarRef<TextOnlySnackBar>;
 
 /**
  * Centralised snackbar helper. Translates message keys via Transloco, uses a
  * translated close-action label, and relies on `MAT_SNACK_BAR_DEFAULT_OPTIONS`
  * for duration/position so call sites don't repeat config.
+ *
+ * A message opens after the active language and the scope of its key are
+ * loaded, so a message shown on a fresh page load never shows a raw key.
+ * When two messages wait, the one that was asked for last stays on screen.
  *
  * `error()` accepts an HttpErrorResponse and resolves its text through the
  * shared `parseHttpErrorMessage` funnel.
@@ -25,17 +29,19 @@ export class NotifyService {
   readonly #snackBar = inject(MatSnackBar);
   readonly #transloco = inject(TranslocoService);
   readonly #reported = new WeakSet<HttpErrorResponse>();
+  #requested = 0;
+  #opened = 0;
 
-  success(messageKey: string, params?: TranslationParams): NotifyRef {
-    return this.#open(this.#transloco.translate(messageKey, params));
+  success(messageKey: string, params?: TranslationParams): void {
+    this.#showKey(messageKey, params);
   }
 
-  info(messageKey: string, params?: TranslationParams): NotifyRef {
-    return this.#open(this.#transloco.translate(messageKey, params));
+  info(messageKey: string, params?: TranslationParams): void {
+    this.#showKey(messageKey, params);
   }
 
-  warn(messageKey: string, params?: TranslationParams): NotifyRef {
-    return this.#open(this.#transloco.translate(messageKey, params));
+  warn(messageKey: string, params?: TranslationParams): void {
+    this.#showKey(messageKey, params);
   }
 
   /**
@@ -44,19 +50,19 @@ export class NotifyService {
    * or `message`, otherwise translate the optional `fallbackKey`, else use
    * `e.message` / status code as a last resort.
    */
-  error(messageKey: string, params?: TranslationParams): NotifyRef;
-  error(httpError: HttpErrorResponse, fallbackKey?: string): NotifyRef;
+  error(messageKey: string, params?: TranslationParams): void;
+  error(httpError: HttpErrorResponse, fallbackKey?: string): void;
   error(
     source: string | HttpErrorResponse,
     paramsOrFallbackKey?: TranslationParams | string
-  ): NotifyRef {
+  ): void {
     if (typeof source === 'string') {
-      return this.#open(
-        this.#transloco.translate(
-          source,
-          paramsOrFallbackKey as TranslationParams | undefined
-        )
+      this.#showKey(
+        source,
+        paramsOrFallbackKey as TranslationParams | undefined
       );
+
+      return;
     }
 
     const fallbackKey =
@@ -64,7 +70,7 @@ export class NotifyService {
 
     this.#reported.add(source);
 
-    return this.#open(
+    this.#show([fallbackKey], () =>
       parseHttpErrorMessage(source, this.#transloco, fallbackKey)
     );
   }
@@ -88,10 +94,34 @@ export class NotifyService {
     this.#reported.add(error);
   }
 
-  #open(message: string): NotifyRef {
-    return this.#snackBar.open(
-      message,
-      this.#transloco.translate('common.close')
+  #showKey(messageKey: string, params?: TranslationParams): void {
+    this.#show([messageKey], () =>
+      this.#transloco.translate(messageKey, params)
     );
+  }
+
+  #show(keys: readonly (string | undefined)[], build: () => string): void {
+    const order = ++this.#requested;
+    const lang = this.#transloco.getActiveLang();
+    const scopes = new Set(
+      keys
+        .map((key) => key?.split('.')[0])
+        .filter((scope) => scope !== undefined && TRANSLATION_SCOPES.has(scope))
+    );
+    // A failed load still shows the message, with the key as its text.
+    const loads = [lang, ...[...scopes].map((scope) => `${scope}/${lang}`)].map(
+      (path) =>
+        this.#transloco.load(path).pipe(
+          take(1),
+          catchError(() => of(null))
+        )
+    );
+
+    forkJoin(loads).subscribe(() => {
+      if (order < this.#opened) return;
+
+      this.#opened = order;
+      this.#snackBar.open(build(), this.#transloco.translate('common.close'));
+    });
   }
 }

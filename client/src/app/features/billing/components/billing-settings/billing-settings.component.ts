@@ -8,7 +8,6 @@ import {
 } from '@angular/core';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatButton } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -165,13 +164,7 @@ export class BillingSettingsComponent implements OnInit {
    * the default payment link, to open its Paddle checkout.
    */
   async #payPaymentMethodChange(transactionId: string): Promise<void> {
-    const [result] = await Promise.all([
-      this.#paddleCheckout.open(transactionId),
-      // The message below must not show a raw key on a fresh page load.
-      firstValueFrom(
-        this.#transloco.load(`billing/${this.#transloco.getActiveLang()}`)
-      ).catch(() => undefined)
-    ]);
+    const result = await this.#paddleCheckout.open(transactionId);
 
     dropPaddleTransactionId(this.#router);
 
