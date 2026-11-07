@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { buildAbilityForUser, getState, resetState } from '../state';
@@ -15,7 +16,10 @@ const ACTOR_EMAIL = 'user@example.com';
 const SUPER_EMAIL = 'admin@example.com';
 const USERS_RESOURCE_ID = mockId('res-users');
 
-const widenRefused = { status: 403, errorKey: 'errors.resources.cannotWiden' };
+const widenRefused = {
+  status: 403,
+  errorKey: ErrorKeys.RESOURCES.CANNOT_WIDEN
+};
 
 beforeAll(async () => {
   resetState();

@@ -1,4 +1,5 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { ErrorKeys } from '@app/shared/constants';
 import { By } from '@angular/platform-browser';
 import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import {
@@ -338,7 +339,7 @@ describe('FeatureFlagListComponent', () => {
       status: 412,
       error: {
         message: 'Feature flag was modified by another request',
-        errorKey: 'errors.featureFlags.versionConflict'
+        errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
       }
     });
     const fresh = { ...flag, enabled: true, version: 2 };

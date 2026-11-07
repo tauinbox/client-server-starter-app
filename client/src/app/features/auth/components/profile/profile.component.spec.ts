@@ -10,7 +10,7 @@ import { By } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
-import { STEP_UP_OPERATION } from '@app/shared/constants';
+import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { ProfileComponent } from './profile.component';
 import { LinkedProvidersComponent } from '../linked-providers/linked-providers.component';
 import { AuthService } from '../../services/auth.service';
@@ -322,7 +322,7 @@ describe('ProfileComponent', () => {
 
     it('should show the translated server error on profile load failure', () => {
       const httpError = new HttpErrorResponse({
-        error: { errorKey: 'errors.users.notFound', message: 'Unauthorized' },
+        error: { errorKey: ErrorKeys.USERS.NOT_FOUND, message: 'Unauthorized' },
         status: 401
       });
 

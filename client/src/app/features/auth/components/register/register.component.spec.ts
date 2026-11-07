@@ -291,6 +291,7 @@ describe('RegisterComponent', () => {
       const httpError = new HttpErrorResponse({
         error: {
           message: 'Registration is closed for this tenant',
+          // eslint-disable-next-line no-restricted-syntax -- a key the client does not know yet
           errorKey: 'errors.auth.keyAddedByTheServerFirst'
         },
         status: 400

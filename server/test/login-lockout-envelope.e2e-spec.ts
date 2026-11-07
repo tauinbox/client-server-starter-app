@@ -4,7 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
-import { MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
+import { ErrorKeys, MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import { User } from '../src/modules/users/entities/user.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
@@ -83,7 +83,7 @@ runWithInfra('Login lockout envelope (e2e)', () => {
     expect(body.retryAfter).toBeGreaterThan(0);
     expect(body.lockedUntil).toBe(lockedUntil.toISOString());
     expect(body.error).toBe('Locked');
-    expect(body.errorKey).toBe('errors.auth.accountLocked');
+    expect(body.errorKey).toBe(ErrorKeys.AUTH.ACCOUNT_LOCKED);
     expect(response.headers['retry-after']).toBe(String(body.retryAfter));
   }, 30000);
 
@@ -99,7 +99,7 @@ runWithInfra('Login lockout envelope (e2e)', () => {
 
     const body = response.body as { errorKey: string; lockedUntil: string };
 
-    expect(body.errorKey).toBe('errors.auth.accountLocked');
+    expect(body.errorKey).toBe(ErrorKeys.AUTH.ACCOUNT_LOCKED);
     expect(body.lockedUntil).toBe(lockedUntil.toISOString());
 
     // The retry must not extend the window it was rejected by

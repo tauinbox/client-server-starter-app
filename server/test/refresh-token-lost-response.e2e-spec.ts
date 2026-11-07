@@ -10,6 +10,7 @@ import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { ErrorKeys } from '@app/shared/constants';
 
 // The replay check orders rows by `created_at` in SQL, so only a real Postgres
 // proves it. Runs only when DB_HOST is set: CI provides Postgres, a bare local
@@ -121,7 +122,9 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     expect(
       await errorKeyOf(authService.refreshTokens(deviceA.raw, '203.0.113.7'))
     ).toEqual(
-      expect.objectContaining({ errorKey: 'errors.auth.invalidRefreshToken' })
+      expect.objectContaining({
+        errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+      })
     );
 
     expect(await rowsOf(deviceA.sessionId)).toBe(0);
@@ -195,7 +198,9 @@ runWithInfra('Refresh token lost-response replay (e2e)', () => {
     expect(
       await errorKeyOf(authService.refreshTokens(deviceA.raw, null))
     ).toEqual(
-      expect.objectContaining({ errorKey: 'errors.auth.invalidRefreshToken' })
+      expect.objectContaining({
+        errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
+      })
     );
 
     expect(await rowsOf(deviceB.sessionId)).toBe(1);

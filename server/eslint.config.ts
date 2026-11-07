@@ -6,7 +6,7 @@ import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescrip
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
 import stylistic from '@stylistic/eslint-plugin';
-import baseRules from '../eslint.base.config.mjs';
+import baseRules, { errorKeyLiteralSyntax } from '../eslint.base.config.mjs';
 
 type RestrictedSyntax = { selector: string; message: string };
 
@@ -14,6 +14,7 @@ type RestrictedSyntax = { selector: string; message: string };
 const [, ...baseRestrictedSyntax] = baseRules['no-restricted-syntax'];
 const restrictedSyntax: RestrictedSyntax[] = [
   ...baseRestrictedSyntax,
+  errorKeyLiteralSyntax,
   {
     selector: "CallExpression[callee.name='forwardRef']",
     message:
@@ -168,6 +169,17 @@ export default defineConfig(
     basePath: __dirname,
     files: ['src/**/*.spec.ts'],
     rules: { 'no-restricted-syntax': ['error', ...restrictedSyntax] }
+  },
+  {
+    basePath: __dirname,
+    files: ['test/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...baseRestrictedSyntax,
+        errorKeyLiteralSyntax
+      ]
+    }
   },
   {
     // A migration is applied history, and Prettier skips this folder too.

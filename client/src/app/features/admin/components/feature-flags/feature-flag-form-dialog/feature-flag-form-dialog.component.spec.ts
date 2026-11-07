@@ -14,7 +14,8 @@ import type {
 } from '@app/shared/types';
 import {
   APP_ENVIRONMENTS,
-  BILLING_PROVIDER_FLAGS
+  BILLING_PROVIDER_FLAGS,
+  ErrorKeys
 } from '@app/shared/constants';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
@@ -368,7 +369,7 @@ describe('FeatureFlagFormDialogComponent', () => {
             status: 412,
             error: {
               message: 'Feature flag was modified by another request',
-              errorKey: 'errors.featureFlags.versionConflict'
+              errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
             }
           })
       )

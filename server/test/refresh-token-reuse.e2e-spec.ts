@@ -33,7 +33,10 @@ import { BreachedPasswordService } from '../src/modules/auth/breached-password/b
 import { createMockCache } from '../src/common/testing/cache.mock';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { DEFAULT_SESSION_ABSOLUTE_MAX_MS } from '@app/shared/constants';
+import {
+  DEFAULT_SESSION_ABSOLUTE_MAX_MS,
+  ErrorKeys
+} from '@app/shared/constants';
 import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
 interface InMemoryStore {
@@ -374,7 +377,7 @@ describe('Refresh token reuse detection (e2e)', () => {
     // Refresh with the SAME original token — reuse detection trips.
     await expect(auth.refreshTokens(originalToken, null)).rejects.toMatchObject(
       {
-        response: { errorKey: 'errors.auth.invalidRefreshToken' }
+        response: { errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN }
       }
     );
 
@@ -418,7 +421,7 @@ describe('Refresh token reuse detection (e2e)', () => {
     await expect(
       auth.refreshTokens(deviceA.tokens.refresh_token, null)
     ).rejects.toMatchObject({
-      response: { errorKey: 'errors.auth.invalidRefreshToken' }
+      response: { errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN }
     });
 
     // Device A's whole chain is gone; device B is untouched.
@@ -538,7 +541,7 @@ describe('Refresh token reuse detection (e2e)', () => {
         auth.refreshTokens(firstRefresh.tokens.refresh_token, null)
       ).rejects.toMatchObject({
         status: HttpStatus.UNAUTHORIZED,
-        response: { errorKey: 'errors.auth.sessionExpired' }
+        response: { errorKey: ErrorKeys.AUTH.SESSION_EXPIRED }
       });
 
       // The revoked ancestor goes too: it would otherwise keep answering the

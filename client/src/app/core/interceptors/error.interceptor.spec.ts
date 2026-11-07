@@ -168,6 +168,7 @@ describe('errorInterceptor', () => {
       expect(notifyMock.error).not.toHaveBeenCalled();
       expect(notifyMock.warn).toHaveBeenCalledTimes(1);
       expect(notifyMock.warn).toHaveBeenCalledWith(
+        // eslint-disable-next-line no-restricted-syntax -- a client key, not in ErrorKeys
         'errors.general.tooManyRequests'
       );
     });
@@ -186,6 +187,7 @@ describe('errorInterceptor', () => {
 
       expect(notifyMock.warn).toHaveBeenCalledTimes(1);
       expect(notifyMock.warn).toHaveBeenCalledWith(
+        // eslint-disable-next-line no-restricted-syntax -- a client key, not in ErrorKeys
         'errors.general.tooManyRequestsRetry',
         { seconds: 42 }
       );
@@ -205,6 +207,7 @@ describe('errorInterceptor', () => {
 
       expect(notifyMock.warn).toHaveBeenCalledTimes(1);
       expect(notifyMock.warn).toHaveBeenCalledWith(
+        // eslint-disable-next-line no-restricted-syntax -- a client key, not in ErrorKeys
         'errors.general.tooManyRequestsRetry',
         { seconds: 42 }
       );

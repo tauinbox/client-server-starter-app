@@ -20,7 +20,7 @@ import { AuthStore } from '../../../auth/store/auth.store';
 import { NotifyService } from '@core/services/notify.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
-import { SYSTEM_ROLES } from '@app/shared/constants';
+import { ErrorKeys, SYSTEM_ROLES } from '@app/shared/constants';
 
 const mockUserRole: RoleAdminResponse = {
   id: 'role-user',
@@ -186,7 +186,7 @@ describe('UserEditComponent', () => {
 
     it('shows the not-found card when the user does not exist', () => {
       const httpError = new HttpErrorResponse({
-        error: { errorKey: 'errors.users.notFound', message: 'Not found' },
+        error: { errorKey: ErrorKeys.USERS.NOT_FOUND, message: 'Not found' },
         status: 404
       });
 
@@ -1245,7 +1245,7 @@ describe('UserEditComponent', () => {
             new HttpErrorResponse({
               error: {
                 message: 'Current password is incorrect',
-                errorKey: 'errors.auth.invalidCurrentPassword'
+                errorKey: ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD
               },
               status: 400
             })

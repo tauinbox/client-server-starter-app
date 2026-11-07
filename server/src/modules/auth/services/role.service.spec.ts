@@ -980,7 +980,7 @@ describe('RoleService', () => {
         service.assignRoleToUser('user-99', 'role-2', { ability })
       ).rejects.toMatchObject({
         status: 404,
-        response: { errorKey: 'errors.users.notFound' }
+        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
       });
 
       // The lookup must stay scoped to live rows so a soft-deleted account
@@ -1149,7 +1149,7 @@ describe('RoleService', () => {
         service.removeRoleFromUser('user-99', 'role-2', { ability })
       ).rejects.toMatchObject({
         status: 404,
-        response: { errorKey: 'errors.users.notFound' }
+        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
       });
 
       expect(mockRoleRepo.manager.findOne).toHaveBeenCalledWith(User, {
@@ -1371,7 +1371,7 @@ describe('RoleService', () => {
         )
       ).rejects.toMatchObject({
         status: 422,
-        response: { errorKey: 'errors.roles.conditionNotApplicable' }
+        response: { errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE }
       });
 
       expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
@@ -1392,7 +1392,7 @@ describe('RoleService', () => {
         )
       ).rejects.toMatchObject({
         status: 422,
-        response: { errorKey: 'errors.roles.conditionNotApplicable' }
+        response: { errorKey: ErrorKeys.ROLES.CONDITION_NOT_APPLICABLE }
       });
 
       expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
@@ -1437,7 +1437,7 @@ describe('RoleService', () => {
         )
       ).rejects.toMatchObject({
         status: 422,
-        response: { errorKey: 'errors.roles.conditionNotSupported' }
+        response: { errorKey: ErrorKeys.ROLES.CONDITION_NOT_SUPPORTED }
       });
       expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
     });
@@ -1459,7 +1459,7 @@ describe('RoleService', () => {
         )
       ).rejects.toMatchObject({
         status: 422,
-        response: { errorKey: 'errors.roles.actionNotGrantable' }
+        response: { errorKey: ErrorKeys.ROLES.ACTION_NOT_GRANTABLE }
       });
       expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
     });
@@ -1604,7 +1604,7 @@ describe('RoleService', () => {
         )
       ).rejects.toMatchObject({
         status: 403,
-        response: { errorKey: 'errors.roles.cannotGrantPermission' }
+        response: { errorKey: ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION }
       });
 
       expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
@@ -1641,7 +1641,7 @@ describe('RoleService', () => {
         )
       ).rejects.toMatchObject({
         status: 403,
-        response: { errorKey: 'errors.roles.cannotGrantPermission' }
+        response: { errorKey: ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION }
       });
 
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
@@ -1675,7 +1675,7 @@ describe('RoleService', () => {
         )
       ).rejects.toMatchObject({
         status: 403,
-        response: { errorKey: 'errors.roles.conditionBroaderThanCaller' }
+        response: { errorKey: ErrorKeys.ROLES.CONDITION_BROADER_THAN_CALLER }
       });
 
       expect(mockRolePermissionRepo.save).not.toHaveBeenCalled();
@@ -1747,7 +1747,7 @@ describe('RoleService', () => {
         )
       ).rejects.toMatchObject({
         status: 403,
-        response: { errorKey: 'errors.roles.cannotGrantPermission' }
+        response: { errorKey: ErrorKeys.ROLES.CANNOT_GRANT_PERMISSION }
       });
     });
 
@@ -1915,7 +1915,7 @@ describe('RoleService', () => {
         })
       ).rejects.toMatchObject({
         status: 403,
-        response: { errorKey: 'errors.roles.cannotModifySystem' }
+        response: { errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM }
       });
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1945,7 +1945,7 @@ describe('RoleService', () => {
         )
       ).rejects.toMatchObject({
         status: 403,
-        response: { errorKey: 'errors.roles.cannotModifySystem' }
+        response: { errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM }
       });
     });
 
@@ -1957,7 +1957,7 @@ describe('RoleService', () => {
         service.removePermissionFromRole('role-1', 'perm-1', { ability })
       ).rejects.toMatchObject({
         status: 403,
-        response: { errorKey: 'errors.roles.cannotModifySystem' }
+        response: { errorKey: ErrorKeys.ROLES.CANNOT_MODIFY_SYSTEM }
       });
     });
 
@@ -2076,7 +2076,7 @@ describe('RoleService', () => {
           })
         ).rejects.toMatchObject({
           status: 403,
-          response: { errorKey: 'errors.roles.cannotLiftDeny' }
+          response: { errorKey: ErrorKeys.ROLES.CANNOT_LIFT_DENY }
         });
         expect(mockRelationQueryBuilder.execute).not.toHaveBeenCalled();
         expectLiftRefusal();

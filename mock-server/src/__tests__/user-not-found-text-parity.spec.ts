@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -80,7 +81,7 @@ describe('an unknown user id', () => {
 
       expect(res.status).toBe(404);
       expect(await res.json()).toMatchObject({
-        errorKey: 'errors.users.notFound',
+        errorKey: ErrorKeys.USERS.NOT_FOUND,
         message: `User with ID ${UNKNOWN_ID} not found`
       });
     }

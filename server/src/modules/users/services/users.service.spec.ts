@@ -1394,7 +1394,7 @@ describe('UsersService', () => {
         service.restore('user-1', { ability: SYSTEM_ABILITY, audit })
       ).rejects.toMatchObject({
         status: 409,
-        response: { errorKey: 'errors.users.notDeleted' }
+        response: { errorKey: ErrorKeys.USERS.NOT_DELETED }
       });
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
       expect(audit).not.toHaveBeenCalled();
@@ -1409,7 +1409,7 @@ describe('UsersService', () => {
         service.restore('user-1', { ability: SYSTEM_ABILITY, audit })
       ).rejects.toMatchObject({
         status: 409,
-        response: { errorKey: 'errors.users.notDeleted' }
+        response: { errorKey: ErrorKeys.USERS.NOT_DELETED }
       });
       expect(audit).not.toHaveBeenCalled();
     });

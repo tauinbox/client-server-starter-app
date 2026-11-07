@@ -49,7 +49,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
         body: JSON.stringify({
           statusCode: 409,
           message: 'Feature flag was modified by another request',
-          errorKey: 'errors.featureFlags.versionConflict'
+          errorKey: ErrorKeys.FEATURE_FLAGS.VERSION_CONFLICT
         })
       });
     });

@@ -7,7 +7,7 @@ import {
   MOCK_REGENERATED_RECOVERY_CODES,
   MOCK_TOTP_CODE
 } from '../constants';
-import { MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
+import { ErrorKeys, MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
 
 let server: Server;
 let baseUrl: string;
@@ -121,7 +121,7 @@ describe('two-factor enrolment', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(403);
-    expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD);
   });
 
   it('refuses an unauthenticated setup', async () => {
@@ -143,7 +143,7 @@ describe('two-factor enrolment', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(422);
-    expect(body['errorKey']).toBe('errors.auth.mfaEnrolmentInvalidCode');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_ENROLMENT_INVALID_CODE);
 
     const profile = await login();
 
@@ -157,7 +157,7 @@ describe('two-factor enrolment', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(409);
-    expect(body['errorKey']).toBe('errors.auth.mfaSetupRequired');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_SETUP_REQUIRED);
   });
 
   it('rejects a code of the wrong length with a validation error', async () => {
@@ -202,7 +202,7 @@ describe('two-factor enrolment', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(403);
-    expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD);
   });
 
   it('reports an existing enrolment once the password is right', async () => {
@@ -216,7 +216,7 @@ describe('two-factor enrolment', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(409);
-    expect(body['errorKey']).toBe('errors.auth.mfaAlreadyEnabled');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_ALREADY_ENABLED);
   });
 });
 
@@ -285,7 +285,7 @@ describe('two-factor sign-in', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(401);
-    expect(body['errorKey']).toBe('errors.auth.mfaInvalidCode');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_INVALID_CODE);
   });
 
   it('refuses a wrong code', async () => {
@@ -296,7 +296,7 @@ describe('two-factor sign-in', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(401);
-    expect(body['errorKey']).toBe('errors.auth.mfaInvalidCode');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_INVALID_CODE);
     expect(res.headers.get('set-cookie') ?? '').not.toContain('refresh_token=');
   });
 
@@ -310,7 +310,7 @@ describe('two-factor sign-in', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(401);
-    expect(body['errorKey']).toBe('errors.auth.mfaInvalidPendingToken');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN);
   });
 });
 
@@ -334,7 +334,7 @@ describe('the brake on the authenticator challenge', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(423);
-    expect(body['errorKey']).toBe('errors.auth.mfaChallengeLocked');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED);
     expect(body['retryAfter']).toEqual(expect.any(Number));
   });
 
@@ -475,7 +475,7 @@ describe('recovery codes', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(401);
-    expect(body['errorKey']).toBe('errors.auth.mfaInvalidRecoveryCode');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_INVALID_RECOVERY_CODE);
   });
 
   it('rejects a malformed recovery code with a validation error', async () => {
@@ -559,7 +559,7 @@ describe('replacing the recovery codes', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(401);
-    expect(body['errorKey']).toBe('errors.auth.mfaInvalidRecoveryCode');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_INVALID_RECOVERY_CODE);
   });
 
   it('signs the account in with a code of the new set', async () => {
@@ -601,7 +601,7 @@ describe('replacing the recovery codes', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(403);
-    expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD);
   });
 
   it('refuses an unauthenticated caller', async () => {
@@ -623,7 +623,7 @@ describe('replacing the recovery codes', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(409);
-    expect(body['errorKey']).toBe('errors.auth.mfaNotEnabled');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_NOT_ENABLED);
   });
 
   it('rejects a code of the wrong length with a validation error', async () => {
@@ -664,7 +664,7 @@ describe('turning the factor off', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(403);
-    expect(body['errorKey']).toBe('errors.auth.mfaStepUpInvalidCode');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_STEP_UP_INVALID_CODE);
   });
 
   it('accepts the password', async () => {
@@ -686,7 +686,7 @@ describe('turning the factor off', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(403);
-    expect(body['errorKey']).toBe('errors.auth.invalidCurrentPassword');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.INVALID_CURRENT_PASSWORD);
     expect(await login()).toHaveProperty('mfaRequired');
   });
 
@@ -701,7 +701,7 @@ describe('turning the factor off', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(409);
-    expect(body['errorKey']).toBe('errors.auth.mfaNotEnabled');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_NOT_ENABLED);
   });
 });
 
@@ -727,7 +727,7 @@ describe('the brake on the step-up code', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(423);
-    expect(body['errorKey']).toBe('errors.auth.mfaStepUpLocked');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_STEP_UP_LOCKED);
     expect(body['retryAfter']).toEqual(expect.any(Number));
     expect(res.headers.get('retry-after')).toBe(String(body['retryAfter']));
     expect(await login()).toHaveProperty('mfaRequired');
@@ -791,7 +791,7 @@ describe('the brake on the step-up code', () => {
     const body = (await res.json()) as Record<string, string>;
 
     expect(res.status).toBe(401);
-    expect(body['errorKey']).toBe('errors.auth.mfaInvalidCode');
+    expect(body['errorKey']).toBe(ErrorKeys.AUTH.MFA_INVALID_CODE);
   });
 
   it('does not count a step-up that offers no code', async () => {

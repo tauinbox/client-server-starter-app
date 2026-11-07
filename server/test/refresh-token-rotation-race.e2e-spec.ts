@@ -10,6 +10,7 @@ import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity'
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { ErrorKeys } from '@app/shared/constants';
 
 // Only a real Postgres under READ COMMITTED produces the interleaving this
 // covers: the refresh-token-reuse spec drives a synchronous in-memory
@@ -125,7 +126,7 @@ runWithInfra('Refresh token rotation race (e2e)', () => {
 
     expect(reason.getStatus()).toBe(401);
     expect(reason.getResponse()).toMatchObject({
-      errorKey: 'errors.auth.invalidRefreshToken'
+      errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN
     });
 
     const repository = dataSource.getRepository(RefreshToken);

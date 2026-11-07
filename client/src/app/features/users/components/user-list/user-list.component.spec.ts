@@ -16,7 +16,7 @@ import { RoleCatalogService } from '@core/services/role-catalog.service';
 import { NotificationsService } from '@core/services/notifications.service';
 import type { User } from '../../models/user.types';
 import type { RoleAdminResponse } from '@app/shared/types';
-import { USER_LIST_QUERY } from '@app/shared/constants';
+import { ErrorKeys, USER_LIST_QUERY } from '@app/shared/constants';
 import type { UserSearch } from '../../models/user.types';
 import { listUrlStoreMock } from '../../../../../test-utils/list-store-mock';
 
@@ -401,7 +401,7 @@ describe('UserListComponent', () => {
     it('passes the server error of a failed delete to the snackbar', () => {
       const failure = new HttpErrorResponse({
         status: 403,
-        error: { errorKey: 'errors.users.superTargetForbidden' }
+        error: { errorKey: ErrorKeys.USERS.SUPER_TARGET_FORBIDDEN }
       });
 
       usersStoreMock.deleteUser.mockReturnValue(throwError(() => failure));
@@ -453,7 +453,7 @@ describe('UserListComponent', () => {
     it('passes the server error of a failed restore to the snackbar', () => {
       const failure = new HttpErrorResponse({
         status: 409,
-        error: { errorKey: 'errors.users.notDeleted' }
+        error: { errorKey: ErrorKeys.USERS.NOT_DELETED }
       });
 
       usersStoreMock.restoreUser.mockReturnValue(throwError(() => failure));

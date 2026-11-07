@@ -1,6 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { ErrorKeys } from '@app/shared/constants';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
@@ -222,7 +223,7 @@ describe('ResetPasswordComponent', () => {
     it('should set error from server on failure', async () => {
       const httpError = new HttpErrorResponse({
         error: {
-          errorKey: 'errors.auth.resetTokenExpired',
+          errorKey: ErrorKeys.AUTH.RESET_TOKEN_EXPIRED,
           message: 'Token expired'
         },
         status: 400

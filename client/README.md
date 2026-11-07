@@ -786,6 +786,13 @@ also bans an `errorKey` as a `NotifyService` message key. `http-error.utils.ts` 
 `eslint-disable-next-line` for the funnel itself. This is permitted, because the funnel compares the
 result with the key and continues when no translation was found.
 
+A spec file or an `e2e/` file writes a server error key as `ErrorKeys.*`, never as a string. The
+selector `errorKeyLiteralSyntax` of `eslint.base.config.mjs` refuses the string form there, because
+a test with a wrong key passes on the fallback message. Production files are not in its scope:
+`npm run check:i18n-keys` already resolves each key literal in them. A test that needs a key that
+`ErrorKeys` does not hold (a client key in the `errors` group, or a key the client does not know
+yet) keeps the string with an `eslint-disable-next-line` and the reason.
+
 A client-owned fallback key has the name `fallbackKey` and never the name `errorKey`. Thus the word
 has exactly one meaning.
 
@@ -1206,8 +1213,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 346 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1642 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 347 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1647 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and

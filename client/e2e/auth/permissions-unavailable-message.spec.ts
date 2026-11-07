@@ -31,6 +31,7 @@ test.describe('Permissions load failure on a reload', () => {
     });
     await expect(snackbar).toContainText('Close');
     await expect(
+      // eslint-disable-next-line no-restricted-syntax -- a client key, not in ErrorKeys
       page.getByText('errors.general.permissionsUnavailable')
     ).toHaveCount(0);
   });
