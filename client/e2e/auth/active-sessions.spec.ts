@@ -34,6 +34,10 @@ async function expectNoOverflow(page: Page): Promise<void> {
 
 // A second browser context is a second device, with a cookie jar of its own.
 test.describe('Signed-in devices', () => {
+  // Two UI sign-ins and a second context use most of the default budget
+  // under a full parallel run.
+  test.slow();
+
   test('ends another device from the profile page', async ({
     _mockServer,
     browser,

@@ -74,6 +74,9 @@ test.describe('Refresh-token reuse detection', () => {
     page,
     context
   }) => {
+    // Two UI sign-ins and a second context use most of the default budget
+    // under a full parallel run.
+    test.slow();
     await loginViaUi(page, _mockServer.url, { roles: ['user'] });
 
     const otherDevice = await browser.newContext();
