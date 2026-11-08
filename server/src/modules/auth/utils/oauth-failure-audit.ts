@@ -106,7 +106,7 @@ export class OAuthFailureAudit {
   ): void {
     const failure: OAuthFailure = {
       provider: exception.provider,
-      reason: exception.oauthError,
+      reason: exception.fault ? 'unexpected_error' : exception.oauthError,
       context: extractAuditContext(req)
     };
 

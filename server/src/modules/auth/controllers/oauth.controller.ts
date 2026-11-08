@@ -110,7 +110,7 @@ function oauthFailureReason(error: unknown): SignInRefusalReason {
   }
 
   if (error instanceof OAuthAuthenticationFailedException) {
-    return error.oauthError;
+    return error.fault ? 'unexpected_error' : error.oauthError;
   }
 
   if (error instanceof ApiError) {
@@ -144,7 +144,7 @@ function logCallbackFailure(
 
 function isRefusal(error: unknown): error is Error {
   return (
-    error instanceof OAuthAuthenticationFailedException ||
+    (error instanceof OAuthAuthenticationFailedException && !error.fault) ||
     (error instanceof HttpException && error.getStatus() < 500)
   );
 }

@@ -26,6 +26,8 @@ export class OAuthAuthenticationFailedException extends Error {
   readonly reason?: unknown;
   readonly redirectPath: OAuthFailureRedirect;
   readonly provider?: OAuthProvider;
+  /** True when the provider or the strategy failed, not the user or the request. */
+  readonly fault: boolean;
 
   constructor(
     readonly oauthError: OAuthError,
@@ -36,5 +38,28 @@ export class OAuthAuthenticationFailedException extends Error {
     this.reason = reason;
     this.redirectPath = redirectPath;
     this.provider = provider;
+    this.fault = isProviderFault(reason);
   }
+}
+
+/**
+ * Passport reports a refusal (a bad state, a declined consent screen) with no
+ * error, and an error for everything else. The one error that the browser
+ * causes is `invalid_grant`: a code that was replayed or that expired. The
+ * names are read as values, because `passport-oauth2` is not a declared
+ * dependency.
+ */
+function isProviderFault(reason: unknown): boolean {
+  if (reason === null || reason === undefined) {
+    return false;
+  }
+
+  const browserCaused =
+    typeof reason === 'object' &&
+    'name' in reason &&
+    reason.name === 'TokenError' &&
+    'code' in reason &&
+    reason.code === 'invalid_grant';
+
+  return !browserCaused;
 }
