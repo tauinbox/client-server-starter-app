@@ -38,6 +38,7 @@ import {
   ErrorKeys
 } from '@app/shared/constants';
 import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
+import { SCENARIO_CLOCK } from './scenario-clock';
 
 interface InMemoryStore {
   tokens: Map<string, RefreshToken>;
@@ -337,9 +338,13 @@ describe('Refresh token reuse detection (e2e)', () => {
       });
   });
 
-  // Rows created in one millisecond would tie on createdAt in this fake.
-  async function nextMillisecond(): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, 2));
+  // Rows created in one millisecond would tie on createdAt in this fake, so
+  // the clock is frozen and moved by hand.
+  beforeEach(() => SCENARIO_CLOCK.freeze());
+  afterEach(() => SCENARIO_CLOCK.release());
+
+  function nextMillisecond(): void {
+    SCENARIO_CLOCK.advance(1);
   }
 
   it('revokes ALL sessions when the original token is replayed after its successor was used', async () => {
@@ -352,7 +357,7 @@ describe('Refresh token reuse detection (e2e)', () => {
 
     expect(store.tokens.size).toBe(1);
 
-    await nextMillisecond();
+    nextMillisecond();
     // First refresh — original token rotates out, a fresh pair is issued.
     const firstRefresh = await auth.refreshTokens(originalToken, null);
 
@@ -368,7 +373,7 @@ describe('Refresh token reuse detection (e2e)', () => {
 
     // The owner uses the successor, so a replay of the original can no longer
     // be a lost response: this is the theft shape.
-    await nextMillisecond();
+    nextMillisecond();
     const secondRefresh = await auth.refreshTokens(
       firstRefresh.tokens.refresh_token,
       null
@@ -414,7 +419,7 @@ describe('Refresh token reuse detection (e2e)', () => {
       ipAddress: null
     });
 
-    await nextMillisecond();
+    nextMillisecond();
     // Device A rotates, but the response never reaches its browser.
     await auth.refreshTokens(deviceA.tokens.refresh_token, null);
 

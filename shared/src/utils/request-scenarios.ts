@@ -507,8 +507,9 @@ export interface ScenarioClockDriver {
 }
 
 /**
- * A clock that the `revoked-actor` fixture needs, so that the order of a
- * token and a revocation does not depend on the speed of the machine.
+ * A clock for the tests of a revocation (the `revoked-actor` fixture and the
+ * revocation e2e and parity specs), so that the order of a token or a session
+ * and a revocation does not depend on the speed of the machine.
  * `freeze` stops `Date` at 100 ms into the previous second; the timers stay
  * real. Tokens issued then and a revocation after `advance` share one second
  * in a fixed order, and the real time after `release` is later than both.
@@ -539,7 +540,7 @@ export function scenarioClock(driver: ScenarioClockDriver) {
     },
     advance(ms: number): void {
       if (!frozen) {
-        throw new Error('freeze() must run before the revoked-actor fixture');
+        throw new Error('freeze() must run before advance()');
       }
 
       driver.setSystemTime(Date.now() + ms);
