@@ -14,8 +14,14 @@ import {
   RESET_TOKEN_EXPIRY_MS,
   STEP_UP_OPERATION,
   SUPPORTED_LOCALES,
-  VERIFICATION_TOKEN_EXPIRY_MS
+  VERIFICATION_TOKEN_EXPIRY_MS,
+  type ErrorKey,
+  type SignInRefusalReason
 } from '@app/shared/constants';
+import {
+  accountRefusal,
+  type SignedTokenRefusal
+} from '@app/shared/utils/token-revocation';
 import isLength from 'validator/lib/isLength';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
@@ -96,6 +102,21 @@ const PROFILE_FIELDS = [
   'locale'
 ] as const;
 
+/** The answer of a refresh whose account can no longer sign in, as on the server. */
+const REFRESH_ACCOUNT_REFUSALS: Record<
+  Exclude<SignedTokenRefusal, 'session_revoked'>,
+  { key: ErrorKey; message: string }
+> = {
+  account_not_found: {
+    key: ErrorKeys.AUTH.USER_NOT_FOUND,
+    message: 'User not found'
+  },
+  account_deactivated: {
+    key: ErrorKeys.AUTH.USER_DEACTIVATED,
+    message: 'User account is deactivated'
+  }
+};
+
 /** Mirrors `@IsString() @IsNotEmpty() @MaxLength(512)` on a mailed `token`. */
 function mailedTokenErrors(value: unknown): string[] {
   return stringErrors('token', value, {
@@ -131,7 +152,7 @@ function respondInvalidCredentials(
   logAudit('USER_LOGIN_FAILURE', {
     actorEmail: email,
     details: {
-      reason: 'invalid_credentials',
+      reason: 'invalid_credentials' satisfies SignInRefusalReason,
       ...(failedLoginAttempts !== null ? { failedLoginAttempts } : {})
     },
     ip
@@ -257,7 +278,7 @@ router.post('/login', (req, res) => {
         actorEmail: email,
         targetId: user.id,
         targetType: 'User',
-        details: { reason: 'account_locked' },
+        details: { reason: 'account_locked' satisfies SignInRefusalReason },
         ip: req.ip
       });
       respondLocked(res, user.lockedUntil);
@@ -281,7 +302,8 @@ router.post('/login', (req, res) => {
         targetId: user.id,
         targetType: 'User',
         details: {
-          reason: 'account_locked_after_max_attempts',
+          reason:
+            'account_locked_after_max_attempts' satisfies SignInRefusalReason,
           failedLoginAttempts: user.failedLoginAttempts
         },
         ip: req.ip
@@ -311,7 +333,7 @@ router.post('/login', (req, res) => {
       actorEmail: email,
       targetId: user.id,
       targetType: 'User',
-      details: { reason: 'email_not_verified' },
+      details: { reason: 'email_not_verified' satisfies SignInRefusalReason },
       ip: req.ip
     });
     sendError(
@@ -707,7 +729,7 @@ router.post('/refresh-token', (req, res) => {
       logAudit('TOKEN_REFRESH_FAILURE', {
         actorId: reusedUserId,
         details: {
-          reason: 'lost_response_replay',
+          reason: 'lost_response_replay' satisfies SignInRefusalReason,
           sessionId,
           replayAgeMs: successor.ageMs,
           sameIp:
@@ -748,7 +770,9 @@ router.post('/refresh-token', (req, res) => {
 
   if (!userId) {
     logAudit('TOKEN_REFRESH_FAILURE', {
-      details: { reason: 'invalid_or_expired_token' },
+      details: {
+        reason: 'invalid_or_expired_token' satisfies SignInRefusalReason
+      },
       ip: req.ip
     });
     sendError(
@@ -767,7 +791,10 @@ router.post('/refresh-token', (req, res) => {
     endSessionOfToken(cookieToken);
     logAudit('TOKEN_REFRESH_FAILURE', {
       actorId: userId,
-      details: { reason: 'session_absolute_lifetime_exceeded' },
+      details: {
+        reason:
+          'session_absolute_lifetime_exceeded' satisfies SignInRefusalReason
+      },
       ip: req.ip
     });
     sendError(
@@ -779,36 +806,26 @@ router.post('/refresh-token', (req, res) => {
     return;
   }
 
-  const user = findUserById(userId);
+  const found = findUserById(userId);
+  const owner = accountRefusal(found);
 
-  if (!user) {
+  if ('refusal' in owner) {
+    const { key, message } = REFRESH_ACCOUNT_REFUSALS[owner.refusal];
+
     endSessionOfToken(cookieToken);
     logAudit('TOKEN_REFRESH_FAILURE', {
-      actorId: userId,
-      details: { reason: 'user_not_found' },
+      ...(found
+        ? { actorId: found.id, actorEmail: found.email }
+        : { actorId: userId }),
+      details: { reason: owner.refusal },
       ip: req.ip
     });
-    sendError(res, ErrorKeys.AUTH.USER_NOT_FOUND, 'User not found');
+    sendError(res, key, message);
 
     return;
   }
 
-  if (!user.isActive) {
-    endSessionOfToken(cookieToken);
-    logAudit('TOKEN_REFRESH_FAILURE', {
-      actorId: user.id,
-      actorEmail: user.email,
-      details: { reason: 'user_deactivated' },
-      ip: req.ip
-    });
-    sendError(
-      res,
-      ErrorKeys.AUTH.USER_DEACTIVATED,
-      'User account is deactivated'
-    );
-
-    return;
-  }
+  const { user } = owner;
 
   const startedSessionId = state.refreshSessions.get(cookieToken);
 
@@ -820,7 +837,7 @@ router.post('/refresh-token', (req, res) => {
     logAudit('TOKEN_REFRESH_FAILURE', {
       actorId: user.id,
       actorEmail: user.email,
-      details: { reason: 'session_revoked' },
+      details: { reason: 'session_revoked' satisfies SignInRefusalReason },
       ip: req.ip
     });
     sendError(

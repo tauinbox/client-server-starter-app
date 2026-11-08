@@ -22,7 +22,8 @@ import {
   TOTP_DIGITS,
   TOTP_EPOCH_TOLERANCE_SECONDS,
   TOTP_ISSUER,
-  TOTP_PERIOD_SECONDS
+  TOTP_PERIOD_SECONDS,
+  type SignInRefusalReason
 } from '@app/shared/constants';
 import type {
   MfaRecoveryCodesResponse,
@@ -30,10 +31,7 @@ import type {
 } from '@app/shared/types';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { normalizeOtpCode } from '@app/shared/utils/otp-code';
-import {
-  signedTokenAccount,
-  type SignedTokenRefusal
-} from '@app/shared/utils/token-revocation';
+import { signedTokenAccount } from '@app/shared/utils/token-revocation';
 import { User } from '../../users/entities/user.entity';
 import { lockUserWithRoles } from '../../users/utils/lock-user';
 import { userNotFound } from '../../users/utils/user-not-found';
@@ -635,7 +633,7 @@ export class MfaService {
    * account.
    */
   private refusedPendingSignIn(
-    reason: SignedTokenRefusal | 'mfa_not_enabled',
+    reason: SignInRefusalReason,
     {
       userId,
       provider,

@@ -116,7 +116,7 @@ describe('refresh-token failure parity', () => {
     const rows = auditRows('TOKEN_REFRESH_FAILURE');
 
     expect(rows).toHaveLength(1);
-    expect(rows[0].details).toEqual({ reason: 'user_deactivated' });
+    expect(rows[0].details).toEqual({ reason: 'account_deactivated' });
     expect(rows[0].actorEmail).toBe(EMAIL);
   });
 
@@ -139,7 +139,7 @@ describe('refresh-token failure parity', () => {
     const rows = auditRows('TOKEN_REFRESH_FAILURE');
 
     expect(rows).toHaveLength(1);
-    expect(rows[0].details).toEqual({ reason: 'user_not_found' });
+    expect(rows[0].details).toEqual({ reason: 'account_not_found' });
   });
 
   it('ends the session at the not-found refusal, so a replay is not read as reuse', async () => {

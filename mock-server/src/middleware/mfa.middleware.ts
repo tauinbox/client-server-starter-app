@@ -5,7 +5,8 @@ import {
   MAX_FAILED_ATTEMPTS,
   STEP_UP_OPERATION,
   TOKEN_PURPOSE,
-  TOTP_ISSUER
+  TOTP_ISSUER,
+  type SignInRefusalReason
 } from '@app/shared/constants';
 import { normalizeOtpCode } from '@app/shared/utils/otp-code';
 import { signedTokenAccount } from '@app/shared/utils/token-revocation';
@@ -134,7 +135,7 @@ function signInFromPendingToken(
       ? decoded.provider
       : undefined;
 
-  const refuse = (reason: string): null => {
+  const refuse = (reason: SignInRefusalReason): null => {
     logAudit('USER_LOGIN_FAILURE', {
       targetId: sub,
       targetType: 'User',

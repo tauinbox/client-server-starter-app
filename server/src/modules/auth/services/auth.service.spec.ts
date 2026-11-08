@@ -25,8 +25,10 @@ import {
   ErrorKeys,
   MAX_CONCURRENT_SESSIONS,
   MAX_FAILED_ATTEMPTS,
+  SIGN_IN_REFUSAL_REASONS,
   STEP_UP_OPERATION,
-  TOKEN_PURPOSE
+  TOKEN_PURPOSE,
+  type SignInRefusalReason
 } from '@app/shared/constants';
 import { MailService } from '../../mail/mail.service';
 import { AuditService } from '../../audit/audit.service';
@@ -2192,7 +2194,7 @@ describe('AuthService', () => {
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
         action: AuditAction.TOKEN_REFRESH_FAILURE,
         actorId: 'user-1',
-        details: { reason: 'user_not_found' }
+        details: { reason: 'account_not_found' }
       });
       expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
       expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
@@ -2223,12 +2225,19 @@ describe('AuthService', () => {
         action: AuditAction.TOKEN_REFRESH_FAILURE,
         actorId: inactiveUser.id,
         actorEmail: inactiveUser.email,
-        details: { reason: 'user_deactivated' }
+        details: { reason: 'account_deactivated' }
       });
       expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledTimes(1);
       expect(mockMetricsService.recordAuthEvent).toHaveBeenCalledWith(
         'token_refresh_failure'
       );
+    });
+
+    it('types the refusal reason so that a value outside the vocabulary does not compile', () => {
+      // @ts-expect-error the refresh value of the old vocabulary is not a refusal reason
+      const reason: SignInRefusalReason = 'user_deactivated';
+
+      expect(SIGN_IN_REFUSAL_REASONS).not.toContain(reason);
     });
 
     it('ends a session that started before the last revocation and refuses it', async () => {

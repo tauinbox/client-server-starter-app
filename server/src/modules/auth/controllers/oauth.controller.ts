@@ -45,7 +45,9 @@ import {
   OAUTH_ERROR,
   REAUTH_PROOF_MAX_AGE_SECONDS,
   STEP_UP_OPERATION,
-  TOKEN_PURPOSE
+  TOKEN_PURPOSE,
+  type ErrorKey,
+  type SignInRefusalReason
 } from '@app/shared/constants';
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
@@ -88,10 +90,21 @@ function invalidOAuthData(): ApiError {
 }
 
 /** The `reason` of a row whose intent cookie did not verify. */
-const INTENT_INVALID_REASON = 'intent_invalid';
+const INTENT_INVALID_REASON: SignInRefusalReason = 'intent_invalid';
+
+/**
+ * The `reason` of a link or step-up refusal of the service. The error key is
+ * the answer to the client, and its text changes with the answer, so the
+ * audit row gets a value of the refusal vocabulary instead.
+ */
+const OAUTH_REFUSAL_REASONS: Partial<Record<ErrorKey, SignInRefusalReason>> = {
+  [ErrorKeys.AUTH.OAUTH_ALREADY_LINKED]: 'identity_linked_elsewhere',
+  [ErrorKeys.AUTH.OAUTH_PROVIDER_ALREADY_LINKED]: 'provider_already_linked',
+  [ErrorKeys.AUTH.REAUTH_REQUIRED]: 'identity_not_linked'
+};
 
 /** The `reason` of an audit row for a refused provider callback. */
-function oauthFailureReason(error: unknown): string {
+function oauthFailureReason(error: unknown): SignInRefusalReason {
   if (error instanceof AccountRefusedException) {
     return error.refusal;
   }
@@ -101,7 +114,7 @@ function oauthFailureReason(error: unknown): string {
   }
 
   if (error instanceof ApiError) {
-    return error.errorKey;
+    return OAUTH_REFUSAL_REASONS[error.errorKey] ?? 'unexpected_error';
   }
 
   return 'unexpected_error';

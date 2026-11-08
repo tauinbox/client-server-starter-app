@@ -58,10 +58,15 @@ import {
   SYSTEM_ROLES,
   TOKEN_PURPOSE,
   VERIFICATION_TOKEN_EXPIRY_MS,
+  type SignInRefusalReason,
   type StepUpOperation
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { stampedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import {
+  accountRefusal,
+  stampedBeforeRevocation,
+  type SignedTokenRefusal
+} from '@app/shared/utils/token-revocation';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 import {
   issuedBeforeMinIat,
@@ -93,6 +98,21 @@ interface Refusal {
 const INVALID_REFRESH_TOKEN: Refusal = {
   key: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN,
   message: 'Invalid refresh token'
+};
+
+/** The answer of a refresh whose account can no longer sign in. */
+const REFRESH_ACCOUNT_REFUSALS: Record<
+  Exclude<SignedTokenRefusal, 'session_revoked'>,
+  Refusal
+> = {
+  account_not_found: {
+    key: ErrorKeys.AUTH.USER_NOT_FOUND,
+    message: 'User not found'
+  },
+  account_deactivated: {
+    key: ErrorKeys.AUTH.USER_DEACTIVATED,
+    message: 'User account is deactivated'
+  }
 };
 
 const ENUMERATION_SAFE_INITIATE_RESPONSE = {
@@ -290,7 +310,9 @@ export class AuthService {
         actorEmail: email,
         targetId: user.id,
         targetType: 'User',
-        details: { reason: 'email_not_verified' }
+        details: {
+          reason: 'email_not_verified' satisfies SignInRefusalReason
+        }
       });
       this.metricsService.recordAuthEvent('login_failure');
       throw new ApiError(
@@ -867,35 +889,21 @@ export class AuthService {
 
     // Not `findOne`: its error would replace the refusal below, and a
     // soft-deleted account whose session is not yet revoked arrives here.
-    const user = await this.usersService.findById(tokenDoc.userId);
+    const found = await this.usersService.findById(tokenDoc.userId);
+    const owner = accountRefusal(found);
 
-    if (!user) {
+    if ('refusal' in owner) {
       await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
       throw this.refreshRefusal(
-        'user_not_found',
-        { actorId: tokenDoc.userId },
-        {
-          refusal: {
-            key: ErrorKeys.AUTH.USER_NOT_FOUND,
-            message: 'User not found'
-          }
-        }
+        owner.refusal,
+        found
+          ? { actorId: found.id, actorEmail: found.email }
+          : { actorId: tokenDoc.userId },
+        { refusal: REFRESH_ACCOUNT_REFUSALS[owner.refusal] }
       );
     }
 
-    if (!user.isActive) {
-      await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
-      throw this.refreshRefusal(
-        'user_deactivated',
-        { actorId: user.id, actorEmail: user.email },
-        {
-          refusal: {
-            key: ErrorKeys.AUTH.USER_DEACTIVATED,
-            message: 'User account is deactivated'
-          }
-        }
-      );
-    }
+    const { user } = owner;
 
     if (
       stampedBeforeRevocation(tokenDoc.sessionStartedAt, user.tokenRevokedAt)
@@ -1563,7 +1571,7 @@ export class AuthService {
    * `token_reuse_detected` instead.
    */
   private refreshRefusal(
-    reason: string,
+    reason: SignInRefusalReason,
     actor: Pick<AuditLogParams, 'actorId' | 'actorEmail'>,
     {
       refusal = INVALID_REFRESH_TOKEN,
@@ -1588,7 +1596,7 @@ export class AuthService {
       action: AuditAction.USER_LOGIN_FAILURE,
       actorEmail: email,
       details: {
-        reason: 'invalid_credentials',
+        reason: 'invalid_credentials' satisfies SignInRefusalReason,
         ...(failedLoginAttempts !== null ? { failedLoginAttempts } : {})
       }
     });
@@ -1606,7 +1614,7 @@ export class AuthService {
       userId,
       lockedUntil
     }: { email: string; userId: string; lockedUntil: Date },
-    details: Record<string, unknown>
+    details: { reason: SignInRefusalReason; failedLoginAttempts?: number }
   ): ApiError {
     this.auditService.logFireAndForget({
       action: AuditAction.USER_LOGIN_FAILURE,
