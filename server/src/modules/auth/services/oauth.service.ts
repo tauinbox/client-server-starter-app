@@ -105,7 +105,7 @@ export class OAuthService {
         throw new AccountRefusedException(existingOAuth.userId, owner.refusal);
       }
 
-      ({ user } = owner);
+      user = owner.user;
 
       // Verifying unconditionally would void the mail sent at creation for
       // providers that assert nothing (VK), opening password login on an
