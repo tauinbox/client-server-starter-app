@@ -7,7 +7,7 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import { PurposeTokenService } from '../services/purpose-token.service';
 import type { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
-import { AuthCookies } from './auth-cookies';
+import { AuthCookies, claimedFlow } from './auth-cookies';
 
 /** The account that a verified intent cookie names. */
 export interface OAuthIntentAccount {
@@ -91,9 +91,10 @@ export class OAuthFailureAudit {
   }
 
   /**
-   * A failure at the provider guard. Only an intent that this flow claimed and
-   * that verifies makes the row a step-up or a link row; the callback handler
-   * reads the intents in the same order. Every other case is a refused sign-in.
+   * A failure at the provider guard. The intent that this flow claimed selects
+   * the row, as it selects the redirect of the guard and the handler of the
+   * callback. Only an intent that verifies puts an actor on the row: an
+   * expired intent is still a step-up or a link attempt of this browser.
    */
   guardFailure(
     req: ExpressRequest,
@@ -105,38 +106,43 @@ export class OAuthFailureAudit {
       context: extractAuditContext(req)
     };
 
-    const { reauth, link } = this.cookies.claimedIntents(req);
+    const intents = this.cookies.claimedIntents(req);
 
-    const reauthAccount = this.verifiedAccount<ReauthIntentAccount>(
-      reauth,
-      TOKEN_PURPOSE.OAUTH_REAUTH
-    );
+    switch (claimedFlow(intents)) {
+      case 'reauth':
+        this.stepUpFailure(
+          failure,
+          this.verifiedAccount<ReauthIntentAccount>(
+            intents.reauth,
+            TOKEN_PURPOSE.OAUTH_REAUTH
+          )
+        );
 
-    if (reauthAccount) {
-      this.stepUpFailure(failure, reauthAccount);
+        return;
+      case 'link':
+        this.linkFailure(
+          failure,
+          this.verifiedAccount<OAuthIntentAccount>(
+            intents.link,
+            TOKEN_PURPOSE.OAUTH_LINK
+          )
+        );
 
-      return;
+        return;
+      case 'login':
+        this.loginFailure(failure, null);
     }
-
-    const linkAccount = this.verifiedAccount<OAuthIntentAccount>(
-      link,
-      TOKEN_PURPOSE.OAUTH_LINK
-    );
-
-    if (linkAccount) {
-      this.linkFailure(failure, linkAccount);
-
-      return;
-    }
-
-    this.loginFailure(failure, null);
   }
 
   private verifiedAccount<T extends OAuthIntentAccount>(
     token: string | null,
     purpose: TokenPurpose
-  ): T | null {
-    return token ? this.purposeTokens.verify<T>(token, purpose) : null;
+  ): T | undefined {
+    if (token === null) {
+      return undefined;
+    }
+
+    return this.purposeTokens.verify<T>(token, purpose) ?? undefined;
   }
 }
 
