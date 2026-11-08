@@ -130,10 +130,17 @@ describe('a user delete ends the sessions (SessionRevocationListener)', () => {
 describe('the revocation stamp is compared at whole seconds (JwtStrategy)', () => {
   it('accepts a token issued later in the second the revocation landed in', async () => {
     const user = await signIn(USER_EMAIL);
+    const revokedAtMs = iatOf(user.accessToken) * 1000 + 500;
 
     findUserByEmail(USER_EMAIL)!.tokenRevokedAt = new Date(
-      iatOf(user.accessToken) * 1000 + 500
+      revokedAtMs
     ).toISOString();
+
+    // The session of the token started after the stamp, as a sign-in that
+    // follows a revocation does; an older session is ended whatever its iat.
+    for (const sid of getState().sessionStarts.keys()) {
+      getState().sessionStarts.set(sid, revokedAtMs);
+    }
 
     expect((await profile(user.accessToken)).status).toBe(200);
   });

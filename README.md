@@ -1921,11 +1921,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3266 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 939 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 917 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3272 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 943 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 917 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1647 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 347 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1440 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1444 tests pass |
 
 ## CI/CD
 
@@ -2034,9 +2034,8 @@ a second request to the registry for a verdict that gates nothing.
   address an attacker controls. Thus the previous holder must not continue to authenticate with the
   tokens from before the change. A resubmitted address that does not change revokes nothing.
 - A **deactivation** (`isActive` set to false) also revokes each session of the target. The refresh
-  flow does not read `tokenRevokedAt`, thus only the deletion of the refresh tokens makes sure that a
-  later re-activation does not make a stolen refresh cookie valid again. The user signs in again
-  after a re-activation.
+  flow refuses a session that started before `tokenRevokedAt`, thus a later re-activation does not
+  make a stolen refresh cookie valid again. The user signs in again after a re-activation.
 - A **self-service password change** (`PATCH /auth/profile`) and a **self-service email change**
   (`POST /auth/profile/email/initiate`) both require a fresh proof of identity, with the factor the
   account actually holds. An account with a password supplies `currentPassword`. Thus a stolen token

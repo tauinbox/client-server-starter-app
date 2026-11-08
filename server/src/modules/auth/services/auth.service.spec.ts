@@ -2231,6 +2231,47 @@ describe('AuthService', () => {
       );
     });
 
+    it('ends a session that started before the last revocation and refuses it', async () => {
+      const revokedUser = {
+        ...mockUser,
+        tokenRevokedAt: new Date(mockTokenDoc.sessionStartedAt.getTime() + 1)
+      };
+
+      mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
+      mockUsersService.findById.mockResolvedValue(revokedUser);
+
+      await expect(
+        service.refreshTokens('valid-refresh-token', null)
+      ).rejects.toMatchObject({
+        status: HttpStatus.UNAUTHORIZED,
+        response: { errorKey: ErrorKeys.AUTH.INVALID_REFRESH_TOKEN }
+      });
+
+      expect(mockRefreshTokenService.deleteBySessionId).toHaveBeenCalledWith(
+        'session-1'
+      );
+      expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.TOKEN_REFRESH_FAILURE,
+        actorId: revokedUser.id,
+        actorEmail: revokedUser.email,
+        details: { reason: 'session_revoked' }
+      });
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('refreshes a session that started at or after the last revocation', async () => {
+      mockRefreshTokenService.findByToken.mockResolvedValue(mockTokenDoc);
+      mockUsersService.findById.mockResolvedValue({
+        ...mockUser,
+        tokenRevokedAt: mockTokenDoc.sessionStartedAt
+      });
+
+      await expect(
+        service.refreshTokens('valid-refresh-token', null)
+      ).resolves.toMatchObject({ tokens: expect.any(Object) });
+      expect(mockRefreshTokenService.deleteBySessionId).not.toHaveBeenCalled();
+    });
+
     it('ends the session and throws when JWT_MIN_IAT is set and token was created before it', async () => {
       const oldToken = {
         ...mockTokenDoc,

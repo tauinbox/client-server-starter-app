@@ -7,7 +7,12 @@ import {
 import { createApp } from '../app';
 import { MOCK_TOTP_CODE } from '../constants';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
-import { findUserByEmail, getState, resetState } from '../state';
+import {
+  findUserByEmail,
+  getState,
+  resetState,
+  revokeUserSessions
+} from '../state';
 
 let server: Server;
 let baseUrl: string;
@@ -348,16 +353,7 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
 
     // The revocation is floored to its second, so the cookie must be older.
     getState().oauthDataTokens.get(token)!.issuedAt -= 1;
-    const revoke = await fetch(
-      `${baseUrl}/__control/invalidate-access-tokens`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: admin!.id })
-      }
-    );
-
-    expect(revoke.status).toBe(200);
+    revokeUserSessions(admin!.id);
 
     const res = await exchange(token);
 

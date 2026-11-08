@@ -380,6 +380,8 @@ router.post('/role-permissions', (req, res) => {
 // holds. The live sessions get new ids, so the session check refuses each
 // token issued so far whatever second it was issued in. Refresh tokens are
 // LEFT INTACT so the client's Unauthorized interceptor can refresh-and-retry.
+// No `tokenRevokedAt` is written: that stamp also ends every session that
+// started before it, the refresh tokens included.
 router.post('/invalidate-access-tokens', (req, res) => {
   const { userId } = req.body as { userId?: string };
 
@@ -389,16 +391,12 @@ router.post('/invalidate-access-tokens', (req, res) => {
     return;
   }
 
-  const state = getState();
-  const user = state.users.get(userId);
-
-  if (!user) {
+  if (!getState().users.has(userId)) {
     res.status(404).json({ message: 'user not found' });
 
     return;
   }
 
-  user.tokenRevokedAt = new Date().toISOString();
   rekeyUserSessions(userId);
   res.json({ message: `tokens invalidated for user ${userId}` });
 });

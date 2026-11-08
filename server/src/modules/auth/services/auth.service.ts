@@ -61,7 +61,10 @@ import {
   type StepUpOperation
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import {
+  issuedBeforeRevocation,
+  sessionStartedBeforeRevocation
+} from '@app/shared/utils/token-revocation';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 import {
   issuedBeforeMinIat,
@@ -897,6 +900,19 @@ export class AuthService {
       );
     }
 
+    if (
+      sessionStartedBeforeRevocation(
+        tokenDoc.sessionStartedAt,
+        user.tokenRevokedAt
+      )
+    ) {
+      await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
+      throw this.refreshRefusal('session_revoked', {
+        actorId: user.id,
+        actorEmail: user.email
+      });
+    }
+
     // Rotation replaces a row inside one session, so the session id carries
     // over. An access token another tab of the same device still holds keeps
     // working, which a per-row id would have ended on every refresh.
@@ -1534,10 +1550,9 @@ export class AuthService {
   /**
    * Ends every session of the account. This is the teardown for a new
    * credential, a changed role or a detected token reuse, not the sign-out
-   * button. Both legs are required: the refresh flow never reads
-   * `tokenRevokedAt`, so the stamp alone kills access tokens only, and
-   * deleting the refresh rows alone leaves issued access tokens valid until
-   * they expire.
+   * button. The stamp is the rule: a session that started before it is not
+   * live and cannot refresh, which also ends a row that a sign-in commits after
+   * the delete. The delete removes the rows that are never presented again.
    */
   async revokeAllUserSessions(userId: string): Promise<void> {
     await Promise.all([
