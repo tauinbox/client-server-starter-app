@@ -1773,8 +1773,9 @@ failed code exchange. Thus the handler that redirects back to the client never r
 `OAuthAuthenticationExceptionFilter` answers with `302 CLIENT_URL/login?oauth_error=auth_failed`. The
 browser is in the middle of a navigation here, and it is not calling an API. The filter also writes
 the audit row of the failure through `OAuthFailureAudit`, the class that the callback handler uses:
-`STEP_UP_FAILURE` or `OAUTH_LINK_FAILURE` for the account of an intent that this flow claimed and
-that verifies, else `USER_LOGIN_FAILURE` with no actor.
+`STEP_UP_FAILURE` or `OAUTH_LINK_FAILURE` for an intent that this flow claimed, with the account of
+the intent when it verifies and with no actor when it does not (an expired intent), else
+`USER_LOGIN_FAILURE` with no actor.
 
 The guard selects the two halves of that redirect from a fixed set, and never from the request. The
 query `?error=access_denied`, which is how each provider reports a declined consent screen, becomes
@@ -1783,7 +1784,8 @@ query `?error=access_denied`, which is how each provider reports a declined cons
 filter also clears that cookie, because the attempt is over. An intent that another flow claimed, or
 that no flow claimed, leaves the failure a plain sign-in, and the cookie stays for its own flow. The
 guard, the filter, the callback and the audit read the intents through one method,
-`AuthCookies.claimedIntents`.
+`AuthCookies.claimedIntents`, and the guard and the audit select the flow from them through one
+function, `claimedFlow`, so the redirect, the error key and the audit row cannot disagree.
 
 A claimed `oauth_reauth` intent of a step-up selects the same target, and the key `reauth_failed`,
 which is the message the profile page holds for a change that did not happen. The guard reads that

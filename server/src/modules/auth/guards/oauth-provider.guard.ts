@@ -4,10 +4,13 @@ import type { IAuthGuard } from '@nestjs/passport';
 import { AuthGuard } from '@nestjs/passport';
 import { firstValueFrom, isObservable } from 'rxjs';
 import type { Request as ExpressRequest } from 'express';
-import type { OAuthFailureRedirect } from '../exceptions/oauth-authentication-failed.exception';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
 import { OAUTH_ERROR, type OAuthError } from '@app/shared/constants';
-import { AuthCookies, type ClaimedIntents } from '../utils/auth-cookies';
+import {
+  AuthCookies,
+  claimedFlow,
+  type ClaimedFlow
+} from '../utils/auth-cookies';
 import type { OAuthProvider } from '../enums/oauth-provider.enum';
 
 // Passport rejects with this message only when the provider's credentials
@@ -74,13 +77,13 @@ export function createOAuthProviderGuard(
     ): TUser {
       if (err || !user) {
         const request = context.switchToHttp().getRequest<ExpressRequest>();
-        const intents = this.cookies.claimedIntents(request);
+        const flow = claimedFlow(this.cookies.claimedIntents(request));
 
         throw new OAuthAuthenticationFailedException(
-          resolveErrorKey(request, intents),
+          resolveErrorKey(request, flow),
           {
             reason: err,
-            redirectPath: resolveRedirectPath(intents),
+            redirectPath: flow === 'login' ? '/login' : '/profile',
             provider
           }
         );
@@ -95,23 +98,15 @@ export function createOAuthProviderGuard(
 
 function resolveErrorKey(
   request: ExpressRequest,
-  intents: ClaimedIntents
+  flow: ClaimedFlow
 ): OAuthError {
   // A step-up that ends at the provider changed nothing, and the profile page
-  // has a message written for exactly that. The callback reads the reauth
-  // intent first too, so a flow that claimed both is a step-up here.
-  if (intents.reauth !== null) {
+  // has a message written for exactly that.
+  if (flow === 'reauth') {
     return OAUTH_ERROR.REAUTH_FAILED;
   }
 
   return request.query?.['error'] === PROVIDER_CANCELLED_ERROR
     ? OAUTH_ERROR.CANCELLED
     : OAUTH_ERROR.AUTH_FAILED;
-}
-
-function resolveRedirectPath({
-  link,
-  reauth
-}: ClaimedIntents): OAuthFailureRedirect {
-  return link !== null || reauth !== null ? '/profile' : '/login';
 }

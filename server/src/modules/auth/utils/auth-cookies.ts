@@ -22,6 +22,20 @@ export interface ClaimedIntents {
   reauth: string | null;
 }
 
+export type ClaimedFlow = 'reauth' | 'link' | 'login';
+
+/**
+ * The flow of one provider request. Re-authentication wins a tie because it
+ * links nothing; the callback handler reads the intents in the same order.
+ */
+export function claimedFlow({ link, reauth }: ClaimedIntents): ClaimedFlow {
+  if (reauth !== null) {
+    return 'reauth';
+  }
+
+  return link !== null ? 'link' : 'login';
+}
+
 /**
  * The auth cookies, bound to the environment once. Every flag comes from
  * `host-cookie`; this class adds only the `SameSite` value of each cookie:

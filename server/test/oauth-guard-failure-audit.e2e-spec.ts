@@ -93,14 +93,21 @@ runWithInfra('Audit of a callback refused at the provider guard (e2e)', () => {
 
   function intentCookie(
     base: string,
-    { purpose, sub }: { purpose: string; sub: string }
-  ): string {
-    const token = jwt.sign({
-      sub,
-      email: 'owner@example.com',
+    {
       purpose,
-      operation: 'email_change'
-    });
+      sub,
+      expiresIn = 300
+    }: { purpose: string; sub: string; expiresIn?: number }
+  ): string {
+    const token = jwt.sign(
+      {
+        sub,
+        email: 'owner@example.com',
+        purpose,
+        operation: 'email_change'
+      },
+      { expiresIn }
+    );
 
     return `${cookieName(base, secure)}=${bindIntent(token, STATE)}`;
   }
@@ -160,6 +167,28 @@ runWithInfra('Audit of a callback refused at the provider guard (e2e)', () => {
       targetId: sub,
       details: {
         operation: 'email_change',
+        factor: 'reauth_proof',
+        provider: 'google',
+        reason: 'reauth_failed'
+      }
+    });
+  }, 30000);
+
+  it('writes an actor-less step-up row for a claimed reauth intent that expired', async () => {
+    const rows = await callback(
+      intentCookie(OAUTH_REAUTH_COOKIE, {
+        purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
+        sub: randomUUID(),
+        expiresIn: -60
+      })
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      action: AuditAction.STEP_UP_FAILURE,
+      actorId: null,
+      targetId: null,
+      details: {
         factor: 'reauth_proof',
         provider: 'google',
         reason: 'reauth_failed'

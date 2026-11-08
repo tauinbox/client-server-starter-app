@@ -266,14 +266,45 @@ describe('OAuthAuthenticationExceptionFilter', () => {
       });
     });
 
-    it('falls back to a refused sign-in row when the intent does not verify', () => {
-      requestCookies['__Host-oauth_reauth'] = bindIntent('forged', flowState);
+    it('writes an actor-less step-up row when the claimed reauth intent does not verify', () => {
+      requestCookies['__Host-oauth_reauth'] = bindIntent('expired', flowState);
 
       filter.catch(failure(OAUTH_ERROR.REAUTH_FAILED), host);
 
-      expect(logFireAndForget).toHaveBeenCalledWith(
-        expect.objectContaining({ action: AuditAction.USER_LOGIN_FAILURE })
+      expect(verify).toHaveBeenCalledWith(
+        'expired',
+        TOKEN_PURPOSE.OAUTH_REAUTH
       );
+      expect(logFireAndForget).toHaveBeenCalledTimes(1);
+      expect(logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.STEP_UP_FAILURE,
+        details: {
+          operation: undefined,
+          factor: 'reauth_proof',
+          provider: OAuthProvider.GOOGLE,
+          reason: OAUTH_ERROR.REAUTH_FAILED
+        },
+        context
+      });
+      expect(recordAuthEvent).not.toHaveBeenCalled();
+    });
+
+    it('writes an actor-less link row when the claimed link intent does not verify', () => {
+      requestCookies['__Host-oauth_link'] = bindIntent('expired', flowState);
+
+      filter.catch(failure(OAUTH_ERROR.CANCELLED), host);
+
+      expect(verify).toHaveBeenCalledWith('expired', TOKEN_PURPOSE.OAUTH_LINK);
+      expect(logFireAndForget).toHaveBeenCalledTimes(1);
+      expect(logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.OAUTH_LINK_FAILURE,
+        details: {
+          provider: OAuthProvider.GOOGLE,
+          reason: OAUTH_ERROR.CANCELLED
+        },
+        context
+      });
+      expect(recordAuthEvent).not.toHaveBeenCalled();
     });
 
     it('ignores an intent that another flow claimed', () => {
