@@ -99,11 +99,7 @@ export const STATE_FIXTURES = [
   'deactivated-actor',
   /** The actor is soft-deleted, and its sessions are not yet revoked. */
   'deleted-actor',
-  /**
-   * Every session of the actor is revoked, as a sign-out everywhere does, in
-   * a later second than the fixtures before it: a token keeps its issue time
-   * in whole seconds.
-   */
+  /** Every session of the actor is revoked, as a sign-out everywhere does. */
   'revoked-actor',
   /** The actor is locked after too many failed sign-ins. */
   'locked-actor',
@@ -484,13 +480,6 @@ export function scenarioPath(
     .split('/')
     .map((segment) => resolvePlaceholders(segment, values))
     .join('/');
-}
-
-/** Resolves in the next whole second, so a later timestamp has a later second. */
-export function untilNextSecond(): Promise<void> {
-  return new Promise((resolve) =>
-    setTimeout(resolve, 1000 - (Date.now() % 1000))
-  );
 }
 
 export function scenarioMethod(scenario: RequestScenario): string {

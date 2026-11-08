@@ -19,7 +19,6 @@ import {
   scenarioMethod,
   scenarioPath,
   StateFixture,
-  untilNextSecond,
   writtenAuditRows
 } from '@app/shared/utils/request-scenarios';
 import { createApp } from '../app';
@@ -412,9 +411,10 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     return Promise.resolve();
   },
-  'revoked-actor': async (ctx) => {
-    await untilNextSecond();
+  'revoked-actor': (ctx) => {
     revokeUserSessions(ctx.actor!.id);
+
+    return Promise.resolve();
   },
   'locked-actor': (ctx) => {
     ctx.actor!.failedLoginAttempts = MAX_FAILED_ATTEMPTS;

@@ -245,8 +245,6 @@ runWithInfra(
     it('refuses an oauth_data cookie issued before a session revocation', async () => {
       const oauthData = await callback();
 
-      // iat has one-second resolution and the revocation is floored to it.
-      await new Promise((resolve) => setTimeout(resolve, 1100));
       await authService.revokeAllUserSessions(user.id);
 
       const res = await request(http())

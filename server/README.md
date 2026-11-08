@@ -1269,15 +1269,15 @@ claim and asks `RefreshTokenService.hasLiveSession`, which looks for a row of th
 not revoked, not expired and of a session that started at or after `tokenRevokedAt`, so a sign-out
 on one device refuses that device on its next request while the other devices continue. The last
 condition is `stampedBeforeRevocation` in the same shared file. It ends a session whose row a
-sign-in committed after the delete of a revocation, which the delete cannot see.
+sign-in committed after the delete of a revocation, which the delete cannot see. It returns
+`PayloadFromJwt`, that is `{ userId, email, sessionId }`. There is no `isAdmin` flag.
 
 **Purpose tokens.** The `oauth_data` cookie, the pending sign-in token, the link and
 re-authentication intents and the re-authentication proof have no session. `PurposeTokenService.sign`
 mints each of them with `iatMs`, the issue time in milliseconds, and `PurposeTokenService.verify`
 refuses a token without it. `signedTokenAccount` and the proof check compare `iatMs` with
 `tokenRevokedAt` through `stampedBeforeRevocation`, with no floor, so a sign-out everywhere ends a
-token minted earlier in the same second. The mock stores the same milliseconds. It returns `PayloadFromJwt`, that is `{ userId, email, sessionId }`.
-There is no `isAdmin` flag.
+token minted earlier in the same second. The mock stores the same milliseconds.
 
 **Sessions.** A sign-in mints a session id in `SessionIssuerService`. The access token carries it as
 `sid` and the refresh row stores it as `session_id`. Rotation revokes one row and inserts the next
