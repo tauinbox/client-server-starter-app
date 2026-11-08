@@ -1,8 +1,27 @@
 import {
+  accountRefusal,
   issuedBeforeRevocation,
   sessionStartedBeforeRevocation,
   signedTokenAccount
 } from '@app/shared/utils/token-revocation';
+
+describe('accountRefusal', () => {
+  it.each([null, undefined])('refuses a missing account (%s)', (user) => {
+    expect(accountRefusal(user)).toEqual({ refusal: 'account_not_found' });
+  });
+
+  it('refuses a deactivated account', () => {
+    expect(accountRefusal({ isActive: false })).toEqual({
+      refusal: 'account_deactivated'
+    });
+  });
+
+  it('accepts an active account', () => {
+    const user = { isActive: true };
+
+    expect(accountRefusal(user)).toEqual({ user });
+  });
+});
 
 describe('issuedBeforeRevocation', () => {
   const iat = 1_700_000_000;

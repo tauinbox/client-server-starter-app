@@ -48,6 +48,24 @@ export function sessionStartedBeforeRevocation(
 export type SignedTokenRefusal = (typeof SIGNED_TOKEN_REFUSALS)[number];
 
 /**
+ * The account that a value the server trusts names (a linked identity, a
+ * signed token), or the reason it can no longer sign in.
+ */
+export function accountRefusal<U extends { isActive: boolean }>(
+  user: U | null | undefined
+): { user: U } | { refusal: Exclude<SignedTokenRefusal, 'session_revoked'> } {
+  if (!user) {
+    return { refusal: 'account_not_found' };
+  }
+
+  if (!user.isActive) {
+    return { refusal: 'account_deactivated' };
+  }
+
+  return { user };
+}
+
+/**
  * The account that a signed sign-in token names, or the reason it can no
  * longer sign in. The caller gives the same answer for every refusal and
  * writes the reason only to its audit row.
@@ -58,17 +76,15 @@ export function signedTokenAccount<
   user: U | null | undefined,
   iat: number
 ): { user: U } | { refusal: SignedTokenRefusal } {
-  if (!user) {
-    return { refusal: 'account_not_found' };
+  const verdict = accountRefusal(user);
+
+  if ('refusal' in verdict) {
+    return verdict;
   }
 
-  if (!user.isActive) {
-    return { refusal: 'account_deactivated' };
-  }
-
-  if (issuedBeforeRevocation(iat, user.tokenRevokedAt)) {
+  if (issuedBeforeRevocation(iat, verdict.user.tokenRevokedAt)) {
     return { refusal: 'session_revoked' };
   }
 
-  return { user };
+  return verdict;
 }

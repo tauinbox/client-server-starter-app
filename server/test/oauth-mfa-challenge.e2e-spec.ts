@@ -87,8 +87,8 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
           // The response carries RoleResponse[], so the entity arrives with
           // `roles` hydrated exactly as the real service returns it.
           useValue: {
-            findOne: (id: string) =>
-              ds.getRepository(User).findOneOrFail({
+            findById: (id: string) =>
+              ds.getRepository(User).findOne({
                 where: { id },
                 relations: { roles: true }
               })

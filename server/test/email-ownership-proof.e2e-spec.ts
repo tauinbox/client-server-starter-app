@@ -210,17 +210,15 @@ runWithInfra('A write that proves mailbox ownership (e2e)', () => {
       .getRepository(OAuthAccount)
       .save({ userId: user.id, provider: 'google', providerId });
     const adminEmail = nextEmail('admin');
-    const original = usersService.findOne.bind(usersService);
+    const original = usersService.findById.bind(usersService);
 
-    jest
-      .spyOn(usersService, 'findOne')
-      .mockImplementationOnce(async (id, ability) => {
-        const read = await original(id, ability);
+    jest.spyOn(usersService, 'findById').mockImplementationOnce(async (id) => {
+      const read = await original(id);
 
-        await adminChangesEmail(user.id, adminEmail);
+      await adminChangesEmail(user.id, adminEmail);
 
-        return read;
-      });
+      return read;
+    });
 
     await app.get(OAuthService).loginWithOAuth({
       provider: 'google',

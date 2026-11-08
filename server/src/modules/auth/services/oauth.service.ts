@@ -5,7 +5,6 @@ import { UsersService } from '../../users/services/users.service';
 import { User } from '../../users/entities/user.entity';
 import { UserCreatedEvent } from '../../users/events/user-created.event';
 import { addressTakenWhere } from '../../users/utils/email-taken';
-import { userNotFound } from '../../users/utils/user-not-found';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
@@ -26,9 +25,12 @@ import {
   VERIFICATION_TOKEN_EXPIRY_MS
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
-import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import {
+  accountRefusal,
+  signedTokenAccount
+} from '@app/shared/utils/token-revocation';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
-import { AccountDeactivatedException } from '../exceptions/account-deactivated.exception';
+import { AccountRefusedException } from '../exceptions/account-refused.exception';
 import type { MfaRequiredResponse } from '@app/shared/types';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import { ApiError } from '../../../common/errors/api-error';
@@ -94,14 +96,16 @@ export class OAuthService {
     if (existingOAuth) {
       // `lockedUntil` counts password guesses; locking the provider path too
       // would let an attacker deny the owner every way in.
-      user = await this.usersService.findOne(
-        existingOAuth.userId,
-        SYSTEM_ABILITY
+      // A soft delete keeps the links, so a deleted owner is refused here.
+      const owner = accountRefusal(
+        await this.usersService.findById(existingOAuth.userId)
       );
 
-      if (!user.isActive) {
-        throw new AccountDeactivatedException(user.id);
+      if ('refusal' in owner) {
+        throw new AccountRefusedException(existingOAuth.userId, owner.refusal);
       }
+
+      user = owner.user;
 
       // Verifying unconditionally would void the mail sent at creation for
       // providers that assert nothing (VK), opening password login on an
@@ -271,12 +275,14 @@ export class OAuthService {
           lock: { mode: 'pessimistic_read' }
         });
 
-        if (!user) throw userNotFound(userId);
+        const holder = this.validIntentHolder(user, {
+          userId,
+          intentIssuedAt: linkTokenIssuedAt
+        });
 
-        this.assertIntentValid(user, linkTokenIssuedAt);
         await manager.insert(OAuthAccount, { userId, provider, providerId });
 
-        return user;
+        return holder;
       });
 
       return { user, created: true };
@@ -392,33 +398,28 @@ export class OAuthService {
    * Loads the account that an intent cookie names. The cookie can outlive the
    * session that minted it - another tab, another device, a replayed request -
    * so the account must still be active and the intent must postdate the last
-   * revocation. A missing account throws `USERS.NOT_FOUND` inside `findOne`;
-   * the callback turns each refusal into the same redirect.
+   * revocation. The callback turns each refusal into the same redirect.
    */
   private async intentHolder(
     userId: string,
     intentIssuedAt: number
   ): Promise<User> {
-    const user = await this.usersService.findOne(userId, SYSTEM_ABILITY);
-
-    this.assertIntentValid(user, intentIssuedAt);
-
-    return user;
+    return this.validIntentHolder(await this.usersService.findById(userId), {
+      userId,
+      intentIssuedAt
+    });
   }
 
-  private assertIntentValid(user: User, intentIssuedAt: number): void {
-    if (!user.isActive) {
-      throw new ApiError(
-        ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED,
-        'User account not found or deactivated'
-      );
+  private validIntentHolder(
+    user: User | null,
+    { userId, intentIssuedAt }: { userId: string; intentIssuedAt: number }
+  ): User {
+    const verdict = signedTokenAccount(user, intentIssuedAt);
+
+    if ('refusal' in verdict) {
+      throw new AccountRefusedException(userId, verdict.refusal);
     }
 
-    if (issuedBeforeRevocation(intentIssuedAt, user.tokenRevokedAt)) {
-      throw new ApiError(
-        ErrorKeys.AUTH.TOKEN_REVOKED,
-        'Token has been revoked'
-      );
-    }
+    return verdict.user;
   }
 }

@@ -301,9 +301,7 @@ runWithInfra('Sign-in state matrix of the provider callback (e2e)', () => {
     30000
   );
 
-  // The provider halves still write the error key as the reason, and a
-  // soft-deleted owner of a linked identity is not named.
-  it.failing.each(refused.map((c) => [c.flow, c.state, c] as const))(
+  it.each(refused.map((c) => [c.flow, c.state, c] as const))(
     `refuses the ${title} and names the account`,
     async (_flow, _state, matrixCase) => run(matrixCase),
     30000

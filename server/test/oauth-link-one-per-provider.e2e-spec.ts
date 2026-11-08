@@ -52,8 +52,7 @@ runWithInfra('One linked identity per provider (e2e)', () => {
         {
           provide: UsersService,
           useValue: {
-            findOne: (id: string) =>
-              ds.getRepository(User).findOneByOrFail({ id })
+            findById: (id: string) => ds.getRepository(User).findOneBy({ id })
           }
         },
         {
