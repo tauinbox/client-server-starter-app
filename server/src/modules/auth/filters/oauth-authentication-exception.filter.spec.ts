@@ -169,17 +169,74 @@ describe('OAuthAuthenticationExceptionFilter', () => {
     });
   });
 
-  it('logs the underlying reason so the failure stays diagnosable', () => {
+  it('logs the underlying reason of a refusal so it stays diagnosable', () => {
+    const reason = Object.assign(new Error('Malformed auth code.'), {
+      name: 'TokenError',
+      code: 'invalid_grant'
+    });
+
     filter.catch(
       new OAuthAuthenticationFailedException(OAUTH_ERROR.AUTH_FAILED, {
-        reason: new Error('Failed to obtain access token')
+        reason
       }),
       host
     );
 
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to obtain access token')
+      expect.stringContaining('Malformed auth code.')
     );
+  });
+
+  describe('log level', () => {
+    let error: jest.SpyInstance;
+
+    beforeEach(() => {
+      error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    });
+
+    function failWith(reason: unknown): void {
+      filter.catch(
+        new OAuthAuthenticationFailedException(OAUTH_ERROR.AUTH_FAILED, {
+          reason,
+          provider: OAuthProvider.GOOGLE
+        }),
+        host
+      );
+    }
+
+    it('logs a provider fault as an error with its reason', () => {
+      const reason = Object.assign(new Error('Failed to obtain access token'), {
+        name: 'InternalOAuthError'
+      });
+
+      failWith(reason);
+
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to obtain access token'),
+        reason
+      );
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('logs a rejected client secret as an error', () => {
+      failWith({ name: 'TokenError', code: 'invalid_client' });
+
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'a replayed or expired code',
+        { name: 'TokenError', code: 'invalid_grant' }
+      ],
+      ['no error (a bad state or a declined consent screen)', null]
+    ])('logs %s as a warning', (_label, reason) => {
+      failWith(reason);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(error).not.toHaveBeenCalled();
+    });
   });
 
   describe('audit', () => {
@@ -199,6 +256,28 @@ describe('OAuthAuthenticationExceptionFilter', () => {
         context
       });
       expect(recordAuthEvent).toHaveBeenCalledWith('login_failure');
+    });
+
+    it('writes the fault reason for a provider fault', () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+      filter.catch(
+        new OAuthAuthenticationFailedException(OAUTH_ERROR.AUTH_FAILED, {
+          reason: { name: 'InternalOAuthError' },
+          provider: OAuthProvider.GOOGLE
+        }),
+        host
+      );
+
+      expect(logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        details: {
+          method: 'oauth',
+          provider: OAuthProvider.GOOGLE,
+          reason: 'unexpected_error'
+        },
+        context
+      });
     });
 
     it('writes a step-up row that names the account of a verified reauth intent', () => {

@@ -27,8 +27,15 @@ export class OAuthAuthenticationExceptionFilter implements ExceptionFilter {
   ): void {
     const reason =
       exception.reason instanceof Error ? `: ${exception.reason.message}` : '';
+    const message = `${exception.message}${reason}`;
 
-    this.logger.warn(`${exception.message}${reason}`);
+    // The level rule of the global exception filter, applied here because this
+    // filter answers with a redirect.
+    if (exception.fault) {
+      this.logger.error(message, exception.reason);
+    } else {
+      this.logger.warn(message);
+    }
 
     const http = host.switchToHttp();
     const request = http.getRequest<Request>();
