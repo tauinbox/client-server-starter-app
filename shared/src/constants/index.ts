@@ -35,7 +35,8 @@ export {
   MFA_RECOVERY_CODE_BYTES,
   type TokenPurpose,
   type StepUpOperation,
-  type OAuthError
+  type OAuthError,
+  type SignInRefusalReason
 } from './auth.constants';
 
 export {

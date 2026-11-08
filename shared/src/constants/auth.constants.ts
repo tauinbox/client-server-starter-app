@@ -102,10 +102,14 @@ export const SIGN_IN_REFUSAL_REASONS = [
   'lost_response_replay',
   'session_absolute_lifetime_exceeded',
   'session_invalidated_by_rotation',
-  'user_not_found',
-  'user_deactivated',
-  'concurrent_rotation'
+  'concurrent_rotation',
+  'identity_linked_elsewhere',
+  'provider_already_linked',
+  'identity_not_linked'
 ] as const;
+
+/** Every writer of a refusal reason uses this type, so a value outside the list does not compile. */
+export type SignInRefusalReason = (typeof SIGN_IN_REFUSAL_REASONS)[number];
 
 /**
  * How long before an access token expires the client refreshes it.

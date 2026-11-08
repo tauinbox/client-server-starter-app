@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
-import { TOKEN_PURPOSE, type TokenPurpose } from '@app/shared/constants';
+import {
+  TOKEN_PURPOSE,
+  type SignInRefusalReason,
+  type TokenPurpose
+} from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuditService, type AuditContext } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -21,7 +25,7 @@ export interface ReauthIntentAccount extends OAuthIntentAccount {
 
 export interface OAuthFailure {
   provider?: string;
-  reason: string;
+  reason: SignInRefusalReason;
   context: AuditContext;
 }
 

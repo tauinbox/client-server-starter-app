@@ -1082,7 +1082,14 @@ describe('OAuthController', () => {
     it.each([
       [
         new ApiError(ErrorKeys.AUTH.OAUTH_ALREADY_LINKED, 'Already linked'),
-        ErrorKeys.AUTH.OAUTH_ALREADY_LINKED
+        'identity_linked_elsewhere'
+      ],
+      [
+        new ApiError(
+          ErrorKeys.AUTH.OAUTH_PROVIDER_ALREADY_LINKED,
+          'Provider already linked'
+        ),
+        'provider_already_linked'
       ],
       [
         new AccountRefusedException('user-1', 'session_revoked'),
@@ -1153,7 +1160,7 @@ describe('OAuthController', () => {
             ErrorKeys.AUTH.REAUTH_REQUIRED,
             'Re-authentication required'
           ),
-          ErrorKeys.AUTH.REAUTH_REQUIRED
+          'identity_not_linked'
         ],
         [
           new AccountRefusedException('user-1', 'session_revoked'),
