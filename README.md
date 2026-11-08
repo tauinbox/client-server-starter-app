@@ -1710,6 +1710,7 @@ npm run typecheck          # tsc --noEmit incl. test/ and specs (excluded from b
 npm run lint               # Lint check
 npm run lint:fix           # Lint and auto-fix
 npm run lint:shared        # Lint shared/src (base rules)
+npm run typecheck:shared   # Typecheck shared/src: browser config (no Node types) + Node-only files
 npm run format:check       # Prettier check
 npm run format             # Prettier format
 npm test                   # Unit tests (Jest)
@@ -1933,7 +1934,7 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server - Checks** | - | audit (high), lint, lint:shared, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:imports, check:versions | - |
+| **Server - Checks** | - | audit (high), lint, lint:shared, typecheck:shared, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:imports, check:versions | - |
 | **Server - Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
 | **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |

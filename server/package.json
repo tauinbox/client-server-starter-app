@@ -17,6 +17,7 @@
     "lint": "eslint \"{src,apps,libs,test,scripts}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test,scripts}/**/*.ts\" --fix",
     "lint:shared": "cd .. && eslint -c server/eslint.shared.config.ts \"shared/src/**/*.ts\"",
+    "typecheck:shared": "tsc -p ../shared/tsconfig.browser.json && tsc -p ../shared/tsconfig.node.json",
     "test": "node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",
     "test:watch": "npm test -- --watch",
     "test:cov": "npm test -- --coverage",
