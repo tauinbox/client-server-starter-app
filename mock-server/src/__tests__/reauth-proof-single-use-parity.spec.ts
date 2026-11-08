@@ -200,12 +200,14 @@ function iatOf(jwt: string): number {
 }
 
 /**
- * Same rule as the server: the revocation is floored to its second, because
- * `issuedAt` has one-second resolution. The proof is pinned to the second of
- * the access token, so that the access token itself stays valid.
+ * Same rule as the server: no session guards a proof, so it is compared with
+ * the revocation in milliseconds, with no floor. The revocation is in the
+ * second of the access token, which the floor of the access token keeps valid.
  */
-describe('a reauth proof is compared with the revocation at whole seconds', () => {
-  async function unlinkAfterRevocation(proofOffset: number): Promise<Response> {
+describe('a reauth proof is compared with the revocation in milliseconds', () => {
+  async function unlinkAfterRevocation(
+    proofOffsetMs: number
+  ): Promise<Response> {
     const token = await accessToken(OAUTH_ONLY_ID);
     const iat = iatOf(token);
     const proof = await issueProof(
@@ -213,9 +215,10 @@ describe('a reauth proof is compared with the revocation at whole seconds', () =
       STEP_UP_OPERATION.OAUTH_UNLINK
     );
 
-    const revokedAtMs = iat * 1000 + 700;
+    const revokedAtMs = iat * 1000 + 500;
 
-    getState().reauthProofs.get(proof)!.issuedAt = iat + proofOffset;
+    getState().reauthProofs.get(proof)!.issuedAtMs =
+      revokedAtMs + proofOffsetMs;
     getState().users.get(OAUTH_ONLY_ID)!.tokenRevokedAt = new Date(
       revokedAtMs
     ).toISOString();
@@ -228,12 +231,13 @@ describe('a reauth proof is compared with the revocation at whole seconds', () =
     return unlink(token, 'google', proof);
   }
 
-  it('accepts a proof issued in the second of the revocation', async () => {
-    expect((await unlinkAfterRevocation(0)).status).toBe(200);
+  it('accepts a proof issued later in the second of the revocation', async () => {
+    expect((await unlinkAfterRevocation(200)).status).toBe(200);
   });
 
-  it('refuses a proof issued in the second before the revocation', async () => {
-    const res = await unlinkAfterRevocation(-1);
+  // Regression: a whole-second floor accepted this proof.
+  it('refuses a proof issued earlier in the second of the revocation', async () => {
+    const res = await unlinkAfterRevocation(-200);
 
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({

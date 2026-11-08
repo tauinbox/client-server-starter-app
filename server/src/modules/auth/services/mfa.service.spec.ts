@@ -673,7 +673,8 @@ describe('MfaService', () => {
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
         provider: 'google',
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
       repository.findOne.mockResolvedValue(enabled);
 
@@ -692,7 +693,8 @@ describe('MfaService', () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
       repository.findOne.mockResolvedValue(enabled);
 
@@ -707,7 +709,8 @@ describe('MfaService', () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
       repository.findOne.mockResolvedValue(
         buildUser({ totpSecret: user.totpSecret, totpEnabledAt: new Date() })
@@ -731,7 +734,8 @@ describe('MfaService', () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.ACCESS,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
 
       await expect(
@@ -749,7 +753,8 @@ describe('MfaService', () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
-        iat: issuedAt
+        iat: issuedAt,
+        iatMs: issuedAt * 1000
       });
       repository.findOne.mockResolvedValue(
         buildUser({
@@ -767,36 +772,53 @@ describe('MfaService', () => {
       });
     });
 
-    it('accepts a token minted inside the second the sign-out landed in', async () => {
-      // `iat` is whole seconds and the timestamp carries milliseconds, so an
-      // unfloored bound refused a sign-in that followed a sign-out closely -
-      // which is the ordinary "sign out, sign back in" path.
-      const { user, secret } = await enrol();
-      const issuedAt = Math.floor(Date.now() / 1000);
+    describe('a sign-out everywhere in the second the token was minted', () => {
+      async function verifyAround(
+        revocationOffsetMs: number
+      ): Promise<unknown> {
+        const { user, secret } = await enrol();
+        // The middle of a second, so the revocation falls in the same second.
+        const issuedAtMs = Math.floor(Date.now() / 1000) * 1000 + 500;
 
-      jwtService.verify.mockReturnValue({
-        sub: 'user-1',
-        purpose: TOKEN_PURPOSE.MFA_PENDING,
-        iat: issuedAt
+        jwtService.verify.mockReturnValue({
+          sub: 'user-1',
+          purpose: TOKEN_PURPOSE.MFA_PENDING,
+          iat: Math.floor(issuedAtMs / 1000),
+          iatMs: issuedAtMs
+        });
+        repository.findOne.mockResolvedValue(
+          buildUser({
+            totpSecret: user.totpSecret,
+            totpEnabledAt: new Date(),
+            tokenRevokedAt: new Date(issuedAtMs + revocationOffsetMs)
+          })
+        );
+
+        return service.verifyChallenge('token', generateSync({ secret }));
+      }
+
+      // The ordinary "sign out, sign back in" path: the token follows the
+      // sign-out closely.
+      it('accepts a token minted after the sign-out', async () => {
+        await expect(verifyAround(-200)).resolves.toBeDefined();
       });
-      repository.findOne.mockResolvedValue(
-        buildUser({
-          totpSecret: user.totpSecret,
-          totpEnabledAt: new Date(),
-          tokenRevokedAt: new Date(issuedAt * 1000 + 700)
-        })
-      );
 
-      await expect(
-        service.verifyChallenge('token', generateSync({ secret }))
-      ).resolves.toBeDefined();
+      // Regression: no session guards the pending token, so a whole-second
+      // floor let a token minted before the sign-out finish the sign-in.
+      it('refuses a token minted before the sign-out', async () => {
+        await expect(verifyAround(200)).rejects.toMatchObject({
+          status: 401,
+          response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN }
+        });
+      });
     });
 
     it('refuses a token for a deactivated account', async () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
       repository.findOne.mockResolvedValue(
         buildUser({
@@ -855,7 +877,8 @@ describe('MfaService', () => {
             sub: 'user-1',
             purpose: TOKEN_PURPOSE.MFA_PENDING,
             provider: 'google',
-            iat: issuedAt
+            iat: issuedAt,
+            iatMs: issuedAt * 1000
           });
           repository.findOne.mockResolvedValue(account);
 
@@ -886,7 +909,8 @@ describe('MfaService', () => {
         jwtService.verify.mockReturnValue({
           sub: 'user-1',
           purpose: TOKEN_PURPOSE.MFA_PENDING,
-          iat: issuedAt
+          iat: issuedAt,
+          iatMs: issuedAt * 1000
         });
         repository.findOne.mockResolvedValue(
           buildUser({ isActive: false, totpEnabledAt: new Date() })
@@ -935,7 +959,8 @@ describe('MfaService', () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
       repository.findOne.mockResolvedValue(enabled);
 
@@ -1050,7 +1075,8 @@ describe('MfaService', () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
     });
 
@@ -1310,7 +1336,8 @@ describe('MfaService', () => {
         jwtService.verify.mockReturnValue({
           sub: 'user-1',
           purpose: TOKEN_PURPOSE.MFA_PENDING,
-          iat: Math.floor(Date.now() / 1000)
+          iat: Math.floor(Date.now() / 1000),
+          iatMs: Date.now()
         });
 
         await guessWrong(user, MAX_FAILED_ATTEMPTS - 1);
@@ -1395,7 +1422,8 @@ describe('MfaService', () => {
       jwtService.verify.mockReturnValue({
         sub: 'user-1',
         purpose: TOKEN_PURPOSE.MFA_PENDING,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
       repository.findOne.mockResolvedValue(enabled);
       const code = generateSync({ secret });

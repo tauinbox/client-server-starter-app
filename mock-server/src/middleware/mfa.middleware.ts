@@ -121,6 +121,8 @@ function signInFromPendingToken(
     typeof decoded.sub !== 'string' ||
     decoded.sub === '' ||
     typeof decoded.iat !== 'number' ||
+    typeof decoded.iatMs !== 'number' ||
+    !Number.isFinite(decoded.iatMs) ||
     decoded.exp < Math.floor(Date.now() / 1000)
   ) {
     return null;
@@ -148,7 +150,7 @@ function signInFromPendingToken(
   };
 
   // A sign-out everywhere since the password check must end this attempt too.
-  const verdict = signedTokenAccount(findUserById(sub), decoded.iat);
+  const verdict = signedTokenAccount(findUserById(sub), decoded.iatMs);
 
   if ('refusal' in verdict) return refuse(verdict.refusal);
 

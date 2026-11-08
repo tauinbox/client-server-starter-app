@@ -204,7 +204,8 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
               return {
                 sub: OWNER_ID,
                 purpose: TOKEN_PURPOSE.OAUTH_LINK,
-                iat: Math.floor(Date.now() / 1000)
+                iat: Math.floor(Date.now() / 1000),
+                iatMs: Date.now()
               };
             })
           }
@@ -271,7 +272,7 @@ describe('OAuth link intent binding (real Passport pipeline)', () => {
       OWNER_ID,
       { provider: OAuthProvider.GOOGLE, providerId: 'google-id-of-the-signer' },
       {
-        linkTokenIssuedAt: expect.any(Number),
+        linkTokenIssuedAtMs: expect.any(Number),
         auditContext: expect.anything()
       }
     );

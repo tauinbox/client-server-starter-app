@@ -351,9 +351,16 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     const admin = findUserByEmail('admin@example.com');
     const token = await issueOAuthData(admin!.id);
 
-    // The revocation is floored to its second, so the cookie must be older.
-    getState().oauthDataTokens.get(token)!.issuedAt -= 1;
     revokeUserSessions(admin!.id);
+
+    // Regression: the cookie is older than the revocation by less than one
+    // second, in the same second. A whole-second floor accepted it.
+    const second = Math.floor(Date.now() / 1000) * 1000;
+
+    getState().oauthDataTokens.get(token)!.issuedAtMs = second + 500;
+    getState().users.get(admin!.id)!.tokenRevokedAt = new Date(
+      second + 700
+    ).toISOString();
 
     const res = await exchange(token);
 

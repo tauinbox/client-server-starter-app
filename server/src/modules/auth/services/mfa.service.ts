@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { JwtService } from '@nestjs/jwt';
 import { PurposeTokenService } from './purpose-token.service';
 import type { Cache } from 'cache-manager';
 import { DataSource, EntityManager, IsNull, Not } from 'typeorm';
@@ -115,7 +114,6 @@ export class MfaService {
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly jwtService: JwtService,
     private readonly purposeTokens: PurposeTokenService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
@@ -421,14 +419,12 @@ export class MfaService {
     { provider }: { provider?: string } = {}
   ): { mfaToken: string; expiresIn: number } {
     return {
-      mfaToken: this.jwtService.sign(
+      mfaToken: this.purposeTokens.sign(
+        { sub: user.id, email: user.email, ...(provider && { provider }) },
         {
-          sub: user.id,
-          email: user.email,
           purpose: TOKEN_PURPOSE.MFA_PENDING,
-          ...(provider && { provider })
-        },
-        { expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS }
+          expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
+        }
       ),
       expiresIn: MFA_PENDING_TOKEN_EXPIRY_SECONDS
     };
@@ -604,7 +600,7 @@ export class MfaService {
       throw invalidPendingToken();
     }
 
-    const { sub, iat } = payload;
+    const { sub, issuedAtMs } = payload;
     const provider =
       typeof payload.provider === 'string' && payload.provider !== ''
         ? payload.provider
@@ -618,7 +614,7 @@ export class MfaService {
 
     // Anything that ended the account's sessions since the password check
     // must end this attempt too.
-    const verdict = signedTokenAccount(found, iat);
+    const verdict = signedTokenAccount(found, issuedAtMs);
 
     if ('refusal' in verdict) {
       throw this.refusedPendingSignIn(verdict.refusal, refused);

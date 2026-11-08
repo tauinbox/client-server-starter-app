@@ -266,7 +266,7 @@ export class OAuthService {
   private async insertLink(
     userId: string,
     { provider, providerId }: ProviderIdentity,
-    linkTokenIssuedAt: number
+    linkTokenIssuedAtMs: number
   ): Promise<{ user: User; created: boolean }> {
     try {
       const user = await withTransaction(this.dataSource, async (manager) => {
@@ -277,7 +277,7 @@ export class OAuthService {
 
         const holder = this.validIntentHolder(user, {
           userId,
-          intentIssuedAt: linkTokenIssuedAt
+          intentIssuedAtMs: linkTokenIssuedAtMs
         });
 
         await manager.insert(OAuthAccount, { userId, provider, providerId });
@@ -306,7 +306,7 @@ export class OAuthService {
       }
 
       if (existing) {
-        const user = await this.intentHolder(userId, linkTokenIssuedAt);
+        const user = await this.intentHolder(userId, linkTokenIssuedAtMs);
 
         return { user, created: false };
       }
@@ -330,9 +330,9 @@ export class OAuthService {
   async assertReauthenticated(
     userId: string,
     { provider, providerId }: ProviderIdentity,
-    reauthTokenIssuedAt: number
+    reauthTokenIssuedAtMs: number
   ): Promise<void> {
-    await this.intentHolder(userId, reauthTokenIssuedAt);
+    await this.intentHolder(userId, reauthTokenIssuedAtMs);
 
     const account = await this.oauthAccountService.findByProviderAndProviderId(
       provider,
@@ -353,21 +353,22 @@ export class OAuthService {
    * provider whose profile carries a different mailbox is legitimate - the
    * session already proves identity.
    *
-   * `linkTokenIssuedAt` is the `iat` of the link token, in seconds. It is
-   * required, not optional: the caller must state when the intent was proved.
+   * `linkTokenIssuedAtMs` is the issue time of the link token in epoch
+   * milliseconds. It is required, not optional: the caller must state when the
+   * intent was proved.
    */
   async linkOAuthToUser(
     userId: string,
     { provider, providerId }: ProviderIdentity,
     {
-      linkTokenIssuedAt,
+      linkTokenIssuedAtMs,
       auditContext
-    }: { linkTokenIssuedAt: number; auditContext?: AuditContext }
+    }: { linkTokenIssuedAtMs: number; auditContext?: AuditContext }
   ): Promise<void> {
     const { user, created } = await this.insertLink(
       userId,
       { provider, providerId },
-      linkTokenIssuedAt
+      linkTokenIssuedAtMs
     );
 
     if (!created) {
@@ -402,19 +403,19 @@ export class OAuthService {
    */
   private async intentHolder(
     userId: string,
-    intentIssuedAt: number
+    intentIssuedAtMs: number
   ): Promise<User> {
     return this.validIntentHolder(await this.usersService.findById(userId), {
       userId,
-      intentIssuedAt
+      intentIssuedAtMs
     });
   }
 
   private validIntentHolder(
     user: User | null,
-    { userId, intentIssuedAt }: { userId: string; intentIssuedAt: number }
+    { userId, intentIssuedAtMs }: { userId: string; intentIssuedAtMs: number }
   ): User {
-    const verdict = signedTokenAccount(user, intentIssuedAt);
+    const verdict = signedTokenAccount(user, intentIssuedAtMs);
 
     if ('refusal' in verdict) {
       throw new AccountRefusedException(userId, verdict.refusal);
