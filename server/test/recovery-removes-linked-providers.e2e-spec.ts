@@ -45,8 +45,9 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
   let email: string;
   let stamp: string;
 
-  // Seconds, as a JWT `iat` is: the intent was proved a minute ago.
-  const linkTokenIssuedAt = (): number => Math.floor(Date.now() / 1000) - 60;
+  // Epoch milliseconds, as the `iatMs` of a link token is: the intent was
+  // proved a minute ago.
+  const linkTokenIssuedAtMs = (): number => Date.now() - 60_000;
 
   beforeAll(async () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
@@ -133,7 +134,7 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
     oauth.linkOAuthToUser(
       userId,
       { provider: 'google', providerId },
-      { linkTokenIssuedAt: linkTokenIssuedAt() }
+      { linkTokenIssuedAtMs: linkTokenIssuedAtMs() }
     );
 
   const reset = (): Promise<{ message: string }> =>

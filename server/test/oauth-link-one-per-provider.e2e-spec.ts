@@ -31,8 +31,9 @@ runWithInfra('One linked identity per provider (e2e)', () => {
   let userId: string;
   let stamp: string;
 
-  // Seconds, as a JWT `iat` is; the seeded user has no revocation.
-  const LINK_TOKEN_IAT = Math.floor(Date.now() / 1000);
+  // Epoch milliseconds, as the `iatMs` of a link token is; the seeded user has
+  // no revocation.
+  const LINK_TOKEN_ISSUED_AT_MS = Date.now();
   const logFireAndForget = jest.fn();
   const sendOAuthLinkedNotification = jest.fn().mockResolvedValue(undefined);
 
@@ -102,7 +103,7 @@ runWithInfra('One linked identity per provider (e2e)', () => {
     service.linkOAuthToUser(
       id,
       { provider: 'google', providerId },
-      { linkTokenIssuedAt: LINK_TOKEN_IAT }
+      { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
     );
 
   it('refuses a second identity of a linked provider, and the unlink removes one row', async () => {

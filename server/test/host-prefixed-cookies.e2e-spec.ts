@@ -452,7 +452,8 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
     const intent = jwtService.sign({
       sub: 'user-1',
       purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
-      operation: STEP_UP_OPERATION.PASSWORD_SET
+      operation: STEP_UP_OPERATION.PASSWORD_SET,
+      iatMs: Date.now()
     });
     const callback = await request(server)
       .get(`/api/v1/auth/oauth/google/callback?state=${FLOW_STATE}`)
@@ -472,7 +473,8 @@ describe('`__Host-` auth cookies outside local (e2e)', () => {
     const intent = jwtService.sign({
       sub: 'user-1',
       purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
-      operation: STEP_UP_OPERATION.PASSWORD_SET
+      operation: STEP_UP_OPERATION.PASSWORD_SET,
+      iatMs: Date.now()
     });
     const callback = await request(server)
       .get(`/api/v1/auth/oauth/google/callback?state=${FLOW_STATE}`)

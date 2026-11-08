@@ -35,10 +35,10 @@ import { AuthCookies } from '../utils/auth-cookies';
 import { OAuthFailureAudit } from '../utils/oauth-failure-audit';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
 
-// Seconds, as a JWT `iat` is.
-const LINK_TOKEN_IAT = Math.floor(
-  new Date('2026-01-01T00:00:00Z').getTime() / 1000
-);
+// Epoch milliseconds, as the `iatMs` of a purpose token is, and the same
+// instant in seconds, as its `iat` is.
+const LINK_TOKEN_ISSUED_AT_MS = Date.parse('2026-01-01T00:00:00.500Z');
+const LINK_TOKEN_IAT = Math.floor(LINK_TOKEN_ISSUED_AT_MS / 1000);
 
 function mockJwtRequest(
   userId: string,
@@ -144,7 +144,8 @@ describe('OAuthController', () => {
         sub: 'user-1',
         email: 'test@example.com',
         purpose: TOKEN_PURPOSE.OAUTH_LINK,
-        iat: LINK_TOKEN_IAT
+        iat: LINK_TOKEN_IAT,
+        iatMs: LINK_TOKEN_ISSUED_AT_MS
       })
     };
 
@@ -480,7 +481,8 @@ describe('OAuthController', () => {
           sub: 'user-1',
           email: 'test@example.com',
           purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
-          operation: STEP_UP_OPERATION.EMAIL_CHANGE
+          operation: STEP_UP_OPERATION.EMAIL_CHANGE,
+          iatMs: expect.any(Number)
         },
         { expiresIn: 300 }
       );
@@ -502,7 +504,8 @@ describe('OAuthController', () => {
         {
           sub: 'user-1',
           email: 'test@example.com',
-          purpose: TOKEN_PURPOSE.OAUTH_LINK
+          purpose: TOKEN_PURPOSE.OAUTH_LINK,
+          iatMs: expect.any(Number)
         },
         { expiresIn: 300 }
       );
@@ -822,7 +825,8 @@ describe('OAuthController', () => {
           sub: 'user-1',
           purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
           operation: STEP_UP_OPERATION.EMAIL_CHANGE,
-          iat: LINK_TOKEN_IAT
+          iat: LINK_TOKEN_IAT,
+          iatMs: LINK_TOKEN_ISSUED_AT_MS
         });
         oauthServiceMock.assertReauthenticated.mockRejectedValue(
           new ApiError(
@@ -975,7 +979,7 @@ describe('OAuthController', () => {
         'user-1',
         { provider: OAuthProvider.GOOGLE, providerId: '456' },
         {
-          linkTokenIssuedAt: LINK_TOKEN_IAT,
+          linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS,
           auditContext: expect.objectContaining({ ip: '127.0.0.1' })
         }
       );
@@ -1138,7 +1142,8 @@ describe('OAuthController', () => {
           email: 'test@example.com',
           purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
           operation: STEP_UP_OPERATION.EMAIL_CHANGE,
-          iat: LINK_TOKEN_IAT
+          iat: LINK_TOKEN_IAT,
+          iatMs: LINK_TOKEN_ISSUED_AT_MS
         });
       });
 
@@ -1323,6 +1328,7 @@ describe('OAuthController', () => {
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         iat: LINK_TOKEN_IAT,
+        iatMs: LINK_TOKEN_ISSUED_AT_MS,
         jti: 'token-id'
       });
 
@@ -1363,6 +1369,7 @@ describe('OAuthController', () => {
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         iat: LINK_TOKEN_IAT,
+        iatMs: LINK_TOKEN_ISSUED_AT_MS,
         jti: 'token-id'
       });
 
@@ -1399,6 +1406,14 @@ describe('OAuthController', () => {
           ...OAUTH_USER,
           tokenRevokedAt: new Date((LINK_TOKEN_IAT + 1) * 1000)
         }
+      ],
+      // Regression: a whole-second floor accepted the cookie here.
+      [
+        'signed out everywhere later in the second of the cookie',
+        {
+          ...OAUTH_USER,
+          tokenRevokedAt: new Date(LINK_TOKEN_ISSUED_AT_MS + 200)
+        }
       ]
     ])(
       'issues no session when the account is %s by the exchange',
@@ -1408,6 +1423,7 @@ describe('OAuthController', () => {
           data: SIGN_IN_DATA,
           purpose: TOKEN_PURPOSE.OAUTH_DATA,
           iat: LINK_TOKEN_IAT,
+          iatMs: LINK_TOKEN_ISSUED_AT_MS,
           jti: 'token-id'
         });
         const res = mockResponse();
@@ -1437,6 +1453,7 @@ describe('OAuthController', () => {
         data: { mfaRequired: true, mfaToken: 'pending-token', expiresIn: 300 },
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         iat: LINK_TOKEN_IAT,
+        iatMs: LINK_TOKEN_ISSUED_AT_MS,
         jti: 'token-id'
       });
 
@@ -1470,6 +1487,7 @@ describe('OAuthController', () => {
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         iat: LINK_TOKEN_IAT,
+        iatMs: LINK_TOKEN_ISSUED_AT_MS,
         jti: 'token-id'
       });
 
@@ -1524,6 +1542,7 @@ describe('OAuthController', () => {
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         iat: LINK_TOKEN_IAT,
+        iatMs: LINK_TOKEN_ISSUED_AT_MS,
         jti: 'replayed-token-id'
       });
 
@@ -1573,6 +1592,7 @@ describe('OAuthController', () => {
         data: SIGN_IN_DATA,
         purpose: TOKEN_PURPOSE.OAUTH_DATA,
         iat: LINK_TOKEN_IAT,
+        iatMs: LINK_TOKEN_ISSUED_AT_MS,
         jti: 'token-id'
       });
 

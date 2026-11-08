@@ -229,7 +229,8 @@ runWithInfra('Sign-in state matrix of the provider callback (e2e)', () => {
         sub: user.id,
         email: user.email,
         purpose,
-        operation: 'email_change'
+        operation: 'email_change',
+        iatMs: Date.now()
       },
       { expiresIn: 300 }
     );

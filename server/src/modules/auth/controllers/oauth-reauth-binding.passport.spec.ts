@@ -207,7 +207,8 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
                 return {
                   sub: OWNER_ID,
                   purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
-                  iat: Math.floor(Date.now() / 1000)
+                  iat: Math.floor(Date.now() / 1000),
+                  iatMs: Date.now()
                 };
               }
 
@@ -219,7 +220,8 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
                 sub: OWNER_ID,
                 purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
                 operation: STEP_UP_OPERATION.EMAIL_CHANGE,
-                iat: Math.floor(Date.now() / 1000)
+                iat: Math.floor(Date.now() / 1000),
+                iatMs: Date.now()
               };
             })
           }

@@ -151,11 +151,14 @@ runWithInfra('Refresh token refused for key rotation (e2e)', () => {
     expect(tokens.refresh_token).toBeTruthy();
   }, 30000);
 
-  // jsonwebtoken keeps an `iat` given in the payload, so these mint a token
-  // as it was issued before the cut-off. The fresh token beside each one shows
+  // jsonwebtoken keeps an `iat` given in the payload, so these mint a token as
+  // it was issued before the cut-off. The fresh token beside each one shows
   // that the refusal comes from the cut-off and not from the token shape.
   function signIssuedAt(payload: object, iat: number): string {
-    return jwtService.sign({ ...payload, iat }, { expiresIn: 3600 });
+    return jwtService.sign(
+      { ...payload, iat, iatMs: iat * 1000 },
+      { expiresIn: 3600 }
+    );
   }
 
   it('refuses a pending second-factor token issued before the cut-off', async () => {

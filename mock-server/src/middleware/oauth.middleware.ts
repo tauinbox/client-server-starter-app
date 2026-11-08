@@ -200,7 +200,7 @@ router.post('/exchange', (req, res) => {
   // pending entry names the account, so the audit row names it too.
   const verdict = signedTokenAccount(
     findUserById(pending.userId),
-    pending.issuedAt
+    pending.issuedAtMs
   );
 
   if ('refusal' in verdict) {

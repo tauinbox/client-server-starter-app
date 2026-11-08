@@ -48,6 +48,7 @@ export function generateMfaPendingToken(
     purpose: TOKEN_PURPOSE.MFA_PENDING,
     ...(provider && { provider }),
     iat: Math.floor(Date.now() / 1000),
+    iatMs: Date.now(),
     exp: Math.floor(Date.now() / 1000) + MFA_PENDING_TOKEN_EXPIRY_SECONDS
   });
 
@@ -86,6 +87,8 @@ export interface DecodedToken {
   sid?: string;
   provider?: unknown;
   iat: number;
+  /** The issue time in milliseconds that a purpose token carries. */
+  iatMs?: unknown;
   exp: number;
 }
 
