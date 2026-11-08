@@ -21,6 +21,7 @@ import {
 } from '@app/shared/constants';
 import { normalizeOtpCode } from '@app/shared/utils/otp-code';
 import {
+  AccountState,
   ACTOR_FIXTURES,
   ActorFixture,
   expectedAnswers,
@@ -35,9 +36,9 @@ import {
   scenarioMethod,
   scenarioPath,
   StateFixture,
-  untilNextSecond,
   writtenAuditRows
 } from '@app/shared/utils/request-scenarios';
+import { ACCOUNT_STATE_SETUP } from './account-states';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { SecretEncryptionService } from '../src/common/crypto/secret-encryption.service';
 import { hashPassword } from '../src/common/utils/password-hash';
@@ -496,6 +497,10 @@ runWithInfra('Request scenarios (e2e)', () => {
     resourceName?: string;
   }
 
+  const actorState = (state: AccountState) => async (ctx: Context) => {
+    await ACCOUNT_STATE_SETUP[state](app, ctx.actor!.user.id);
+  };
+
   const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     'refresh-cookie': async (ctx) => {
       const session = await signIn(ctx.actor!);
@@ -637,34 +642,12 @@ runWithInfra('Request scenarios (e2e)', () => {
     'deleted-target': async (ctx) => {
       await dataSource.getRepository(User).softDelete(ctx.target!.user.id);
     },
-    'deactivated-actor': async (ctx) => {
-      await dataSource
-        .getRepository(User)
-        .update(ctx.actor!.user.id, { isActive: false });
-    },
-    'deleted-actor': async (ctx) => {
-      await dataSource.getRepository(User).softDelete(ctx.actor!.user.id);
-    },
-    'revoked-actor': async (ctx) => {
-      await untilNextSecond();
-      await app.get(AuthService).revokeAllUserSessions(ctx.actor!.user.id);
-    },
-    'locked-actor': async (ctx) => {
-      await dataSource.getRepository(User).update(ctx.actor!.user.id, {
-        failedLoginAttempts: MAX_FAILED_ATTEMPTS,
-        lockedUntil: new Date(Date.now() + 3600_000)
-      });
-    },
-    'unverified-actor': async (ctx) => {
-      await dataSource
-        .getRepository(User)
-        .update(ctx.actor!.user.id, { isEmailVerified: false });
-    },
-    'passwordless-actor': async (ctx) => {
-      await dataSource
-        .getRepository(User)
-        .update(ctx.actor!.user.id, { password: null });
-    },
+    'deactivated-actor': actorState('deactivated-actor'),
+    'deleted-actor': actorState('deleted-actor'),
+    'revoked-actor': actorState('revoked-actor'),
+    'locked-actor': actorState('locked-actor'),
+    'unverified-actor': actorState('unverified-actor'),
+    'passwordless-actor': actorState('passwordless-actor'),
     'feature-flag': async (ctx) => {
       const flag = await dataSource.getRepository(FeatureFlag).save({
         key: ctx.values.$flagKey!,

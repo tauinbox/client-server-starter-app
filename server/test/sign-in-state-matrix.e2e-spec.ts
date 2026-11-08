@@ -11,18 +11,13 @@ import { randomBytes } from 'crypto';
 import { Server } from 'http';
 import request from 'supertest';
 import { DataSource, In } from 'typeorm';
-import {
-  MAX_FAILED_ATTEMPTS,
-  SIGN_IN_REFUSAL_REASONS,
-  TOKEN_PURPOSE
-} from '@app/shared/constants';
+import { SIGN_IN_REFUSAL_REASONS, TOKEN_PURPOSE } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   ACCOUNT_STATES,
-  SCENARIO_PASSWORD,
-  ScenarioAuditRow,
   AccountState,
-  untilNextSecond
+  SCENARIO_PASSWORD,
+  ScenarioAuditRow
 } from '@app/shared/utils/request-scenarios';
 import type { SignedTokenRefusal } from '@app/shared/utils/token-revocation';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
@@ -36,11 +31,11 @@ import {
 } from '../src/modules/auth/constants/oauth.constants';
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
 import { GoogleOAuthGuard } from '../src/modules/auth/guards/google-oauth.guard';
-import { AuthService } from '../src/modules/auth/services/auth.service';
 import { AuthCookies } from '../src/modules/auth/utils/auth-cookies';
 import { bindIntent } from '../src/modules/auth/utils/oauth-flow-intent';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { User } from '../src/modules/users/entities/user.entity';
+import { ACCOUNT_STATE_SETUP } from './account-states';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // The provider rows of the sign-in state matrix. The mock has no provider
@@ -225,29 +220,6 @@ runWithInfra('Sign-in state matrix of the provider callback (e2e)', () => {
     return user;
   }
 
-  const STATES: Record<AccountState, (user: User) => Promise<unknown>> = {
-    'deactivated-actor': (user) =>
-      dataSource.getRepository(User).update(user.id, { isActive: false }),
-    'deleted-actor': (user) =>
-      dataSource.getRepository(User).softDelete(user.id),
-    // An intent keeps its issue time in whole seconds.
-    'revoked-actor': async (user) => {
-      await untilNextSecond();
-      await app.get(AuthService).revokeAllUserSessions(user.id);
-    },
-    'locked-actor': (user) =>
-      dataSource.getRepository(User).update(user.id, {
-        failedLoginAttempts: MAX_FAILED_ATTEMPTS,
-        lockedUntil: new Date(Date.now() + 3600_000)
-      }),
-    'unverified-actor': (user) =>
-      dataSource
-        .getRepository(User)
-        .update(user.id, { isEmailVerified: false }),
-    'passwordless-actor': (user) =>
-      dataSource.getRepository(User).update(user.id, { password: null })
-  };
-
   function intentCookie(
     { cookie, purpose }: NonNullable<FlowSpec['intent']>,
     user: User
@@ -301,7 +273,7 @@ runWithInfra('Sign-in state matrix of the provider callback (e2e)', () => {
     const user = await createAccount(flow);
     const cookie = spec.intent && intentCookie(spec.intent, user);
 
-    await STATES[state](user);
+    await ACCOUNT_STATE_SETUP[state](app, user.id);
     const { location, rows } = await callback(cookie, user);
 
     for (const { reason } of rows) {
