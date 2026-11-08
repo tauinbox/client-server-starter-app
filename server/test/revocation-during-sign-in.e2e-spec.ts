@@ -17,6 +17,7 @@ import { cookieName } from '../src/common/utils/host-cookie';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { SCENARIO_CLOCK } from './scenario-clock';
 
 // A revocation that runs between the INSERT of a sign-in row and its COMMIT
 // cannot see the row, so its delete leaves it. The subscriber runs the
@@ -38,6 +39,7 @@ runWithInfra('Revocation during a sign-in (e2e)', () => {
       if (!armed) return;
 
       armed = false;
+      SCENARIO_CLOCK.advance(100);
       await authService.revokeAllUserSessions(event.entity.userId);
     }
   };
@@ -68,6 +70,11 @@ runWithInfra('Revocation during a sign-in (e2e)', () => {
       .getRepository(User)
       .update({ email }, { isEmailVerified: true });
   }, 60000);
+
+  // The raced row starts 100 ms before the revocation, and a later sign-in
+  // runs in the same millisecond as the revocation, on every machine.
+  beforeEach(() => SCENARIO_CLOCK.freeze());
+  afterEach(() => SCENARIO_CLOCK.release());
 
   afterAll(async () => {
     if (dataSource) {
@@ -165,8 +172,6 @@ runWithInfra('Revocation during a sign-in (e2e)', () => {
 
   it('keeps a sign-in after the revocation and does not list the raced session', async () => {
     await racedSignIn();
-    // The next whole second: an access token is floored to its second.
-    await new Promise((resolve) => setTimeout(resolve, 1100));
     const later = await signIn();
 
     const sessions = await request(http())
@@ -186,7 +191,6 @@ runWithInfra('Revocation during a sign-in (e2e)', () => {
 
   it('does not count the raced session when the other sessions end', async () => {
     await racedSignIn();
-    await new Promise((resolve) => setTimeout(resolve, 1100));
     const later = await signIn();
 
     const ended = await request(http())

@@ -100,9 +100,8 @@ export const STATE_FIXTURES = [
   /** The actor is soft-deleted, and its sessions are not yet revoked. */
   'deleted-actor',
   /**
-   * Every session of the actor is revoked, as a sign-out everywhere does, in
-   * a later second than the fixtures before it: a token keeps its issue time
-   * in whole seconds.
+   * Every session of the actor is revoked, as a sign-out everywhere does,
+   * 100 ms after the fixtures before it on a frozen clock (`scenarioClock`).
    */
   'revoked-actor',
   /** The actor is locked after too many failed sign-ins. */
@@ -486,11 +485,73 @@ export function scenarioPath(
     .join('/');
 }
 
-/** Resolves in the next whole second, so a later timestamp has a later second. */
-export function untilNextSecond(): Promise<void> {
-  return new Promise((resolve) =>
-    setTimeout(resolve, 1000 - (Date.now() % 1000))
-  );
+/** The calls of the Jest object that the scenario clock makes. */
+export interface ScenarioClockDriver {
+  useFakeTimers(config: {
+    now: number;
+    doNotFake: (
+      | 'hrtime'
+      | 'nextTick'
+      | 'performance'
+      | 'queueMicrotask'
+      | 'setImmediate'
+      | 'clearImmediate'
+      | 'setInterval'
+      | 'clearInterval'
+      | 'setTimeout'
+      | 'clearTimeout'
+    )[];
+  }): unknown;
+  setSystemTime(now: number): void;
+  useRealTimers(): unknown;
+}
+
+/**
+ * A clock for the tests of a revocation (the `revoked-actor` fixture and the
+ * revocation e2e and parity specs), so that the order of a token or a session
+ * and a revocation does not depend on the speed of the machine.
+ * `freeze` stops `Date` at 100 ms into the previous second; the timers stay
+ * real. Tokens issued then and a revocation after `advance` share one second
+ * in a fixed order, and the real time after `release` is later than both.
+ */
+export function scenarioClock(driver: ScenarioClockDriver) {
+  let frozen = false;
+
+  return {
+    freeze(): void {
+      const second = Math.floor(Date.now() / 1000) * 1000;
+
+      driver.useFakeTimers({
+        now: second - 900,
+        doNotFake: [
+          'hrtime',
+          'nextTick',
+          'performance',
+          'queueMicrotask',
+          'setImmediate',
+          'clearImmediate',
+          'setInterval',
+          'clearInterval',
+          'setTimeout',
+          'clearTimeout'
+        ]
+      });
+      frozen = true;
+    },
+    advance(ms: number): void {
+      if (!frozen) {
+        throw new Error('freeze() must run before advance()');
+      }
+
+      driver.setSystemTime(Date.now() + ms);
+    },
+    release(): void {
+      if (frozen) {
+        driver.useRealTimers();
+        frozen = false;
+      }
+    }
+  };
 }
 
 export function scenarioMethod(scenario: RequestScenario): string {

@@ -27,7 +27,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { withPrivateThrottlerStorage } from './private-throttler';
-import { eventually } from './eventually';
+import { trackAuditWrites } from './audit-writes';
 
 // The whole pipeline is real: the grant, the super-target rule, the event bus,
 // the revocation listener, the JWT session check and the audit row.
@@ -37,6 +37,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
   let usersService: UsersService;
   const stamp = Date.now();
@@ -63,6 +64,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
 
@@ -206,7 +208,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     );
     expect((await profile(support.access)).status).toBe(200);
 
-    const audit = await eventually(() =>
+    const audit = await auditWrites.read(() =>
       dataSource.getRepository(AuditLog).findOne({
         where: { action: AuditAction.SESSION_REVOKE, targetId: id }
       })

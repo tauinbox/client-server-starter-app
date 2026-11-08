@@ -10,6 +10,7 @@ import {
   type SseConnectionsRef
 } from '../src/modules/core/metrics/metrics.module';
 import { AuditService } from '../src/modules/audit/audit.service';
+import { NotificationsController } from '../src/modules/notifications/notifications.controller';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { UsersService } from '../src/modules/users/services/users.service';
@@ -26,6 +27,18 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
   let token: string;
   const email = `sse-close-during-guard-${Date.now()}@example.com`;
   const requests: ClientRequest[] = [];
+  const handleStream = NotificationsController.prototype.stream;
+  // Nest keeps the handler it finds at init, so the spy goes on first, with
+  // the route metadata of the handler that the decorators wrote.
+  const streamHandler = jest.spyOn(NotificationsController.prototype, 'stream');
+
+  for (const key of Reflect.getMetadataKeys(handleStream)) {
+    Reflect.defineMetadata(
+      key,
+      Reflect.getMetadata(key, handleStream),
+      NotificationsController.prototype.stream
+    );
+  }
 
   beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -107,6 +120,20 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
         return original(sessionId);
       });
 
+    const { promise: handled, resolve: handlerReturned } =
+      Promise.withResolvers<void>();
+
+    streamHandler.mockImplementationOnce(function (
+      this: NotificationsController,
+      ...args: Parameters<NotificationsController['stream']>
+    ) {
+      const stream = handleStream.apply(this, args);
+
+      handlerReturned();
+
+      return stream;
+    });
+
     const serverSocket = new Promise<Socket>((resolve) =>
       server.once('connection', resolve)
     );
@@ -121,7 +148,8 @@ runWithInfra('An SSE client that leaves during the auth guard (e2e)', () => {
     left.destroy();
     await socketClosed;
     release();
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // The handler registers a stream before it returns, so the count is final.
+    await handled;
 
     expect(app.get<SseConnectionsRef>(SSE_CONNECTIONS_REF).getCount()).toBe(0);
 

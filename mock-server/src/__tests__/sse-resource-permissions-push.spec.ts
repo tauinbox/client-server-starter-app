@@ -3,6 +3,7 @@ import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
+import { untilSentinel } from '../utils/sse-sentinel';
 
 // Mirrors ResourceService and the ResourceActionsChangedEvent listener: a
 // committed change of the grantable actions of a resource sends one
@@ -45,7 +46,9 @@ async function login(email: string): Promise<string> {
   return body.tokens.access_token;
 }
 
-async function openStream(token: string): Promise<() => number> {
+async function openStream(
+  token: string
+): Promise<{ pushes: () => number; body: () => string }> {
   const controller = new AbortController();
   const res = await fetch(`${baseUrl}/api/v1/notifications/stream`, {
     headers: { authorization: `Bearer ${token}` },
@@ -73,16 +76,16 @@ async function openStream(token: string): Promise<() => number> {
   })();
   openStreams.push({ close: () => controller.abort() });
 
-  return () =>
-    body
-      .split('\n')
-      .filter((line) => line.startsWith('data: {'))
-      .map((line) => JSON.parse(line.slice(6)) as { type: string })
-      .filter((e) => e.type === 'permissions_updated').length;
+  return {
+    pushes: () =>
+      body
+        .split('\n')
+        .filter((line) => line.startsWith('data: {'))
+        .map((line) => JSON.parse(line.slice(6)) as { type: string })
+        .filter((e) => e.type === 'permissions_updated').length,
+    body: () => body
+  };
 }
-
-const wait = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
 
 async function call(
   method: string,
@@ -105,12 +108,12 @@ async function pushesAfter(
   write: (adminToken: string) => Promise<number>
 ): Promise<number> {
   const admin = await login('admin@example.com');
-  const pushes = await openStream(await login('user@example.com'));
+  const stream = await openStream(await login('user@example.com'));
 
   expect(await write(admin)).toBe(200);
-  await wait(100);
+  await untilSentinel([stream.body]);
 
-  return pushes();
+  return stream.pushes();
 }
 
 describe('permissions_updated after a resource write', () => {

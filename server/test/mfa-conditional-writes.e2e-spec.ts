@@ -8,6 +8,7 @@ import { CoreModule } from '../src/modules/core/core.module';
 import { SecretEncryptionService } from '../src/common/crypto/secret-encryption.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { User } from '../src/modules/users/entities/user.entity';
+import { waitsOnLock } from './lock-wait';
 
 // Each write of the factor holds only while the state it was checked against
 // still holds. The caller's copy of the row can be stale: another request may
@@ -105,7 +106,7 @@ runWithInfra('Conditional writes of the second factor (e2e)', () => {
           racing = mfaService.beginEnrolment(user);
           await Promise.race([
             racing.catch(() => undefined),
-            new Promise((resolve) => setTimeout(resolve, 500))
+            waitsOnLock(dataSource, '%"users"%')
           ]);
         }
 

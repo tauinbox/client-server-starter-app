@@ -1,6 +1,7 @@
 import type { Server } from 'http';
 import { ErrorKeys } from '@app/shared/constants';
 import type { ActiveSessionResponse } from '@app/shared/types';
+import { scenarioClock } from '@app/shared/utils/request-scenarios';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
@@ -26,9 +27,15 @@ afterAll((done) => {
   server.close(done);
 });
 
+// A later sign-in runs in the millisecond of the revocation on every machine.
+const clock = scenarioClock(jest);
+
 beforeEach(() => {
   resetState();
+  clock.freeze();
 });
+
+afterEach(() => clock.release());
 
 async function signIn(): Promise<Session> {
   const res = await fetch(`${baseUrl}/api/v1/auth/login`, {
@@ -104,7 +111,7 @@ describe('a session that started before the last revocation', () => {
   it('is not listed beside a session that started after the revocation', async () => {
     await signIn();
     revokeAfterSessionStart();
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    clock.advance(1);
     const later = await signIn();
 
     const res = await listSessions(later);
@@ -119,7 +126,7 @@ describe('a session that started before the last revocation', () => {
   it('is not counted when the other sessions end', async () => {
     await signIn();
     revokeAfterSessionStart();
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    clock.advance(1);
     const later = await signIn();
 
     const res = await fetch(`${baseUrl}/api/v1/auth/sessions`, {

@@ -21,7 +21,7 @@ import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
-import { eventually } from './eventually';
+import { trackAuditWrites } from './audit-writes';
 
 // Every authorization refusal writes one row with the caller ip and request
 // id. The guard binds them to the ability, and the instance checks in the
@@ -41,6 +41,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
 
   let app: NestExpressApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   const ids = {} as Record<keyof typeof emails, string>;
   let token: string;
   let emptyRole: Role;
@@ -63,6 +64,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     const roleService = app.get(RoleService);
 
     const userRepository = dataSource.getRepository(User);
@@ -186,7 +188,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
     requestId: string,
     action = AuditAction.PERMISSION_CHECK_FAILURE
   ): Promise<AuditLog> {
-    const row = await eventually(() =>
+    const row = await auditWrites.read(() =>
       dataSource
         .getRepository(AuditLog)
         .findOne({ where: { action, actorId: ids.actor, requestId } })

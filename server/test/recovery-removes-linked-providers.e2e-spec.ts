@@ -30,6 +30,7 @@ import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity'
 import { User } from '../src/modules/users/entities/user.entity';
 import { createMockCache } from '../src/common/testing/cache.mock';
 import { hashToken } from '../src/common/utils/hash-token';
+import { waitsOnLock } from './lock-wait';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -245,8 +246,8 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
       return result;
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    // The link holds the user row, so the reset cannot write it yet.
+    // The link holds the user row, so the reset waits on its lock.
+    expect(await waitsOnLock(ds, '%"users"%')).toBe(true);
     expect(resetDone).toBe(false);
 
     releaseInsert();

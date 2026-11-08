@@ -18,8 +18,8 @@ import {
   ScenarioPlaceholder,
   scenarioMethod,
   scenarioPath,
+  scenarioClock,
   StateFixture,
-  untilNextSecond,
   writtenAuditRows
 } from '@app/shared/utils/request-scenarios';
 import { createApp } from '../app';
@@ -54,6 +54,7 @@ interface Context {
 
 let server: Server;
 let baseUrl: string;
+const clock = scenarioClock(jest);
 
 beforeAll(async () => {
   server = await listenOnUnblockedPort(createApp());
@@ -412,9 +413,11 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     return Promise.resolve();
   },
-  'revoked-actor': async (ctx) => {
-    await untilNextSecond();
+  'revoked-actor': (ctx) => {
+    clock.advance(100);
     revokeUserSessions(ctx.actor!.id);
+
+    return Promise.resolve();
   },
   'locked-actor': (ctx) => {
     ctx.actor!.failedLoginAttempts = MAX_FAILED_ATTEMPTS;
@@ -658,12 +661,18 @@ async function run(scenario: RequestScenario) {
 
   const states = scenario.state ?? [];
 
-  if (scenario.auth === 'bearer' && !states.includes('refresh-cookie')) {
-    ctx.bearer = (await signIn(ctx.actor!)).bearer;
-  }
+  if (states.includes('revoked-actor')) clock.freeze();
 
-  for (const state of states) {
-    await STATES[state](ctx);
+  try {
+    if (scenario.auth === 'bearer' && !states.includes('refresh-cookie')) {
+      ctx.bearer = (await signIn(ctx.actor!)).bearer;
+    }
+
+    for (const state of states) {
+      await STATES[state](ctx);
+    }
+  } finally {
+    clock.release();
   }
 
   if (ctx.actor && scenario.actor === 'user-mfa') {

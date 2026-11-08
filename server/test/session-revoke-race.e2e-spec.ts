@@ -21,7 +21,7 @@ import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity'
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
-import { eventually } from './eventually';
+import { trackAuditWrites } from './audit-writes';
 
 // Two requests that end the same session are held in front of the delete of
 // refresh rows and released together, so both run their delete against
@@ -31,6 +31,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Session revoke race (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
   let usersService: UsersService;
   const stamp = Date.now();
@@ -54,6 +55,7 @@ runWithInfra('Session revoke race (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
 
@@ -153,19 +155,17 @@ runWithInfra('Session revoke race (e2e)', () => {
       ErrorKeys.AUTH.SESSION_NOT_FOUND
     );
 
-    const rows = await eventually(async () => {
-      const found = await dataSource.getRepository(AuditLog).find({
+    const rows = await auditWrites.read(() =>
+      dataSource.getRepository(AuditLog).find({
         where: {
           action: AuditAction.SESSION_REVOKE,
           actorEmail: email,
           createdAt: MoreThanOrEqual(since)
         }
-      });
-
-      return found.length > 0 ? found : null;
-    });
+      })
+    );
 
     expect(rows).toHaveLength(1);
-    expect(rows?.[0]?.details).toEqual({ scope: 'one', count: 1 });
+    expect(rows[0]?.details).toEqual({ scope: 'one', count: 1 });
   }, 30000);
 });

@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
+import { untilSentinel } from '../utils/sse-sentinel';
 
 let server: Server;
 let baseUrl: string;
@@ -37,6 +38,7 @@ async function login(email: string): Promise<string> {
 
 interface OpenStream {
   frames: string[];
+  body: () => string;
   close: () => void;
 }
 
@@ -67,11 +69,12 @@ async function openStream(token: string): Promise<OpenStream> {
     }
   })();
 
-  return { frames, close: () => controller.abort() };
+  return {
+    frames,
+    body: () => frames.join(''),
+    close: () => controller.abort()
+  };
 }
-
-const wait = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('SSE user_crud_events scoping', () => {
   it('delivers user_crud_events only to admins', async () => {
@@ -96,7 +99,7 @@ describe('SSE user_crud_events scoping', () => {
 
     expect(res.status).toBe(201);
 
-    await wait(100);
+    await untilSentinel([adminStream.body, userStream.body]);
     adminStream.close();
     userStream.close();
 
@@ -143,7 +146,7 @@ describe('SSE user_crud_events scoping', () => {
     expect((await patch(other.id)).status).toBe(200);
     expect((await patch(viewer.id)).status).toBe(200);
 
-    await wait(100);
+    await untilSentinel([viewerStream.body]);
     viewerStream.close();
 
     const frames = viewerStream.frames.join('');
@@ -209,7 +212,7 @@ describe('SSE user_crud_events scoping', () => {
 
     expect(res.status).toBe(200);
 
-    await wait(100);
+    await untilSentinel([viewerStream.body]);
     viewerStream.close();
 
     expect(viewerStream.frames.join('')).toContain(

@@ -1,12 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
-import {
-  AccountState,
-  untilNextSecond
-} from '@app/shared/utils/request-scenarios';
+import { AccountState } from '@app/shared/utils/request-scenarios';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { User } from '../src/modules/users/entities/user.entity';
+import { SCENARIO_CLOCK } from './scenario-clock';
 
 /** Puts an account into each state of the sign-in state matrix. */
 export const ACCOUNT_STATE_SETUP: Record<
@@ -16,9 +14,8 @@ export const ACCOUNT_STATE_SETUP: Record<
   'deactivated-actor': (app, userId) =>
     users(app).update(userId, { isActive: false }),
   'deleted-actor': (app, userId) => users(app).softDelete(userId),
-  // A token keeps its issue time in whole seconds.
   'revoked-actor': async (app, userId) => {
-    await untilNextSecond();
+    SCENARIO_CLOCK.advance(100);
     await app.get(AuthService).revokeAllUserSessions(userId);
   },
   'locked-actor': (app, userId) =>

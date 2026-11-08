@@ -22,7 +22,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { withPrivateThrottlerStorage } from './private-throttler';
-import { eventually } from './eventually';
+import { trackAuditWrites } from './audit-writes';
 
 // The way back for an owner who lost the authenticator and the recovery codes.
 // The whole pipeline is real: the grant, the super-target rule, the caller
@@ -33,6 +33,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
   let usersService: UsersService;
   const stamp = Date.now();
@@ -59,6 +60,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
 
@@ -182,7 +184,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     );
     expect((await row(id)).totpEnabledAt).not.toBeNull();
 
-    const failure = await eventually(() =>
+    const failure = await auditWrites.read(() =>
       dataSource.getRepository(AuditLog).findOne({
         where: {
           action: AuditAction.STEP_UP_FAILURE,

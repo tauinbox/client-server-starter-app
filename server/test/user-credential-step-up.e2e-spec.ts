@@ -24,7 +24,7 @@ import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { MailService } from '../src/modules/mail/mail.service';
 import { maskEmail } from '../src/common/utils/escape-html';
 import { withPrivateThrottlerStorage } from './private-throttler';
-import { eventually } from './eventually';
+import { trackAuditWrites } from './audit-writes';
 
 // A credential change of another account proves the factor of the CALLER; on
 // the own record the profile flows own it, so the route refuses it outright.
@@ -35,6 +35,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
   let usersService: UsersService;
   const stamp = Date.now();
@@ -64,6 +65,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
 
@@ -197,7 +199,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     );
     expect(await holdsPassword(id, password)).toBe(true);
 
-    const audit = await eventually(() =>
+    const audit = await auditWrites.read(() =>
       dataSource.getRepository(AuditLog).findOne({
         where: { action: AuditAction.STEP_UP_FAILURE, actorEmail: adminEmail },
         order: { createdAt: 'DESC' }

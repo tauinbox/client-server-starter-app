@@ -29,7 +29,8 @@ import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { withPrivateThrottlerStorage } from './private-throttler';
-import { eventually } from './eventually';
+import { SCENARIO_CLOCK } from './scenario-clock';
+import { trackAuditWrites } from './audit-writes';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -39,6 +40,7 @@ runWithInfra(
   () => {
     let app: INestApplication;
     let dataSource: DataSource;
+    let auditWrites: ReturnType<typeof trackAuditWrites>;
     let authService: AuthService;
     let usersService: UsersService;
     let refreshCookieName: string;
@@ -78,6 +80,7 @@ runWithInfra(
       await app.init();
 
       dataSource = app.get(DataSource);
+      auditWrites = trackAuditWrites(app);
       authService = app.get(AuthService);
       usersService = app.get(UsersService);
       const secure = requiresSecureCookies(
@@ -124,26 +127,22 @@ runWithInfra(
     });
 
     /**
-     * The refused sign-in rows that name the test account, once at least one
-     * has landed: the audit write is fire-and-forget.
+     * The refused sign-in rows that name the test account, once every audit
+     * write has ended: the write is fire-and-forget.
      */
-    async function loginFailureRows(): Promise<
+    function loginFailureRows(): Promise<
       Array<Pick<AuditLog, 'actorId' | 'details'>>
     > {
-      const rows = await eventually(async () => {
-        const found = await dataSource.getRepository(AuditLog).find({
+      return auditWrites.read(() =>
+        dataSource.getRepository(AuditLog).find({
           select: { actorId: true, details: true },
           where: {
             action: AuditAction.USER_LOGIN_FAILURE,
             targetId: user.id,
             targetType: 'User'
           }
-        });
-
-        return found.length > 0 ? found : null;
-      });
-
-      return rows ?? [];
+        })
+      );
     }
 
     function http(): Server {
@@ -243,11 +242,16 @@ runWithInfra(
     // every session. Before the fix a callback that the old holder finished
     // just before it still turned into a fresh session.
     it('refuses an oauth_data cookie issued before a session revocation', async () => {
-      const oauthData = await callback();
+      SCENARIO_CLOCK.freeze();
+      let oauthData: string;
 
-      // iat has one-second resolution and the revocation is floored to it.
-      await new Promise((resolve) => setTimeout(resolve, 1100));
-      await authService.revokeAllUserSessions(user.id);
+      try {
+        oauthData = await callback();
+        SCENARIO_CLOCK.advance(100);
+        await authService.revokeAllUserSessions(user.id);
+      } finally {
+        SCENARIO_CLOCK.release();
+      }
 
       const res = await request(http())
         .post('/api/v1/auth/oauth/exchange')
