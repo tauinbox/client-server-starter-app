@@ -1419,7 +1419,8 @@ route. Routes that write the same `<action>:<Subject>` must have the same `acces
 states an `accessExempt` reason.
 
 **Request scenarios** (`contracts/scenarios/`) state the result of one request: the actor, the state
-before the request, the status, the `errorKey` and the audit actions it writes. The e2e suite
+before the request, the status, the `errorKey` and the audit rows it writes (the action, or the
+action with its reason and target). The e2e suite
 `test/scenarios.e2e-spec.ts` runs them against the real server and database, and
 `mock-server/src/__tests__/scenarios.spec.ts` runs the same files against the mock server. Thus a
 difference between the two servers fails one of the two runs. `npm run check:scenarios` fails when a
@@ -1427,8 +1428,13 @@ POST, PUT, PATCH or DELETE route has no scenario with a status below 400. The ro
 `PENDING_ROUTES` list have no scenario yet. Since 2026-10-30 the list is empty: each such route has a
 success scenario. A listed route that gets a scenario must leave the list.
 CI runs the check with `-- --base origin/master`, which refuses a listed route that is not pending
-on `master`, so the list can only get shorter. `npm run check:scenarios -- --self-test` proves each rule of the
-check. The format is in `contracts/README.md`.
+on `master`, so the list can only get shorter. The check also refuses a sign-in route (password,
+refresh, provider exchange, code, recovery code) with no scenario for one of the account states
+(deactivated, soft-deleted, revoked, locked, not verified, no password), and a refused sign-in whose
+audit reason is not in `SIGN_IN_REFUSAL_REASONS`. `test/sign-in-state-matrix.e2e-spec.ts` runs the
+provider callback, link and step-up, which the mock cannot run, against the same states.
+`npm run check:scenarios -- --self-test` proves each rule of the check. The format is in
+`contracts/README.md`.
 
 **The `@Public()` decorator** marks an endpoint that a caller can reach with no authentication. The
 routes are the login, the register, the password reset, the OAuth init and callback, the health check

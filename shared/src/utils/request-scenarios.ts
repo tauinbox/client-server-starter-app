@@ -19,11 +19,7 @@ export const ACTOR_FIXTURES = [
   /** As `user`, with an authenticator and the recovery code below. */
   'user-mfa',
   /** As `user`, with no password and a linked `google` account. */
-  'oauth-only',
-  /** As `user`, with an address that is not verified. */
-  'unverified',
-  /** As `user`, locked after too many failed sign-ins. */
-  'locked'
+  'oauth-only'
 ] as const;
 export type ActorFixture = (typeof ACTOR_FIXTURES)[number];
 
@@ -94,13 +90,52 @@ export const STATE_FIXTURES = [
   'metered-plan',
   /** A webhook event in `dead_letter`; `$webhookEventId`. */
   'dead-letter-webhook-event',
-  /**
-   * The actor is deactivated. Put it after the fixtures that need an active
-   * actor, for example `oauth-data` and `mfa-challenge`.
+  /*
+   * The account states below change the actor after the fixtures before them
+   * in `state`. Put them after the fixtures that sign the actor in, for
+   * example `refresh-cookie`, `oauth-data` and `mfa-challenge`.
    */
-  'deactivated-actor'
+  /** The actor is deactivated. */
+  'deactivated-actor',
+  /** The actor is soft-deleted, and its sessions are not yet revoked. */
+  'deleted-actor',
+  /**
+   * Every session of the actor is revoked, as a sign-out everywhere does, in
+   * a later second than the fixtures before it: a token keeps its issue time
+   * in whole seconds.
+   */
+  'revoked-actor',
+  /** The actor is locked after too many failed sign-ins. */
+  'locked-actor',
+  /** The address of the actor is not verified. */
+  'unverified-actor',
+  /** The actor has no password. */
+  'passwordless-actor'
 ] as const;
 export type StateFixture = (typeof STATE_FIXTURES)[number];
+
+/** The routes that sign an account in or keep its session. */
+export const SIGN_IN_ROUTES = [
+  'POST /api/v1/auth/login',
+  'POST /api/v1/auth/refresh-token',
+  'POST /api/v1/auth/oauth/exchange',
+  'POST /api/v1/auth/mfa/verify',
+  'POST /api/v1/auth/mfa/recovery'
+] as const;
+
+/**
+ * The account states that each route of `SIGN_IN_ROUTES` runs against: each
+ * pair of a route and a state has a scenario.
+ */
+export const ACCOUNT_STATES = [
+  'deactivated-actor',
+  'deleted-actor',
+  'revoked-actor',
+  'locked-actor',
+  'unverified-actor',
+  'passwordless-actor'
+] as const satisfies readonly StateFixture[];
+export type AccountState = (typeof ACCOUNT_STATES)[number];
 
 /** A body string or a path segment that is exactly one of these is replaced. */
 export const SCENARIO_PLACEHOLDERS = [
@@ -169,12 +204,73 @@ export interface RequestScenario {
     /** The answer of each request before the last. Default: `expect`. */
     earlier?: ScenarioAnswer;
     /**
-     * The actions of the audit rows that all requests write and that name an
-     * account of the scenario. The runners compare them in any order: the
-     * server writes some rows fire-and-forget.
+     * The audit rows that all requests write and that name an account of the
+     * scenario, as actions or as rows. The runners compare them in any order:
+     * the server writes some rows fire-and-forget. All entries of one
+     * scenario have the same form.
      */
-    audit: string[];
+    audit: string[] | ScenarioAuditRow[];
   };
+}
+
+/** An audit row: its action, its `details.reason` and its target. */
+export interface ScenarioAuditRow {
+  action: string;
+  reason: string | null;
+  /** `actor` when the row names the actor as its target. */
+  target: 'actor' | 'none';
+}
+
+/** An audit row as a runner reads it. */
+export interface WrittenAuditRow {
+  action: string;
+  targetId: string | null;
+  details: Record<string, unknown> | null;
+}
+
+function auditRowKey(row: ScenarioAuditRow): string {
+  return `${row.action} reason=${row.reason ?? '-'} target=${row.target}`;
+}
+
+function isAuditRowList(
+  audit: RequestScenario['expect']['audit']
+): audit is ScenarioAuditRow[] {
+  return audit.some((entry) => typeof entry !== 'string');
+}
+
+/** The expected audit rows of a scenario, in a stable order. */
+export function expectedAuditRows(scenario: RequestScenario): string[] {
+  const { audit } = scenario.expect;
+
+  return isAuditRowList(audit)
+    ? audit.map(auditRowKey).toSorted()
+    : audit.toSorted();
+}
+
+/**
+ * The written audit rows in the form of the expected rows of the scenario,
+ * in a stable order. `actorId` is the id of the actor of the scenario.
+ */
+export function writtenAuditRows(
+  scenario: RequestScenario,
+  { rows, actorId }: { rows: WrittenAuditRow[]; actorId: string | undefined }
+): string[] {
+  if (!isAuditRowList(scenario.expect.audit)) {
+    return rows.map((row) => row.action).toSorted();
+  }
+
+  return rows
+    .map((row) => {
+      const reason = row.details?.['reason'];
+
+      return auditRowKey({
+        action: row.action,
+        reason: typeof reason === 'string' ? reason : null,
+        target:
+          actorId !== undefined && row.targetId === actorId ? 'actor' : 'none'
+      });
+    })
+    .toSorted();
 }
 
 export interface ScenarioAnswer {
@@ -237,6 +333,27 @@ function placeholdersIn(value: unknown): string[] {
   return [];
 }
 
+function isAuditRow(value: unknown): value is ScenarioAuditRow {
+  if (value === null || typeof value !== 'object') return false;
+
+  const { action, reason, target, ...rest } = value as Record<string, unknown>;
+
+  return (
+    Object.keys(rest).length === 0 &&
+    typeof action === 'string' &&
+    (reason === null || typeof reason === 'string') &&
+    (target === 'actor' || target === 'none')
+  );
+}
+
+function auditErrors(audit: unknown[]): string[] {
+  if (audit.every((entry) => typeof entry === 'string')) return [];
+
+  return audit.every(isAuditRow)
+    ? []
+    : ['audit holds actions only, or rows of { action, reason, target } only'];
+}
+
 /** The problems of one scenario, as text. An empty list means it is valid. */
 export function scenarioErrors(scenario: RequestScenario): string[] {
   const errors: string[] = [];
@@ -289,6 +406,8 @@ export function scenarioErrors(scenario: RequestScenario): string[] {
     !Array.isArray(expect.audit)
   ) {
     errors.push('expect needs status, errorKey (or null) and audit');
+  } else {
+    errors.push(...auditErrors(expect.audit));
   }
 
   if (
@@ -365,6 +484,13 @@ export function scenarioPath(
     .split('/')
     .map((segment) => resolvePlaceholders(segment, values))
     .join('/');
+}
+
+/** Resolves in the next whole second, so a later timestamp has a later second. */
+export function untilNextSecond(): Promise<void> {
+  return new Promise((resolve) =>
+    setTimeout(resolve, 1000 - (Date.now() % 1000))
+  );
 }
 
 export function scenarioMethod(scenario: RequestScenario): string {

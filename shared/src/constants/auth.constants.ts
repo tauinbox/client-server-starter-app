@@ -75,6 +75,38 @@ export const OAUTH_ERROR = {
 
 export type OAuthError = (typeof OAUTH_ERROR)[keyof typeof OAUTH_ERROR];
 
+/** Why a token that the server signed for an account no longer signs it in. */
+export const SIGNED_TOKEN_REFUSALS = [
+  'account_not_found',
+  'account_deactivated',
+  'session_revoked'
+] as const;
+
+/**
+ * Every `reason` that a refused sign-in writes to its audit row: a password,
+ * a second factor, a provider callback, link or step-up, and a refresh. One
+ * cause has one value, so a search for it finds every row. The request
+ * scenarios refuse a sign-in row whose reason is not in this list.
+ */
+export const SIGN_IN_REFUSAL_REASONS = [
+  'invalid_credentials',
+  'account_locked',
+  'account_locked_after_max_attempts',
+  'email_not_verified',
+  ...SIGNED_TOKEN_REFUSALS,
+  'mfa_not_enabled',
+  'intent_invalid',
+  'unexpected_error',
+  ...Object.values(OAUTH_ERROR),
+  'invalid_or_expired_token',
+  'lost_response_replay',
+  'session_absolute_lifetime_exceeded',
+  'session_invalidated_by_rotation',
+  'user_not_found',
+  'user_deactivated',
+  'concurrent_rotation'
+] as const;
+
 /**
  * How long before an access token expires the client refreshes it.
  *

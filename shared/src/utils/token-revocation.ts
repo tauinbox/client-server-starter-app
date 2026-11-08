@@ -1,3 +1,5 @@
+import { SIGNED_TOKEN_REFUSALS } from '../constants/auth.constants';
+
 /**
  * True when a token was issued before the account's last revocation, so it
  * must be refused.
@@ -23,8 +25,7 @@ export function issuedBeforeRevocation(
 }
 
 /** Why a token that the server signed for an account no longer signs it in. */
-export type SignedTokenRefusal =
-  'account_not_found' | 'account_deactivated' | 'session_revoked';
+export type SignedTokenRefusal = (typeof SIGNED_TOKEN_REFUSALS)[number];
 
 /**
  * The account that a signed sign-in token names, or the reason it can no
