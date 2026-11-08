@@ -9,6 +9,7 @@ import { CoreModule } from '../src/modules/core/core.module';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { trackAuditWrites } from './audit-writes';
 
 // RequestIdMiddleware rejects a malformed X-Request-Id and substitutes a UUID.
 // Only a real request proves the value that reaches audit_logs is the sanitised
@@ -20,6 +21,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Audit rows carry the sanitised request id (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   const email = `audit-request-id-${Date.now()}@example.com`;
   const password = 'Sunrise-Kettle-19';
 
@@ -28,19 +30,11 @@ runWithInfra('Audit rows carry the sanitised request id (e2e)', () => {
   const waitForAuditRow = async (
     action: AuditAction
   ): Promise<AuditLog | null> => {
-    const repository = dataSource.getRepository(AuditLog);
+    await auditWrites.settled();
 
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const row = await repository.findOne({
-        where: { actorEmail: email, action }
-      });
-
-      if (row) return row;
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-
-    return null;
+    return dataSource
+      .getRepository(AuditLog)
+      .findOne({ where: { actorEmail: email, action } });
   };
 
   beforeAll(async () => {
@@ -55,6 +49,7 @@ runWithInfra('Audit rows carry the sanitised request id (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
   }, 60000);
 
   afterAll(async () => {

@@ -46,6 +46,13 @@ runWithRedis('server pushes across instances (e2e)', () => {
   let role: Role;
   let searchUser: Permission;
   const requests: { destroy: () => void }[] = [];
+  const SENTINEL = { type: 'entitlements_updated' } as const;
+  /** For each stream of the test: true once its body holds the sentinel. */
+  const sentinels: (() => boolean)[] = [];
+
+  beforeEach(() => {
+    sentinels.length = 0;
+  });
 
   const startInstance = async (): Promise<INestApplication> => {
     const moduleRef = await Test.createTestingModule({
@@ -182,7 +189,9 @@ runWithRedis('server pushes across instances (e2e)', () => {
               .split('\n')
               .filter((line) => line.startsWith('data: {'))
               .map((line) => JSON.parse(line.slice(6)) as NotificationEvent)
+              .filter(({ type }) => type !== SENTINEL.type)
           );
+          sentinels.push(() => body.includes(`"type":"${SENTINEL.type}"`));
         }
       );
 
@@ -191,10 +200,13 @@ runWithRedis('server pushes across instances (e2e)', () => {
     });
   }
 
-  const settle = async (read: () => NotificationEvent[], count: number) => {
-    await eventually(() => Promise.resolve(read().length >= count || null));
-    // Room for a frame that must not come.
-    await new Promise((resolve) => setTimeout(resolve, 300));
+  // Redis delivers the messages of one channel in order, so a frame that was
+  // sent before the sentinel has reached every stream once the sentinel has.
+  const settle = async () => {
+    first.get(NotificationsService).pushToAll(SENTINEL);
+    await eventually(() =>
+      Promise.resolve(sentinels.every((seen) => seen()) || null)
+    );
   };
 
   it('delivers push, pushToAll and pushToAuthorized to the streams of the other instance', async () => {
@@ -228,8 +240,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
       { action: 'search', subject: 'User' }
     );
 
-    await settle(viewerOnSecond, 2);
-    await settle(plainOnSecond, 2);
+    await settle();
     expect(viewerOnSecond()).toEqual([broadcast, authorized]);
     expect(plainOnSecond()).toEqual([direct, broadcast]);
     // The sending instance delivers once, not again from its own message.
@@ -261,9 +272,11 @@ runWithRedis('server pushes across instances (e2e)', () => {
           ability: SYSTEM_ABILITY
         });
 
-      await settle(viewerOnSecond, 1);
+      await settle();
       expect(viewerOnSecond()).toEqual([{ type: 'permissions_updated' }]);
-      expect(messages).toEqual([
+      expect(
+        messages.filter(({ event }) => event.type !== SENTINEL.type)
+      ).toEqual([
         expect.objectContaining({
           userIds: [viewer.id],
           event: { type: 'permissions_updated' }

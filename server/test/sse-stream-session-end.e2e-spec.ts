@@ -269,9 +269,27 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
 
   it('keeps the stream of a live session open across heartbeats', async () => {
     const a = await signIn();
+    const sessionCheck = app.get(RefreshTokenService);
+    const check = sessionCheck.hasLiveSession.bind(sessionCheck);
+    const { promise: fourthCheck, resolve: fourthCheckStarted } =
+      Promise.withResolvers<void>();
+    let streamOpen = false;
+    let checks = 0;
+
+    // A heartbeat that ends the stream stops the interval, so a fourth check
+    // starts only when the first three kept the stream open.
+    const spy = jest
+      .spyOn(sessionCheck, 'hasLiveSession')
+      .mockImplementation((sessionId) => {
+        if (streamOpen && ++checks === 4) fourthCheckStarted();
+
+        return check(sessionId);
+      });
     const stream = await openStream(a.token);
 
-    await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_MS * 4));
+    streamOpen = true;
+    await fourthCheck;
+    spy.mockRestore();
 
     expect(stream.ended()).toBe(false);
     expect(stream.body()).not.toContain('session_invalidated');

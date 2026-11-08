@@ -109,6 +109,21 @@ async function openStream(token: string): Promise<OpenStream> {
 const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Resolves once `condition` holds. The deadline only stops a hang. */
+async function until(condition: () => boolean): Promise<void> {
+  const deadline = Date.now() + 5000;
+
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error('The condition never held');
+
+    await wait(5);
+  }
+}
+
+// A heartbeat writes its frame only after its session check kept the stream.
+const heartbeats = (stream: OpenStream): number =>
+  stream.body().split(HEARTBEAT_FRAME).length - 1;
+
 const invalidatedFrame = `data: ${JSON.stringify({ type: 'session_invalidated' })}`;
 
 describe('an SSE stream ends with its session', () => {
@@ -128,7 +143,11 @@ describe('an SSE stream ends with its session', () => {
 
     expect(logout.status).toBe(200);
 
-    await wait(HEARTBEAT_MS * 4);
+    const beforeLogout = heartbeats(streamB);
+
+    await until(
+      () => streamA.ended() && heartbeats(streamB) >= beforeLogout + 2
+    );
 
     expect(streamA.ended()).toBe(true);
     expect(streamA.body()).toContain(invalidatedFrame);
@@ -142,7 +161,7 @@ describe('an SSE stream ends with its session', () => {
     const stream = await openStream(a.accessToken);
 
     revokeUserSessions(userId);
-    await wait(HEARTBEAT_MS * 4);
+    await until(() => stream.ended());
 
     expect(stream.ended()).toBe(true);
     expect(stream.body()).toContain(invalidatedFrame);
@@ -152,10 +171,10 @@ describe('an SSE stream ends with its session', () => {
     const a = await signIn();
     const stream = await openStream(a.accessToken);
 
-    await wait(HEARTBEAT_MS * 4);
+    // The first frame comes at once; three more come from session checks.
+    await until(() => heartbeats(stream) >= 4);
 
     expect(stream.ended()).toBe(false);
-    expect(stream.body()).toContain(HEARTBEAT_FRAME);
   });
 
   it('sends the heartbeat frame of the server at once, before the first interval', async () => {

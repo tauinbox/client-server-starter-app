@@ -37,6 +37,7 @@ import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { User } from '../src/modules/users/entities/user.entity';
 import { ACCOUNT_STATE_SETUP } from './account-states';
 import { SCENARIO_CLOCK } from './scenario-clock';
+import { trackAuditWrites } from './audit-writes';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // The provider rows of the sign-in state matrix. The mock has no provider
@@ -124,6 +125,7 @@ runWithInfra('Sign-in state matrix of the provider callback (e2e)', () => {
   const previousKey = process.env['MFA_ENCRYPTION_KEY'];
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let secure: boolean;
   let profile: OAuthUserProfile;
   const emailPrefix = `sign-in-matrix-${Date.now()}-${randomBytes(3).toString('hex')}-`;
@@ -155,6 +157,7 @@ runWithInfra('Sign-in state matrix of the provider callback (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     secure = app.get(AuthCookies).secure;
   }, 60000);
 
@@ -251,8 +254,7 @@ runWithInfra('Sign-in state matrix of the provider callback (e2e)', () => {
     const res = await req.expect(302);
     const repository = dataSource.getRepository(AuditLog);
 
-    // Fire-and-forget rows land after the redirect.
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await auditWrites.settled();
     const rows = await repository.find({ where: { requestId } });
 
     await repository.delete({ requestId });

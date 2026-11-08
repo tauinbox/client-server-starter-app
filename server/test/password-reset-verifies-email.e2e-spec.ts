@@ -9,7 +9,7 @@ import { AuthService } from '../src/modules/auth/services/auth.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { hashToken } from '../src/common/utils/hash-token';
-import { eventually } from './eventually';
+import { trackAuditWrites } from './audit-writes';
 
 // Redeeming a reset token is the same proof of mailbox control as the
 // verification link, so the row must come out verified - only a real Postgres
@@ -20,6 +20,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Password reset verifies the email (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
   let usersService: UsersService;
 
@@ -86,6 +87,7 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
   }, 60000);
@@ -114,7 +116,7 @@ runWithInfra('Password reset verifies the email (e2e)', () => {
 
     const audit = dataSource.getRepository(AuditLog);
     const where = { action: AuditAction.EMAIL_VERIFIED, targetId: user.id };
-    const row = await eventually(() => audit.findOne({ where }));
+    const row = await auditWrites.read(() => audit.findOne({ where }));
 
     expect(row?.details).toEqual({ source: 'reset' });
     expect(await audit.count({ where })).toBe(1);

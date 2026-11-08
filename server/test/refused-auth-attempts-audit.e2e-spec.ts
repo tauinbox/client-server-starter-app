@@ -15,6 +15,7 @@ import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { User } from '../src/modules/users/entities/user.entity';
+import { trackAuditWrites } from './audit-writes';
 
 // ASVS 16.3.1: every refused authentication attempt leaves a row, also the
 // attempts that a per-account brake refuses before it checks the factor.
@@ -29,6 +30,7 @@ const ATTEMPTS = MAX_FAILED_ATTEMPTS + 2;
 runWithInfra('Refused authentication attempts are audited (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
   let mfaService: MfaService;
   const previousKey = process.env['MFA_ENCRYPTION_KEY'];
@@ -46,6 +48,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
     mfaService = app.get(MfaService);
   }, 60000);
@@ -95,21 +98,13 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
   // after the refusal has already reached the caller, and out of order.
   async function waitForRows(
     targetId: string,
-    action: AuditAction,
-    expected: number
+    action: AuditAction
   ): Promise<AuditLog[]> {
-    const repository = dataSource.getRepository(AuditLog);
-    let rows: AuditLog[] = [];
+    await auditWrites.settled();
 
-    for (let attempt = 0; attempt < 40; attempt++) {
-      rows = await repository.find({ where: { targetId, action } });
-
-      if (rows.length >= expected) break;
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-
-    return rows;
+    return dataSource
+      .getRepository(AuditLog)
+      .find({ where: { targetId, action } });
   }
 
   function byAttempt(rows: AuditLog[]): unknown[] {
@@ -148,11 +143,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
     }
 
     expect(keys.at(-1)).toBe(ErrorKeys.AUTH.MFA_CHALLENGE_LOCKED);
-    const rows = await waitForRows(
-      user.id,
-      AuditAction.MFA_CHALLENGE_FAILURE,
-      ATTEMPTS
-    );
+    const rows = await waitForRows(user.id, AuditAction.MFA_CHALLENGE_FAILURE);
 
     expect(byAttempt(rows)).toEqual(
       Array.from({ length: ATTEMPTS }, (_, i) => ({
@@ -182,11 +173,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
     }
 
     expect(keys.at(-1)).toBe(ErrorKeys.AUTH.STEP_UP_LOCKED);
-    const rows = await waitForRows(
-      user.id,
-      AuditAction.STEP_UP_FAILURE,
-      ATTEMPTS
-    );
+    const rows = await waitForRows(user.id, AuditAction.STEP_UP_FAILURE);
 
     expect(rows).toHaveLength(ATTEMPTS);
   }, 30000);
@@ -211,17 +198,12 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
     }
 
     expect(keys.at(-1)).toBe(ErrorKeys.AUTH.MFA_STEP_UP_LOCKED);
-    const stepUpRows = await waitForRows(
-      user.id,
-      AuditAction.STEP_UP_FAILURE,
-      ATTEMPTS
-    );
+    const stepUpRows = await waitForRows(user.id, AuditAction.STEP_UP_FAILURE);
 
     expect(stepUpRows).toHaveLength(ATTEMPTS);
     const codeRows = await waitForRows(
       user.id,
-      AuditAction.MFA_CHALLENGE_FAILURE,
-      ATTEMPTS
+      AuditAction.MFA_CHALLENGE_FAILURE
     );
 
     expect(byAttempt(codeRows)).toEqual(
@@ -241,7 +223,7 @@ runWithInfra('Refused authentication attempts are audited (e2e)', () => {
     expect(
       await errorKeyOf(authService.validateUser(user.email, PASSWORD))
     ).toBe(ErrorKeys.AUTH.EMAIL_NOT_VERIFIED);
-    const rows = await waitForRows(user.id, AuditAction.USER_LOGIN_FAILURE, 1);
+    const rows = await waitForRows(user.id, AuditAction.USER_LOGIN_FAILURE);
 
     expect(rows.map(({ details }) => details)).toEqual([
       { reason: 'email_not_verified' }

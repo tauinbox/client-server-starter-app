@@ -40,6 +40,7 @@ import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
 } from './billing-db-lock';
+import { waitsOnLock } from './lock-wait';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -372,25 +373,8 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
   }
 
   /** True once an UPDATE whose text contains `marker` waits on a row lock. */
-  async function updateBlockedOn(marker: string): Promise<boolean> {
-    const deadline = Date.now() + 5000;
-
-    while (Date.now() < deadline) {
-      const rows: unknown[] = await ds.query(
-        `SELECT 1 FROM pg_stat_activity
-          WHERE datname = current_database()
-            AND wait_event_type = 'Lock'
-            AND query ILIKE 'UPDATE%'
-            AND query LIKE $1`,
-        [`%${marker}%`]
-      );
-
-      if (rows.length > 0) return true;
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-
-    return false;
+  function updateBlockedOn(marker: string): Promise<boolean> {
+    return waitsOnLock(ds, `UPDATE%${marker}%`);
   }
 
   async function lateRowStored(): Promise<boolean> {

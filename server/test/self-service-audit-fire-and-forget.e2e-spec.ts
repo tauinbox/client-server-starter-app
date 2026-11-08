@@ -22,6 +22,7 @@ import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity'
 import { AuditService } from '../src/modules/audit/audit.service';
 import { hashToken } from '../src/common/utils/hash-token';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { trackAuditWrites } from './audit-writes';
 
 // A self-service action and its refusals do not depend on the audit row: when
 // the row cannot be written, the action keeps its effect and its answer, and
@@ -31,6 +32,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let usersService: UsersService;
   let mfaService: MfaService;
   let failures: Counter<string>;
@@ -81,6 +83,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
     jest
       .spyOn(app.get(AuditService), 'log')
       .mockRejectedValue(new Error('audit down'));
+    auditWrites = trackAuditWrites(app);
   });
 
   afterEach(() => {
@@ -106,7 +109,7 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
 
   // The catch of a fire-and-forget write runs after the answer.
   function settle(): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, 50));
+    return auditWrites.settled();
   }
 
   async function owner(): Promise<User> {

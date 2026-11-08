@@ -20,7 +20,7 @@ import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
-import { eventually } from './eventually';
+import { trackAuditWrites } from './audit-writes';
 
 // The whole pipeline is real: the global JWT guard, whose session check is what
 // ends the access token of a device, the step-up, and the scoped delete.
@@ -31,6 +31,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Active sessions (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
   let usersService: UsersService;
   const stamp = Date.now();
@@ -55,6 +56,7 @@ runWithInfra('Active sessions (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
 
@@ -161,7 +163,7 @@ runWithInfra('Active sessions (e2e)', () => {
     expect(await profileStatus(b.token)).toBe(401);
     expect(await profileStatus(a.token)).toBe(200);
 
-    const audit = await eventually(() =>
+    const audit = await auditWrites.read(() =>
       dataSource.getRepository(AuditLog).findOne({
         where: { action: AuditAction.SESSION_REVOKE, actorEmail: ownerEmail },
         order: { createdAt: 'DESC' }

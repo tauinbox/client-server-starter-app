@@ -6,6 +6,7 @@ import { CoreModule } from '../src/modules/core/core.module';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { User } from '../src/modules/users/entities/user.entity';
+import { trackAuditWrites } from './audit-writes';
 
 // The row is written fire-and-forget through a repository of its own, and the
 // enum value only exists once the migration has run - neither is observable
@@ -16,6 +17,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Register conflict is audited (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
 
   const emails: string[] = [];
@@ -40,17 +42,11 @@ runWithInfra('Register conflict is audited (e2e)', () => {
     actorEmail: string,
     action: AuditAction
   ): Promise<AuditLog[]> => {
-    const repository = dataSource.getRepository(AuditLog);
+    await auditWrites.settled();
 
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const rows = await repository.find({ where: { actorEmail, action } });
-
-      if (rows.length > 0) return rows;
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-
-    return [];
+    return dataSource
+      .getRepository(AuditLog)
+      .find({ where: { actorEmail, action } });
   };
 
   const statusOf = async (run: Promise<unknown>): Promise<number> => {
@@ -74,6 +70,7 @@ runWithInfra('Register conflict is audited (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
   }, 60000);
 

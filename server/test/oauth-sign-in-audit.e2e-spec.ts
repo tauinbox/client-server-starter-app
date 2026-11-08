@@ -25,6 +25,7 @@ import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity'
 import { User } from '../src/modules/users/entities/user.entity';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { trackAuditWrites } from './audit-writes';
 
 // Only the Passport guard is replaced: every row is written after it or not at
 // all. Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
@@ -37,6 +38,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
   const previousKey = process.env['MFA_ENCRYPTION_KEY'];
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let oauthDataCookieName: string;
   let currentProfile: OAuthUserProfile;
   const emails: string[] = [];
@@ -98,19 +100,9 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
       .getRepository(AuditLog)
       .find({ where: { requestId }, order: { createdAt: 'ASC' } });
 
-  // Polls until `expected` rows land, then waits one more interval so a row
-  // written late would still be counted.
-  const settledRows = async (
-    requestId: string,
-    expected: number
-  ): Promise<AuditLog[]> => {
-    for (let attempt = 0; attempt < 40; attempt++) {
-      if ((await rowsFor(requestId)).length >= expected) break;
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 200));
+  /** The rows of a request, once every audit write it started has ended. */
+  const settledRows = async (requestId: string): Promise<AuditLog[]> => {
+    await auditWrites.settled();
 
     return rowsFor(requestId);
   };
@@ -157,6 +149,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     oauthDataCookieName = requiresSecureCookies(
       app.get(ConfigService).get<string>('ENVIRONMENT')
     )
@@ -197,13 +190,13 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     const user = await dataSource
       .getRepository(User)
       .findOneByOrFail({ email: currentProfile.email });
-    const callbackRows = await settledRows(requestId, 1);
+    const callbackRows = await settledRows(requestId);
 
     expect(callbackRows).toHaveLength(1);
     expect(callbackRows[0].action).toBe(AuditAction.USER_REGISTER);
     expect(callbackRows[0].details).toEqual({ provider: 'google' });
 
-    const exchangeRows = await settledRows(exchangeId, 1);
+    const exchangeRows = await settledRows(exchangeId);
 
     expect(exchangeRows).toHaveLength(1);
     expect(exchangeRows[0].action).toBe(AuditAction.USER_LOGIN_SUCCESS);
@@ -226,8 +219,8 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
 
     await exchange(await callback(requestId), exchangeId);
 
-    expect(await settledRows(requestId, 0)).toEqual([]);
-    const rows = await settledRows(exchangeId, 1);
+    expect(await settledRows(requestId)).toEqual([]);
+    const rows = await settledRows(exchangeId);
 
     expect(rows).toHaveLength(1);
     expect(rows[0].action).toBe(AuditAction.USER_LOGIN_SUCCESS);
@@ -244,7 +237,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
 
     expect(response.headers['location']).toMatch(/\/oauth\/callback$/);
 
-    expect(await settledRows(requestId, 0)).toEqual([]);
+    expect(await settledRows(requestId)).toEqual([]);
   });
 
   // The pending token carries the provider, so the row of the finished
@@ -290,7 +283,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
         .send(body(mfaToken))
         .expect(200);
 
-      const rows = (await settledRows(verifyId, 1)).filter(
+      const rows = (await settledRows(verifyId)).filter(
         ({ action }) => action === AuditAction.USER_LOGIN_SUCCESS
       );
 
@@ -330,7 +323,7 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
         /\/login\?oauth_error=auth_failed$/
       );
 
-      const rows = await settledRows(requestId, 1);
+      const rows = await settledRows(requestId);
 
       expect(rows).toHaveLength(1);
       expect(rows[0].action).toBe(AuditAction.USER_LOGIN_FAILURE);

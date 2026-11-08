@@ -27,6 +27,7 @@ import {
   OAUTH_REAUTH_COOKIE
 } from '../src/modules/auth/constants/oauth.constants';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { trackAuditWrites } from './audit-writes';
 
 // A callback that the provider guard refuses never reaches the handler, so the
 // exception filter writes its audit row. Most cases forge the state, so the
@@ -39,6 +40,7 @@ const STATE = 'forged';
 runWithInfra('Audit of a callback refused at the provider guard (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let server: Server;
   let jwt: JwtService;
   let secure: boolean;
@@ -72,6 +74,7 @@ runWithInfra('Audit of a callback refused at the provider guard (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     server = app.getHttpServer() as Server;
     jwt = app.get(JwtService);
     secure = app.get(AuthCookies).secure;
@@ -132,18 +135,11 @@ runWithInfra('Audit of a callback refused at the provider guard (e2e)', () => {
     return rowsOf(requestId);
   }
 
+  /** The rows of a request, once every audit write it started has ended. */
   async function rowsOf(requestId: string): Promise<AuditLog[]> {
-    // The row is written fire-and-forget, after the redirect.
-    const repository = dataSource.getRepository(AuditLog);
-    const deadline = Date.now() + 5000;
+    await auditWrites.settled();
 
-    for (;;) {
-      const rows = await repository.find({ where: { requestId } });
-
-      if (rows.length > 0 || Date.now() > deadline) return rows;
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
+    return dataSource.getRepository(AuditLog).find({ where: { requestId } });
   }
 
   /**

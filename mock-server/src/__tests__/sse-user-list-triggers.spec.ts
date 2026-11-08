@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { findUserByEmail, getState, resetState } from '../state';
+import { untilSentinel } from '../utils/sse-sentinel';
 
 const ROLE_ID = '6f1c2a4e-8d3b-4c5a-9e7f-1a2b3c4d5e6f';
 
@@ -53,6 +54,7 @@ async function login(email: string): Promise<string> {
 
 interface OpenStream {
   events: () => { type: string }[];
+  body: () => string;
   close: () => void;
 }
 
@@ -92,6 +94,7 @@ async function openStream(email: string): Promise<OpenStream> {
         .filter(
           (e) => e.type === 'user_crud_events' || e.type === 'user_list_stale'
         ),
+    body: () => body,
     close: () => controller.abort()
   };
 
@@ -100,8 +103,10 @@ async function openStream(email: string): Promise<OpenStream> {
   return stream;
 }
 
-const wait = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+/** Waits until every frame of the requests so far has reached the streams. */
+function settled(...streams: OpenStream[]): Promise<void> {
+  return untilSentinel(streams.map((stream) => stream.body));
+}
 
 async function call(
   method: string,
@@ -142,7 +147,7 @@ describe('SSE user list events outside the admin user routes', () => {
       })
     ).toBe(201);
 
-    await wait(100);
+    await settled(admin, plain);
     admin.close();
     plain.close();
     const { id } = findUserByEmail('sse-registered@example.com')!;
@@ -170,7 +175,7 @@ describe('SSE user list events outside the admin user routes', () => {
       })
     ).toBe(200);
 
-    await wait(100);
+    await settled(admin);
     admin.close();
     expect(admin.events()).toEqual([
       crud('updated', target.id),
@@ -196,7 +201,7 @@ describe('SSE user list events outside the admin user routes', () => {
       })
     ).toBe(200);
 
-    await wait(100);
+    await settled(admin);
     admin.close();
     expect(admin.events()).toEqual([crud('updated', target.id)]);
   });
@@ -218,7 +223,7 @@ describe('SSE user list events outside the admin user routes', () => {
       })
     ).toBe(200);
 
-    await wait(100);
+    await settled(admin);
     admin.close();
     expect(admin.events()).toEqual([crud('updated', target.id)]);
   });
@@ -238,7 +243,7 @@ describe('SSE user list events outside the admin user routes', () => {
       await call('DELETE', `/roles/${ROLE_ID}`, { token: adminToken })
     ).toBe(200);
 
-    await wait(100);
+    await settled(admin, plain);
     admin.close();
     plain.close();
     const stale = { type: 'user_list_stale' };

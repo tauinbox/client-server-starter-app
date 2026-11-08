@@ -40,6 +40,7 @@ import {
 } from '@app/shared/utils/request-scenarios';
 import { ACCOUNT_STATE_SETUP } from './account-states';
 import { SCENARIO_CLOCK } from './scenario-clock';
+import { trackAuditWrites } from './audit-writes';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { SecretEncryptionService } from '../src/common/crypto/secret-encryption.service';
 import { hashPassword } from '../src/common/utils/password-hash';
@@ -87,9 +88,6 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 const TOTP_SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
 const WRONG_CODE = '000000';
-// Fire-and-forget audit writes land after the answer.
-const AUDIT_SETTLE_MS = 300;
-const AUDIT_WAIT_MS = 3000;
 const DAY_MS = 24 * 3600_000;
 
 // Each scenario starts with a full rate-limit budget. Rate limiting is an
@@ -128,6 +126,7 @@ interface Answer {
 runWithInfra('Request scenarios (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let auditWrites: ReturnType<typeof trackAuditWrites>;
   let refreshCookieName: string;
   let oauthDataCookieName: string;
   let userRole: Role;
@@ -207,6 +206,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    auditWrites = trackAuditWrites(app);
     const secure = requiresSecureCookies(
       app.get(ConfigService).get<string>('ENVIRONMENT')
     );
@@ -794,39 +794,21 @@ runWithInfra('Request scenarios (e2e)', () => {
     return rows.map((r) => r.id);
   }
 
+  /** The rows of the request, once every audit write it started has ended. */
   async function newAuditRows(
     emails: string[],
-    seen: Set<string>,
-    expected: number
+    seen: Set<string>
   ): Promise<AuditLog[]> {
-    const read = async () => {
-      const rows = await auditRows(await idsOf(emails), emails);
+    await auditWrites.settled();
+    const rows = await auditRows(await idsOf(emails), emails);
 
-      return rows.filter((r) => !seen.has(r.id));
-    };
-    const deadline = Date.now() + AUDIT_WAIT_MS;
-    let rows = await read();
-
-    while (rows.length < expected && Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 50));
-      rows = await read();
-    }
-
-    await new Promise((r) => setTimeout(r, AUDIT_SETTLE_MS));
-
-    return read();
+    return rows.filter((r) => !seen.has(r.id));
   }
 
-  /** The ids of the rows that exist once the fixture writes have landed. */
+  /** The ids of the rows that exist once the fixture writes have ended. */
   async function settledAuditIds(emails: string[]): Promise<Set<string>> {
-    let before = -1;
-    let rows = await auditRows(await idsOf(emails), emails);
-
-    while (rows.length !== before) {
-      before = rows.length;
-      await new Promise((r) => setTimeout(r, AUDIT_SETTLE_MS));
-      rows = await auditRows(await idsOf(emails), emails);
-    }
+    await auditWrites.settled();
+    const rows = await auditRows(await idsOf(emails), emails);
 
     return new Set(rows.map((r) => r.id));
   }
@@ -912,7 +894,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       });
     }
 
-    const rows = await newAuditRows(emails, seen, scenario.expect.audit.length);
+    const rows = await newAuditRows(emails, seen);
 
     return {
       answers,
