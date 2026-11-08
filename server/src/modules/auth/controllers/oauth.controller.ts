@@ -50,7 +50,7 @@ import {
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
-import { AccountDeactivatedException } from '../exceptions/account-deactivated.exception';
+import { AccountRefusedException } from '../exceptions/account-refused.exception';
 import {
   OAUTH_DATA_COOKIE,
   OAUTH_LINK_COOKIE,
@@ -92,6 +92,10 @@ const INTENT_INVALID_REASON = 'intent_invalid';
 
 /** The `reason` of an audit row for a refused provider callback. */
 function oauthFailureReason(error: unknown): string {
+  if (error instanceof AccountRefusedException) {
+    return error.refusal;
+  }
+
   if (error instanceof OAuthAuthenticationFailedException) {
     return error.oauthError;
   }
@@ -528,9 +532,7 @@ export class OAuthController {
           reason: oauthFailureReason(error),
           context: extractAuditContext(req)
         },
-        error instanceof AccountDeactivatedException
-          ? { id: error.userId }
-          : null
+        error instanceof AccountRefusedException ? { id: error.userId } : null
       );
 
       if (error instanceof OAuthAuthenticationFailedException) {

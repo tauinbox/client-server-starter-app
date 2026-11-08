@@ -17,7 +17,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { normalizeOtpCode } from '@app/shared/utils/otp-code';
 import { SecretEncryptionService } from '../src/common/crypto/secret-encryption.service';
 import { hashToken } from '../src/common/utils/hash-token';
-import { ErrorKeys, requiresSecureCookies } from '@app/shared/constants';
+import { requiresSecureCookies } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import { GoogleOAuthGuard } from '../src/modules/auth/guards/google-oauth.guard';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
@@ -303,27 +303,45 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     }
   );
 
-  it('records a failure with its reason for a deactivated account', async () => {
-    currentProfile = newProfile();
-    await linkedAccount(currentProfile, { isActive: false });
-    const requestId = `oauth-audit-inactive-${crypto.randomUUID()}`;
+  it.each([
+    {
+      state: 'a deactivated account',
+      reason: 'account_deactivated',
+      refuse: (user: User) =>
+        dataSource.getRepository(User).update(user.id, { isActive: false })
+    },
+    {
+      state: 'a soft-deleted owner of a linked identity',
+      reason: 'account_not_found',
+      refuse: (user: User) => dataSource.getRepository(User).softDelete(user.id)
+    }
+  ])(
+    'records a failure with its reason for $state',
+    async ({ reason, refuse }) => {
+      currentProfile = newProfile();
+      const user = await linkedAccount(currentProfile, {});
 
-    const response = await callback(requestId);
+      await refuse(user);
+      const requestId = `oauth-audit-refused-${crypto.randomUUID()}`;
 
-    expect(response.headers['location']).toMatch(
-      /\/login\?oauth_error=auth_failed$/
-    );
+      const response = await callback(requestId);
 
-    const rows = await settledRows(requestId, 1);
+      expect(response.headers['location']).toMatch(
+        /\/login\?oauth_error=auth_failed$/
+      );
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].action).toBe(AuditAction.USER_LOGIN_FAILURE);
-    expect(rows[0].actorEmail).toBeNull();
-    expect(rows[0].details).toEqual({
-      method: 'oauth',
-      provider: 'google',
-      reason: ErrorKeys.AUTH.USER_DEACTIVATED
-    });
-    await dataSource.getRepository(AuditLog).delete({ requestId });
-  });
+      const rows = await settledRows(requestId, 1);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].action).toBe(AuditAction.USER_LOGIN_FAILURE);
+      expect(rows[0].actorEmail).toBeNull();
+      expect(rows[0].targetId).toBe(user.id);
+      expect(rows[0].details).toEqual({
+        method: 'oauth',
+        provider: 'google',
+        reason
+      });
+      await dataSource.getRepository(AuditLog).delete({ requestId });
+    }
+  );
 });

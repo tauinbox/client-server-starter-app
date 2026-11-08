@@ -30,6 +30,7 @@ import {
 import { bindIntent } from '../utils/oauth-flow-intent';
 import { createMockCache } from '../../../common/testing/cache.mock';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
+import { AccountRefusedException } from '../exceptions/account-refused.exception';
 import { AuthCookies } from '../utils/auth-cookies';
 import { OAuthFailureAudit } from '../utils/oauth-failure-audit';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
@@ -798,14 +799,6 @@ describe('OAuthController', () => {
           new OAuthAuthenticationFailedException(OAUTH_ERROR.NO_EMAIL),
           OAUTH_ERROR.NO_EMAIL
         ],
-        [
-          'a deactivated account',
-          new ApiError(
-            ErrorKeys.AUTH.USER_DEACTIVATED,
-            'User account is deactivated'
-          ),
-          ErrorKeys.AUTH.USER_DEACTIVATED
-        ],
         ['an unexpected error', new Error('DB error'), 'unexpected_error']
       ])(
         'records a failure row for %s without the provider address',
@@ -829,6 +822,32 @@ describe('OAuthController', () => {
           expect(metricsServiceMock.recordAuthEvent).toHaveBeenCalledWith(
             'login_failure'
           );
+        }
+      );
+
+      it.each(['account_deactivated', 'account_not_found'] as const)(
+        'names the account and writes the reason %s for a refused account',
+        async (refusal) => {
+          oauthServiceMock.loginWithOAuth.mockRejectedValue(
+            new AccountRefusedException('user-1', refusal)
+          );
+
+          await controller.googleCallback(
+            mockExpressRequest(profile),
+            mockResponse()
+          );
+
+          expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+            action: AuditAction.USER_LOGIN_FAILURE,
+            targetId: 'user-1',
+            targetType: 'User',
+            details: {
+              method: 'oauth',
+              provider: OAuthProvider.GOOGLE,
+              reason: refusal
+            },
+            context: { ip: '127.0.0.1', requestId: undefined }
+          });
         }
       );
     });
@@ -953,42 +972,49 @@ describe('OAuthController', () => {
       });
     });
 
-    it('should audit a link that the service refuses', async () => {
-      oauthServiceMock.linkOAuthToUser.mockRejectedValue(
-        new ApiError(ErrorKeys.AUTH.OAUTH_ALREADY_LINKED, 'Already linked')
-      );
+    it.each([
+      [
+        new ApiError(ErrorKeys.AUTH.OAUTH_ALREADY_LINKED, 'Already linked'),
+        ErrorKeys.AUTH.OAUTH_ALREADY_LINKED
+      ],
+      [
+        new AccountRefusedException('user-1', 'session_revoked'),
+        'session_revoked'
+      ]
+    ])(
+      'should audit a link that the service refuses with %s',
+      async (error, reason) => {
+        oauthServiceMock.linkOAuthToUser.mockRejectedValue(error);
 
-      const res = mockResponse();
-      const profile: OAuthUserProfile = {
-        provider: OAuthProvider.GOOGLE,
-        providerId: '456',
-        email: 'other@example.com',
-        name: 'Other User',
-        emailVerified: true
-      };
-
-      await controller.googleCallback(
-        mockExpressRequest(profile, linkCookie('valid-link-token')),
-        res
-      );
-
-      expect(res.redirect).toHaveBeenCalledWith(
-        'http://localhost:4200/profile?oauth_error=link_failed'
-      );
-      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
-      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
-        action: AuditAction.OAUTH_LINK_FAILURE,
-        actorId: 'user-1',
-        actorEmail: 'test@example.com',
-        targetId: 'user-1',
-        targetType: 'User',
-        details: {
+        const res = mockResponse();
+        const profile: OAuthUserProfile = {
           provider: OAuthProvider.GOOGLE,
-          reason: ErrorKeys.AUTH.OAUTH_ALREADY_LINKED
-        },
-        context: { ip: '127.0.0.1', requestId: undefined }
-      });
-    });
+          providerId: '456',
+          email: 'other@example.com',
+          name: 'Other User',
+          emailVerified: true
+        };
+
+        await controller.googleCallback(
+          mockExpressRequest(profile, linkCookie('valid-link-token')),
+          res
+        );
+
+        expect(res.redirect).toHaveBeenCalledWith(
+          'http://localhost:4200/profile?oauth_error=link_failed'
+        );
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
+        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+          action: AuditAction.OAUTH_LINK_FAILURE,
+          actorId: 'user-1',
+          actorEmail: 'test@example.com',
+          targetId: 'user-1',
+          targetType: 'User',
+          details: { provider: OAuthProvider.GOOGLE, reason },
+          context: { ip: '127.0.0.1', requestId: undefined }
+        });
+      }
+    );
 
     describe('re-authentication', () => {
       const profile: OAuthUserProfile = {
@@ -1013,39 +1039,49 @@ describe('OAuthController', () => {
         });
       });
 
-      it('should audit a re-authentication that the service refuses', async () => {
-        oauthServiceMock.assertReauthenticated.mockRejectedValue(
+      it.each([
+        [
           new ApiError(
             ErrorKeys.AUTH.REAUTH_REQUIRED,
             'Re-authentication required'
-          )
-        );
-        const res = mockResponse();
+          ),
+          ErrorKeys.AUTH.REAUTH_REQUIRED
+        ],
+        [
+          new AccountRefusedException('user-1', 'session_revoked'),
+          'session_revoked'
+        ]
+      ])(
+        'should audit a re-authentication that the service refuses with %s',
+        async (error, reason) => {
+          oauthServiceMock.assertReauthenticated.mockRejectedValue(error);
+          const res = mockResponse();
 
-        await controller.googleCallback(
-          mockExpressRequest(profile, reauthCookie('reauth-token')),
-          res
-        );
+          await controller.googleCallback(
+            mockExpressRequest(profile, reauthCookie('reauth-token')),
+            res
+          );
 
-        expect(res.redirect).toHaveBeenCalledWith(
-          'http://localhost:4200/profile?oauth_error=reauth_failed'
-        );
-        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
-        expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
-          action: AuditAction.STEP_UP_FAILURE,
-          actorId: 'user-1',
-          actorEmail: 'test@example.com',
-          targetId: 'user-1',
-          targetType: 'User',
-          details: {
-            operation: STEP_UP_OPERATION.EMAIL_CHANGE,
-            factor: 'reauth_proof',
-            provider: OAuthProvider.GOOGLE,
-            reason: ErrorKeys.AUTH.REAUTH_REQUIRED
-          },
-          context: { ip: '127.0.0.1', requestId: undefined }
-        });
-      });
+          expect(res.redirect).toHaveBeenCalledWith(
+            'http://localhost:4200/profile?oauth_error=reauth_failed'
+          );
+          expect(auditServiceMock.logFireAndForget).toHaveBeenCalledTimes(1);
+          expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+            action: AuditAction.STEP_UP_FAILURE,
+            actorId: 'user-1',
+            actorEmail: 'test@example.com',
+            targetId: 'user-1',
+            targetType: 'User',
+            details: {
+              operation: STEP_UP_OPERATION.EMAIL_CHANGE,
+              factor: 'reauth_proof',
+              provider: OAuthProvider.GOOGLE,
+              reason
+            },
+            context: { ip: '127.0.0.1', requestId: undefined }
+          });
+        }
+      );
 
       it('should write an actor-less row when the intent does not verify', async () => {
         jwtServiceMock.verify.mockImplementation(() => {

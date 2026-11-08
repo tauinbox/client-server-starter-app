@@ -313,7 +313,7 @@ runWithInfra(
           details: {
             method: 'oauth',
             provider: 'google',
-            reason: ErrorKeys.AUTH.USER_DEACTIVATED
+            reason: 'account_deactivated'
           }
         }
       ]);

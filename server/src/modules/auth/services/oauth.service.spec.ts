@@ -17,6 +17,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { OAuthUserProfile } from '../types/oauth-profile';
 import { User } from '../../users/entities/user.entity';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
+import { AccountRefusedException } from '../exceptions/account-refused.exception';
 import { ErrorKeys, OAUTH_ERROR } from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
@@ -39,6 +40,7 @@ describe('OAuthService', () => {
   };
   let mockUsersService: {
     findOne: jest.Mock;
+    findById: jest.Mock;
     markEmailVerified: jest.Mock;
   };
   let mockOAuthAccountService: {
@@ -112,6 +114,7 @@ describe('OAuthService', () => {
 
     mockUsersService = {
       findOne: jest.fn(),
+      findById: jest.fn(),
       markEmailVerified: jest.fn().mockResolvedValue(true)
     };
 
@@ -210,7 +213,7 @@ describe('OAuthService', () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         existingOAuth
       );
-      mockUsersService.findOne.mockResolvedValue(oauthUser);
+      mockUsersService.findById.mockResolvedValue(oauthUser);
 
       const result = await loginExpectingUser(oauthProfile);
 
@@ -229,7 +232,7 @@ describe('OAuthService', () => {
         providerId: 'google-123',
         userId: 'oauth-user-1'
       });
-      mockUsersService.findOne.mockResolvedValue({
+      mockUsersService.findById.mockResolvedValue({
         ...oauthUser,
         totpEnabledAt: new Date()
       });
@@ -258,7 +261,7 @@ describe('OAuthService', () => {
         providerId: 'google-123',
         userId: 'oauth-user-1'
       });
-      mockUsersService.findOne.mockResolvedValue(entity);
+      mockUsersService.findById.mockResolvedValue(entity);
 
       const result = await loginExpectingUser(oauthProfile);
 
@@ -283,7 +286,7 @@ describe('OAuthService', () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         existingOAuth
       );
-      mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
+      mockUsersService.findById.mockResolvedValue(unverifiedOauthUser);
 
       const result = await loginExpectingUser(oauthProfile);
 
@@ -310,7 +313,7 @@ describe('OAuthService', () => {
         providerId: 'google-123',
         userId: 'oauth-user-1'
       });
-      mockUsersService.findOne.mockResolvedValue({
+      mockUsersService.findById.mockResolvedValue({
         ...oauthUser,
         isEmailVerified: false
       });
@@ -332,7 +335,7 @@ describe('OAuthService', () => {
         providerId: 'google-123',
         userId: 'oauth-user-1'
       });
-      mockUsersService.findOne.mockResolvedValue({
+      mockUsersService.findById.mockResolvedValue({
         ...oauthUser,
         isEmailVerified: false
       });
@@ -355,7 +358,7 @@ describe('OAuthService', () => {
         providerId: 'vk-123',
         userId: 'oauth-user-1'
       });
-      mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
+      mockUsersService.findById.mockResolvedValue(unverifiedOauthUser);
 
       const result = await loginExpectingUser({
         ...oauthProfile,
@@ -380,7 +383,7 @@ describe('OAuthService', () => {
         providerId: 'google-123',
         userId: 'oauth-user-1'
       });
-      mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
+      mockUsersService.findById.mockResolvedValue(unverifiedOauthUser);
 
       const result = await loginExpectingUser({
         ...oauthProfile,
@@ -403,7 +406,7 @@ describe('OAuthService', () => {
         providerId: 'google-123',
         userId: 'oauth-user-1'
       });
-      mockUsersService.findOne.mockResolvedValue(unverifiedOauthUser);
+      mockUsersService.findById.mockResolvedValue(unverifiedOauthUser);
 
       await service.loginWithOAuth({
         ...oauthProfile,
@@ -427,14 +430,29 @@ describe('OAuthService', () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         existingOAuth
       );
-      mockUsersService.findOne.mockResolvedValue({
+      mockUsersService.findById.mockResolvedValue({
         ...oauthUser,
         isActive: false
       });
 
       await expect(service.loginWithOAuth(oauthProfile)).rejects.toThrow(
-        HttpException
+        new AccountRefusedException('oauth-user-1', 'account_deactivated')
       );
+    });
+
+    it('refuses a soft-deleted owner of a linked identity and names it', async () => {
+      mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
+        id: '1',
+        provider: 'google',
+        providerId: 'google-123',
+        userId: 'oauth-user-1'
+      });
+      mockUsersService.findById.mockResolvedValue(null);
+
+      await expect(service.loginWithOAuth(oauthProfile)).rejects.toMatchObject({
+        userId: 'oauth-user-1',
+        refusal: 'account_not_found'
+      });
     });
 
     // Auto-link is disabled. When a local account already exists for the
@@ -447,7 +465,7 @@ describe('OAuthService', () => {
         providerId: 'fb-123',
         userId: 'oauth-user-1'
       });
-      mockUsersService.findOne.mockResolvedValue(oauthUser);
+      mockUsersService.findById.mockResolvedValue(oauthUser);
 
       const result = await loginExpectingUser({
         ...oauthProfile,
@@ -730,7 +748,7 @@ describe('OAuthService', () => {
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         userId: 'oauth-user-1'
       });
-      mockUsersService.findOne.mockResolvedValue(oauthUser);
+      mockUsersService.findById.mockResolvedValue(oauthUser);
 
       await service.loginWithOAuth(oauthProfile);
 
@@ -918,7 +936,10 @@ describe('OAuthService', () => {
           { provider: 'google', providerId: 'google-123' },
           { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
-      ).rejects.toThrow(HttpException);
+      ).rejects.toMatchObject({
+        userId: 'user-1',
+        refusal: 'account_deactivated'
+      });
       expect(mockManager.insert).not.toHaveBeenCalled();
     });
 
@@ -932,7 +953,8 @@ describe('OAuthService', () => {
           { linkTokenIssuedAt: LINK_TOKEN_IAT }
         )
       ).rejects.toMatchObject({
-        response: { errorKey: ErrorKeys.USERS.NOT_FOUND }
+        userId: 'user-1',
+        refusal: 'account_not_found'
       });
       expect(mockManager.insert).not.toHaveBeenCalled();
     });
@@ -955,7 +977,7 @@ describe('OAuthService', () => {
     });
 
     it('should silently succeed when OAuth account already linked to same user', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
       mockManager.insert.mockRejectedValue(uniqueViolation);
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         LINK_ROW
@@ -994,7 +1016,7 @@ describe('OAuthService', () => {
     });
 
     it('should recognise the unique violation when TypeORM wraps the driver error', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
       mockManager.insert.mockRejectedValue({ driverError: uniqueViolation });
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         LINK_ROW
@@ -1079,7 +1101,7 @@ describe('OAuthService', () => {
     const IAT = Math.floor(Date.now() / 1000);
 
     it('accepts an identity that already belongs to the account', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         userId: mockUser.id,
         provider: 'google',
@@ -1096,7 +1118,7 @@ describe('OAuthService', () => {
     });
 
     it('refuses an identity linked to a different account', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         userId: 'somebody-else',
         provider: 'google',
@@ -1115,7 +1137,7 @@ describe('OAuthService', () => {
     });
 
     it('refuses an identity that is linked to nobody', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersService.findById.mockResolvedValue(mockUser);
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue(
         null
       );
@@ -1132,7 +1154,7 @@ describe('OAuthService', () => {
     });
 
     it('refuses an intent minted before the last session revocation', async () => {
-      mockUsersService.findOne.mockResolvedValue({
+      mockUsersService.findById.mockResolvedValue({
         ...mockUser,
         tokenRevokedAt: new Date(IAT * 1000)
       });
@@ -1144,6 +1166,8 @@ describe('OAuthService', () => {
           IAT - 60
         )
       ).rejects.toMatchObject({
+        userId: mockUser.id,
+        refusal: 'session_revoked',
         response: { errorKey: ErrorKeys.AUTH.TOKEN_REVOKED }
       });
       expect(
@@ -1152,7 +1176,7 @@ describe('OAuthService', () => {
     });
 
     it('accepts an intent minted in the second of the last session revocation', async () => {
-      mockUsersService.findOne.mockResolvedValue({
+      mockUsersService.findById.mockResolvedValue({
         ...mockUser,
         tokenRevokedAt: new Date(IAT * 1000 + 700)
       });
@@ -1172,7 +1196,7 @@ describe('OAuthService', () => {
     });
 
     it('refuses a deactivated account', async () => {
-      mockUsersService.findOne.mockResolvedValue({
+      mockUsersService.findById.mockResolvedValue({
         ...mockUser,
         isActive: false
       });
@@ -1184,6 +1208,8 @@ describe('OAuthService', () => {
           IAT
         )
       ).rejects.toMatchObject({
+        userId: mockUser.id,
+        refusal: 'account_deactivated',
         response: {
           errorKey: ErrorKeys.AUTH.USER_NOT_FOUND_OR_DEACTIVATED
         }
