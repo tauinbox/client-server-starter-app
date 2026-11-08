@@ -1,5 +1,6 @@
 import { createMongoAbility, ForcedSubject, MongoAbility } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
+import { sessionStartedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { generateSessionId } from './jwt.utils';
 import type {
   AdminUserResponse,
@@ -183,13 +184,34 @@ export function sessionAgeMs(refreshToken: string): number {
 }
 
 /**
- * A session lives as long as one live refresh token points at it. Rotation
- * moves the binding to the successor token, so a refresh does not end the
- * access tokens issued earlier in the same session.
+ * Whether the session started before the last revocation of its account.
+ * Mirrors the session-start condition of `LIVE_ROW` in `RefreshTokenService`.
+ * The mock deletes and stamps in one step, so no sign-in lands between them;
+ * the check keeps one rule on both sides.
+ */
+export function sessionRevoked(sessionId: string, userId: string): boolean {
+  const startedAt = state.sessionStarts.get(sessionId);
+  const user = state.users.get(userId);
+
+  if (startedAt === undefined || !user) return false;
+
+  return sessionStartedBeforeRevocation(startedAt, user.tokenRevokedAt);
+}
+
+/**
+ * A session lives as long as one live refresh token points at it and it
+ * started after the last revocation. Rotation moves the binding to the
+ * successor token, so a refresh does not end the access tokens issued earlier
+ * in the same session.
  */
 export function isSessionLive(sessionId: string): boolean {
-  for (const token of state.refreshTokens.keys()) {
-    if (state.refreshSessions.get(token) === sessionId) return true;
+  for (const [token, userId] of state.refreshTokens.entries()) {
+    if (
+      state.refreshSessions.get(token) === sessionId &&
+      !sessionRevoked(sessionId, userId)
+    ) {
+      return true;
+    }
   }
 
   return false;
@@ -262,7 +284,7 @@ export function liveSessionIdsOf(userId: string): string[] {
 
     const sid = state.refreshSessions.get(token);
 
-    if (sid !== undefined) ids.add(sid);
+    if (sid !== undefined && !sessionRevoked(sid, userId)) ids.add(sid);
   }
 
   return [...ids].toSorted(
@@ -328,7 +350,7 @@ function moveKey<V>(map: Map<string, V>, from: string, to: string): void {
  * Gives each live session of the account a new id, so every access token
  * issued so far fails the session check while the refresh token still works.
  * Unlike a revocation stamp, this does not depend on which second a token was
- * issued in.
+ * issued in, and it does not end the sessions.
  */
 export function rekeyUserSessions(userId: string): void {
   const renamed = new Map<string, string>();

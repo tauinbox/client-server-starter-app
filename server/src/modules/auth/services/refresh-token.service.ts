@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { hashToken } from '../../../common/utils/hash-token';
 import type { SessionClient } from '../utils/session-client';
@@ -19,6 +19,16 @@ export type RefreshRowFields = Pick<
   'userId' | 'sessionId' | 'sessionStartedAt'
 > &
   SessionDevice;
+
+/**
+ * A usable row of a session that started at or after the last revocation of
+ * the account. The revocation deletes the rows, but a row that a sign-in
+ * commits after that delete survives it; this condition ends that session
+ * too. Needs the row as `rt`, the `users` row as `u` and the `:now` parameter.
+ * The SQL form of `sessionStartedBeforeRevocation`.
+ */
+const LIVE_ROW =
+  'rt.revoked = false AND rt.expires_at > :now AND (u.token_revoked_at IS NULL OR rt.session_started_at >= u.token_revoked_at)';
 
 /** The unused successor that a lost rotation response left behind. */
 export interface LostResponseSuccessor {
@@ -114,10 +124,13 @@ export class RefreshTokenService {
    * behind all the same.
    */
   async findLiveSessions(userId: string): Promise<RefreshToken[]> {
-    const rows = await this.repository.find({
-      where: { userId, revoked: false, expiresAt: MoreThan(new Date()) },
-      order: { createdAt: 'DESC' }
-    });
+    const rows = await this.repository
+      .createQueryBuilder('rt')
+      .innerJoin('users', 'u', 'u.id = rt.user_id')
+      .where('rt.user_id = :userId', { userId })
+      .andWhere(LIVE_ROW, { now: new Date() })
+      .orderBy('rt.created_at', 'DESC')
+      .getMany();
 
     const seen = new Set<string>();
 
@@ -145,7 +158,7 @@ export class RefreshTokenService {
       .from(RefreshToken)
       .where('user_id = :userId AND session_id = :sessionId')
       .andWhere(
-        'EXISTS (SELECT 1 FROM refresh_tokens live WHERE live.user_id = :userId AND live.session_id = :sessionId AND live.revoked = false AND live.expires_at > :now)'
+        `EXISTS (SELECT 1 FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id WHERE rt.user_id = :userId AND rt.session_id = :sessionId AND ${LIVE_ROW})`
       )
       .setParameters({ userId, sessionId, now: new Date() })
       .execute();
@@ -197,13 +210,12 @@ export class RefreshTokenService {
    * the session is over even though the token has not expired.
    */
   async hasLiveSession(sessionId: string): Promise<boolean> {
-    return this.repository.exists({
-      where: {
-        sessionId,
-        revoked: false,
-        expiresAt: MoreThan(new Date())
-      }
-    });
+    return this.repository
+      .createQueryBuilder('rt')
+      .innerJoin('users', 'u', 'u.id = rt.user_id')
+      .where('rt.session_id = :sessionId', { sessionId })
+      .andWhere(LIVE_ROW, { now: new Date() })
+      .getExists();
   }
 
   /**

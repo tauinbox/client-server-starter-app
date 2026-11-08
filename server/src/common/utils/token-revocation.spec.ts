@@ -1,5 +1,6 @@
 import {
   issuedBeforeRevocation,
+  sessionStartedBeforeRevocation,
   signedTokenAccount
 } from '@app/shared/utils/token-revocation';
 
@@ -26,6 +27,42 @@ describe('issuedBeforeRevocation', () => {
 
     expect(issuedBeforeRevocation(iat, revokedAt)).toBe(false);
     expect(issuedBeforeRevocation(iat - 1, revokedAt)).toBe(true);
+  });
+});
+
+describe('sessionStartedBeforeRevocation', () => {
+  const startedAt = new Date('2026-11-08T07:55:01.407Z');
+
+  it('keeps any session when the account was never revoked', () => {
+    expect(sessionStartedBeforeRevocation(startedAt, null)).toBe(false);
+  });
+
+  it('ends a session that started one millisecond before the revocation', () => {
+    // No floor: a row that a sign-in commits after the revocation is this case.
+    expect(
+      sessionStartedBeforeRevocation(
+        startedAt,
+        new Date(startedAt.getTime() + 1)
+      )
+    ).toBe(true);
+  });
+
+  it('keeps a session that started at or after the revocation', () => {
+    expect(sessionStartedBeforeRevocation(startedAt, startedAt)).toBe(false);
+    expect(
+      sessionStartedBeforeRevocation(
+        startedAt,
+        new Date(startedAt.getTime() - 1)
+      )
+    ).toBe(false);
+  });
+
+  it('reads the epoch milliseconds and the ISO string of the mock', () => {
+    const revokedAt = new Date(startedAt.getTime() + 1).toISOString();
+
+    expect(sessionStartedBeforeRevocation(startedAt.getTime(), revokedAt)).toBe(
+      true
+    );
   });
 });
 

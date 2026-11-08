@@ -47,6 +47,7 @@ import {
   removeLinkedProviders,
   revokeUserSessions,
   sessionAgeMs,
+  sessionRevoked,
   toUserResponse
 } from '../state';
 import {
@@ -804,6 +805,28 @@ router.post('/refresh-token', (req, res) => {
       res,
       ErrorKeys.AUTH.USER_DEACTIVATED,
       'User account is deactivated'
+    );
+
+    return;
+  }
+
+  const startedSessionId = state.refreshSessions.get(cookieToken);
+
+  if (
+    startedSessionId !== undefined &&
+    sessionRevoked(startedSessionId, user.id)
+  ) {
+    endSessionOfToken(cookieToken);
+    logAudit('TOKEN_REFRESH_FAILURE', {
+      actorId: user.id,
+      actorEmail: user.email,
+      details: { reason: 'session_revoked' },
+      ip: req.ip
+    });
+    sendError(
+      res,
+      ErrorKeys.AUTH.INVALID_REFRESH_TOKEN,
+      'Invalid refresh token'
     );
 
     return;

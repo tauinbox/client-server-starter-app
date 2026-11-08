@@ -213,10 +213,17 @@ describe('a reauth proof is compared with the revocation at whole seconds', () =
       STEP_UP_OPERATION.OAUTH_UNLINK
     );
 
+    const revokedAtMs = iat * 1000 + 700;
+
     getState().reauthProofs.get(proof)!.issuedAt = iat + proofOffset;
     getState().users.get(OAUTH_ONLY_ID)!.tokenRevokedAt = new Date(
-      iat * 1000 + 700
+      revokedAtMs
     ).toISOString();
+
+    // The session must start after the stamp, or it ends with it.
+    for (const sid of getState().sessionStarts.keys()) {
+      getState().sessionStarts.set(sid, revokedAtMs);
+    }
 
     return unlink(token, 'google', proof);
   }

@@ -27,6 +27,10 @@ describe('RefreshTokenService', () => {
     andWhere: jest.Mock;
     setParameters: jest.Mock;
     returning: jest.Mock;
+    innerJoin: jest.Mock;
+    orderBy: jest.Mock;
+    getMany: jest.Mock;
+    getExists: jest.Mock;
     execute: jest.Mock;
   };
   let mockGeoIp: { lookup: jest.Mock };
@@ -39,6 +43,10 @@ describe('RefreshTokenService', () => {
       andWhere: jest.fn().mockReturnThis(),
       setParameters: jest.fn().mockReturnThis(),
       returning: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn(),
+      getExists: jest.fn(),
       execute: jest.fn().mockResolvedValue({ affected: 5 })
     };
 
@@ -124,23 +132,29 @@ describe('RefreshTokenService', () => {
   });
 
   describe('hasLiveSession', () => {
-    it('asks only for an unrevoked row of that session that has not expired', async () => {
-      mockRepository.exists.mockResolvedValue(true);
+    it('asks for a usable row of that session that started after the revocation', async () => {
+      mockQueryBuilder.getExists.mockResolvedValue(true);
 
       const live = await service.hasLiveSession('session-1');
 
       expect(live).toBe(true);
-      expect(mockRepository.exists).toHaveBeenCalledWith({
-        where: {
-          sessionId: 'session-1',
-          revoked: false,
-          expiresAt: expect.any(Object)
-        }
-      });
+      expect(mockQueryBuilder.innerJoin).toHaveBeenCalledWith(
+        'users',
+        'u',
+        'u.id = rt.user_id'
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'rt.session_id = :sessionId',
+        { sessionId: 'session-1' }
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('rt.session_started_at >= u.token_revoked_at'),
+        { now: expect.any(Date) }
+      );
     });
 
     it('reports a session with no live row as over', async () => {
-      mockRepository.exists.mockResolvedValue(false);
+      mockQueryBuilder.getExists.mockResolvedValue(false);
 
       await expect(service.hasLiveSession('session-1')).resolves.toBe(false);
     });
@@ -452,7 +466,7 @@ describe('RefreshTokenService', () => {
 
   describe('findLiveSessions', () => {
     it('keeps the newest live row of each session', async () => {
-      mockRepository.find.mockResolvedValue([
+      mockQueryBuilder.getMany.mockResolvedValue([
         { id: 'r3', sessionId: 's-1' },
         { id: 'r2', sessionId: 's-2' },
         { id: 'r1', sessionId: 's-1' }
@@ -461,14 +475,18 @@ describe('RefreshTokenService', () => {
       const rows = await service.findLiveSessions('user-1');
 
       expect(rows.map((r) => r.id)).toEqual(['r3', 'r2']);
-      expect(mockRepository.find).toHaveBeenCalledWith({
-        where: {
-          userId: 'user-1',
-          revoked: false,
-          expiresAt: expect.anything()
-        },
-        order: { createdAt: 'DESC' }
-      });
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'rt.user_id = :userId',
+        { userId: 'user-1' }
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('rt.session_started_at >= u.token_revoked_at'),
+        { now: expect.any(Date) }
+      );
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'rt.created_at',
+        'DESC'
+      );
     });
   });
 

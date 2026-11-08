@@ -24,6 +24,26 @@ export function issuedBeforeRevocation(
   return iat < Math.floor(new Date(revokedAt).getTime() / 1000);
 }
 
+/**
+ * True when a session started before the account's last revocation, so it
+ * must not be refreshed. The revocation deletes the refresh rows, but a row
+ * that a sign-in inserts and commits around that delete survives it. Both
+ * values have milliseconds and come from the clock of the application, so no
+ * floor applies.
+ *
+ * `startedAt` is a `Date` on the server and epoch milliseconds in the mock.
+ */
+export function sessionStartedBeforeRevocation(
+  startedAt: Date | number,
+  revokedAt: Date | string | null
+): boolean {
+  if (revokedAt === null) {
+    return false;
+  }
+
+  return new Date(startedAt).getTime() < new Date(revokedAt).getTime();
+}
+
 /** Why a token that the server signed for an account no longer signs it in. */
 export type SignedTokenRefusal = (typeof SIGNED_TOKEN_REFUSALS)[number];
 

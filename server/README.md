@@ -1265,8 +1265,10 @@ seconds because `iat` has no finer unit. That rule is `issuedBeforeRevocation` i
 `shared/src/utils/token-revocation.ts`. The pending sign-in token, the re-authentication proof, the
 provider re-authentication intent, the link intent and the mock use the same function. It then requires a `sid`
 claim and asks `RefreshTokenService.hasLiveSession`, which looks for a row of that session which is
-not revoked and not expired, so a sign-out on one device refuses that device on its next request
-while the other devices continue. It returns `PayloadFromJwt`, that is `{ userId, email, sessionId }`.
+not revoked, not expired and of a session that started at or after `tokenRevokedAt`, so a sign-out
+on one device refuses that device on its next request while the other devices continue. The last
+condition is `sessionStartedBeforeRevocation` in the same shared file. It ends a session whose row a
+sign-in committed after the delete of a revocation, which the delete cannot see. It returns `PayloadFromJwt`, that is `{ userId, email, sessionId }`.
 There is no `isAdmin` flag.
 
 **Sessions.** A sign-in mints a session id in `SessionIssuerService`. The access token carries it as
@@ -1886,8 +1888,8 @@ through `UserSessionRevocationRequiredEvent`, which the code awaits as it awaits
 password change. A person moves an address to recover an account, thus the access token and the
 refresh tokens of the previous holder must die with it. A resubmitted address that does not change
 revokes nothing. A deactivation (`isActive` set to false) revokes each session through the same
-event. The refresh flow does not read `tokenRevokedAt`, thus the refresh tokens must go, or a later
-re-activation makes them valid again.
+event. The refresh flow refuses a session that started before `tokenRevokedAt`, thus a later
+re-activation does not make the refresh tokens of the previous holder valid again.
 
 The server enforces the uniqueness of the address. A conflict answers HTTP 409 with
 `errorKey: errors.users.emailExists`.

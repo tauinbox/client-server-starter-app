@@ -2034,9 +2034,8 @@ a second request to the registry for a verdict that gates nothing.
   address an attacker controls. Thus the previous holder must not continue to authenticate with the
   tokens from before the change. A resubmitted address that does not change revokes nothing.
 - A **deactivation** (`isActive` set to false) also revokes each session of the target. The refresh
-  flow does not read `tokenRevokedAt`, thus only the deletion of the refresh tokens makes sure that a
-  later re-activation does not make a stolen refresh cookie valid again. The user signs in again
-  after a re-activation.
+  flow refuses a session that started before `tokenRevokedAt`, thus a later re-activation does not
+  make a stolen refresh cookie valid again. The user signs in again after a re-activation.
 - A **self-service password change** (`PATCH /auth/profile`) and a **self-service email change**
   (`POST /auth/profile/email/initiate`) both require a fresh proof of identity, with the factor the
   account actually holds. An account with a password supplies `currentPassword`. Thus a stolen token
