@@ -18,7 +18,7 @@ import {
 import type { Request, Response } from 'express';
 import type { StepUpOperation } from '@app/shared/constants';
 import { normalizeOtpCode } from '@app/shared/utils/otp-code';
-import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import { stampedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import type { FailedAttemptWindow, MockUser } from '../types';
 import {
   fixedLengthStringErrors,
@@ -115,7 +115,7 @@ export function isValidReauthProof(
     return false;
   }
 
-  if (issuedBeforeRevocation(record.issuedAt, user.tokenRevokedAt)) {
+  if (stampedBeforeRevocation(record.issuedAtMs, user.tokenRevokedAt)) {
     return false;
   }
 

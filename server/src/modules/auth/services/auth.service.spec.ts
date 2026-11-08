@@ -2531,6 +2531,7 @@ describe('AuthService', () => {
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
         operation: STEP_UP_OPERATION.PASSWORD_SET,
         iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now(),
         jti: 'proof-1'
       });
 
@@ -2551,6 +2552,7 @@ describe('AuthService', () => {
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
         operation: STEP_UP_OPERATION.PASSWORD_SET,
         iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now(),
         jti: 'proof-replayed'
       });
 
@@ -2582,7 +2584,8 @@ describe('AuthService', () => {
         sub: oauthOnlyUser.id,
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
         operation: STEP_UP_OPERATION.PASSWORD_SET,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
 
       await expect(
@@ -2604,6 +2607,7 @@ describe('AuthService', () => {
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
         operation: STEP_UP_OPERATION.PASSWORD_SET,
         iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now(),
         jti: 'proof-unspent'
       });
 
@@ -2632,7 +2636,8 @@ describe('AuthService', () => {
         sub: oauthOnlyUser.id,
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
         operation: STEP_UP_OPERATION.EMAIL_CHANGE,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
 
       await expect(
@@ -2652,7 +2657,8 @@ describe('AuthService', () => {
       mockJwtService.verify.mockReturnValue({
         sub: oauthOnlyUser.id,
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now()
       });
 
       await expect(
@@ -2808,6 +2814,7 @@ describe('AuthService', () => {
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
         operation: STEP_UP_OPERATION.MFA_DISABLE,
         iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now(),
         jti: 'proof-after-wrong-code'
       });
 
@@ -3296,6 +3303,7 @@ describe('AuthService', () => {
         purpose: TOKEN_PURPOSE.REAUTH_PROOF,
         operation: STEP_UP_OPERATION.EMAIL_CHANGE,
         iat: Math.floor(Date.now() / 1000),
+        iatMs: Date.now(),
         jti: `proof-${(proofCounter += 1)}`
       });
 
@@ -3373,7 +3381,8 @@ describe('AuthService', () => {
         });
         mockJwtService.verify.mockReturnValue({
           ...validProof(),
-          iat: now - 60
+          iat: now - 60,
+          iatMs: (now - 60) * 1000
         });
 
         await expect(
@@ -3387,23 +3396,43 @@ describe('AuthService', () => {
         });
       });
 
-      it('accepts a proof minted in the second of the last session revocation', async () => {
-        const now = Math.floor(Date.now() / 1000);
+      describe('a revocation in the second the proof was minted', () => {
+        // The middle of a second, so the revocation falls in the same second.
+        const issuedAtMs = Math.floor(Date.now() / 1000) * 1000 + 500;
 
-        mockUsersService.findOne.mockResolvedValue({
-          ...oauthOnlyUser(),
-          tokenRevokedAt: new Date(now * 1000 + 700)
+        function changeEmailAround(revocationOffsetMs: number) {
+          mockUsersService.findOne.mockResolvedValue({
+            ...oauthOnlyUser(),
+            tokenRevokedAt: new Date(issuedAtMs + revocationOffsetMs)
+          });
+          mockJwtService.verify.mockReturnValue({
+            ...validProof(),
+            iat: Math.floor(issuedAtMs / 1000),
+            iatMs: issuedAtMs
+          });
+
+          return service.initiateEmailChange(
+            'user-1',
+            { newEmail: 'new@example.com' },
+            { reauthProof: 'same-second-proof' }
+          );
+        }
+
+        it('accepts a proof minted after the revocation', async () => {
+          const result = await changeEmailAround(-200);
+
+          expect(result.message).toBeDefined();
+          expect(mockManager.update).toHaveBeenCalled();
         });
-        mockJwtService.verify.mockReturnValue({ ...validProof(), iat: now });
 
-        const result = await service.initiateEmailChange(
-          'user-1',
-          { newEmail: 'new@example.com' },
-          { reauthProof: 'same-second-proof' }
-        );
-
-        expect(result.message).toBeDefined();
-        expect(mockManager.update).toHaveBeenCalled();
+        // Regression: no session guards the proof, so a whole-second floor
+        // let a proof minted before a sign-out everywhere change the email.
+        it('refuses a proof minted before the revocation', async () => {
+          await expect(changeEmailAround(200)).rejects.toMatchObject({
+            response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
+          });
+          expect(mockManager.update).not.toHaveBeenCalled();
+        });
       });
 
       it('refuses a proof that does not verify at all', async () => {

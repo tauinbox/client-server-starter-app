@@ -846,10 +846,9 @@ describe('OAuthService', () => {
   });
 
   describe('linkOAuthToUser', () => {
-    // Seconds, as a JWT `iat` is.
-    const LINK_TOKEN_IAT = Math.floor(
-      new Date('2026-01-01T00:00:00Z').getTime() / 1000
-    );
+    // Epoch milliseconds, as the `iatMs` of a link token is. The middle of a
+    // second, so a revocation can fall on either side of it in that second.
+    const LINK_TOKEN_ISSUED_AT_MS = Date.parse('2026-01-01T00:00:00.500Z');
 
     const LINK_ROW = {
       userId: 'user-1',
@@ -866,7 +865,7 @@ describe('OAuthService', () => {
       await service.linkOAuthToUser(
         'user-1',
         { provider: 'google', providerId: 'google-123' },
-        { linkTokenIssuedAt: LINK_TOKEN_IAT }
+        { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
       );
 
       expect(mockManager.findOne).toHaveBeenCalledWith(User, {
@@ -893,7 +892,7 @@ describe('OAuthService', () => {
         'user-1',
         { provider: 'google', providerId: 'google-123' },
         {
-          linkTokenIssuedAt: LINK_TOKEN_IAT,
+          linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS,
           auditContext: { ip: '198.51.100.7' }
         }
       );
@@ -917,7 +916,7 @@ describe('OAuthService', () => {
       await service.linkOAuthToUser(
         'user-1',
         { provider: 'google', providerId: 'google-123' },
-        { linkTokenIssuedAt: LINK_TOKEN_IAT }
+        { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
       );
       await new Promise((resolve) => setImmediate(resolve));
 
@@ -934,7 +933,7 @@ describe('OAuthService', () => {
         service.linkOAuthToUser(
           'user-1',
           { provider: 'google', providerId: 'google-123' },
-          { linkTokenIssuedAt: LINK_TOKEN_IAT }
+          { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
         )
       ).rejects.toMatchObject({
         userId: 'user-1',
@@ -950,7 +949,7 @@ describe('OAuthService', () => {
         service.linkOAuthToUser(
           'user-1',
           { provider: 'google', providerId: 'google-123' },
-          { linkTokenIssuedAt: LINK_TOKEN_IAT }
+          { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
         )
       ).rejects.toMatchObject({
         userId: 'user-1',
@@ -971,7 +970,7 @@ describe('OAuthService', () => {
         service.linkOAuthToUser(
           'user-1',
           { provider: 'google', providerId: 'google-123' },
-          { linkTokenIssuedAt: LINK_TOKEN_IAT }
+          { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
         )
       ).rejects.toThrow(HttpException);
     });
@@ -987,7 +986,7 @@ describe('OAuthService', () => {
         service.linkOAuthToUser(
           'user-1',
           { provider: 'google', providerId: 'google-123' },
-          { linkTokenIssuedAt: LINK_TOKEN_IAT }
+          { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
         )
       ).resolves.toBeUndefined();
       expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
@@ -1006,7 +1005,7 @@ describe('OAuthService', () => {
         service.linkOAuthToUser(
           'user-1',
           { provider: 'google', providerId: 'google-456' },
-          { linkTokenIssuedAt: LINK_TOKEN_IAT }
+          { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
         )
       ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
@@ -1026,7 +1025,7 @@ describe('OAuthService', () => {
         service.linkOAuthToUser(
           'user-1',
           { provider: 'google', providerId: 'google-123' },
-          { linkTokenIssuedAt: LINK_TOKEN_IAT }
+          { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
         )
       ).resolves.toBeUndefined();
     });
@@ -1036,29 +1035,47 @@ describe('OAuthService', () => {
     it('should refuse a link token issued before the last session revocation', async () => {
       mockManager.findOne.mockResolvedValue({
         ...mockUser,
-        tokenRevokedAt: new Date((LINK_TOKEN_IAT + 60) * 1000)
+        tokenRevokedAt: new Date(LINK_TOKEN_ISSUED_AT_MS + 60_000)
       });
 
       await expect(
         service.linkOAuthToUser(
           'user-1',
           { provider: 'google', providerId: 'google-123' },
-          { linkTokenIssuedAt: LINK_TOKEN_IAT }
+          { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
         )
       ).rejects.toThrow(HttpException);
       expect(mockManager.insert).not.toHaveBeenCalled();
     });
 
-    it('should link when the token was issued in the second of the last revocation', async () => {
+    // Regression: no session guards a link token, so a revocation later in the
+    // second the token was minted must end it too.
+    it('should refuse a link token issued earlier in the second of the last revocation', async () => {
       mockManager.findOne.mockResolvedValue({
         ...mockUser,
-        tokenRevokedAt: new Date(LINK_TOKEN_IAT * 1000 + 700)
+        tokenRevokedAt: new Date(LINK_TOKEN_ISSUED_AT_MS + 200)
+      });
+
+      await expect(
+        service.linkOAuthToUser(
+          'user-1',
+          { provider: 'google', providerId: 'google-123' },
+          { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
+        )
+      ).rejects.toMatchObject({ userId: 'user-1', refusal: 'session_revoked' });
+      expect(mockManager.insert).not.toHaveBeenCalled();
+    });
+
+    it('should link when the token was issued later in the second of the last revocation', async () => {
+      mockManager.findOne.mockResolvedValue({
+        ...mockUser,
+        tokenRevokedAt: new Date(LINK_TOKEN_ISSUED_AT_MS - 200)
       });
 
       await service.linkOAuthToUser(
         'user-1',
         { provider: 'google', providerId: 'google-123' },
-        { linkTokenIssuedAt: LINK_TOKEN_IAT }
+        { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
       );
 
       expect(mockManager.insert).toHaveBeenCalled();
@@ -1067,13 +1084,13 @@ describe('OAuthService', () => {
     it('should link when the token was issued after the last revocation', async () => {
       mockManager.findOne.mockResolvedValue({
         ...mockUser,
-        tokenRevokedAt: new Date((LINK_TOKEN_IAT - 60) * 1000)
+        tokenRevokedAt: new Date(LINK_TOKEN_ISSUED_AT_MS - 60_000)
       });
 
       await service.linkOAuthToUser(
         'user-1',
         { provider: 'google', providerId: 'google-123' },
-        { linkTokenIssuedAt: LINK_TOKEN_IAT }
+        { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
       );
 
       expect(mockManager.insert).toHaveBeenCalledWith(
@@ -1091,14 +1108,15 @@ describe('OAuthService', () => {
         service.linkOAuthToUser(
           'user-1',
           { provider: 'google', providerId: 'google-123' },
-          { linkTokenIssuedAt: LINK_TOKEN_IAT }
+          { linkTokenIssuedAtMs: LINK_TOKEN_ISSUED_AT_MS }
         )
       ).rejects.toThrow('Connection lost');
     });
   });
 
   describe('assertReauthenticated', () => {
-    const IAT = Math.floor(Date.now() / 1000);
+    // Epoch milliseconds, in the middle of a second.
+    const ISSUED_AT_MS = Date.parse('2026-01-01T00:00:00.500Z');
 
     it('accepts an identity that already belongs to the account', async () => {
       mockUsersService.findById.mockResolvedValue(mockUser);
@@ -1112,7 +1130,7 @@ describe('OAuthService', () => {
         service.assertReauthenticated(
           mockUser.id,
           { provider: 'google', providerId: 'google-123' },
-          IAT
+          ISSUED_AT_MS
         )
       ).resolves.toBeUndefined();
     });
@@ -1129,7 +1147,7 @@ describe('OAuthService', () => {
         service.assertReauthenticated(
           mockUser.id,
           { provider: 'google', providerId: 'google-999' },
-          IAT
+          ISSUED_AT_MS
         )
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
@@ -1146,7 +1164,7 @@ describe('OAuthService', () => {
         service.assertReauthenticated(
           mockUser.id,
           { provider: 'google', providerId: 'google-unknown' },
-          IAT
+          ISSUED_AT_MS
         )
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.AUTH.REAUTH_REQUIRED }
@@ -1156,14 +1174,14 @@ describe('OAuthService', () => {
     it('refuses an intent minted before the last session revocation', async () => {
       mockUsersService.findById.mockResolvedValue({
         ...mockUser,
-        tokenRevokedAt: new Date(IAT * 1000)
+        tokenRevokedAt: new Date(ISSUED_AT_MS + 60_000)
       });
 
       await expect(
         service.assertReauthenticated(
           mockUser.id,
           { provider: 'google', providerId: 'google-123' },
-          IAT - 60
+          ISSUED_AT_MS
         )
       ).rejects.toMatchObject({
         userId: mockUser.id,
@@ -1175,10 +1193,30 @@ describe('OAuthService', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('accepts an intent minted in the second of the last session revocation', async () => {
+    // Regression: no session guards the intent, so a revocation later in the
+    // second it was minted must end it too.
+    it('refuses an intent minted earlier in the second of the last session revocation', async () => {
       mockUsersService.findById.mockResolvedValue({
         ...mockUser,
-        tokenRevokedAt: new Date(IAT * 1000 + 700)
+        tokenRevokedAt: new Date(ISSUED_AT_MS + 200)
+      });
+
+      await expect(
+        service.assertReauthenticated(
+          mockUser.id,
+          { provider: 'google', providerId: 'google-123' },
+          ISSUED_AT_MS
+        )
+      ).rejects.toMatchObject({
+        userId: mockUser.id,
+        refusal: 'session_revoked'
+      });
+    });
+
+    it('accepts an intent minted later in the second of the last session revocation', async () => {
+      mockUsersService.findById.mockResolvedValue({
+        ...mockUser,
+        tokenRevokedAt: new Date(ISSUED_AT_MS - 200)
       });
       mockOAuthAccountService.findByProviderAndProviderId.mockResolvedValue({
         userId: mockUser.id,
@@ -1190,7 +1228,7 @@ describe('OAuthService', () => {
         service.assertReauthenticated(
           mockUser.id,
           { provider: 'google', providerId: 'google-123' },
-          IAT
+          ISSUED_AT_MS
         )
       ).resolves.toBeUndefined();
     });
@@ -1205,7 +1243,7 @@ describe('OAuthService', () => {
         service.assertReauthenticated(
           mockUser.id,
           { provider: 'google', providerId: 'google-123' },
-          IAT
+          ISSUED_AT_MS
         )
       ).rejects.toMatchObject({
         userId: mockUser.id,

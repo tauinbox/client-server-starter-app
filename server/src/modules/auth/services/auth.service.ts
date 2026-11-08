@@ -61,10 +61,7 @@ import {
   type StepUpOperation
 } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import {
-  issuedBeforeRevocation,
-  sessionStartedBeforeRevocation
-} from '@app/shared/utils/token-revocation';
+import { stampedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { InitiateEmailChangeDto } from '../dtos/initiate-email-change.dto';
 import {
   issuedBeforeMinIat,
@@ -901,10 +898,7 @@ export class AuthService {
     }
 
     if (
-      sessionStartedBeforeRevocation(
-        tokenDoc.sessionStartedAt,
-        user.tokenRevokedAt
-      )
+      stampedBeforeRevocation(tokenDoc.sessionStartedAt, user.tokenRevokedAt)
     ) {
       await this.refreshTokenService.deleteBySessionId(tokenDoc.sessionId);
       throw this.refreshRefusal('session_revoked', {
@@ -1465,7 +1459,7 @@ export class AuthService {
       payload !== null &&
       payload.sub === user.id &&
       payload.operation === operation &&
-      !issuedBeforeRevocation(payload.iat, user.tokenRevokedAt);
+      !stampedBeforeRevocation(payload.issuedAtMs, user.tokenRevokedAt);
 
     // A proof minted before the ledger existed carries no id and cannot be
     // recorded as spent, so it is refused rather than trusted.

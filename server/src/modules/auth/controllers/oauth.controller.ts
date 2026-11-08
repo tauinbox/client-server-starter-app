@@ -25,7 +25,6 @@ import { Request as ExpressRequest, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
-import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import { OAuthService } from '../services/oauth.service';
 import { OAuthAccountService } from '../services/oauth-account.service';
@@ -156,7 +155,6 @@ export class OAuthController {
     private readonly oauthAccountService: OAuthAccountService,
     private readonly authService: AuthService,
     private readonly cookies: AuthCookies,
-    private readonly jwtService: JwtService,
     private readonly purposeTokens: PurposeTokenService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
@@ -200,13 +198,12 @@ export class OAuthController {
       auditContext: extractAuditContext(req)
     });
 
-    const linkToken = this.jwtService.sign(
+    const linkToken = this.purposeTokens.sign(
+      { sub: req.user.userId, email: req.user.email },
       {
-        sub: req.user.userId,
-        email: req.user.email,
-        purpose: TOKEN_PURPOSE.OAUTH_LINK
-      },
-      { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
+        purpose: TOKEN_PURPOSE.OAUTH_LINK,
+        expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS
+      }
     );
 
     this.cookies.setShortLived(
@@ -243,14 +240,16 @@ export class OAuthController {
     @Body() dto: ReauthInitDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    const reauthToken = this.jwtService.sign(
+    const reauthToken = this.purposeTokens.sign(
       {
         sub: req.user.userId,
         email: req.user.email,
-        purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
         operation: dto.operation
       },
-      { expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS }
+      {
+        purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
+        expiresIn: OAuthController.OAUTH_LINK_MAX_AGE_SECONDS
+      }
     );
 
     this.cookies.setShortLived(
@@ -436,7 +435,7 @@ export class OAuthController {
     }
 
     let data: OAuthSignInData | MfaRequiredResponseDto;
-    let issuedAt: number;
+    let issuedAtMs: number;
 
     try {
       const payload = this.purposeTokens.verify<{
@@ -465,7 +464,7 @@ export class OAuthController {
       }
 
       data = payload.data;
-      issuedAt = payload.iat;
+      issuedAtMs = payload.issuedAtMs;
     } catch {
       throw invalidOAuthData();
     }
@@ -483,7 +482,7 @@ export class OAuthController {
     // same refusal as a bad cookie so the exchange leaks no account state.
     // eslint-disable-next-line no-restricted-syntax -- the id comes from the signed, single-use oauth_data cookie that the callback minted
     const user = await this.usersService.findById(data.userId);
-    const verdict = signedTokenAccount(user, issuedAt);
+    const verdict = signedTokenAccount(user, issuedAtMs);
 
     if ('refusal' in verdict) {
       // The signed cookie names the account, so the row names it too.
@@ -545,13 +544,12 @@ export class OAuthController {
         'mfaRequired' in result
           ? result
           : { userId: result.id, provider: profile.provider };
-      const signedData = this.jwtService.sign(
+      const signedData = this.purposeTokens.sign(
+        { data, jti: randomUUID() },
         {
-          data,
           purpose: TOKEN_PURPOSE.OAUTH_DATA,
-          jti: randomUUID()
-        },
-        { expiresIn: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS }
+          expiresIn: OAuthController.OAUTH_DATA_MAX_AGE_SECONDS
+        }
       );
 
       this.cookies.setShortLived(
@@ -612,7 +610,7 @@ export class OAuthController {
       sub: string;
       email?: string;
       operation?: string;
-      iat: number;
+      issuedAtMs: number;
     } | null = null;
 
     try {
@@ -633,19 +631,17 @@ export class OAuthController {
       await this.oauthService.assertReauthenticated(
         payload.sub,
         { provider: profile.provider, providerId: profile.providerId },
-        payload.iat
+        payload.issuedAtMs
       );
 
       // The id is what the single-use ledger records, so a value captured
       // before the change is refused once the owner has spent it.
-      const proof = this.jwtService.sign(
+      const proof = this.purposeTokens.sign(
+        { sub: payload.sub, operation: payload.operation, jti: randomUUID() },
         {
-          sub: payload.sub,
           purpose: TOKEN_PURPOSE.REAUTH_PROOF,
-          operation: payload.operation,
-          jti: randomUUID()
-        },
-        { expiresIn: REAUTH_PROOF_MAX_AGE_SECONDS }
+          expiresIn: REAUTH_PROOF_MAX_AGE_SECONDS
+        }
       );
 
       this.cookies.setShortLived(
@@ -700,7 +696,7 @@ export class OAuthController {
         account.sub,
         { provider: profile.provider, providerId: profile.providerId },
         {
-          linkTokenIssuedAt: payload.iat,
+          linkTokenIssuedAtMs: payload.issuedAtMs,
           auditContext: extractAuditContext(req)
         }
       );

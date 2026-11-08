@@ -360,8 +360,8 @@ export interface FailedAttemptWindow {
 
 interface MockOAuthDataBase {
   userId: string;
-  /** Seconds, like the `iat` of the real cookie. */
-  issuedAt: number;
+  /** Epoch milliseconds, like the `iatMs` of the real cookie. */
+  issuedAtMs: number;
   expiresAt: number;
 }
 
@@ -385,8 +385,8 @@ export type MockOAuthData = MockOAuthSessionData | MockOAuthChallengeData;
 
 export interface MockReauthProof {
   userId: string;
-  /** Seconds, like the `iat` the real proof carries. */
-  issuedAt: number;
+  /** Epoch milliseconds, like the `iatMs` the real proof carries. */
+  issuedAtMs: number;
   expiresAt: number;
   /** The sensitive operation the proof was minted for, like the real one. */
   operation: StepUpOperation;

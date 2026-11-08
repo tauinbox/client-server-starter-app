@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { sessionStartedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import { stampedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { hashToken } from '../../../common/utils/hash-token';
 import type { SessionClient } from '../utils/session-client';
@@ -26,7 +26,7 @@ export type RefreshRowFields = Pick<
  * the account. The revocation deletes the rows, but a row that a sign-in
  * commits after that delete survives it; this condition ends that session
  * too. Needs the row as `rt`, the `users` row as `u` and the `:now` parameter.
- * The SQL form of `sessionStartedBeforeRevocation`.
+ * The SQL form of `stampedBeforeRevocation`.
  */
 const LIVE_ROW =
   'rt.revoked = false AND rt.expires_at > :now AND (u.token_revoked_at IS NULL OR rt.session_started_at >= u.token_revoked_at)';
@@ -207,7 +207,7 @@ export class RefreshTokenService {
           (row) =>
             !row.revoked &&
             row.expires_at.getTime() > now &&
-            !sessionStartedBeforeRevocation(
+            !stampedBeforeRevocation(
               row.session_started_at,
               row.token_revoked_at
             )

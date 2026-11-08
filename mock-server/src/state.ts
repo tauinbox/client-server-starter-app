@@ -1,6 +1,6 @@
 import { createMongoAbility, ForcedSubject, MongoAbility } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
-import { sessionStartedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import { stampedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { generateSessionId } from './jwt.utils';
 import type {
   AdminUserResponse,
@@ -195,7 +195,7 @@ export function sessionRevoked(sessionId: string, userId: string): boolean {
 
   if (startedAt === undefined || !user) return false;
 
-  return sessionStartedBeforeRevocation(startedAt, user.tokenRevokedAt);
+  return stampedBeforeRevocation(startedAt, user.tokenRevokedAt);
 }
 
 /**

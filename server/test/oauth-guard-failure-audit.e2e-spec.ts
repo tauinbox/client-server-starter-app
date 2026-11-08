@@ -104,7 +104,8 @@ runWithInfra('Audit of a callback refused at the provider guard (e2e)', () => {
         sub,
         email: 'owner@example.com',
         purpose,
-        operation: 'email_change'
+        operation: 'email_change',
+        iatMs: Date.now()
       },
       { expiresIn }
     );
