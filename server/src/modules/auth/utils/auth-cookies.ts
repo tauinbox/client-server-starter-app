@@ -22,18 +22,21 @@ export interface ClaimedIntents {
   reauth: string | null;
 }
 
-export type ClaimedFlow = 'reauth' | 'link' | 'login';
+export type ClaimedFlow =
+  | { kind: 'reauth'; token: string }
+  | { kind: 'link'; token: string }
+  | { kind: 'login' };
 
 /**
  * The flow of one provider request. Re-authentication wins a tie because it
- * links nothing; the callback handler reads the intents in the same order.
+ * links nothing.
  */
 export function claimedFlow({ link, reauth }: ClaimedIntents): ClaimedFlow {
   if (reauth !== null) {
-    return 'reauth';
+    return { kind: 'reauth', token: reauth };
   }
 
-  return link !== null ? 'link' : 'login';
+  return link !== null ? { kind: 'link', token: link } : { kind: 'login' };
 }
 
 /**

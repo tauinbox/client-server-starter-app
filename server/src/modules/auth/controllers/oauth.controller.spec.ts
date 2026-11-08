@@ -754,6 +754,109 @@ describe('OAuthController', () => {
       );
     });
 
+    describe('log level', () => {
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '123',
+        email: 'test@example.com',
+        name: 'Test User',
+        emailVerified: true
+      };
+      const reauthIntent = {
+        '__Host-oauth_reauth': bindIntent('reauth-token', FLOW_STATE)
+      };
+
+      function expectWarnOnly() {
+        expect(Logger.prototype.warn).toHaveBeenCalledTimes(1);
+        expect(Logger.prototype.error).not.toHaveBeenCalled();
+      }
+
+      it.each([
+        [
+          'an account refusal',
+          new AccountRefusedException('1', 'account_deactivated')
+        ],
+        [
+          'a provider failure',
+          new OAuthAuthenticationFailedException(OAUTH_ERROR.NO_EMAIL)
+        ]
+      ])('logs %s of the sign-in at warn', async (_name, error) => {
+        oauthServiceMock.loginWithOAuth.mockRejectedValue(error);
+
+        await controller.googleCallback(
+          mockExpressRequest(profile),
+          mockResponse()
+        );
+
+        expectWarnOnly();
+      });
+
+      it('logs a refused link at warn', async () => {
+        oauthServiceMock.linkOAuthToUser.mockRejectedValue(
+          new AccountRefusedException('user-1', 'session_revoked')
+        );
+
+        await controller.googleCallback(
+          mockExpressRequest(profile, linkCookie('valid-link-token')),
+          mockResponse()
+        );
+
+        expectWarnOnly();
+      });
+
+      it('logs a link intent that does not verify at warn', async () => {
+        jwtServiceMock.verify.mockImplementation(() => {
+          throw new Error('invalid token');
+        });
+
+        await controller.googleCallback(
+          mockExpressRequest(profile, linkCookie('expired-link-token')),
+          mockResponse()
+        );
+
+        expectWarnOnly();
+      });
+
+      it('logs a refused re-authentication at warn', async () => {
+        jwtServiceMock.verify.mockReturnValue({
+          sub: 'user-1',
+          purpose: TOKEN_PURPOSE.OAUTH_REAUTH,
+          operation: STEP_UP_OPERATION.EMAIL_CHANGE,
+          iat: LINK_TOKEN_IAT
+        });
+        oauthServiceMock.assertReauthenticated.mockRejectedValue(
+          new ApiError(
+            ErrorKeys.AUTH.REAUTH_REQUIRED,
+            'Re-authentication required'
+          )
+        );
+
+        await controller.googleCallback(
+          mockExpressRequest(profile, reauthIntent),
+          mockResponse()
+        );
+
+        expectWarnOnly();
+      });
+
+      it('logs a fault at error with its stack', async () => {
+        const fault = new Error('DB error');
+
+        oauthServiceMock.linkOAuthToUser.mockRejectedValue(fault);
+
+        await controller.googleCallback(
+          mockExpressRequest(profile, linkCookie('valid-link-token')),
+          mockResponse()
+        );
+
+        expect(Logger.prototype.error).toHaveBeenCalledWith(
+          'OAuth link error via google',
+          fault
+        );
+        expect(Logger.prototype.warn).not.toHaveBeenCalled();
+      });
+    });
+
     describe('audit trail', () => {
       const profile: OAuthUserProfile = {
         provider: OAuthProvider.GOOGLE,

@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
   Inject,
   Logger,
   Param,
@@ -57,7 +58,7 @@ import {
   OAUTH_REAUTH_COOKIE,
   REAUTH_PROOF_COOKIE
 } from '../constants/oauth.constants';
-import { AuthCookies } from '../utils/auth-cookies';
+import { AuthCookies, claimedFlow } from '../utils/auth-cookies';
 import {
   OAuthFailureAudit,
   type OAuthIntentAccount
@@ -105,6 +106,35 @@ function oauthFailureReason(error: unknown): string {
   }
 
   return 'unexpected_error';
+}
+
+/**
+ * The level rule of the global exception filter, applied here because the
+ * callback answers with a redirect and no exception reaches that filter: a
+ * refusal is a warning, a fault is an error with its stack.
+ */
+function logCallbackFailure(
+  logger: Logger,
+  {
+    label,
+    provider,
+    error
+  }: { label: string; provider: string; error: unknown }
+): void {
+  if (isRefusal(error)) {
+    logger.warn(`${label} via ${provider}: ${error.message}`);
+
+    return;
+  }
+
+  logger.error(`${label} via ${provider}`, error);
+}
+
+function isRefusal(error: unknown): error is Error {
+  return (
+    error instanceof OAuthAuthenticationFailedException ||
+    (error instanceof HttpException && error.getStatus() < 500)
+  );
 }
 
 @ApiTags('OAuth API')
@@ -486,16 +516,22 @@ export class OAuthController {
   ): Promise<void> {
     try {
       // No intent is cleared here: an intent of another flow stays for that
-      // flow. Re-authentication wins a tie because it links nothing.
-      const { reauth: reauthToken, link: linkToken } =
-        this.cookies.claimedIntents(req);
+      // flow.
+      const flow = claimedFlow(this.cookies.claimedIntents(req));
 
-      if (reauthToken) {
-        return this.handleOAuthReauth({ reauthToken, profile }, req, res);
-      }
-
-      if (linkToken) {
-        return this.handleOAuthLink({ linkToken, profile }, req, res);
+      switch (flow.kind) {
+        case 'reauth':
+          return this.handleOAuthReauth(
+            { reauthToken: flow.token, profile },
+            req,
+            res
+          );
+        case 'link':
+          return this.handleOAuthLink(
+            { linkToken: flow.token, profile },
+            req,
+            res
+          );
       }
 
       const result = await this.oauthService.loginWithOAuth(
@@ -535,14 +571,18 @@ export class OAuthController {
         error instanceof AccountRefusedException ? { id: error.userId } : null
       );
 
+      logCallbackFailure(this.logger, {
+        label: 'OAuth callback error',
+        provider: profile.provider,
+        error
+      });
+
       if (error instanceof OAuthAuthenticationFailedException) {
-        this.logger.warn(`${error.message} via ${profile.provider}`);
         res.redirect(`${this.clientUrl}/login?oauth_error=${error.oauthError}`);
 
         return;
       }
 
-      this.logger.error('OAuth callback error', error);
       res.redirect(
         `${this.clientUrl}/login?oauth_error=${OAUTH_ERROR.AUTH_FAILED}`
       );
@@ -583,7 +623,7 @@ export class OAuthController {
       }>(reauthToken, TOKEN_PURPOSE.OAUTH_REAUTH);
 
       if (!payload) {
-        throw new Error('Invalid re-authentication token');
+        throw new OAuthAuthenticationFailedException(OAUTH_ERROR.REAUTH_FAILED);
       }
 
       if (!isStepUpOperation(payload.operation)) {
@@ -624,7 +664,11 @@ export class OAuthController {
         },
         payload ?? undefined
       );
-      this.logger.error('OAuth re-authentication error', error);
+      logCallbackFailure(this.logger, {
+        label: 'OAuth re-authentication error',
+        provider: profile.provider,
+        error
+      });
       res.redirect(
         `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR.REAUTH_FAILED}`
       );
@@ -647,7 +691,7 @@ export class OAuthController {
       }>(linkToken, TOKEN_PURPOSE.OAUTH_LINK);
 
       if (!payload) {
-        throw new Error('Invalid link token');
+        throw new OAuthAuthenticationFailedException(OAUTH_ERROR.LINK_FAILED);
       }
 
       account = { sub: payload.sub, email: payload.email };
@@ -673,7 +717,11 @@ export class OAuthController {
         },
         account
       );
-      this.logger.error('OAuth link error', error);
+      logCallbackFailure(this.logger, {
+        label: 'OAuth link error',
+        provider: profile.provider,
+        error
+      });
       res.redirect(
         `${this.clientUrl}/profile?oauth_error=${OAUTH_ERROR.LINK_FAILED}`
       );

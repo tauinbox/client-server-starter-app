@@ -83,7 +83,7 @@ export function createOAuthProviderGuard(
           resolveErrorKey(request, flow),
           {
             reason: err,
-            redirectPath: flow === 'login' ? '/login' : '/profile',
+            redirectPath: flow.kind === 'login' ? '/login' : '/profile',
             provider
           }
         );
@@ -102,7 +102,7 @@ function resolveErrorKey(
 ): OAuthError {
   // A step-up that ends at the provider changed nothing, and the profile page
   // has a message written for exactly that.
-  if (flow === 'reauth') {
+  if (flow.kind === 'reauth') {
     return OAUTH_ERROR.REAUTH_FAILED;
   }
 

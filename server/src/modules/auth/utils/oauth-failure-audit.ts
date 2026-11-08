@@ -106,14 +106,14 @@ export class OAuthFailureAudit {
       context: extractAuditContext(req)
     };
 
-    const intents = this.cookies.claimedIntents(req);
+    const flow = claimedFlow(this.cookies.claimedIntents(req));
 
-    switch (claimedFlow(intents)) {
+    switch (flow.kind) {
       case 'reauth':
         this.stepUpFailure(
           failure,
           this.verifiedAccount<ReauthIntentAccount>(
-            intents.reauth,
+            flow.token,
             TOKEN_PURPOSE.OAUTH_REAUTH
           )
         );
@@ -123,7 +123,7 @@ export class OAuthFailureAudit {
         this.linkFailure(
           failure,
           this.verifiedAccount<OAuthIntentAccount>(
-            intents.link,
+            flow.token,
             TOKEN_PURPOSE.OAUTH_LINK
           )
         );
@@ -135,13 +135,9 @@ export class OAuthFailureAudit {
   }
 
   private verifiedAccount<T extends OAuthIntentAccount>(
-    token: string | null,
+    token: string,
     purpose: TokenPurpose
   ): T | undefined {
-    if (token === null) {
-      return undefined;
-    }
-
     return this.purposeTokens.verify<T>(token, purpose) ?? undefined;
   }
 }
