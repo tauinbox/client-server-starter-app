@@ -528,8 +528,20 @@ describe('RefreshTokenService', () => {
           { session_id: 's-2', revoked: true, expires_at: future },
           { session_id: 's-3', revoked: false, expires_at: future },
           { session_id: 's-4', revoked: true, expires_at: future },
-          { session_id: 's-5', revoked: false, expires_at: past }
-        ]
+          { session_id: 's-5', revoked: false, expires_at: past },
+          // Started before the revocation: not live, so not counted.
+          {
+            session_id: 's-6',
+            revoked: false,
+            expires_at: future,
+            session_started_at: past,
+            token_revoked_at: new Date(past.getTime() + 1)
+          }
+        ].map((row) => ({
+          session_started_at: past,
+          token_revoked_at: null,
+          ...row
+        }))
       });
 
       await expect(service.deleteOtherSessions('user-1', 'keep')).resolves.toBe(

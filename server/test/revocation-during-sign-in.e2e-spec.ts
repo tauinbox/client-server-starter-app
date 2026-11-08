@@ -183,4 +183,18 @@ runWithInfra('Revocation during a sign-in (e2e)', () => {
       .set('Cookie', later.refreshCookie)
       .expect(200);
   }, 30000);
+
+  it('does not count the raced session when the other sessions end', async () => {
+    await racedSignIn();
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    const later = await signIn();
+
+    const ended = await request(http())
+      .delete('/api/v1/auth/sessions')
+      .auth(later.access, { type: 'bearer' })
+      .send({ currentPassword: password })
+      .expect(200);
+
+    expect((ended.body as { count: number }).count).toBe(0);
+  }, 30000);
 });

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { sessionStartedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { hashToken } from '../../../common/utils/hash-token';
 import type { SessionClient } from '../utils/session-client';
@@ -187,17 +188,30 @@ export class RefreshTokenService {
         userId,
         keepSessionId
       })
-      .returning('session_id, revoked, expires_at')
+      .returning(
+        'session_id, revoked, expires_at, session_started_at, (SELECT u.token_revoked_at FROM users u WHERE u.id = user_id) AS token_revoked_at'
+      )
       .execute();
 
     const rows = result.raw as {
       session_id: string;
       revoked: boolean;
       expires_at: Date;
+      session_started_at: Date;
+      token_revoked_at: Date | null;
     }[];
+    // The live condition of `LIVE_ROW`, so the count matches the list.
     const ended = new Set(
       rows
-        .filter((row) => !row.revoked && row.expires_at.getTime() > now)
+        .filter(
+          (row) =>
+            !row.revoked &&
+            row.expires_at.getTime() > now &&
+            !sessionStartedBeforeRevocation(
+              row.session_started_at,
+              row.token_revoked_at
+            )
+        )
         .map((row) => row.session_id)
     );
 

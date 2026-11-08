@@ -115,4 +115,23 @@ describe('a session that started before the last revocation', () => {
     ).toEqual([true]);
     expect((await refresh(later)).status).toBe(200);
   });
+
+  it('is not counted when the other sessions end', async () => {
+    await signIn();
+    revokeAfterSessionStart();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const later = await signIn();
+
+    const res = await fetch(`${baseUrl}/api/v1/auth/sessions`, {
+      method: 'DELETE',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${later.accessToken}`
+      },
+      body: JSON.stringify({ currentPassword: SEED_PASSWORD })
+    });
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { count: number }).count).toBe(0);
+  });
 });
