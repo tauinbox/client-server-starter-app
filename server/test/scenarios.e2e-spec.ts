@@ -641,6 +641,11 @@ runWithInfra('Request scenarios (e2e)', () => {
     'deleted-target': async (ctx) => {
       await dataSource.getRepository(User).softDelete(ctx.target!.user.id);
     },
+    'deactivated-actor': async (ctx) => {
+      await dataSource
+        .getRepository(User)
+        .update(ctx.actor!.user.id, { isActive: false });
+    },
     'feature-flag': async (ctx) => {
       const flag = await dataSource.getRepository(FeatureFlag).save({
         key: ctx.values.$flagKey!,

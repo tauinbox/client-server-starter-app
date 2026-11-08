@@ -1,4 +1,7 @@
-import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import {
+  issuedBeforeRevocation,
+  signedTokenAccount
+} from '@app/shared/utils/token-revocation';
 
 describe('issuedBeforeRevocation', () => {
   const iat = 1_700_000_000;
@@ -23,5 +26,34 @@ describe('issuedBeforeRevocation', () => {
 
     expect(issuedBeforeRevocation(iat, revokedAt)).toBe(false);
     expect(issuedBeforeRevocation(iat - 1, revokedAt)).toBe(true);
+  });
+});
+
+describe('signedTokenAccount', () => {
+  const iat = 1_700_000_000;
+  const revokedLater = new Date(iat * 1000 + 5000);
+
+  it('returns an active account that was never revoked', () => {
+    const user = { isActive: true, tokenRevokedAt: null };
+
+    expect(signedTokenAccount(user, iat)).toEqual({ user });
+  });
+
+  it('names a missing account', () => {
+    expect(signedTokenAccount(null, iat)).toEqual({
+      refusal: 'account_not_found'
+    });
+  });
+
+  it('names a deactivated account before a revocation', () => {
+    expect(
+      signedTokenAccount({ isActive: false, tokenRevokedAt: revokedLater }, iat)
+    ).toEqual({ refusal: 'account_deactivated' });
+  });
+
+  it('names a token minted before the revocation', () => {
+    expect(
+      signedTokenAccount({ isActive: true, tokenRevokedAt: revokedLater }, iat)
+    ).toEqual({ refusal: 'session_revoked' });
   });
 });

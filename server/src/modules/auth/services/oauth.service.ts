@@ -28,6 +28,7 @@ import {
 import { normalizeEmail } from '@app/shared/utils/email';
 import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
+import { AccountDeactivatedException } from '../exceptions/account-deactivated.exception';
 import type { MfaRequiredResponse } from '@app/shared/types';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import { ApiError } from '../../../common/errors/api-error';
@@ -99,10 +100,7 @@ export class OAuthService {
       );
 
       if (!user.isActive) {
-        throw new ApiError(
-          ErrorKeys.AUTH.USER_DEACTIVATED,
-          'User account is deactivated'
-        );
+        throw new AccountDeactivatedException(user.id);
       }
 
       // Verifying unconditionally would void the mail sent at creation for

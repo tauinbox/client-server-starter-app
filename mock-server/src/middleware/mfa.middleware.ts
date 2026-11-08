@@ -8,7 +8,7 @@ import {
   TOTP_ISSUER
 } from '@app/shared/constants';
 import { normalizeOtpCode } from '@app/shared/utils/otp-code';
-import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import { signedTokenAccount } from '@app/shared/utils/token-revocation';
 import { authGuard } from '../helpers/auth.helpers';
 import {
   clearFailures,
@@ -102,8 +102,15 @@ interface PendingSignIn {
   provider?: string;
 }
 
-/** Resolves the sign-in behind an mfa-pending token, or null. */
-function signInFromPendingToken(mfaToken: unknown): PendingSignIn | null {
+/**
+ * Resolves the sign-in behind an mfa-pending token, or null. A refusal for the
+ * account that a valid token names writes the refused sign-in row, as on the
+ * server; a token that does not verify names no account and writes none.
+ */
+function signInFromPendingToken(
+  mfaToken: unknown,
+  { ip }: { ip: string | undefined }
+): PendingSignIn | null {
   if (typeof mfaToken !== 'string') return null;
 
   const decoded = decodeToken(mfaToken);
@@ -119,18 +126,37 @@ function signInFromPendingToken(mfaToken: unknown): PendingSignIn | null {
     return null;
   }
 
-  const user = findUserById(decoded.sub);
+  const { sub } = decoded;
+  const provider =
+    typeof decoded.provider === 'string' && decoded.provider !== ''
+      ? decoded.provider
+      : undefined;
 
-  if (!user || !user.isActive || !user.totpEnabledAt) return null;
+  const refuse = (reason: string): null => {
+    logAudit('USER_LOGIN_FAILURE', {
+      targetId: sub,
+      targetType: 'User',
+      details: {
+        factor: 'mfa',
+        reason,
+        ...(provider && { method: 'oauth', provider })
+      },
+      ip
+    });
+
+    return null;
+  };
 
   // A sign-out everywhere since the password check must end this attempt too.
-  if (issuedBeforeRevocation(decoded.iat, user.tokenRevokedAt)) return null;
+  const verdict = signedTokenAccount(findUserById(sub), decoded.iat);
 
-  const { provider } = decoded;
+  if ('refusal' in verdict) return refuse(verdict.refusal);
 
-  return typeof provider === 'string' && provider !== ''
-    ? { user, provider }
-    : { user };
+  const { user } = verdict;
+
+  if (!user.totpEnabledAt) return refuse('mfa_not_enabled');
+
+  return provider ? { user, provider } : { user };
 }
 
 /** The sign-in the password alone did not buy. */
@@ -377,7 +403,7 @@ router.post('/verify', (req, res) => {
     return;
   }
 
-  const pending = signInFromPendingToken(mfaToken);
+  const pending = signInFromPendingToken(mfaToken, { ip: req.ip });
 
   if (!pending) {
     sendInvalidPendingToken(res);
@@ -441,7 +467,7 @@ router.post('/recovery', (req, res) => {
     return;
   }
 
-  const pending = signInFromPendingToken(mfaToken);
+  const pending = signInFromPendingToken(mfaToken, { ip: req.ip });
 
   if (!pending) {
     sendInvalidPendingToken(res);

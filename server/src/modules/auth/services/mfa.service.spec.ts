@@ -19,6 +19,7 @@ import { PurposeTokenService } from './purpose-token.service';
 import { User } from '../../users/entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { SecretEncryptionService } from '../../../common/crypto/secret-encryption.service';
 import { hashToken } from '../../../common/utils/hash-token';
 import { createMockConfigService } from '../../../common/testing/config-service.mock';
@@ -88,6 +89,7 @@ describe('MfaService', () => {
   };
   let jwtService: { sign: jest.Mock; verify: jest.Mock };
   let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
+  let metricsService: { recordAuthEvent: jest.Mock };
   let mailService: {
     sendMfaEnabledNotification: jest.Mock;
     sendMfaDisabledNotification: jest.Mock;
@@ -114,6 +116,7 @@ describe('MfaService', () => {
       log: jest.fn().mockResolvedValue(undefined),
       logFireAndForget: jest.fn()
     };
+    metricsService = { recordAuthEvent: jest.fn() };
     mailService = {
       sendMfaEnabledNotification: jest.fn().mockResolvedValue(undefined),
       sendMfaDisabledNotification: jest.fn().mockResolvedValue(undefined),
@@ -155,6 +158,7 @@ describe('MfaService', () => {
         { provide: JwtService, useValue: jwtService },
         { provide: AuditService, useValue: auditService },
         { provide: MailService, useValue: mailService },
+        { provide: MetricsService, useValue: metricsService },
         { provide: SecretEncryptionService, useValue: encryption },
         { provide: CACHE_MANAGER, useValue: createMockCache() }
       ]
@@ -805,6 +809,113 @@ describe('MfaService', () => {
       await expect(
         service.verifyChallenge('token', '000000')
       ).rejects.toMatchObject({ status: 401 });
+    });
+  });
+
+  // The pending token is signed by this server, so a refusal for the account
+  // it names is a failed sign-in of that account and names it as the target.
+  describe('refused pending sign-in audit', () => {
+    const context = { ip: '203.0.113.7', requestId: 'req-1' };
+    const issuedAt = Math.floor(Date.now() / 1000);
+
+    const challenges = {
+      verifyChallenge: (s: MfaService) =>
+        s.verifyChallenge('token', '000000', context),
+      consumeRecoveryCode: (s: MfaService) =>
+        s.consumeRecoveryCode('token', 'ABCDEFGH-IJKLMNOP', context)
+    };
+
+    const accounts: Array<[string, User | null, string]> = [
+      [
+        'a deactivated account',
+        buildUser({ isActive: false, totpEnabledAt: new Date() }),
+        'account_deactivated'
+      ],
+      [
+        'an account whose sessions were revoked',
+        buildUser({
+          totpEnabledAt: new Date(),
+          tokenRevokedAt: new Date((issuedAt + 5) * 1000)
+        }),
+        'session_revoked'
+      ],
+      [
+        'an account with no second factor',
+        buildUser({ totpEnabledAt: null }),
+        'mfa_not_enabled'
+      ],
+      ['a missing account', null, 'account_not_found']
+    ];
+
+    describe.each(Object.entries(challenges))('%s', (_name, run) => {
+      it.each(accounts)(
+        'writes a refused sign-in row for %s',
+        async (_label, account, reason) => {
+          jwtService.verify.mockReturnValue({
+            sub: 'user-1',
+            purpose: TOKEN_PURPOSE.MFA_PENDING,
+            provider: 'google',
+            iat: issuedAt
+          });
+          repository.findOne.mockResolvedValue(account);
+
+          await expect(run(service)).rejects.toMatchObject({
+            response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN }
+          });
+
+          expect(auditService.logFireAndForget).toHaveBeenCalledTimes(1);
+          expect(auditService.logFireAndForget).toHaveBeenCalledWith({
+            action: AuditAction.USER_LOGIN_FAILURE,
+            targetId: 'user-1',
+            targetType: 'User',
+            details: {
+              factor: 'mfa',
+              reason,
+              method: 'oauth',
+              provider: 'google'
+            },
+            context
+          });
+          expect(metricsService.recordAuthEvent).toHaveBeenCalledWith(
+            'login_failure'
+          );
+        }
+      );
+
+      it('writes no provider for a password sign-in', async () => {
+        jwtService.verify.mockReturnValue({
+          sub: 'user-1',
+          purpose: TOKEN_PURPOSE.MFA_PENDING,
+          iat: issuedAt
+        });
+        repository.findOne.mockResolvedValue(
+          buildUser({ isActive: false, totpEnabledAt: new Date() })
+        );
+
+        await expect(run(service)).rejects.toBeDefined();
+
+        const [[row]] = auditService.logFireAndForget.mock.calls as [
+          [{ details: unknown }]
+        ];
+
+        expect(row.details).toEqual({
+          factor: 'mfa',
+          reason: 'account_deactivated'
+        });
+      });
+
+      it('writes no row for a token that does not verify', async () => {
+        jwtService.verify.mockImplementation(() => {
+          throw new Error('invalid signature');
+        });
+
+        await expect(run(service)).rejects.toMatchObject({
+          response: { errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN }
+        });
+
+        expect(auditService.logFireAndForget).not.toHaveBeenCalled();
+        expect(metricsService.recordAuthEvent).not.toHaveBeenCalled();
+      });
     });
   });
 

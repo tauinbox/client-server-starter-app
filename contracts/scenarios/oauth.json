@@ -37,6 +37,23 @@
       }
     },
     {
+      "name": "the oauth_data cookie of a deactivated account is refused and audited",
+      "route": "POST /api/v1/auth/oauth/exchange",
+      "actor": "oauth-only",
+      "auth": "none",
+      "state": [
+        "oauth-data",
+        "deactivated-actor"
+      ],
+      "expect": {
+        "status": 401,
+        "errorKey": "errors.auth.invalidOauthData",
+        "audit": [
+          "USER_LOGIN_FAILURE"
+        ]
+      }
+    },
+    {
       "name": "the current password starts a provider link",
       "route": "POST /api/v1/auth/oauth/link-init",
       "actor": "user",

@@ -41,9 +41,18 @@ export class OAuthFailureAudit {
     private readonly cookies: AuthCookies
   ) {}
 
-  loginFailure({ provider, reason, context }: OAuthFailure): void {
+  /**
+   * `target` is the account that the server found from a value it trusts: a
+   * verified linked identity or a token it signed. A refusal that rests on the
+   * address of the provider profile names no account, so it passes null.
+   */
+  loginFailure(
+    { provider, reason, context }: OAuthFailure,
+    target: { id: string } | null
+  ): void {
     this.auditService.logFireAndForget({
       action: AuditAction.USER_LOGIN_FAILURE,
+      ...(target && { targetId: target.id, targetType: 'User' }),
       details: { method: 'oauth', provider, reason },
       context
     });
@@ -120,7 +129,7 @@ export class OAuthFailureAudit {
       return;
     }
 
-    this.loginFailure(failure);
+    this.loginFailure(failure, null);
   }
 
   private verifiedAccount<T extends OAuthIntentAccount>(

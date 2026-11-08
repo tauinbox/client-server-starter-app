@@ -401,6 +401,11 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     return Promise.resolve();
   },
+  'deactivated-actor': (ctx) => {
+    ctx.actor!.isActive = false;
+
+    return Promise.resolve();
+  },
   'feature-flag': (ctx) => {
     const now = new Date().toISOString();
     const id = randomUUID();

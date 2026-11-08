@@ -21,3 +21,33 @@ export function issuedBeforeRevocation(
 
   return iat < Math.floor(new Date(revokedAt).getTime() / 1000);
 }
+
+/** Why a token that the server signed for an account no longer signs it in. */
+export type SignedTokenRefusal =
+  'account_not_found' | 'account_deactivated' | 'session_revoked';
+
+/**
+ * The account that a signed sign-in token names, or the reason it can no
+ * longer sign in. The caller gives the same answer for every refusal and
+ * writes the reason only to its audit row.
+ */
+export function signedTokenAccount<
+  U extends { isActive: boolean; tokenRevokedAt: Date | string | null }
+>(
+  user: U | null | undefined,
+  iat: number
+): { user: U } | { refusal: SignedTokenRefusal } {
+  if (!user) {
+    return { refusal: 'account_not_found' };
+  }
+
+  if (!user.isActive) {
+    return { refusal: 'account_deactivated' };
+  }
+
+  if (issuedBeforeRevocation(iat, user.tokenRevokedAt)) {
+    return { refusal: 'session_revoked' };
+  }
+
+  return { user };
+}

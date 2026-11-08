@@ -93,7 +93,12 @@ export const STATE_FIXTURES = [
   /** A plan with the key `$meterKey` that meters `$meterKey`. */
   'metered-plan',
   /** A webhook event in `dead_letter`; `$webhookEventId`. */
-  'dead-letter-webhook-event'
+  'dead-letter-webhook-event',
+  /**
+   * The actor is deactivated. Put it after the fixtures that need an active
+   * actor, for example `oauth-data` and `mfa-challenge`.
+   */
+  'deactivated-actor'
 ] as const;
 export type StateFixture = (typeof STATE_FIXTURES)[number];
 

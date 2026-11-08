@@ -63,6 +63,12 @@ function refreshCookieOf(res: Response): string {
   return `refresh_token=${match?.[1] ?? ''}`;
 }
 
+function loginFailureRowsOf(userId: string) {
+  return getState().auditLogs.filter(
+    (l) => l.action === 'USER_LOGIN_FAILURE' && l.targetId === userId
+  );
+}
+
 function liveTokensOf(userId: string): number {
   return [...getState().refreshTokens.values()].filter((id) => id === userId)
     .length;
@@ -269,6 +275,71 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
     });
     expect(res.headers.get('set-cookie')).not.toContain('refresh_token=');
     expect(liveTokensOf(admin!.id)).toBe(0);
+    expect(loginFailureRowsOf(admin!.id)).toEqual([
+      expect.objectContaining({
+        actorId: null,
+        targetType: 'User',
+        details: {
+          method: 'oauth',
+          provider: 'google',
+          reason: 'account_deactivated'
+        }
+      })
+    ]);
+  });
+
+  // As on the server, the exchange of a challenge does not read the account;
+  // POST /auth/mfa/verify does, and it writes the refused sign-in row.
+  it('hands out the challenge of an account deactivated after the callback, then refuses the code', async () => {
+    const admin = findUserByEmail('admin@example.com');
+
+    admin!.totpEnabledAt = new Date().toISOString();
+    const token = await issueOAuthData(admin!.id, { provider: 'github' });
+
+    admin!.isActive = false;
+
+    const res = await exchange(token);
+
+    expect(res.status).toBe(201);
+    const { mfaToken } = (await res.json()) as { mfaToken: string };
+
+    expect(loginFailureRowsOf(admin!.id)).toHaveLength(0);
+
+    const verified = await fetch(`${baseUrl}/api/v1/auth/mfa/verify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mfaToken, code: MOCK_TOTP_CODE })
+    });
+
+    expect(verified.status).toBe(401);
+    expect(await verified.json()).toMatchObject({
+      errorKey: ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN
+    });
+    expect(loginFailureRowsOf(admin!.id)).toEqual([
+      expect.objectContaining({
+        actorId: null,
+        targetType: 'User',
+        details: {
+          factor: 'mfa',
+          reason: 'account_deactivated',
+          method: 'oauth',
+          provider: 'github'
+        }
+      })
+    ]);
+  });
+
+  it('writes no refused sign-in row for a pending token that does not verify', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/auth/mfa/verify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mfaToken: 'not.a.token', code: MOCK_TOTP_CODE })
+    });
+
+    expect(res.status).toBe(401);
+    expect(
+      getState().auditLogs.filter((l) => l.action === 'USER_LOGIN_FAILURE')
+    ).toHaveLength(0);
   });
 
   it('refuses a cookie issued before a session revocation like a bad cookie', async () => {
@@ -295,6 +366,15 @@ describe('POST /api/v1/auth/oauth/exchange parity with server', () => {
       errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
     });
     expect(liveTokensOf(admin!.id)).toBe(0);
+    expect(loginFailureRowsOf(admin!.id)).toEqual([
+      expect.objectContaining({
+        details: {
+          method: 'oauth',
+          provider: 'google',
+          reason: 'session_revoked'
+        }
+      })
+    ]);
   });
 
   it('records the sign-in with its method and provider at the exchange', async () => {
