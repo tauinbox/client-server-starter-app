@@ -1792,8 +1792,10 @@ query `?error=access_denied`, which is how each provider reports a declined cons
 filter also clears that cookie, because the attempt is over. An intent that another flow claimed, or
 that no flow claimed, leaves the failure a plain sign-in, and the cookie stays for its own flow. The
 guard, the filter, the callback and the audit read the intents through one method,
-`AuthCookies.claimedIntents`, and the guard and the audit select the flow from them through one
-function, `claimedFlow`, so the redirect, the error key and the audit row cannot disagree.
+`AuthCookies.claimedIntents`, and the guard, the callback and the audit select the flow from them
+through one function, `claimedFlow`, so the redirect, the handler, the error key and the audit row
+cannot disagree. The callback logs a refusal at warn and a fault at error with its stack, as the
+global exception filter does (`logCallbackFailure`).
 
 A claimed `oauth_reauth` intent of a step-up selects the same target, and the key `reauth_failed`,
 which is the message the profile page holds for a change that did not happen. The guard reads that
