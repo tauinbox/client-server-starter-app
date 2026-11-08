@@ -36,6 +36,7 @@ import { bindIntent } from '../src/modules/auth/utils/oauth-flow-intent';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { User } from '../src/modules/users/entities/user.entity';
 import { ACCOUNT_STATE_SETUP } from './account-states';
+import { SCENARIO_CLOCK } from './scenario-clock';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // The provider rows of the sign-in state matrix. The mock has no provider
@@ -272,9 +273,18 @@ runWithInfra('Sign-in state matrix of the provider callback (e2e)', () => {
   async function run({ flow, state, refusal }: MatrixCase) {
     const spec = FLOWS[flow];
     const user = await createAccount(flow);
-    const cookie = spec.intent && intentCookie(spec.intent, user);
 
-    await ACCOUNT_STATE_SETUP[state](app, user.id);
+    if (state === 'revoked-actor') SCENARIO_CLOCK.freeze();
+
+    let cookie: string | undefined;
+
+    try {
+      cookie = spec.intent && intentCookie(spec.intent, user);
+      await ACCOUNT_STATE_SETUP[state](app, user.id);
+    } finally {
+      SCENARIO_CLOCK.release();
+    }
+
     const { location, rows } = await callback(cookie, user);
 
     for (const { reason } of rows) {

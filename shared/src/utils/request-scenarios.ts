@@ -99,7 +99,10 @@ export const STATE_FIXTURES = [
   'deactivated-actor',
   /** The actor is soft-deleted, and its sessions are not yet revoked. */
   'deleted-actor',
-  /** Every session of the actor is revoked, as a sign-out everywhere does. */
+  /**
+   * Every session of the actor is revoked, as a sign-out everywhere does,
+   * 100 ms after the fixtures before it on a frozen clock (`scenarioClock`).
+   */
   'revoked-actor',
   /** The actor is locked after too many failed sign-ins. */
   'locked-actor',
@@ -480,6 +483,74 @@ export function scenarioPath(
     .split('/')
     .map((segment) => resolvePlaceholders(segment, values))
     .join('/');
+}
+
+/** The calls of the Jest object that the scenario clock makes. */
+export interface ScenarioClockDriver {
+  useFakeTimers(config: {
+    now: number;
+    doNotFake: (
+      | 'hrtime'
+      | 'nextTick'
+      | 'performance'
+      | 'queueMicrotask'
+      | 'setImmediate'
+      | 'clearImmediate'
+      | 'setInterval'
+      | 'clearInterval'
+      | 'setTimeout'
+      | 'clearTimeout'
+    )[];
+  }): unknown;
+  setSystemTime(now: number): void;
+  useRealTimers(): unknown;
+}
+
+/**
+ * A clock that the `revoked-actor` fixture needs, so that the order of a
+ * token and a revocation does not depend on the speed of the machine.
+ * `freeze` stops `Date` at 100 ms into the previous second; the timers stay
+ * real. Tokens issued then and a revocation after `advance` share one second
+ * in a fixed order, and the real time after `release` is later than both.
+ */
+export function scenarioClock(driver: ScenarioClockDriver) {
+  let frozen = false;
+
+  return {
+    freeze(): void {
+      const second = Math.floor(Date.now() / 1000) * 1000;
+
+      driver.useFakeTimers({
+        now: second - 900,
+        doNotFake: [
+          'hrtime',
+          'nextTick',
+          'performance',
+          'queueMicrotask',
+          'setImmediate',
+          'clearImmediate',
+          'setInterval',
+          'clearInterval',
+          'setTimeout',
+          'clearTimeout'
+        ]
+      });
+      frozen = true;
+    },
+    advance(ms: number): void {
+      if (!frozen) {
+        throw new Error('freeze() must run before the revoked-actor fixture');
+      }
+
+      driver.setSystemTime(Date.now() + ms);
+    },
+    release(): void {
+      if (frozen) {
+        driver.useRealTimers();
+        frozen = false;
+      }
+    }
+  };
 }
 
 export function scenarioMethod(scenario: RequestScenario): string {

@@ -39,6 +39,7 @@ import {
   writtenAuditRows
 } from '@app/shared/utils/request-scenarios';
 import { ACCOUNT_STATE_SETUP } from './account-states';
+import { SCENARIO_CLOCK } from './scenario-clock';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { SecretEncryptionService } from '../src/common/crypto/secret-encryption.service';
 import { hashPassword } from '../src/common/utils/password-hash';
@@ -863,12 +864,18 @@ runWithInfra('Request scenarios (e2e)', () => {
 
     const states = scenario.state ?? [];
 
-    if (scenario.auth === 'bearer' && !states.includes('refresh-cookie')) {
-      ctx.bearer = (await signIn(ctx.actor!)).bearer;
-    }
+    if (states.includes('revoked-actor')) SCENARIO_CLOCK.freeze();
 
-    for (const state of states) {
-      await STATES[state](ctx);
+    try {
+      if (scenario.auth === 'bearer' && !states.includes('refresh-cookie')) {
+        ctx.bearer = (await signIn(ctx.actor!)).bearer;
+      }
+
+      for (const state of states) {
+        await STATES[state](ctx);
+      }
+    } finally {
+      SCENARIO_CLOCK.release();
     }
 
     if (ctx.actor && scenario.actor === 'user-mfa') {

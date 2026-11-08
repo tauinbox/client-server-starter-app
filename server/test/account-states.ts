@@ -4,6 +4,7 @@ import { MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
 import { AccountState } from '@app/shared/utils/request-scenarios';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { User } from '../src/modules/users/entities/user.entity';
+import { SCENARIO_CLOCK } from './scenario-clock';
 
 /** Puts an account into each state of the sign-in state matrix. */
 export const ACCOUNT_STATE_SETUP: Record<
@@ -13,8 +14,10 @@ export const ACCOUNT_STATE_SETUP: Record<
   'deactivated-actor': (app, userId) =>
     users(app).update(userId, { isActive: false }),
   'deleted-actor': (app, userId) => users(app).softDelete(userId),
-  'revoked-actor': (app, userId) =>
-    app.get(AuthService).revokeAllUserSessions(userId),
+  'revoked-actor': async (app, userId) => {
+    SCENARIO_CLOCK.advance(100);
+    await app.get(AuthService).revokeAllUserSessions(userId);
+  },
   'locked-actor': (app, userId) =>
     users(app).update(userId, {
       failedLoginAttempts: MAX_FAILED_ATTEMPTS,

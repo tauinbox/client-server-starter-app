@@ -30,6 +30,7 @@ import { User } from '../src/modules/users/entities/user.entity';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { withPrivateThrottlerStorage } from './private-throttler';
 import { eventually } from './eventually';
+import { SCENARIO_CLOCK } from './scenario-clock';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -243,9 +244,16 @@ runWithInfra(
     // every session. Before the fix a callback that the old holder finished
     // just before it still turned into a fresh session.
     it('refuses an oauth_data cookie issued before a session revocation', async () => {
-      const oauthData = await callback();
+      SCENARIO_CLOCK.freeze();
+      let oauthData: string;
 
-      await authService.revokeAllUserSessions(user.id);
+      try {
+        oauthData = await callback();
+        SCENARIO_CLOCK.advance(100);
+        await authService.revokeAllUserSessions(user.id);
+      } finally {
+        SCENARIO_CLOCK.release();
+      }
 
       const res = await request(http())
         .post('/api/v1/auth/oauth/exchange')
