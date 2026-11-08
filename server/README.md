@@ -43,6 +43,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Lint | `npm run lint` covers `src/`, `test/` and `scripts/` |
 | Lint fix | `npm run lint:fix` |
 | Lint `shared/` | `npm run lint:shared` runs the base rules of `eslint.base.config.mjs` over `shared/src/` from the repository root, with `eslint.shared.config.ts` |
+| Typecheck `shared/` | `npm run typecheck:shared` compiles `shared/tsconfig.browser.json` (every `shared/src` file with `types: []`, so a Node import fails) and `shared/tsconfig.node.json` (the four Node-only files, with `@types/node` from `server/node_modules`) |
 | Format check | `npm run format:check` covers `src/`, `test/`, `scripts/` and the root configuration files. It also covers `shared/src/` and the root-level `*.mjs` configuration files |
 | Format | `npm run format` uses the same scope and writes the corrections |
 | Unit tests | `npm test`. It starts Jest with `--experimental-vm-modules`, because Jest can `require()` the ESM-only NestJS 12 packages only with that flag. Do not start `jest` directly |
