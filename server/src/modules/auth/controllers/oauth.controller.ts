@@ -50,6 +50,7 @@ import {
 import { CLIENT_URL } from '../providers/client-url.provider';
 import { OAuthAuthenticationExceptionFilter } from '../filters/oauth-authentication-exception.filter';
 import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authentication-failed.exception';
+import { AccountDeactivatedException } from '../exceptions/account-deactivated.exception';
 import {
   OAUTH_DATA_COOKIE,
   OAUTH_LINK_COOKIE,
@@ -62,7 +63,7 @@ import {
   type OAuthIntentAccount
 } from '../utils/oauth-failure-audit';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
-import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import { signedTokenAccount } from '@app/shared/utils/token-revocation';
 import { ReauthInitDto } from '../dtos/reauth-init.dto';
 import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
 import { StepUpRoute } from '../decorators/step-up-route.decorator';
@@ -448,16 +449,24 @@ export class OAuthController {
     // same refusal as a bad cookie so the exchange leaks no account state.
     // eslint-disable-next-line no-restricted-syntax -- the id comes from the signed, single-use oauth_data cookie that the callback minted
     const user = await this.usersService.findById(data.userId);
+    const verdict = signedTokenAccount(user, issuedAt);
 
-    if (
-      !user?.isActive ||
-      issuedBeforeRevocation(issuedAt, user.tokenRevokedAt)
-    ) {
+    if ('refusal' in verdict) {
+      // The signed cookie names the account, so the row names it too.
+      this.failureAudit.loginFailure(
+        {
+          provider: data.provider,
+          reason: verdict.refusal,
+          context: extractAuditContext(req)
+        },
+        { id: data.userId }
+      );
+
       throw invalidOAuthData();
     }
 
     return await this.signIn.complete(
-      user,
+      verdict.user,
       { req, res },
       {
         method: 'oauth',
@@ -513,11 +522,16 @@ export class OAuthController {
 
       res.redirect(`${this.clientUrl}/oauth/callback`);
     } catch (error) {
-      this.failureAudit.loginFailure({
-        provider: profile.provider,
-        reason: oauthFailureReason(error),
-        context: extractAuditContext(req)
-      });
+      this.failureAudit.loginFailure(
+        {
+          provider: profile.provider,
+          reason: oauthFailureReason(error),
+          context: extractAuditContext(req)
+        },
+        error instanceof AccountDeactivatedException
+          ? { id: error.userId }
+          : null
+      );
 
       if (error instanceof OAuthAuthenticationFailedException) {
         this.logger.warn(`${error.message} via ${profile.provider}`);

@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import { Router, type Response } from 'express';
+import { signedTokenAccount } from '@app/shared/utils/token-revocation';
 import { completeSignIn } from '../helpers/sign-in.helpers';
 import {
   ErrorKeys,
@@ -151,6 +151,14 @@ for (const provider of OAUTH_PROVIDERS) {
   });
 }
 
+function sendInvalidOAuthData(res: Response): void {
+  sendError(
+    res,
+    ErrorKeys.AUTH.INVALID_OAUTH_DATA,
+    'Invalid or expired OAuth data'
+  );
+}
+
 // POST /api/v1/auth/oauth/exchange
 router.post('/exchange', (req, res) => {
   const cookie = (req.cookies as Record<string, string> | undefined)?.[
@@ -170,39 +178,51 @@ router.post('/exchange', (req, res) => {
 
   // One-shot, like the cookie the real server clears on exchange.
   state.oauthDataTokens.delete(cookie);
-  const user = pending ? findUserById(pending.userId) : undefined;
 
-  // A deactivated or recovered account gets the refusal a bad cookie gets, as
-  // on the server, so the exchange tells nothing about the account.
-  if (
-    !pending ||
-    pending.expiresAt < Date.now() ||
-    !user?.isActive ||
-    issuedBeforeRevocation(pending.issuedAt, user.tokenRevokedAt)
-  ) {
-    sendError(
-      res,
-      ErrorKeys.AUTH.INVALID_OAUTH_DATA,
-      'Invalid or expired OAuth data'
-    );
+  if (!pending || pending.expiresAt < Date.now()) {
+    sendInvalidOAuthData(res);
 
     return;
   }
 
-  // The server route sets no other status, so a POST answers 201.
-  res.status(201);
-
   // No session exists behind a challenge, so nothing is handed out but the
-  // right to present a code. POST /auth/mfa/verify finishes the sign-in.
+  // right to present a code. POST /auth/mfa/verify finishes the sign-in and
+  // checks the account, as on the server. The server route sets no other
+  // status, so a POST answers 201.
   if ('challenge' in pending) {
-    res.json(pending.challenge);
+    res.status(201).json(pending.challenge);
+
+    return;
+  }
+
+  // A deactivated or recovered account gets the refusal a bad cookie gets, as
+  // on the server, so the exchange tells nothing about the account. The
+  // pending entry names the account, so the audit row names it too.
+  const verdict = signedTokenAccount(
+    findUserById(pending.userId),
+    pending.issuedAt
+  );
+
+  if ('refusal' in verdict) {
+    logAudit('USER_LOGIN_FAILURE', {
+      targetId: pending.userId,
+      targetType: 'User',
+      details: {
+        method: 'oauth',
+        provider: pending.provider,
+        reason: verdict.refusal
+      },
+      ip: req.ip
+    });
+    sendInvalidOAuthData(res);
 
     return;
   }
 
   // The session is issued here, as on the server: only this request carries
   // the refresh cookie of the session it replaces.
-  completeSignIn({ req, res }, user, {
+  res.status(201);
+  completeSignIn({ req, res }, verdict.user, {
     method: 'oauth',
     provider: pending.provider
   });

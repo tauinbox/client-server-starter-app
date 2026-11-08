@@ -17,6 +17,7 @@ import * as crypto from 'crypto';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
 import { ErrorKeys, requiresSecureCookies } from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { CoreModule } from '../src/modules/core/core.module';
 import { GoogleOAuthGuard } from '../src/modules/auth/guards/google-oauth.guard';
 import { AuthService } from '../src/modules/auth/services/auth.service';
@@ -28,6 +29,7 @@ import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { eventually } from './eventually';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -104,17 +106,45 @@ runWithInfra(
       await dataSource.query(`DELETE FROM refresh_tokens WHERE user_id = $1`, [
         user.id
       ]);
+      await dataSource.getRepository(AuditLog).delete({ targetId: user.id });
+      await dataSource
+        .getRepository(User)
+        .update(user.id, { isActive: true, tokenRevokedAt: null });
     });
 
     afterAll(async () => {
       if (user) {
         await dataSource.getRepository(AuditLog).delete({ actorId: user.id });
+        await dataSource.getRepository(AuditLog).delete({ targetId: user.id });
         // refresh_tokens.user_id and oauth_accounts.user_id cascade on delete.
         await dataSource.getRepository(User).delete({ id: user.id });
       }
 
       await app?.close();
     });
+
+    /**
+     * The refused sign-in rows that name the test account, once at least one
+     * has landed: the audit write is fire-and-forget.
+     */
+    async function loginFailureRows(): Promise<
+      Array<Pick<AuditLog, 'actorId' | 'details'>>
+    > {
+      const rows = await eventually(async () => {
+        const found = await dataSource.getRepository(AuditLog).find({
+          select: { actorId: true, details: true },
+          where: {
+            action: AuditAction.USER_LOGIN_FAILURE,
+            targetId: user.id,
+            targetType: 'User'
+          }
+        });
+
+        return found.length > 0 ? found : null;
+      });
+
+      return rows ?? [];
+    }
 
     function http(): Server {
       return app.getHttpServer() as Server;
@@ -228,6 +258,65 @@ runWithInfra(
         errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
       });
       expect(await liveRows()).toBe(0);
+      expect(await loginFailureRows()).toEqual([
+        {
+          actorId: null,
+          details: {
+            method: 'oauth',
+            provider: 'google',
+            reason: 'session_revoked'
+          }
+        }
+      ]);
+    }, 30000);
+
+    // The signed cookie names the account, so the refusal is a failed sign-in
+    // of that account. Before the fix it left no trace.
+    it('audits an exchange for an account deactivated after the callback', async () => {
+      const oauthData = await callback();
+
+      await dataSource.getRepository(User).update(user.id, { isActive: false });
+
+      const res = await request(http())
+        .post('/api/v1/auth/oauth/exchange')
+        .set('Cookie', oauthData)
+        .expect(401);
+
+      expect(res.body).toMatchObject({
+        errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
+      });
+      expect(await loginFailureRows()).toEqual([
+        {
+          actorId: null,
+          details: {
+            method: 'oauth',
+            provider: 'google',
+            reason: 'account_deactivated'
+          }
+        }
+      ]);
+    }, 30000);
+
+    // The account comes from its linked identity, not from the address of the
+    // profile, so the row names it. Before the fix the row named no account.
+    it('names the account in the row of a callback for a deactivated account', async () => {
+      await dataSource.getRepository(User).update(user.id, { isActive: false });
+
+      const res = await request(http())
+        .get('/api/v1/auth/oauth/google/callback')
+        .expect(302);
+
+      expect(res.headers['location']).toMatch(/\/login\?oauth_error=/);
+      expect(await loginFailureRows()).toEqual([
+        {
+          actorId: null,
+          details: {
+            method: 'oauth',
+            provider: 'google',
+            reason: ErrorKeys.AUTH.USER_DEACTIVATED
+          }
+        }
+      ]);
     }, 30000);
   }
 );

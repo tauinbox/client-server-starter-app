@@ -31,12 +31,16 @@ import type {
 } from '@app/shared/types';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { normalizeOtpCode } from '@app/shared/utils/otp-code';
-import { issuedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import {
+  signedTokenAccount,
+  type SignedTokenRefusal
+} from '@app/shared/utils/token-revocation';
 import { User } from '../../users/entities/user.entity';
 import { lockUserWithRoles } from '../../users/utils/lock-user';
 import { userNotFound } from '../../users/utils/user-not-found';
 import { AuditContext, AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import {
   SecretEncryptionService,
   digestsMatch
@@ -48,6 +52,13 @@ import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { ApiError } from '../../../common/errors/api-error';
 
 const base32 = new ScureBase32Plugin();
+
+function invalidPendingToken(): ApiError {
+  return new ApiError(
+    ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN,
+    'Two-factor sign-in is invalid or has expired'
+  );
+}
 
 /** One group of a recovery code, as the user reads it: ABCDEFGH-IJKLMNOP-QRSTUVWX. */
 const RECOVERY_CODE_GROUP = 8;
@@ -109,6 +120,7 @@ export class MfaService {
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
     private readonly encryption: SecretEncryptionService,
+    private readonly metricsService: MetricsService,
     @Inject(CACHE_MANAGER) cache: Cache
   ) {
     this.#challengeFailures = new FailedAttemptCounter(
@@ -428,7 +440,7 @@ export class MfaService {
     code: string,
     context?: AuditContext
   ): Promise<PendingSignIn> {
-    const pending = await this.signInFromPendingToken(mfaToken);
+    const pending = await this.signInFromPendingToken(mfaToken, { context });
     const { user } = pending;
 
     // The attempt takes its slot before the code is checked. Reading the count
@@ -476,7 +488,7 @@ export class MfaService {
     recoveryCode: string,
     context?: AuditContext
   ): Promise<PendingSignIn> {
-    const pending = await this.signInFromPendingToken(mfaToken);
+    const pending = await this.signInFromPendingToken(mfaToken, { context });
     const { user } = pending;
     const digest = hashToken(normalizeOtpCode(recoveryCode));
 
@@ -575,47 +587,79 @@ export class MfaService {
   }
 
   private async signInFromPendingToken(
-    mfaToken: string
+    mfaToken: string,
+    { context }: { context?: AuditContext }
   ): Promise<PendingSignIn> {
-    const invalidTokenError = new ApiError(
-      ErrorKeys.AUTH.MFA_INVALID_PENDING_TOKEN,
-      'Two-factor sign-in is invalid or has expired'
-    );
-
     const payload = this.purposeTokens.verify<{
       sub?: string;
       provider?: unknown;
     }>(mfaToken, TOKEN_PURPOSE.MFA_PENDING);
 
+    // A token that does not verify names no account, so it writes no row.
     if (
       payload === null ||
       typeof payload.sub !== 'string' ||
       payload.sub === ''
     ) {
-      throw invalidTokenError;
+      throw invalidPendingToken();
     }
 
-    const user = await this.dataSource.getRepository(User).findOne({
-      where: { id: payload.sub },
+    const { sub, iat } = payload;
+    const provider =
+      typeof payload.provider === 'string' && payload.provider !== ''
+        ? payload.provider
+        : undefined;
+    const refused = { userId: sub, provider, context };
+
+    const found = await this.dataSource.getRepository(User).findOne({
+      where: { id: sub },
       relations: { roles: true }
     });
 
     // Anything that ended the account's sessions since the password check
     // must end this attempt too.
-    if (
-      !user ||
-      !user.isActive ||
-      user.totpEnabledAt === null ||
-      issuedBeforeRevocation(payload.iat, user.tokenRevokedAt)
-    ) {
-      throw invalidTokenError;
+    const verdict = signedTokenAccount(found, iat);
+
+    if ('refusal' in verdict) {
+      throw this.refusedPendingSignIn(verdict.refusal, refused);
     }
 
-    const { provider } = payload;
+    const { user } = verdict;
 
-    return typeof provider === 'string' && provider !== ''
-      ? { user, provider }
-      : { user };
+    if (user.totpEnabledAt === null) {
+      throw this.refusedPendingSignIn('mfa_not_enabled', refused);
+    }
+
+    return provider ? { user, provider } : { user };
+  }
+
+  /**
+   * The signed token names the account, so the row names it as the target.
+   * The answer is the same for every reason, so it tells nothing about the
+   * account.
+   */
+  private refusedPendingSignIn(
+    reason: SignedTokenRefusal | 'mfa_not_enabled',
+    {
+      userId,
+      provider,
+      context
+    }: { userId: string; provider?: string; context?: AuditContext }
+  ): ApiError {
+    this.auditService.logFireAndForget({
+      action: AuditAction.USER_LOGIN_FAILURE,
+      targetId: userId,
+      targetType: 'User',
+      details: {
+        factor: 'mfa',
+        reason,
+        ...(provider && { method: 'oauth', provider })
+      },
+      context
+    });
+    this.metricsService.recordAuthEvent('login_failure');
+
+    return invalidPendingToken();
   }
 
   /**
