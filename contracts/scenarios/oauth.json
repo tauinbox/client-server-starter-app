@@ -49,7 +49,104 @@
         "status": 401,
         "errorKey": "errors.auth.invalidOauthData",
         "audit": [
-          "USER_LOGIN_FAILURE"
+          {
+            "action": "USER_LOGIN_FAILURE",
+            "reason": "account_deactivated",
+            "target": "actor"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the oauth_data cookie of a soft-deleted account is refused and audited",
+      "route": "POST /api/v1/auth/oauth/exchange",
+      "actor": "oauth-only",
+      "auth": "none",
+      "state": [
+        "oauth-data",
+        "deleted-actor"
+      ],
+      "expect": {
+        "status": 401,
+        "errorKey": "errors.auth.invalidOauthData",
+        "audit": [
+          {
+            "action": "USER_LOGIN_FAILURE",
+            "reason": "account_not_found",
+            "target": "actor"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a sign-out everywhere ends the oauth_data cookie",
+      "route": "POST /api/v1/auth/oauth/exchange",
+      "actor": "oauth-only",
+      "auth": "none",
+      "state": [
+        "oauth-data",
+        "revoked-actor"
+      ],
+      "expect": {
+        "status": 401,
+        "errorKey": "errors.auth.invalidOauthData",
+        "audit": [
+          {
+            "action": "USER_LOGIN_FAILURE",
+            "reason": "session_revoked",
+            "target": "actor"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the oauth_data cookie signs in a locked account",
+      "route": "POST /api/v1/auth/oauth/exchange",
+      "actor": "oauth-only",
+      "auth": "none",
+      "state": [
+        "oauth-data",
+        "locked-actor"
+      ],
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "USER_LOGIN_SUCCESS"
+        ]
+      }
+    },
+    {
+      "name": "the oauth_data cookie signs in an address that is not verified",
+      "route": "POST /api/v1/auth/oauth/exchange",
+      "actor": "oauth-only",
+      "auth": "none",
+      "state": [
+        "oauth-data",
+        "unverified-actor"
+      ],
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "USER_LOGIN_SUCCESS"
+        ]
+      }
+    },
+    {
+      "name": "the oauth_data cookie of an account with no password signs in",
+      "route": "POST /api/v1/auth/oauth/exchange",
+      "actor": "oauth-only",
+      "auth": "none",
+      "state": [
+        "oauth-data",
+        "passwordless-actor"
+      ],
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "USER_LOGIN_SUCCESS"
         ]
       }
     },

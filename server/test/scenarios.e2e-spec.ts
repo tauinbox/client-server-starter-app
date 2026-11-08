@@ -24,6 +24,7 @@ import {
   ACTOR_FIXTURES,
   ActorFixture,
   expectedAnswers,
+  expectedAuditRows,
   loadScenarioFiles,
   RequestScenario,
   resolvePlaceholders,
@@ -33,7 +34,9 @@ import {
   ScenarioPlaceholder,
   scenarioMethod,
   scenarioPath,
-  StateFixture
+  StateFixture,
+  untilNextSecond,
+  writtenAuditRows
 } from '@app/shared/utils/request-scenarios';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { SecretEncryptionService } from '../src/common/crypto/secret-encryption.service';
@@ -402,13 +405,6 @@ runWithInfra('Request scenarios (e2e)', () => {
     },
     'oauth-only': (u) => {
       u.password = null;
-    },
-    unverified: (u) => {
-      u.isEmailVerified = false;
-    },
-    locked: (u) => {
-      u.failedLoginAttempts = MAX_FAILED_ATTEMPTS;
-      u.lockedUntil = new Date(Date.now() + 3600_000);
     }
   };
 
@@ -646,6 +642,29 @@ runWithInfra('Request scenarios (e2e)', () => {
         .getRepository(User)
         .update(ctx.actor!.user.id, { isActive: false });
     },
+    'deleted-actor': async (ctx) => {
+      await dataSource.getRepository(User).softDelete(ctx.actor!.user.id);
+    },
+    'revoked-actor': async (ctx) => {
+      await untilNextSecond();
+      await app.get(AuthService).revokeAllUserSessions(ctx.actor!.user.id);
+    },
+    'locked-actor': async (ctx) => {
+      await dataSource.getRepository(User).update(ctx.actor!.user.id, {
+        failedLoginAttempts: MAX_FAILED_ATTEMPTS,
+        lockedUntil: new Date(Date.now() + 3600_000)
+      });
+    },
+    'unverified-actor': async (ctx) => {
+      await dataSource
+        .getRepository(User)
+        .update(ctx.actor!.user.id, { isEmailVerified: false });
+    },
+    'passwordless-actor': async (ctx) => {
+      await dataSource
+        .getRepository(User)
+        .update(ctx.actor!.user.id, { password: null });
+    },
     'feature-flag': async (ctx) => {
       const flag = await dataSource.getRepository(FeatureFlag).save({
         key: ctx.values.$flagKey!,
@@ -791,22 +810,22 @@ runWithInfra('Request scenarios (e2e)', () => {
     return rows.map((r) => r.id);
   }
 
-  async function newAuditActions(
+  async function newAuditRows(
     emails: string[],
     seen: Set<string>,
     expected: number
-  ): Promise<string[]> {
+  ): Promise<AuditLog[]> {
     const read = async () => {
       const rows = await auditRows(await idsOf(emails), emails);
 
-      return rows.filter((r) => !seen.has(r.id)).map((r) => r.action);
+      return rows.filter((r) => !seen.has(r.id));
     };
     const deadline = Date.now() + AUDIT_WAIT_MS;
-    let actions = await read();
+    let rows = await read();
 
-    while (actions.length < expected && Date.now() < deadline) {
+    while (rows.length < expected && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 50));
-      actions = await read();
+      rows = await read();
     }
 
     await new Promise((r) => setTimeout(r, AUDIT_SETTLE_MS));
@@ -903,13 +922,15 @@ runWithInfra('Request scenarios (e2e)', () => {
       });
     }
 
-    const audit = await newAuditActions(
-      emails,
-      seen,
-      scenario.expect.audit.length
-    );
+    const rows = await newAuditRows(emails, seen, scenario.expect.audit.length);
 
-    return { answers, audit };
+    return {
+      answers,
+      audit: writtenAuditRows(scenario, {
+        rows,
+        actorId: ctx.actor?.user.id
+      })
+    };
   }
 
   for (const { file, scenarios } of loadScenarioFiles()) {
@@ -917,12 +938,10 @@ runWithInfra('Request scenarios (e2e)', () => {
       it.each(scenarios.map((s) => [s.name, s] as const))(
         '%s',
         async (_name, scenario) => {
-          const { answers, audit } = await run(scenario);
-
-          // Fire-and-forget writes land in any order.
-          expect({ answers, audit: audit.toSorted() }).toEqual({
+          // Fire-and-forget writes land in any order, so both lists are sorted.
+          expect(await run(scenario)).toEqual({
             answers: expectedAnswers(scenario),
-            audit: scenario.expect.audit.toSorted()
+            audit: expectedAuditRows(scenario)
           });
         },
         30000

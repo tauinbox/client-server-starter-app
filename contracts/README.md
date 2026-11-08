@@ -95,9 +95,23 @@ expected status, `errorKey` and audit actions:
   `shared/src/utils/request-scenarios.ts`.
 - `headers` holds request headers, for example `{ "If-Match": "\"1\"" }`. A
   header value that is exactly a placeholder gets its value too.
-- `audit` is the full list of actions of the rows that the requests write and
-  that name an account of the scenario. An empty list is a statement: no row.
-  The runners compare the list in any order.
+- `audit` is the full list of the rows that the requests write and that name
+  an account of the scenario. An empty list is a statement: no row. The runners
+  compare the list in any order. An entry is an action (`"SESSION_REVOKE"`) or
+  a row `{ "action": ..., "reason": ..., "target": "actor" | "none" }`, which
+  also compares `details.reason` (or `null`) and whether the target of the row
+  is the actor. All entries of one scenario have the same form.
+- The sign-in state matrix: each route of `SIGN_IN_ROUTES` (password, refresh,
+  provider exchange, code and recovery code) has a scenario for each account
+  state of `ACCOUNT_STATES` (deactivated, soft-deleted, revoked, locked, not
+  verified, no password). An account state is a `state` fixture, and it goes
+  after the fixtures that sign the actor in, for example
+  `["mfa-challenge", "revoked-actor"]`. A scenario on a sign-in route with a
+  status of 400 or more states its rows as `{ action, reason, target }`, and
+  each reason is a value of `SIGN_IN_REFUSAL_REASONS`
+  (`shared/src/constants/auth.constants.ts`). The provider callback, link and
+  step-up cannot run on the mock, so `server/test/sign-in-state-matrix.e2e-spec.ts`
+  runs them against the same states and the same vocabulary.
 - `expect.earlier` is the answer of each request before the last, when it is
   not the same as the last one.
 
@@ -117,7 +131,10 @@ Consumers:
   route that is not listed. CI runs the check as
   `npm run check:scenarios -- --base origin/master`: a listed route also fails
   when it is not a route with no success scenario on `master`, so a change
-  cannot add a route to the list and the list can only get shorter. CI runs
+  cannot add a route to the list and the list can only get shorter. The check
+  also fails on a pair of the sign-in state matrix with no scenario, on a
+  refused sign-in whose rows are actions only, and on a reason that is not in
+  `SIGN_IN_REFUSAL_REASONS`. CI runs
   `npm run check:scenarios -- --self-test` before the check.
 
 Rate limiting is an allowed difference between the server and the mock, so a

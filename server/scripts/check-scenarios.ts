@@ -10,17 +10,26 @@
  * also fails when it has a scenario or does not exist in that commit, so the
  * list can only get shorter.
  *
+ * Each route of SIGN_IN_ROUTES must have a scenario for each state of
+ * ACCOUNT_STATES. A scenario on such a route with a status of 400 or more
+ * states its audit rows as { action, reason, target }, and each reason must be
+ * in SIGN_IN_REFUSAL_REASONS.
+ *
  * Usage (from server/): npm run check:scenarios [-- --self-test | --base <ref>]
  */
 
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SIGN_IN_REFUSAL_REASONS } from '@app/shared/constants';
 import {
+  ACCOUNT_STATES,
   loadScenarioFiles,
   RequestScenario,
   ROUTES_DIR,
-  ScenarioFile
+  ScenarioFile,
+  SIGN_IN_ROUTES,
+  StateFixture
 } from '@app/shared/utils/request-scenarios';
 
 const PENDING_ROUTES = new Set<string>();
@@ -116,8 +125,13 @@ export function scenarioCoverageErrors(
   scenarioFiles: ScenarioFile[],
   {
     pending,
-    base
-  }: { pending: ReadonlySet<string>; base?: ReadonlySet<string> }
+    base,
+    matrix
+  }: {
+    pending: ReadonlySet<string>;
+    base?: ReadonlySet<string>;
+    matrix: SignInMatrix;
+  }
 ): string[] {
   const errors: string[] = [];
   const routesByFile = new Map(
@@ -169,6 +183,73 @@ export function scenarioCoverageErrors(
     }
   }
 
+  errors.push(...signInMatrixErrors(scenarioFiles, matrix, allRoutes));
+
+  return errors;
+}
+
+export interface SignInMatrix {
+  routes: readonly string[];
+  states: readonly StateFixture[];
+  reasons: readonly string[];
+}
+
+/**
+ * Each pair of a sign-in route and an account state has a scenario. A refused
+ * sign-in states its audit rows with their reason and target, and each reason
+ * is in the vocabulary.
+ */
+function signInMatrixErrors(
+  scenarioFiles: ScenarioFile[],
+  { routes, states, reasons }: SignInMatrix,
+  allRoutes: ReadonlySet<string>
+): string[] {
+  const errors: string[] = [];
+  const scenarios = scenarioFiles
+    .flatMap((f) => f.scenarios)
+    .filter((s) => routes.includes(s.route));
+
+  for (const route of routes) {
+    if (!allRoutes.has(route)) {
+      errors.push(
+        `SIGN_IN_ROUTES names ${route}, which contracts/routes does not hold`
+      );
+      continue;
+    }
+
+    for (const state of states) {
+      const covered = scenarios.some(
+        (s) => s.route === route && s.state?.includes(state)
+      );
+
+      if (!covered) {
+        errors.push(`${route} has no scenario for the account state ${state}`);
+      }
+    }
+  }
+
+  for (const s of scenarios) {
+    const { status, audit } = s.expect;
+
+    if (status >= 400 && audit.some((entry) => typeof entry === 'string')) {
+      errors.push(
+        `"${s.name}" refuses a sign-in and states its audit rows as actions: give each row { action, reason, target }`
+      );
+    }
+
+    for (const entry of audit) {
+      if (
+        typeof entry !== 'string' &&
+        entry.reason !== null &&
+        !reasons.includes(entry.reason)
+      ) {
+        errors.push(
+          `"${s.name}" expects the reason ${entry.reason}, which SIGN_IN_REFUSAL_REASONS does not hold`
+        );
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -201,6 +282,15 @@ function selfTest(): void {
     auth: 'none',
     expect: { status, errorKey: null, audit: [] }
   });
+  const refusal = (
+    name: string,
+    audit: RequestScenario['expect']['audit']
+  ): RequestScenario => ({
+    ...scenario(name, 'POST /api/v1/things', 401),
+    state: ['deactivated-actor'],
+    expect: { status: 401, errorKey: null, audit }
+  });
+  const failure = 'USER_LOGIN_FAILURE';
   const scenarioFiles: ScenarioFile[] = [
     {
       file: 'things.json',
@@ -210,10 +300,30 @@ function selfTest(): void {
         // Rule 2: a listed route that has a scenario.
         scenario('update', 'PATCH /api/v1/things/1', 200),
         // Rule 4: a scenario that names an unknown route.
-        scenario('unknown', 'POST /api/v1/things/2', 200)
+        scenario('unknown', 'POST /api/v1/things/2', 200),
+        // Passes: a refused sign-in with a row of the vocabulary.
+        refusal('refused', [
+          { action: failure, reason: 'invalid_credentials', target: 'none' }
+        ]),
+        // Rule 7: a refused sign-in that states actions only.
+        refusal('actions', [failure]),
+        // Rule 8: a reason that is not in the vocabulary.
+        refusal('made up', [
+          { action: failure, reason: 'made_up', target: 'actor' }
+        ])
       ]
     }
   ];
+  const matrix: SignInMatrix = {
+    routes: [
+      'POST /api/v1/things',
+      // Rule 9: a sign-in route that no route file holds.
+      'POST /api/v1/things/9/login'
+    ],
+    // Rule 6: no scenario of the sign-in route has `locked-actor`.
+    states: ['deactivated-actor', 'locked-actor'],
+    reasons: ['invalid_credentials']
+  };
   const pending = new Set([
     'PATCH /api/v1/things/1',
     // Passes: a listed route with no scenario.
@@ -230,7 +340,8 @@ function selfTest(): void {
 
   const problems = scenarioCoverageErrors(routeFiles, scenarioFiles, {
     pending,
-    base
+    base,
+    matrix
   });
 
   const expected = [
@@ -239,7 +350,11 @@ function selfTest(): void {
     'PATCH /api/v1/things/1 has a scenario: remove it',
     'PENDING_ROUTES names DELETE /api/v1/things/9',
     '"unknown" names POST /api/v1/things/2',
-    'POST /api/v1/things/1/copy is not pending on the base branch'
+    'POST /api/v1/things/1/copy is not pending on the base branch',
+    'POST /api/v1/things has no scenario for the account state locked-actor',
+    '"actions" refuses a sign-in and states its audit rows as actions',
+    '"made up" expects the reason made_up',
+    'SIGN_IN_ROUTES names POST /api/v1/things/9/login'
   ];
   const missing = expected.filter(
     (text) => !problems.some((p) => p.includes(text))
@@ -252,7 +367,7 @@ function selfTest(): void {
     process.exit(1);
   }
 
-  console.log('check-scenarios self-test: all five rules report');
+  console.log('check-scenarios self-test: all nine rules report');
 }
 
 function main(): void {
@@ -266,7 +381,12 @@ function main(): void {
 
   const errors = scenarioCoverageErrors(loadRouteFiles(), loadScenarioFiles(), {
     pending: PENDING_ROUTES,
-    base: ref ? routesWithoutScenarioAt(ref) : undefined
+    base: ref ? routesWithoutScenarioAt(ref) : undefined,
+    matrix: {
+      routes: SIGN_IN_ROUTES,
+      states: ACCOUNT_STATES,
+      reasons: SIGN_IN_REFUSAL_REASONS
+    }
   });
 
   if (errors.length > 0) {

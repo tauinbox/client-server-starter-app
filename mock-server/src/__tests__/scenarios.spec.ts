@@ -8,6 +8,7 @@ import {
   ACTOR_FIXTURES,
   ActorFixture,
   expectedAnswers,
+  expectedAuditRows,
   loadScenarioFiles,
   RequestScenario,
   resolvePlaceholders,
@@ -17,12 +18,19 @@ import {
   ScenarioPlaceholder,
   scenarioMethod,
   scenarioPath,
-  StateFixture
+  StateFixture,
+  untilNextSecond,
+  writtenAuditRows
 } from '@app/shared/utils/request-scenarios';
 import { createApp } from '../app';
 import { MOCK_TOTP_CODE, MOCK_TOTP_SECRET } from '../constants';
 import { recordFailure } from '../helpers/reauth.helpers';
-import { addOAuthAccounts, getState, resetState } from '../state';
+import {
+  addOAuthAccounts,
+  getState,
+  resetState,
+  revokeUserSessions
+} from '../state';
 import type { MockIssuedToken, MockUser } from '../types';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 
@@ -116,13 +124,6 @@ const ACTORS: Record<ActorFixture, (user: MockUser) => void> = {
         createdAt: new Date().toISOString()
       }
     ]);
-  },
-  unverified: (u) => {
-    u.isEmailVerified = false;
-  },
-  locked: (u) => {
-    u.failedLoginAttempts = MAX_FAILED_ATTEMPTS;
-    u.lockedUntil = new Date(Date.now() + 3600_000).toISOString();
   }
 };
 
@@ -406,6 +407,31 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     return Promise.resolve();
   },
+  'deleted-actor': (ctx) => {
+    ctx.actor!.deletedAt = new Date().toISOString();
+
+    return Promise.resolve();
+  },
+  'revoked-actor': async (ctx) => {
+    await untilNextSecond();
+    revokeUserSessions(ctx.actor!.id);
+  },
+  'locked-actor': (ctx) => {
+    ctx.actor!.failedLoginAttempts = MAX_FAILED_ATTEMPTS;
+    ctx.actor!.lockedUntil = new Date(Date.now() + 3600_000).toISOString();
+
+    return Promise.resolve();
+  },
+  'unverified-actor': (ctx) => {
+    ctx.actor!.isEmailVerified = false;
+
+    return Promise.resolve();
+  },
+  'passwordless-actor': (ctx) => {
+    ctx.actor!.password = null;
+
+    return Promise.resolve();
+  },
   'feature-flag': (ctx) => {
     const now = new Date().toISOString();
     const id = randomUUID();
@@ -589,8 +615,8 @@ function readRolePermissionId(): string {
   return found.id;
 }
 
-/** The actions of the audit rows that name one of the accounts. */
-function auditActions(ids: string[], emails: string[], from: number) {
+/** The audit rows that name one of the accounts. */
+function auditRows(ids: string[], emails: string[], from: number) {
   return getState()
     .auditLogs.slice(from)
     .filter(
@@ -598,8 +624,7 @@ function auditActions(ids: string[], emails: string[], from: number) {
         (row.actorId !== null && ids.includes(row.actorId)) ||
         (row.targetId !== null && ids.includes(row.targetId)) ||
         (row.actorEmail !== null && emails.includes(row.actorEmail))
-    )
-    .map((row) => row.action);
+    );
 }
 
 async function run(scenario: RequestScenario) {
@@ -673,7 +698,13 @@ async function run(scenario: RequestScenario) {
     .filter((u) => emails.includes(u.email))
     .map((u) => u.id);
 
-  return { answers, audit: auditActions(ids, emails, from) };
+  return {
+    answers,
+    audit: writtenAuditRows(scenario, {
+      rows: auditRows(ids, emails, from),
+      actorId: ctx.actor?.id
+    })
+  };
 }
 
 it('builds every actor fixture', () => {
@@ -685,12 +716,10 @@ for (const { file, scenarios } of loadScenarioFiles()) {
     it.each(scenarios.map((s) => [s.name, s] as const))(
       '%s',
       async (_name, scenario) => {
-        const { answers, audit } = await run(scenario);
-
-        // The server writes some rows fire-and-forget, so the order is free.
-        expect({ answers, audit: audit.toSorted() }).toEqual({
+        // The server writes some rows fire-and-forget, so both lists are sorted.
+        expect(await run(scenario)).toEqual({
           answers: expectedAnswers(scenario),
-          audit: scenario.expect.audit.toSorted()
+          audit: expectedAuditRows(scenario)
         });
       }
     );
