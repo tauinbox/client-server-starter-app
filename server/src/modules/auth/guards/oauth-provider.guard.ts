@@ -12,6 +12,8 @@ import {
   type ClaimedFlow
 } from '../utils/auth-cookies';
 import type { OAuthProvider } from '../enums/oauth-provider.enum';
+import { CookieStateStore } from '../utils/cookie-state-store';
+import { providerFault } from '../utils/oauth-provider-fault';
 
 // Passport rejects with this message only when the provider's credentials
 // are absent and conditionalProvider skipped registering the strategy.
@@ -78,13 +80,18 @@ export function createOAuthProviderGuard(
       if (err || !user) {
         const request = context.switchToHttp().getRequest<ExpressRequest>();
         const flow = claimedFlow(this.cookies.claimedIntents(request));
+        const stateIssued = new CookieStateStore(
+          provider,
+          this.cookies.secure
+        ).issued(request, request.query?.['state']);
 
         throw new OAuthAuthenticationFailedException(
           resolveErrorKey(request, flow),
           {
             reason: err,
             redirectPath: flow.kind === 'login' ? '/login' : '/profile',
-            provider
+            provider,
+            fault: providerFault(err, { provider, stateIssued })
           }
         );
       }

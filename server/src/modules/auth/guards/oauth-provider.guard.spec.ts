@@ -25,6 +25,8 @@ import { OAuthAuthenticationFailedException } from '../exceptions/oauth-authenti
 import { OAUTH_ERROR } from '@app/shared/constants';
 import { AuthCookies } from '../utils/auth-cookies';
 import { bindIntent } from '../utils/oauth-flow-intent';
+import { OAuthProvider } from '../enums/oauth-provider.enum';
+import { cookieName } from '../../../common/utils/host-cookie';
 
 const FLOW_STATE = 'b'.repeat(32);
 const LINK = bindIntent('link-token', FLOW_STATE);
@@ -54,10 +56,22 @@ const captureFailure = (call: () => unknown) => {
 };
 
 describe.each([
-  ['GoogleOAuthGuard', GoogleOAuthGuard, 'google', 'Google'],
-  ['FacebookOAuthGuard', FacebookOAuthGuard, 'facebook', 'Facebook'],
-  ['VkOAuthGuard', VkOAuthGuard, 'vkontakte', 'VK']
-])('%s', (_name, GuardClass, strategy, providerName) => {
+  [
+    'GoogleOAuthGuard',
+    GoogleOAuthGuard,
+    'google',
+    'Google',
+    OAuthProvider.GOOGLE
+  ],
+  [
+    'FacebookOAuthGuard',
+    FacebookOAuthGuard,
+    'facebook',
+    'Facebook',
+    OAuthProvider.FACEBOOK
+  ],
+  ['VkOAuthGuard', VkOAuthGuard, 'vkontakte', 'VK', OAuthProvider.VK]
+])('%s', (_name, GuardClass, strategy, providerName, provider) => {
   let environment: string;
 
   // Nest injects AuthCookies as a property; a bare `new` leaves it unset.
@@ -305,6 +319,63 @@ describe.each([
       );
 
       expect(failure.oauthError).toBe(OAUTH_ERROR.AUTH_FAILED);
+    });
+
+    it('marks a failed code exchange as a provider fault', () => {
+      const failure = captureFailure(() =>
+        createGuard().handleRequest<unknown>(
+          new Error('Failed to obtain access token'),
+          undefined,
+          undefined,
+          callbackContext
+        )
+      );
+
+      expect(failure.fault).toBe(true);
+    });
+
+    it('marks a failure with no error as a refusal', () => {
+      const failure = captureFailure(() =>
+        createGuard().handleRequest<unknown>(
+          null,
+          false,
+          undefined,
+          callbackContext
+        )
+      );
+
+      expect(failure.fault).toBe(false);
+    });
+
+    describe('an error redirect', () => {
+      const state = 'c'.repeat(64);
+      const redirectError = Object.assign(new Error('server_error'), {
+        name: 'AuthorizationError'
+      });
+
+      const failRedirect = (cookies: Record<string, string>) =>
+        captureFailure(() =>
+          createGuard().handleRequest<unknown>(
+            redirectError,
+            undefined,
+            undefined,
+            contextWith({ query: { error: 'server_error', state }, cookies })
+          )
+        );
+
+      it('is a refusal when this browser holds no matching state', () => {
+        expect(failRedirect({}).fault).toBe(false);
+      });
+
+      it('is a fault when the state matches a flow of this browser', () => {
+        const pending = `${state}-${Date.now() + 60_000}`;
+
+        expect(
+          failRedirect({
+            [cookieName(`oauth_state_${provider}`, true)]: pending
+          }).fault
+        ).toBe(true);
+      });
     });
 
     it('returns the authenticated profile untouched', () => {

@@ -75,6 +75,19 @@ function serialize(pending: PendingState[]): string {
     .join(ENTRY_SEPARATOR);
 }
 
+function matchPending(
+  pending: PendingState[],
+  state: unknown
+): PendingState | undefined {
+  if (typeof state !== 'string' || state.length === 0) {
+    return undefined;
+  }
+
+  return pending.find((candidate) =>
+    timingSafeStringEqual(candidate.state, state)
+  );
+}
+
 export class CookieStateStore implements OAuth2Strategy.StateStore {
   private readonly cookieBase: string;
 
@@ -174,16 +187,8 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     const callback =
       typeof callbackOrMeta === 'function' ? callbackOrMeta : maybeCallback!;
 
-    if (typeof providedState !== 'string' || providedState.length === 0) {
-      callback(null, false, providedState);
-
-      return;
-    }
-
     const pending = this.readPendingStates(req);
-    const matched = pending.find((candidate) =>
-      timingSafeStringEqual(candidate.state, providedState)
-    );
+    const matched = matchPending(pending, providedState);
 
     if (!matched) {
       // Leave the other tabs' states alone: an unmatched callback must not be
@@ -205,6 +210,14 @@ export class CookieStateStore implements OAuth2Strategy.StateStore {
     const report = callback as PkceVerifyCallback;
 
     report(null, matched.verifier ?? true, providedState);
+  }
+
+  /**
+   * True when a pending entry matches the state. It reads and changes nothing,
+   * so the flow can still be verified after the check.
+   */
+  issued(req: Request, state: unknown): boolean {
+    return matchPending(this.readPendingStates(req), state) !== undefined;
   }
 
   /**
