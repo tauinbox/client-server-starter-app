@@ -194,10 +194,10 @@ describe('OAuthAuthenticationExceptionFilter', () => {
       error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     });
 
-    function failWith(reason: unknown): void {
+    function failWith(options: { reason: unknown; fault?: boolean }): void {
       filter.catch(
         new OAuthAuthenticationFailedException(OAUTH_ERROR.AUTH_FAILED, {
-          reason,
+          ...options,
           provider: OAuthProvider.GOOGLE
         }),
         host
@@ -209,7 +209,7 @@ describe('OAuthAuthenticationExceptionFilter', () => {
         name: 'InternalOAuthError'
       });
 
-      failWith(reason);
+      failWith({ reason, fault: true });
 
       expect(error).toHaveBeenCalledWith(
         expect.stringContaining('Failed to obtain access token'),
@@ -218,21 +218,15 @@ describe('OAuthAuthenticationExceptionFilter', () => {
       expect(warn).not.toHaveBeenCalled();
     });
 
-    it('logs a rejected client secret as an error', () => {
-      failWith({ name: 'TokenError', code: 'invalid_client' });
-
-      expect(error).toHaveBeenCalledTimes(1);
-      expect(warn).not.toHaveBeenCalled();
-    });
-
     it.each([
       [
-        'a replayed or expired code',
-        { name: 'TokenError', code: 'invalid_grant' }
+        'a refused error',
+        { reason: { name: 'TokenError', code: 'invalid_grant' }, fault: false }
       ],
-      ['no error (a bad state or a declined consent screen)', null]
-    ])('logs %s as a warning', (_label, reason) => {
-      failWith(reason);
+      ['an error with no fault flag', { reason: new Error('refused') }],
+      ['no error (a bad state or a declined consent screen)', { reason: null }]
+    ])('logs %s as a warning', (_label, options) => {
+      failWith(options);
 
       expect(warn).toHaveBeenCalledTimes(1);
       expect(error).not.toHaveBeenCalled();
@@ -264,7 +258,8 @@ describe('OAuthAuthenticationExceptionFilter', () => {
       filter.catch(
         new OAuthAuthenticationFailedException(OAUTH_ERROR.AUTH_FAILED, {
           reason: { name: 'InternalOAuthError' },
-          provider: OAuthProvider.GOOGLE
+          provider: OAuthProvider.GOOGLE,
+          fault: true
         }),
         host
       );
