@@ -288,7 +288,9 @@ src/app/
 │       │   │                       # live proration mini-ledger comes from /change/preview. For
 │       │   │                       # YooKassa the ledger splits the credit and the charge. For
 │       │   │                       # Paddle it shows the net value only. A negative net shows
-│       │   │                       # "Refund due". A trial shows a note. The dialog closes with
+│       │   │                       # "Refund due". A trial shows a note. A switch from a usage
+│       │   │                       # plan to a fixed plan shows a note that the closing
+│       │   │                       # window is charged now. The dialog closes with
 │       │   │                       # the selected plan key, and the settings page applies it.
 │       │   ├── usage-meter/       # UsageMeterComponent is the usage card for the current period.
 │       │   │                      # It shows the unit readout and a quota gauge. The included
@@ -1214,7 +1216,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 347 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1647 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1651 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and

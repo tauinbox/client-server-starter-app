@@ -182,6 +182,12 @@ export class ChangePlanDialogComponent {
     };
   });
 
+  /** A switch from a usage plan bills the metered window that it closes. */
+  protected readonly closesUsage = computed(
+    () =>
+      this.data.subscription.billingMode === 'usage' && this.mode() === 'fixed'
+  );
+
   protected readonly canConfirm = computed(
     () =>
       this.selectedKey() !== null &&

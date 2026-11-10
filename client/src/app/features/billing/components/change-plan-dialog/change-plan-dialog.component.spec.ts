@@ -312,6 +312,91 @@ describe('ChangePlanDialogComponent', () => {
     ).not.toBeNull();
   });
 
+  describe('closing usage charge', () => {
+    const usageClosingNote =
+      'Metered usage of the current period is charged now, at the switch.';
+
+    function notes(): string[] {
+      return Array.from(
+        nativeEl().querySelectorAll('.proration-note'),
+        (note) => note.textContent?.trim() ?? ''
+      );
+    }
+
+    const usageSubscription: SubscriptionResponse = {
+      ...subscription,
+      planKey: 'usage',
+      billingMode: 'usage'
+    };
+
+    it('discloses the charge of the closing window on a switch from a usage plan', () => {
+      createComponent({
+        subscription: usageSubscription,
+        currentPlan: plans[3]
+      });
+
+      fixture.componentInstance.setMode('fixed');
+      fixture.detectChanges();
+      optionButtons()[1].click();
+      fixture.detectChanges();
+
+      expect(notes()).toEqual([usageClosingNote]);
+    });
+
+    it('discloses it beside the net note of a delegated provider', () => {
+      billingMock.previewChange.mockReturnValue(
+        of({
+          ...splitPreview,
+          provider: 'paddle',
+          currency: 'USD',
+          creditMinor: null,
+          chargeMinor: null,
+          dueNowMinor: 1700
+        } satisfies ProrationPreviewResponse)
+      );
+      createComponent({
+        subscription: { ...usageSubscription, provider: 'paddle' },
+        currentPlan: plans[3]
+      });
+
+      fixture.componentInstance.setMode('fixed');
+      fixture.detectChanges();
+      optionButtons()[1].click();
+      fixture.detectChanges();
+
+      expect(notes()).toEqual([
+        'The exact split is settled by the payment provider; this is the net amount.',
+        usageClosingNote
+      ]);
+    });
+
+    it('discloses it beside the trial note of a trialing usage subscription', () => {
+      createComponent({
+        subscription: { ...usageSubscription, status: 'trialing' },
+        currentPlan: plans[3]
+      });
+
+      fixture.componentInstance.setMode('fixed');
+      fixture.detectChanges();
+      optionButtons()[1].click();
+      fixture.detectChanges();
+
+      expect(notes()).toEqual([
+        "You're on a trial: the plan price moves no money now.",
+        usageClosingNote
+      ]);
+    });
+
+    it('shows no closing charge on a switch between fixed plans', () => {
+      createComponent();
+
+      optionButtons()[1].click();
+      fixture.detectChanges();
+
+      expect(notes()).not.toContain(usageClosingNote);
+    });
+  });
+
   it('confirm closes the dialog with the selected plan key', () => {
     createComponent();
 

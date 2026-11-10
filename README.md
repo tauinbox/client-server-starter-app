@@ -814,7 +814,8 @@ the same permission both apply.
   mode (fixed or pay as you go) and a target plan. Then it shows a live proration mini-ledger from
   `/change/preview`. For YooKassa the ledger shows a credit line, a charge line and a bold "Due now"
   line. For Paddle it shows the net amount, because the provider settles the two parts. A negative net
-  amount reads "Refund due".
+  amount reads "Refund due". A switch from a usage plan to a fixed plan shows a note that the metered
+  usage of the current period is charged at the switch.
 
   The Confirm button calls `POST /api/v1/billing/subscription/change`, which switches the plan
   immediately. Paddle computes the proration itself, through `subscriptions.update` with immediate
@@ -1924,7 +1925,7 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3339 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 954 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 931 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1647 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1651 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 347 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1444 tests pass |
 
