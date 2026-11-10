@@ -654,9 +654,17 @@ export class YooKassaProvider implements PaymentProvider {
       return null;
     }
 
+    if (event !== `payment.${payment.status}`) {
+      this.logger.warn(
+        `YooKassa webhook event "${event}" disagrees with the re-fetched status "${payment.status}" of payment ${payment.id}`
+      );
+    }
+
+    // The dedup key comes from the re-fetched payment, never from the body: a
+    // forged event name for the same payment must hit the key of the real one.
     const base = {
       provider: this.id,
-      providerEventId: `${event}:${objectId}`
+      providerEventId: `payment.${payment.status}:${payment.id}`
     };
     const ref = refFromMetadata(payment.metadata);
 

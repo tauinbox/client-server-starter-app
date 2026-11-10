@@ -1332,6 +1332,33 @@ describe('YooKassaProvider', () => {
       });
     });
 
+    it('keys the event by the re-fetched status, so a forged event name dedups onto the real one', async () => {
+      const { provider, client } = await build();
+
+      client!.getPayment.mockResolvedValue({
+        id: 'pay-w',
+        status: 'succeeded',
+        amount: { value: '990.00', currency: 'RUB' },
+        metadata: { customerId: 'cust-1', userId: 'user-1', planKey: 'pro' }
+      });
+
+      const honest = await provider.verifyAndParseWebhook(
+        notification('payment.succeeded')
+      );
+      const forged = await provider.verifyAndParseWebhook(
+        notification('payment.canceled')
+      );
+
+      expect(honest).toMatchObject({
+        providerEventId: 'payment.succeeded:pay-w',
+        type: 'invoice.paid'
+      });
+      expect(forged).toMatchObject({
+        providerEventId: 'payment.succeeded:pay-w',
+        type: 'invoice.paid'
+      });
+    });
+
     it('ignores a non-terminal re-fetched status (authentic, nothing to reduce)', async () => {
       const { provider, client } = await build();
 
