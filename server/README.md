@@ -623,7 +623,9 @@ are:
   redirects. It reuses an unpaid row that stays from an earlier attempt, through a conditional write
   that matches only while the row is `incomplete`. Thus a first-payment webhook that activates the
   row during the checkout gets a 409, and it does not reset a paid subscription. The release of a
-  stale row on the provider-managed path uses the same guard.
+  stale row on the provider-managed path uses the same guard. Only a self-managed row is reused or
+  released: over a provider-owned `incomplete` row checkout answers 409
+  `errors.billing.alreadySubscribed` and writes nothing.
 - `POST subscription/change` does an immediate prorated change of the plan or of the mode.
   `POST subscription/change/preview` gives the cost and applies nothing.
 - `POST subscription/cancel` cancels at the end of the period by default. A second period-end
