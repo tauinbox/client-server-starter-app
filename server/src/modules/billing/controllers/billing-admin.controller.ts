@@ -19,7 +19,8 @@ import {
   ApiOperation,
   ApiParam,
   ApiTags,
-  ApiUnauthorizedResponse
+  ApiUnauthorizedResponse,
+  ApiUnprocessableEntityResponse
 } from '@nestjs/swagger';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
@@ -120,6 +121,12 @@ export class BillingAdminController {
   @ApiBody({ type: RefundInvoiceRequestDto })
   @ApiOkResponse({ type: InvoiceResponseDto })
   @ApiNotFoundResponse({ description: 'Invoice not found' })
+  @ApiConflictResponse({
+    description: 'Invoice is not paid, or nothing is left to refund'
+  })
+  @ApiUnprocessableEntityResponse({
+    description: 'Refund amount is outside the remaining refundable total'
+  })
   refund(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: RefundInvoiceRequestDto

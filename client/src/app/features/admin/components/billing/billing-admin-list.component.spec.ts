@@ -302,5 +302,7 @@ describe('BillingAdminListComponent', () => {
     expect(cmp.canCancel({ ...activeSub, status: 'canceled' })).toBe(false);
     expect(cmp.canRefund(paidInvoice)).toBe(true);
     expect(cmp.canRefund({ ...paidInvoice, status: 'refunded' })).toBe(false);
+    // A paid invoice of 0 (a trial binding, a zero renewal) has nothing to refund.
+    expect(cmp.canRefund({ ...paidInvoice, amountMinor: 0 })).toBe(false);
   });
 });
