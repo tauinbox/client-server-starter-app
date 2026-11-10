@@ -814,7 +814,8 @@ the same permission both apply.
   mode (fixed or pay as you go) and a target plan. Then it shows a live proration mini-ledger from
   `/change/preview`. For YooKassa the ledger shows a credit line, a charge line and a bold "Due now"
   line. For Paddle it shows the net amount, because the provider settles the two parts. A negative net
-  amount reads "Refund due".
+  amount reads "Refund due". A switch from a usage plan to a fixed plan shows a note that the metered
+  usage of the current period is charged at the switch.
 
   The Confirm button calls `POST /api/v1/billing/subscription/change`, which switches the plan
   immediately. Paddle computes the proration itself, through `subscriptions.update` with immediate

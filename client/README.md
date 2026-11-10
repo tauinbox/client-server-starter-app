@@ -288,7 +288,9 @@ src/app/
 │       │   │                       # live proration mini-ledger comes from /change/preview. For
 │       │   │                       # YooKassa the ledger splits the credit and the charge. For
 │       │   │                       # Paddle it shows the net value only. A negative net shows
-│       │   │                       # "Refund due". A trial shows a note. The dialog closes with
+│       │   │                       # "Refund due". A trial shows a note. A switch from a usage
+│       │   │                       # plan to a fixed plan shows a note that the closing
+│       │   │                       # window is charged now. The dialog closes with
 │       │   │                       # the selected plan key, and the settings page applies it.
 │       │   ├── usage-meter/       # UsageMeterComponent is the usage card for the current period.
 │       │   │                      # It shows the unit readout and a quota gauge. The included

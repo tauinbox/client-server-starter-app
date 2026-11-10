@@ -123,6 +123,11 @@
             {{ t('billing.changePlan.providerSettles') }}
           </p>
         }
+        @if (closesUsage()) {
+          <p class="proration-note">
+            {{ t('billing.changePlan.usageClosingNote') }}
+          </p>
+        }
       } @else {
         <p class="proration-hint">{{ t('billing.changePlan.selectHint') }}</p>
       }

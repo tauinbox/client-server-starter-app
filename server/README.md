@@ -733,7 +733,8 @@ runs the identical flip, thus exactly one of the two emits `InvoicePaidEvent`. T
 inserts the refund leg and applies the plan. Thus there is no window in which the customer is charged
 and the plan is not applied. Each leg has its own unique `change-charge` or `change-refund` event id.
 
-A switch during a trial moves no money. The route is guarded to the `active` and `trialing` statuses.
+A switch during a trial moves no plan money; a switch from a usage plan still bills the closing
+window. The route is guarded to the `active` and `trialing` statuses.
 It refuses a subscription with a scheduled cancel. It requires a price for the same provider.
 
 **`BillingAdminService`** does the cross-customer read, the cancel and the refund.
