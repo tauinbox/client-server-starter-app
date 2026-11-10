@@ -172,7 +172,7 @@ describe('admin billing mutations write audit entries', () => {
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({
       message: 'This subscription has no paid period to end.',
-      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+      errorKey: ErrorKeys.BILLING.NO_PAID_PERIOD
     });
     expect(
       getState().billingSubscriptions.get(subscriptionId)?.cancelAtPeriodEnd

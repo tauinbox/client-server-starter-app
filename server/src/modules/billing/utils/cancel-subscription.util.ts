@@ -42,7 +42,7 @@ function cancelRefusal(
 
   if (subscription.status === 'incomplete') {
     return new ApiError(
-      ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED,
+      ErrorKeys.BILLING.NO_PAID_PERIOD,
       'This subscription has no paid period to end.'
     );
   }

@@ -507,7 +507,7 @@ describe('BillingAdminService', () => {
         status: 409,
         response: {
           message: 'This subscription has no paid period to end.',
-          errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+          errorKey: ErrorKeys.BILLING.NO_PAID_PERIOD
         }
       });
 

@@ -129,6 +129,7 @@ export const ErrorKeys = {
     CANCELLATION_SCHEDULED: 'errors.billing.cancellationScheduled',
     CANCELLATION_ALREADY_SCHEDULED:
       'errors.billing.cancellationAlreadyScheduled',
+    NO_PAID_PERIOD: 'errors.billing.noPaidPeriod',
     RENEWAL_IN_PROGRESS: 'errors.billing.renewalInProgress',
     PLAN_CHANGE_APPLIED_AT_PROVIDER:
       'errors.billing.planChangeAppliedAtProvider',
