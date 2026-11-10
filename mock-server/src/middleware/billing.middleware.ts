@@ -798,6 +798,14 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   });
 });
 
+function refuseAlreadySubscribed(res: Response): void {
+  sendError(
+    res,
+    ErrorKeys.BILLING.ALREADY_SUBSCRIBED,
+    'You already have an active subscription. Cancel it before subscribing to another plan.'
+  );
+}
+
 // POST /billing/checkout — start a hosted checkout for a plan.
 billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
@@ -831,11 +839,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     );
 
   if (hasActive) {
-    sendError(
-      res,
-      ErrorKeys.BILLING.ALREADY_SUBSCRIBED,
-      'You already have an active subscription. Cancel it before subscribing to another plan.'
-    );
+    refuseAlreadySubscribed(res);
 
     return;
   }
@@ -850,6 +854,14 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   const pending = getState()
     .billingSubscriptions.values()
     .find((s) => s.customerId === customer.id && s.status === 'incomplete');
+
+  // Only an unpaid self-managed row is released, as in PUT /billing/region: a
+  // provider-owned `incomplete` row has a subscription at the provider.
+  if (pending && pending.lifecycleOwner !== 'self') {
+    refuseAlreadySubscribed(res);
+
+    return;
+  }
 
   // One trial for each customer.
   const trial = plan.trialDays > 0 && !customer.trialUsedAt;

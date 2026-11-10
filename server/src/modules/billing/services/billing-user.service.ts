@@ -422,6 +422,12 @@ export class BillingUserService {
       where: { customerId: customer.id, status: 'incomplete' }
     });
 
+    // Only an unpaid self-managed row is released, as in setRegion: a
+    // provider-owned `incomplete` row has a subscription at the provider.
+    if (pending && pending.lifecycleOwner !== 'self') {
+      throw alreadySubscribed();
+    }
+
     // Self-managed (YooKassa) has no provider-side subscription object, so the
     // local row is created here in `incomplete`; the success webhook flips it to
     // active. Provider-managed (Paddle) rows are created by the webhook reducer.
