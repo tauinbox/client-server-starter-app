@@ -244,6 +244,35 @@ describe('admin billing mutations write audit entries', () => {
     });
   });
 
+  it('refuses a paid invoice with nothing left as not refundable', async () => {
+    const { token, userId } = await loginAdmin();
+    const { customerId } = await activateSubscription(userId);
+    const invoice = getState()
+      .billingInvoices.values()
+      .find((i) => i.customerId === customerId);
+
+    expect(invoice?.status).toBe('paid');
+
+    if (invoice) {
+      invoice.amountMinor = 0;
+    }
+
+    for (const body of [{}, { amountMinor: 100 }]) {
+      const res = await post(
+        token,
+        `/admin/billing/invoices/${invoice?.id}/refund`,
+        body
+      );
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({
+        errorKey: ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE
+      });
+    }
+
+    expect(entriesFor('BILLING_INVOICE_REFUND')).toHaveLength(0);
+  });
+
   it('audits recorded usage, including an idempotent replay', async () => {
     const { token, userId } = await loginAdmin();
     const { customerId } = await activateSubscription(userId);

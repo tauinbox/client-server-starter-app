@@ -1597,18 +1597,19 @@ billingAdminRouter.post(
       return;
     }
 
-    if (invoice.status !== 'paid') {
+    const alreadyRefunded = invoice.refundedMinor ?? 0;
+    const remaining = invoice.amountMinor - alreadyRefunded;
+
+    if (invoice.status !== 'paid' || remaining <= 0) {
       sendError(
         res,
         ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE,
-        'Only paid invoices can be refunded'
+        'Only a paid invoice with an amount left can be refunded'
       );
 
       return;
     }
 
-    const alreadyRefunded = invoice.refundedMinor ?? 0;
-    const remaining = invoice.amountMinor - alreadyRefunded;
     const refundAmount = amountMinor ?? remaining;
 
     if (refundAmount <= 0 || refundAmount > remaining) {

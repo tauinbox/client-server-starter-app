@@ -187,16 +187,17 @@ export class BillingAdminService {
           throw invoiceNotFound();
         }
 
-        if (invoice.status !== 'paid') {
+        const remaining = remainingRefundable(invoice);
+
+        if (invoice.status !== 'paid' || remaining.compare(ZERO) <= 0) {
           throw new ApiError(
             ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE,
-            'Only paid invoices can be refunded'
+            'Only a paid invoice with an amount left can be refunded'
           );
         }
 
         // Rejecting rather than capping is this route's policy: an admin who
         // asked for more than is left gets told, not quietly given less.
-        const remaining = remainingRefundable(invoice);
         const requested =
           amountMinor != null ? Money.fromMinor(amountMinor) : remaining;
 

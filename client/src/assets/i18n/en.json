@@ -216,7 +216,7 @@
       "webhookEventNotReplayable": "Only a dead-lettered webhook event can be replayed.",
       "subscriptionNotFound": "This subscription was not found.",
       "invoiceNotFound": "This invoice was not found.",
-      "invoiceNotRefundable": "Only a paid invoice can be refunded.",
+      "invoiceNotRefundable": "This invoice cannot be refunded: it is not paid, or nothing is left on it.",
       "refundAmountOutOfRange": "The refund amount must be between 1 and the remaining refundable total.",
       "creditsBlocked": "The credit balance is negative. Top up credits before you record more usage.",
       "customerNoActiveSubscription": "The customer has no active subscription to record usage against.",

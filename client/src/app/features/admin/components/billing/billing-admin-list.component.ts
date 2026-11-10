@@ -214,9 +214,9 @@ export class BillingAdminListComponent implements OnInit {
     );
   }
 
-  // Only paid invoices can be refunded (mirrors the server guard).
+  // A paid invoice with an amount to give back (mirrors the server guard).
   canRefund(invoice: InvoiceResponse): boolean {
-    return invoice.status === 'paid';
+    return invoice.status === 'paid' && invoice.amountMinor > 0;
   }
 
   confirmCancel(subscription: SubscriptionResponse, mode: CancelMode): void {

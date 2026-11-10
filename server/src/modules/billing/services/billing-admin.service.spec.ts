@@ -874,6 +874,28 @@ describe('BillingAdminService', () => {
       });
     });
 
+    it('refuses a paid invoice with nothing left as not refundable', async () => {
+      const ctx = await build();
+
+      ctx.invoices.findOne.mockResolvedValue(
+        makeInvoice({ amountMinor: Money.fromMinor(0) })
+      );
+      const yoo = providerStub('yookassa');
+
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expect(ctx.service.refundInvoice('inv-1')).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE }
+      });
+      // An explicit amount names the same cause: nothing is left.
+      await expect(
+        ctx.service.refundInvoice('inv-1', 100)
+      ).rejects.toMatchObject({
+        response: { errorKey: ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE }
+      });
+      expect(yoo.refund).not.toHaveBeenCalled();
+    });
+
     it('rejects a partial amount above the invoice total', async () => {
       const ctx = await build();
 
