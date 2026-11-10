@@ -207,7 +207,7 @@
       "cancellationScheduled": "A cancellation is scheduled for this subscription, so its plan can no longer be changed.",
       "cancellationAlreadyScheduled": "A cancellation is already scheduled for the end of the period.",
       "renewalInProgress": "The billing period has ended and its renewal is in progress. Try again shortly.",
-      "planChangeConflict": "The subscription changed while the plan change was in progress. Please try again.",
+      "planChangeAppliedAtProvider": "The payment provider has already switched the plan. This page shows it as soon as the provider confirms.",
       "planChangePaymentConflict": "The subscription changed while the payment was in progress, so the plan was not switched. Any amount charged is on your invoices.",
       "planChangeUnfinished": "An earlier switch to another plan was charged but did not finish. Switch to that plan again to finish it.",
       "entitlementRequired": "Your plan does not include this feature.",

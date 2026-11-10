@@ -174,6 +174,8 @@ const UNPATTERNED: Readonly<Record<string, string>> = {
     'the subscription state refuses the change for now (409)',
   'BILLING.PLAN_CHANGE_UNFINISHED':
     'the subscription state refuses the change (409)',
+  'BILLING.PLAN_CHANGE_APPLIED_AT_PROVIDER':
+    'a state conflict after the provider applied the change (409)',
   'BILLING.ENTITLEMENT_REQUIRED': 'refused by the plan (403)',
   'BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE':
     'the event state refuses the replay (409)',

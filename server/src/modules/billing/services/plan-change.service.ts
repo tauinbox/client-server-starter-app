@@ -851,8 +851,8 @@ export class PlanChangeService {
 
     if (!saved) {
       throw new ApiError(
-        ErrorKeys.BILLING.PLAN_CHANGE_CONFLICT,
-        'This subscription changed while the plan change was in flight. Please retry.'
+        ErrorKeys.BILLING.PLAN_CHANGE_APPLIED_AT_PROVIDER,
+        'The payment provider has already switched the plan; its webhook updates this subscription.'
       );
     }
 
