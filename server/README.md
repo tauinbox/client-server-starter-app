@@ -664,8 +664,9 @@ and the usage record checks `create`. No check reads the record, so `Billing` de
 - `POST subscriptions/:id/cancel` answers 409 when the subscription is no longer open. The route
   takes an id, thus a person can address a canceled row here. The self-service cancel cannot get
   such a row. Without the 409, a repeat asks the provider again, emits the cancel event again, and
-  writes a second audit entry. A period-end cancel of a row with a scheduled cancel, or of an
-  `incomplete` row, answers 409 `errors.billing.cancellationAlreadyScheduled` for the same reason.
+  writes a second audit entry. A period-end cancel of a row with a scheduled cancel answers 409
+  `errors.billing.cancellationAlreadyScheduled` for the same reason. A period-end cancel of an
+  `incomplete` row answers 409 `errors.billing.noPaidPeriod`.
   An immediate cancel of such a row is allowed.
 - `POST invoices/:id/refund`. The system tracks the refunds cumulatively in `refunded_minor`, and
   the sum cannot be more than `amount_minor`. When the cumulative refunds reach the total, the
