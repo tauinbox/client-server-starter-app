@@ -661,7 +661,11 @@ describe('BillingUserService', () => {
       // active check: none; pending check: a prior unpaid row.
       ctx.subscriptions.findOne
         .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ id: 'sub-pending', status: 'incomplete' });
+        .mockResolvedValueOnce({
+          id: 'sub-pending',
+          status: 'incomplete',
+          lifecycleOwner: 'self'
+        });
 
       await ctx.service.checkout('user-1', 'pro');
 
@@ -688,7 +692,11 @@ describe('BillingUserService', () => {
       );
       ctx.subscriptions.findOne
         .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ id: 'sub-pending', status: 'incomplete' });
+        .mockResolvedValueOnce({
+          id: 'sub-pending',
+          status: 'incomplete',
+          lifecycleOwner: 'self'
+        });
       // The first-payment webhook flipped the row to `active` in the meantime,
       // so the conditional write matches nothing.
       ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
@@ -735,7 +743,11 @@ describe('BillingUserService', () => {
       ctx.billing.resolveProvider.mockResolvedValue(provider('paddle', true));
       ctx.subscriptions.findOne
         .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ id: 'sub-pending', status: 'incomplete' });
+        .mockResolvedValueOnce({
+          id: 'sub-pending',
+          status: 'incomplete',
+          lifecycleOwner: 'self'
+        });
 
       await ctx.service.checkout('user-1', 'pro');
 
@@ -761,7 +773,11 @@ describe('BillingUserService', () => {
       ctx.billing.resolveProvider.mockResolvedValue(paddle);
       ctx.subscriptions.findOne
         .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ id: 'sub-pending', status: 'incomplete' });
+        .mockResolvedValueOnce({
+          id: 'sub-pending',
+          status: 'incomplete',
+          lifecycleOwner: 'self'
+        });
       ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
 
       await expectRefusal(
@@ -770,6 +786,44 @@ describe('BillingUserService', () => {
       );
       expect(paddle.startCheckout).not.toHaveBeenCalled();
     });
+
+    it.each([
+      ['a self-managed', 'yookassa', false],
+      ['a provider-managed', 'paddle', true]
+    ] as const)(
+      'refuses a provider-owned incomplete row on %s checkout and writes nothing',
+      async (_label, id, managesLifecycle) => {
+        const ctx = await build();
+
+        ctx.plans.findOne.mockResolvedValue(makePlan());
+        ctx.customers.findOne.mockResolvedValue({
+          id: 'cust-1',
+          userId: 'user-1',
+          country: 'US',
+          providerOverride: null
+        });
+        const resolved = provider(id, managesLifecycle);
+
+        ctx.billing.resolveProvider.mockResolvedValue(resolved);
+        ctx.subscriptions.findOne
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({
+            id: 'sub-pending',
+            provider: 'paddle',
+            providerSubscriptionId: 'sub_ext',
+            status: 'incomplete',
+            lifecycleOwner: 'provider'
+          });
+
+        await expectRefusal(
+          ctx.service.checkout('user-1', 'pro'),
+          ErrorKeys.BILLING.ALREADY_SUBSCRIBED
+        );
+        expect(ctx.subscriptions.update).not.toHaveBeenCalled();
+        expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+        expect(resolved.startCheckout).not.toHaveBeenCalled();
+      }
+    );
   });
 
   describe('cancelSubscription', () => {

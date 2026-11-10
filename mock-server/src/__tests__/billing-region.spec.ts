@@ -202,6 +202,48 @@ describe('PUT /billing/region with an unpaid checkout (server parity)', () => {
     );
     expect(pending.status).toBe('incomplete');
   });
+
+  it.each(['ru', 'world'] as const)(
+    'refuses checkout over a provider-owned incomplete row in region %s',
+    async (target) => {
+      const token = await login('user@example.com');
+      const pending = await yookassaCheckout(token);
+
+      pending.provider = 'paddle';
+      pending.lifecycleOwner = 'provider';
+      pending.providerSubscriptionId = 'sub_probe_paddle';
+
+      // The row is already in `ru`; `world` moves checkout to the Paddle branch.
+      if (target === 'world') {
+        expect((await region('PUT', token, { region: target })).status).toBe(
+          200
+        );
+      }
+
+      const snapshot = structuredClone(pending);
+      const sessions = getState().billingCheckoutSessions.size;
+
+      const res = await fetch(`${baseUrl}/api/v1/billing/checkout`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ planKey: 'pro' })
+      });
+      const body = await readErrorBody(res);
+
+      expect(res.status).toBe(409);
+      expect(body).toEqual({
+        statusCode: 409,
+        errorKey: ErrorKeys.BILLING.ALREADY_SUBSCRIBED,
+        message:
+          'You already have an active subscription. Cancel it before subscribing to another plan.'
+      });
+      expect(pending).toEqual(snapshot);
+      expect(getState().billingCheckoutSessions.size).toBe(sessions);
+    }
+  );
 });
 
 describe('checkout and purchase on an unavailable provider (server parity)', () => {
