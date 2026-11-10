@@ -200,7 +200,7 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
 
     expect(res.body).toMatchObject({
       message: 'This subscription has no paid period to end.',
-      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+      errorKey: ErrorKeys.BILLING.NO_PAID_PERIOD
     });
     expect(providerCancel).not.toHaveBeenCalled();
     expect(audit.logFireAndForget).not.toHaveBeenCalled();

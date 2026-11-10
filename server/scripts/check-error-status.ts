@@ -170,6 +170,8 @@ const UNPATTERNED: Readonly<Record<string, string>> = {
     'the subscription state refuses the change for now (409)',
   'BILLING.CANCELLATION_SCHEDULED':
     'the subscription state refuses the change (409)',
+  'BILLING.NO_PAID_PERIOD':
+    'the subscription state refuses the period-end cancel (409)',
   'BILLING.RENEWAL_IN_PROGRESS':
     'the subscription state refuses the change for now (409)',
   'BILLING.PLAN_CHANGE_UNFINISHED':
