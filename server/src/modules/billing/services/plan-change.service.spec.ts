@@ -1367,7 +1367,7 @@ describe('PlanChangeService', () => {
 
       await expectRefusal(
         ctx.service.changePlan('user-1', 'business'),
-        ErrorKeys.BILLING.PLAN_CHANGE_CONFLICT
+        ErrorKeys.BILLING.PLAN_CHANGE_APPLIED_AT_PROVIDER
       );
 
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();

@@ -589,7 +589,10 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
 
     await expect(
       service.changePlan(user, 'race-business')
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({
+      status: 409,
+      response: { errorKey: ErrorKeys.BILLING.PLAN_CHANGE_APPLIED_AT_PROVIDER }
+    });
 
     expect(await reload(subscription.id)).toMatchObject({
       cancelAtPeriodEnd: true,

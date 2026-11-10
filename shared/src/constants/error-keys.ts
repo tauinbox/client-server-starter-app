@@ -130,7 +130,8 @@ export const ErrorKeys = {
     CANCELLATION_ALREADY_SCHEDULED:
       'errors.billing.cancellationAlreadyScheduled',
     RENEWAL_IN_PROGRESS: 'errors.billing.renewalInProgress',
-    PLAN_CHANGE_CONFLICT: 'errors.billing.planChangeConflict',
+    PLAN_CHANGE_APPLIED_AT_PROVIDER:
+      'errors.billing.planChangeAppliedAtProvider',
     PLAN_CHANGE_PAYMENT_CONFLICT: 'errors.billing.planChangePaymentConflict',
     PLAN_CHANGE_UNFINISHED: 'errors.billing.planChangeUnfinished',
     ENTITLEMENT_REQUIRED: 'errors.billing.entitlementRequired',
