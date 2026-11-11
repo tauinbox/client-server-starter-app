@@ -301,7 +301,6 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         {
           provide: BillingService,
           useValue: {
-            geoDefaultFor: () => 'paddle',
             effectiveProviderId: (customer: Customer) =>
               customer.providerOverride ?? 'paddle',
             getProviderById: () => null,

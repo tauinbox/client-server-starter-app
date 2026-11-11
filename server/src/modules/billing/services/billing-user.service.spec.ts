@@ -68,9 +68,6 @@ async function build() {
     resolveProvider: jest.fn(),
     isProviderAvailable: jest.fn().mockResolvedValue(true),
     getProviderById: jest.fn(),
-    geoDefaultFor: jest.fn((country: string) =>
-      country.toUpperCase() === 'RU' ? 'yookassa' : 'paddle'
-    ),
     effectiveProviderId: jest.fn(
       (c: { providerOverride: BillingProviderId | null; country: string }) =>
         c.providerOverride ??
@@ -444,13 +441,16 @@ describe('BillingUserService', () => {
       const usdProduct = makeProduct({
         prices: { paddle: { currency: 'USD', amountMinor: 500 } }
       });
+      const rubProduct = makeProduct({
+        key: 'yookassa-only',
+        prices: { yookassa: { currency: 'RUB', amountMinor: 50000 } }
+      });
 
-      ctx.products.find.mockResolvedValue([usdProduct]);
+      ctx.products.find.mockResolvedValue([usdProduct, rubProduct]);
 
       const result = await ctx.service.listProducts('user-1');
 
       expect(result).toEqual([usdProduct]);
-      expect(ctx.billing.geoDefaultFor).toHaveBeenCalledWith('US');
     });
   });
 

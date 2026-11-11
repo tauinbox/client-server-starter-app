@@ -98,7 +98,6 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
             getProviderById: () => provider,
             resolveProvider: () => Promise.resolve(provider),
             isProviderAvailable: () => Promise.resolve(true),
-            geoDefaultFor: (): BillingProviderId => 'yookassa',
             effectiveProviderId: (c: Customer): BillingProviderId =>
               c.providerOverride ?? 'yookassa'
           }

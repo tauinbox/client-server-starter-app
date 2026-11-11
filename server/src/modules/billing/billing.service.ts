@@ -36,7 +36,7 @@ export class BillingService {
   async resolveProvider(
     customer: Pick<Customer, 'providerOverride' | 'country' | 'userId'>
   ): Promise<PaymentProvider> {
-    const effective = customer.providerOverride ?? geoDefault(customer.country);
+    const effective = this.effectiveProviderId(customer);
 
     if (!this.billingConfig.isConfigured(effective)) {
       throw new ApiError(
@@ -68,11 +68,6 @@ export class BillingService {
       this.providers.some((p) => p.id === id) &&
       (await this.isProviderEnabled(id, userId))
     );
-  }
-
-  /** Geo default provider for a country (no enabled/configured check). */
-  geoDefaultFor(country: string): BillingProviderId {
-    return geoDefault(country);
   }
 
   /**

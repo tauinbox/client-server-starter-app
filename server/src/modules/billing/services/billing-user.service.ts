@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm';
 import {
+  geoDefault,
   geoFromLocale,
   meteredWindowStart,
   overrideForRegion,
@@ -235,7 +236,7 @@ export class BillingUserService {
     const customer = await this.customerFor(userId);
     const providerId = customer
       ? this.billing.effectiveProviderId(customer)
-      : this.billing.geoDefaultFor(await this.detectCountry(userId));
+      : geoDefault(await this.detectCountry(userId));
 
     const products = await this.products.find({
       where: { active: true, type: In([...LISTED_PRODUCT_TYPES]) },
@@ -606,8 +607,7 @@ export class BillingUserService {
   ): Promise<BillingRegionResponse> {
     const customer = await this.getOrCreateCustomer(userId);
     const newOverride = overrideForRegion(region);
-    const newEffective =
-      newOverride ?? this.billing.geoDefaultFor(customer.country);
+    const newEffective = newOverride ?? geoDefault(customer.country);
 
     // Checked before the subscription guard: telling the user to cancel for a
     // region that checkout would then refuse leaves them with nothing.
@@ -668,7 +668,7 @@ export class BillingUserService {
 
     return {
       region: regionForOverride(customer.providerOverride),
-      detectedProvider: this.billing.geoDefaultFor(customer.country),
+      detectedProvider: geoDefault(customer.country),
       effectiveProvider: this.billing.effectiveProviderId(customer),
       availableProviders: BILLING_PROVIDER_FLAGS.filter(
         (_, i) => availability[i]
@@ -694,7 +694,7 @@ export class BillingUserService {
       return await this.customers.save(
         this.customers.create({
           userId,
-          provider: this.billing.geoDefaultFor(country),
+          provider: geoDefault(country),
           providerOverride: null,
           country,
           currency,
