@@ -1412,9 +1412,9 @@ billingRouter.get(
 // ---------------------------------------------------------------------------
 const billingAdminRouter = Router();
 
-// Mirrors the server's @LogAudit on the admin billing mutations: the entry is
-// written only after the handler has succeeded, with the same action names,
-// target types and projected detail fields.
+// Mirrors the audit rows of the server for the admin billing mutations: the
+// entry is written only after the handler has succeeded, with the same action
+// names, target types and projected detail fields.
 function auditAdminAction(
   req: Request,
   {
