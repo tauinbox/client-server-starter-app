@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoService } from '@jsverse/transloco';
 import { TranslocoTestingModuleWithLangs } from '../../../test-utils/transloco-testing';
 
-import { parseHttpErrorMessage } from './http-error.utils';
+import { isStaleStateRefusal, parseHttpErrorMessage } from './http-error.utils';
 
 describe('parseHttpErrorMessage', () => {
   let transloco: TranslocoService;
@@ -100,5 +100,24 @@ describe('parseHttpErrorMessage', () => {
     const error = new HttpErrorResponse({ error: null, status: 500 });
 
     expect(parseHttpErrorMessage(error, transloco)).toContain('500');
+  });
+});
+
+describe('isStaleStateRefusal', () => {
+  it.each([
+    [404, true],
+    [409, true],
+    [0, false],
+    [422, false],
+    [429, false],
+    [502, false]
+  ])('status %s -> %s', (status, expected) => {
+    expect(isStaleStateRefusal(new HttpErrorResponse({ status }))).toBe(
+      expected
+    );
+  });
+
+  it('is false for an error that is not an HTTP answer', () => {
+    expect(isStaleStateRefusal(new Error('409'))).toBe(false);
   });
 });

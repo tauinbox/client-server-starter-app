@@ -486,12 +486,122 @@ describe('BillingStore', () => {
     await store.setRegion('ru');
     expect(store.region()?.effectiveProvider).toBe('yookassa');
   });
+
+  describe('after a refusal', () => {
+    function refused(status: number, errorKey: string) {
+      return throwError(
+        () =>
+          new HttpErrorResponse({
+            status,
+            error: { message: 'Refused', errorKey, statusCode: status }
+          })
+      );
+    }
+
+    it('a plan change refused after the payment re-reads the subscription and the invoices', async () => {
+      billingMock.changePlan.mockReturnValue(
+        refused(409, ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT)
+      );
+      billingMock.getInvoices.mockReturnValue(of(page([invoice])));
+      const store = createStore();
+
+      const ok = await store.changePlan('business');
+
+      expect(ok).toBe(false);
+      expect(billingMock.getSubscription).toHaveBeenCalledTimes(1);
+      expect(billingMock.getInvoices).toHaveBeenCalledWith(
+        expect.objectContaining({ cursor: null })
+      );
+      expect(store.entities()).toEqual([invoice]);
+      expect(notifyMock.error).toHaveBeenCalledTimes(1);
+      expect(store.working()).toBe(false);
+    });
+
+    it('a plan change refused for another state re-reads the subscription only', async () => {
+      billingMock.changePlan.mockReturnValue(
+        refused(409, ErrorKeys.BILLING.SUBSCRIPTION_BUSY)
+      );
+      const store = createStore();
+
+      await store.changePlan('business');
+
+      expect(billingMock.getSubscription).toHaveBeenCalledTimes(1);
+      expect(billingMock.getInvoices).not.toHaveBeenCalled();
+    });
+
+    it('a refused cancel shows the cancellation the server already holds', async () => {
+      billingMock.cancel.mockReturnValue(
+        refused(409, ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED)
+      );
+      billingMock.getSubscription.mockReturnValue(
+        of({ ...activeSub, cancelAtPeriodEnd: true })
+      );
+      const store = createStore();
+
+      const ok = await store.cancel('period_end');
+
+      expect(ok).toBe(false);
+      expect(store.subscription()?.cancelAtPeriodEnd).toBe(true);
+      expect(notifyMock.error).toHaveBeenCalledTimes(1);
+    });
+
+    it('a refused checkout re-reads the subscription', async () => {
+      billingMock.checkout.mockReturnValue(
+        refused(409, ErrorKeys.BILLING.ALREADY_SUBSCRIBED)
+      );
+      const store = createStore();
+
+      expect(await store.checkout('pro')).toBeNull();
+      expect(store.subscription()).toEqual(activeSub);
+    });
+
+    it('a payment-method update with no subscription clears the subscription', async () => {
+      billingMock.updatePaymentMethod.mockReturnValue(
+        refused(404, ErrorKeys.BILLING.NO_ACTIVE_SUBSCRIPTION)
+      );
+      const store = createStore();
+
+      await store.loadSettings();
+      expect(store.subscription()).toEqual(activeSub);
+      billingMock.getSubscription.mockReturnValue(of(null));
+
+      expect(await store.startPaymentMethodUpdate()).toBeNull();
+      expect(billingMock.getSubscription).toHaveBeenCalledTimes(2);
+      expect(store.subscription()).toBeNull();
+    });
+
+    it('a refused region change re-reads the region and the subscription', async () => {
+      billingMock.setRegion.mockReturnValue(
+        refused(409, ErrorKeys.BILLING.REGION_CHANGE_BLOCKED)
+      );
+      const store = createStore();
+
+      expect(await store.setRegion('ru')).toBe(false);
+      expect(billingMock.getRegion).toHaveBeenCalledTimes(1);
+      expect(billingMock.getSubscription).toHaveBeenCalledTimes(1);
+      expect(store.region()?.region).toBe('auto');
+    });
+
+    it('a provider failure reads nothing again', async () => {
+      billingMock.cancel.mockReturnValue(
+        refused(502, ErrorKeys.BILLING.PROVIDER_ERROR)
+      );
+      const store = createStore();
+
+      await store.cancel('period_end');
+
+      expect(billingMock.getSubscription).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('BillingStore refusal messages', () => {
   let billingMock: {
     setRegion: ReturnType<typeof vi.fn>;
     changePlan: ReturnType<typeof vi.fn>;
+    getSubscription: ReturnType<typeof vi.fn>;
+    getRegion: ReturnType<typeof vi.fn>;
+    getInvoices: ReturnType<typeof vi.fn>;
   };
   let snackBarMock: { open: ReturnType<typeof vi.fn> };
 
@@ -503,7 +613,13 @@ describe('BillingStore refusal messages', () => {
   }
 
   beforeEach(() => {
-    billingMock = { setRegion: vi.fn(), changePlan: vi.fn() };
+    billingMock = {
+      setRegion: vi.fn(),
+      changePlan: vi.fn(),
+      getSubscription: vi.fn().mockReturnValue(of(null)),
+      getRegion: vi.fn().mockReturnValue(of(null)),
+      getInvoices: vi.fn().mockReturnValue(of(page([])))
+    };
     snackBarMock = { open: vi.fn() };
 
     TestBed.configureTestingModule({
@@ -605,92 +721,122 @@ describe('Billing requests through the error interceptor', () => {
 
   afterEach(() => httpMock.verify());
 
-  it.each<[string, (store: Store) => Promise<unknown>, string, string, string]>(
+  it.each<
     [
-      [
-        'loadPlans',
-        (store) => store.loadPlans(),
-        'GET',
-        '/plans',
-        'billing.store.errorLoadFailed'
-      ],
-      [
-        'loadRegion',
-        (store) => store.loadRegion(),
-        'GET',
-        '/region',
-        'billing.store.errorLoadFailed'
-      ],
-      [
-        'loadProducts',
-        (store) => store.loadProducts(),
-        'GET',
-        '/products',
-        'billing.store.errorLoadFailed'
-      ],
-      [
-        'refreshSubscription',
-        (store) => store.refreshSubscription(),
-        'GET',
-        '/subscription',
-        'billing.store.errorLoadFailed'
-      ],
-      [
-        'refreshInvoices',
-        (store) => store.refreshInvoices(),
-        'GET',
-        '/invoices',
-        'billing.store.errorLoadFailed'
-      ],
-      [
-        'checkout',
-        (store) => store.checkout('pro'),
-        'POST',
-        '/checkout',
-        'billing.store.errorCheckoutFailed'
-      ],
-      [
-        'purchase',
-        (store) => store.purchase({ productKey: 'report-pack' }),
-        'POST',
-        '/purchase',
-        'billing.store.errorPurchaseFailed'
-      ],
-      [
-        'changePlan',
-        (store) => store.changePlan('business'),
-        'POST',
-        '/subscription/change',
-        'billing.store.errorChangeFailed'
-      ],
-      [
-        'startPaymentMethodUpdate',
-        (store) => store.startPaymentMethodUpdate(),
-        'POST',
-        '/payment-method',
-        'billing.store.errorPaymentMethodFailed'
-      ],
-      [
-        'cancel',
-        (store) => store.cancel(),
-        'POST',
-        '/subscription/cancel',
-        'billing.store.errorCancelFailed'
-      ],
-      [
-        'setRegion',
-        (store) => store.setRegion('ru'),
-        'PUT',
-        '/region',
-        'billing.store.errorRegionFailed'
-      ]
+      string,
+      (store: Store) => Promise<unknown>,
+      string,
+      string,
+      string,
+      string[]
     ]
-  )(
-    'a refused %s shows one notification',
-    async (_name, run, method, path, fallbackKey) => {
+  >([
+    [
+      'loadPlans',
+      (store) => store.loadPlans(),
+      'GET',
+      '/plans',
+      'billing.store.errorLoadFailed',
+      []
+    ],
+    [
+      'loadRegion',
+      (store) => store.loadRegion(),
+      'GET',
+      '/region',
+      'billing.store.errorLoadFailed',
+      []
+    ],
+    [
+      'loadProducts',
+      (store) => store.loadProducts(),
+      'GET',
+      '/products',
+      'billing.store.errorLoadFailed',
+      []
+    ],
+    [
+      'refreshSubscription',
+      (store) => store.refreshSubscription(),
+      'GET',
+      '/subscription',
+      'billing.store.errorLoadFailed',
+      []
+    ],
+    [
+      'refreshInvoices',
+      (store) => store.refreshInvoices(),
+      'GET',
+      '/invoices',
+      'billing.store.errorLoadFailed',
+      []
+    ],
+    [
+      'checkout',
+      (store) => store.checkout('pro'),
+      'POST',
+      '/checkout',
+      'billing.store.errorCheckoutFailed',
+      ['/subscription']
+    ],
+    [
+      'purchase',
+      (store) => store.purchase({ productKey: 'report-pack' }),
+      'POST',
+      '/purchase',
+      'billing.store.errorPurchaseFailed',
+      []
+    ],
+    [
+      'changePlan',
+      (store) => store.changePlan('business'),
+      'POST',
+      '/subscription/change',
+      'billing.store.errorChangeFailed',
+      ['/subscription']
+    ],
+    [
+      'startPaymentMethodUpdate',
+      (store) => store.startPaymentMethodUpdate(),
+      'POST',
+      '/payment-method',
+      'billing.store.errorPaymentMethodFailed',
+      ['/subscription']
+    ],
+    [
+      'cancel',
+      (store) => store.cancel(),
+      'POST',
+      '/subscription/cancel',
+      'billing.store.errorCancelFailed',
+      ['/subscription']
+    ],
+    [
+      'setRegion',
+      (store) => store.setRegion('ru'),
+      'PUT',
+      '/region',
+      'billing.store.errorRegionFailed',
+      ['/subscription', '/region']
+    ]
+  ])(
+    'a refused %s shows one notification and re-reads what it refused',
+    async (_name, run, method, path, fallbackKey, rereads) => {
       const done = run(TestBed.inject(BillingStore));
 
       refuse(method, path);
+      await settle();
+
+      for (const reread of rereads) {
+        httpMock
+          .expectOne(
+            (request) =>
+              request.method === 'GET' &&
+              request.url === `${BILLING_API_V1}${reread}`
+          )
+          .flush(null);
+      }
+
       await done;
       await settle();
 

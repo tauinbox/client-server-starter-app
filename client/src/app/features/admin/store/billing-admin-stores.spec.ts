@@ -6,6 +6,7 @@ import {
   provideHttpClientTesting
 } from '@angular/common/http/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { DEFAULT_CURSOR_PAGE_SIZE } from '@app/shared/constants';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { NotifyService } from '@core/services/notify.service';
@@ -30,6 +31,23 @@ describe('Admin billing requests through the error interceptor', () => {
         { message: 'Refused', statusCode: 409 },
         { status: 409, statusText: 'Conflict' }
       );
+  }
+
+  function answerList(path: string): void {
+    httpMock
+      .expectOne(
+        (request) =>
+          request.method === 'GET' &&
+          request.url === `${ADMIN_BILLING_API_V1}${path}`
+      )
+      .flush({
+        data: [],
+        meta: {
+          nextCursor: null,
+          hasMore: false,
+          limit: DEFAULT_CURSOR_PAGE_SIZE
+        }
+      });
   }
 
   // The interceptor shows its message in a later macrotask.
@@ -82,7 +100,7 @@ describe('Admin billing requests through the error interceptor', () => {
     );
   });
 
-  it('a refused cancel shows one notification', async () => {
+  it('a refused cancel shows one notification and reloads the list', async () => {
     const done = TestBed.inject(BillingSubscriptionsStore).cancelSubscription(
       'sub-1'
     );
@@ -90,6 +108,7 @@ describe('Admin billing requests through the error interceptor', () => {
     refuse('POST', '/subscriptions/sub-1/cancel');
 
     expect(await done).toBe(false);
+    answerList('/subscriptions');
     await settle();
     expect(notifyError).toHaveBeenCalledTimes(1);
     expect(notifyError).toHaveBeenCalledWith(
@@ -98,17 +117,34 @@ describe('Admin billing requests through the error interceptor', () => {
     );
   });
 
-  it('a refused refund shows one notification', async () => {
+  it('a refused refund shows one notification and reloads the list', async () => {
     const done = TestBed.inject(BillingInvoicesStore).refundInvoice('inv-1');
 
     refuse('POST', '/invoices/inv-1/refund');
 
     expect(await done).toBe(false);
+    answerList('/invoices');
     await settle();
     expect(notifyError).toHaveBeenCalledTimes(1);
     expect(notifyError).toHaveBeenCalledWith(
       expect.objectContaining({ status: 409 }),
       'admin.billing.errorRefundFailed'
+    );
+  });
+
+  it('a refund that the provider failed does not reload the list', async () => {
+    const done = TestBed.inject(BillingInvoicesStore).refundInvoice('inv-1');
+
+    httpMock
+      .expectOne(`${ADMIN_BILLING_API_V1}/invoices/inv-1/refund`)
+      .flush(
+        { message: 'Provider failed', statusCode: 502 },
+        { status: 502, statusText: 'Bad Gateway' }
+      );
+
+    expect(await done).toBe(false);
+    httpMock.expectNone(
+      (request) => request.url === `${ADMIN_BILLING_API_V1}/invoices`
     );
   });
 });

@@ -1,5 +1,17 @@
-import type { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import type { TranslocoService } from '@jsverse/transloco';
+
+/**
+ * True when the server refused a request because the target is gone or its
+ * current state refuses it. The data on screen is then out of date, so the
+ * caller reads it again.
+ */
+export function isStaleStateRefusal(error: unknown): boolean {
+  return (
+    error instanceof HttpErrorResponse &&
+    (error.status === 404 || error.status === 409)
+  );
+}
 
 type ServerErrorBody = {
   message?: string | string[];

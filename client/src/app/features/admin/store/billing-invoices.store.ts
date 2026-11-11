@@ -12,6 +12,7 @@ import type { HttpErrorResponse } from '@angular/common/http';
 import { INVOICE_LIST_QUERY } from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
 import { withList } from '@shared/store/with-list';
+import { isStaleStateRefusal } from '@shared/utils/http-error.utils';
 import { BillingAdminService } from '../services/billing-admin.service';
 
 /** Admin-side invoice list; see `BillingSubscriptionsStore` for the pattern. */
@@ -52,6 +53,8 @@ export const BillingInvoicesStore = signalStore(
             error as HttpErrorResponse,
             'admin.billing.errorRefundFailed'
           );
+
+          if (isStaleStateRefusal(error)) store.load();
 
           return false;
         } finally {
