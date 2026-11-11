@@ -97,30 +97,6 @@ describe('AuditLogInterceptor', () => {
     );
   });
 
-  it('extracts targetId from response body when targetIdFromResponse is set', async () => {
-    const opts: LogAuditOptions = {
-      action: AuditAction.ROLE_CREATE,
-      targetType: 'Role',
-      targetIdFromResponse: (r) => (r as { id: string }).id
-    };
-
-    reflector.get.mockReturnValue(opts);
-    const ctx = makeContext({
-      user: { userId: 'admin-1', email: 'a@e.com' },
-      params: {},
-      headers: {}
-    });
-    const next: CallHandler = {
-      handle: () => of({ id: 'role-new', name: 'editor' })
-    };
-
-    await lastValueFrom(interceptor.intercept(ctx, next));
-
-    expect(auditService.logFireAndForget).toHaveBeenCalledWith(
-      expect.objectContaining({ targetId: 'role-new' })
-    );
-  });
-
   it('builds details from the details() callback', async () => {
     const opts: LogAuditOptions = {
       action: AuditAction.ROLE_UPDATE,

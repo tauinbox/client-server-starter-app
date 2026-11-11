@@ -5,6 +5,8 @@ import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import { FindOneOptions } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { AuditService } from '../../audit/audit.service';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
@@ -61,6 +63,12 @@ const INPUT = {
   idempotencyKey: 'evt-1'
 };
 
+const AUDIT = {
+  action: AuditAction.BILLING_USAGE_RECORD,
+  actorId: 'admin-1',
+  targetType: 'UsageRecord'
+};
+
 describe('UsageService', () => {
   let service: UsageService;
   let usageRecords: RepoMock;
@@ -68,8 +76,10 @@ describe('UsageService', () => {
   let plans: RepoMock;
   let credits: { isBlocked: jest.Mock };
   let metrics: { recordUnratedUsage: jest.Mock };
+  let audit: { logFireAndForget: jest.Mock };
 
   beforeEach(async () => {
+    audit = { logFireAndForget: jest.fn() };
     usageRecords = repo();
     subscriptions = repo();
     plans = repo();
@@ -99,7 +109,8 @@ describe('UsageService', () => {
         { provide: getRepositoryToken(Plan), useValue: plans },
         { provide: getDataSourceToken(), useValue: dataSource },
         { provide: CreditService, useValue: credits },
-        { provide: MetricsService, useValue: metrics }
+        { provide: MetricsService, useValue: metrics },
+        { provide: AuditService, useValue: audit }
       ]
     }).compile();
 
@@ -214,6 +225,49 @@ describe('UsageService', () => {
     // The replay still resolves the pricing verdict, so it reports the plan in
     // force now rather than whatever applied when the row was written.
     expect(existing.pricedByCurrentPlan).toBe(true);
+  });
+
+  it('audits a new record with its id', async () => {
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+
+    await service.record(INPUT, { audit: AUDIT });
+
+    expect(audit.logFireAndForget).toHaveBeenCalledTimes(1);
+    expect(audit.logFireAndForget).toHaveBeenCalledWith({
+      ...AUDIT,
+      targetId: 'usage-1'
+    });
+  });
+
+  it('writes no audit row for a replayed key', async () => {
+    usageRecords.findOne.mockResolvedValue({
+      id: 'usage-1',
+      customerId: 'cust-1',
+      meterKey: 'api_calls',
+      idempotencyKey: 'evt-1'
+    });
+
+    await service.record(INPUT, { audit: AUDIT });
+
+    expect(audit.logFireAndForget).not.toHaveBeenCalled();
+  });
+
+  it('writes no audit row when an insert loses the unique-key race', async () => {
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+    usageRecords.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'usage-1', idempotencyKey: 'evt-1' });
+    usageRecords.save.mockRejectedValue({ code: '23505' });
+
+    await service.record(INPUT, { audit: AUDIT });
+
+    expect(audit.logFireAndForget).not.toHaveBeenCalled();
+  });
+
+  it('writes no audit row for a refused record', async () => {
+    await expect(service.record(INPUT, { audit: AUDIT })).rejects.toThrow();
+
+    expect(audit.logFireAndForget).not.toHaveBeenCalled();
   });
 
   it('reports a replayed record as unpriced once the customer has moved off the metered plan', async () => {

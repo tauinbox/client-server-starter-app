@@ -226,7 +226,7 @@
       }
     },
     {
-      "name": "a repeat with the same idempotency key answers the first record and is audited",
+      "name": "a repeat with the same idempotency key answers the first record and writes no second row",
       "route": "POST /api/v1/admin/billing/usage",
       "actor": "admin",
       "auth": "bearer",
@@ -245,7 +245,6 @@
         "status": 201,
         "errorKey": null,
         "audit": [
-          "BILLING_USAGE_RECORD",
           "BILLING_USAGE_RECORD"
         ]
       }

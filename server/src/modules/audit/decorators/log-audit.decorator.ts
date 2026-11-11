@@ -16,16 +16,8 @@ export interface LogAuditOptions {
   action: AuditAction;
   /** Target type label (e.g. 'User', 'Role') */
   targetType: string;
-  /**
-   * Route param name to read targetId from. Defaults to `'id'`.
-   * Ignored when `targetIdFromResponse` is set.
-   */
+  /** Route param name to read targetId from. Defaults to `'id'`. */
   targetIdParam?: string;
-  /**
-   * Extract targetId from the handler's response body.
-   * Use this for create endpoints where the new entity's id is not in the route.
-   */
-  targetIdFromResponse?: (response: unknown) => string | null | undefined;
   /**
    * Build the `details` object from the request/response context.
    * Return `undefined` to omit details.

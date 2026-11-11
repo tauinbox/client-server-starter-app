@@ -1412,9 +1412,9 @@ billingRouter.get(
 // ---------------------------------------------------------------------------
 const billingAdminRouter = Router();
 
-// Mirrors the server's @LogAudit on the admin billing mutations: the entry is
-// written only after the handler has succeeded, with the same action names,
-// target types and projected detail fields.
+// Mirrors the audit rows of the server for the admin billing mutations: the
+// entry is written only after the handler has succeeded, with the same action
+// names, target types and projected detail fields.
 function auditAdminAction(
   req: Request,
   {
@@ -1745,19 +1745,8 @@ billingAdminRouter.post(
           r.customerId === customerId && r.idempotencyKey === idempotencyKey
       );
 
+    // A replay changes nothing, so it writes no audit row.
     if (existing) {
-      // The server audits by response, so an idempotent replay is recorded too,
-      // pointing at the original record's id.
-      auditAdminAction(req, {
-        action: 'BILLING_USAGE_RECORD',
-        targetType: 'UsageRecord',
-        targetId: existing.id,
-        details: {
-          customerId,
-          meterKey,
-          quantity
-        }
-      });
       res.status(201).json(toUsageResponse(existing));
 
       return;

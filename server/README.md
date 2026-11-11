@@ -432,12 +432,14 @@ from a proxy header. The mock `logAudit` applies the same truncation.
 older than `AUDIT_LOG_RETENTION_DAYS` days.
 
 `decorators/` holds
-`@LogAudit({action,targetType,targetIdParam?,targetIdFromResponse?,details?})` for declarative audit
+`@LogAudit({action,targetType,targetIdParam?,details?})` for declarative audit
 logging.
 
 `interceptors/` holds `AuditLogInterceptor`. It is a global `APP_INTERCEPTOR`. It reads the
-`@LogAudit` metadata and calls `logFireAndForget` after a success. Only the four billing
-administrator routes use it. An administrator change to a user, a role, a resource or a feature flag
+`@LogAudit` metadata and calls `logFireAndForget` after a success. Only three billing
+administrator routes use it: the cancel, the refund and the webhook replay. The usage route does
+not, because a replay of an idempotency key is also a success: `UsageService.record` writes the
+row with `logFireAndForget` only after a new insert. An administrator change to a user, a role, a resource or a feature flag
 writes its row with `AuditService.log(params, manager)` in the transaction of the change instead.
 
 `entities/` holds the `AuditLog` entity, with `action`, `actorId`, `actorEmail`, `targetId`, `ip`,
