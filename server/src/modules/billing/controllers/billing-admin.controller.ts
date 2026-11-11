@@ -10,7 +10,6 @@ import {
   Req
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
@@ -166,8 +165,11 @@ export class BillingAdminController {
   })
   @ApiBody({ type: RecordUsageRequestDto })
   @ApiCreatedResponse({ type: UsageResponseDto })
-  @ApiNotFoundResponse({ description: 'No active subscription for customer' })
-  @ApiBadRequestResponse({
+  @ApiConflictResponse({
+    description:
+      'No active subscription for customer, or a negative credit balance'
+  })
+  @ApiUnprocessableEntityResponse({
     description:
       'Meter not declared by any plan, or occurredAt outside the accepted range'
   })
