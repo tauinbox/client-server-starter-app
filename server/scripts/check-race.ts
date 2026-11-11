@@ -24,6 +24,11 @@
  *    caller before the write. Inside means in a callback of `transaction` or
  *    `withTransaction`, or of a method of the same file that runs one, or in
  *    a function that such a callback calls or receives.
+ * 5. An entity loaded by `find*` with no pessimistic lock, a read of one of its
+ *    columns, then an `update` keyed only on the id that writes that column,
+ *    in the method or through a parameter of a method of the same file. The
+ *    read decided the write, and a concurrent write that landed after the read
+ *    is overwritten. Put the read value in the where of the update.
  *
  * A method with `// race-checked: <reason>` on the line above it is skipped.
  *
@@ -212,6 +217,7 @@ class MethodScan {
   problems(): string[] {
     const found = [
       this.staleSave(),
+      this.staleKeyedUpdate(),
       checkOutsideTransaction(this.method, this.local, this.label())
     ];
     const read = this.firstRead();
@@ -236,6 +242,24 @@ class MethodScan {
     if (!stale) return undefined;
 
     return `${this.label()}: a loaded entity is written back with save; write only the changed columns with a keyed update`;
+  }
+
+  private staleKeyedUpdate(): string | undefined {
+    const sites = new Set<string>();
+
+    for (const decl of loadedEntities(this.method, this.local)) {
+      updatesFromRead(scopeOf(decl), {
+        name: decl.name.getText(this.sf),
+        after: decl.getStart(),
+        local: this.local,
+        seen: new Set(),
+        sites
+      });
+    }
+
+    if (sites.size === 0) return undefined;
+
+    return `${this.label()}: a column of a loaded entity decides an update keyed only on the id (${[...sites].join(', ')}); put the read value in the where of the update`;
   }
 
   private label(): string {
@@ -521,6 +545,146 @@ function reachesSave(
       return reachesSave(body, { name: param.text, after: -1, local, seen });
     });
   });
+}
+
+/** The criteria and the values of `repo.update(c, v)` or `em.update(E, c, v)`. */
+function updateArguments(
+  call: ts.CallExpression
+): { criteria: ts.Expression; values: ts.Expression } | undefined {
+  if (
+    calleeName(call) !== 'update' ||
+    !ts.isPropertyAccessExpression(call.expression)
+  ) {
+    return undefined;
+  }
+
+  const [first] = call.arguments;
+  const entityFirst =
+    first !== undefined && ts.isIdentifier(first) && /^[A-Z]/.test(first.text);
+  const [criteria, values] = call.arguments.slice(entityFirst ? 1 : 0);
+
+  return criteria && values ? { criteria, values } : undefined;
+}
+
+/** A criteria that names the primary key and nothing else. */
+function keyedOnIdOnly(criteria: ts.Expression): boolean {
+  if (ts.isIdentifier(criteria)) return criteria.text === 'id';
+
+  if (ts.isPropertyAccessExpression(criteria)) {
+    return criteria.name.text === 'id';
+  }
+
+  if (!ts.isObjectLiteralExpression(criteria)) return false;
+
+  const { properties } = criteria;
+
+  return (
+    properties.length === 1 &&
+    (ts.isPropertyAssignment(properties[0]) ||
+      ts.isShorthandPropertyAssignment(properties[0])) &&
+    properties[0].name.getText() === 'id'
+  );
+}
+
+/** The column names that the values of an update write. */
+function writtenColumns(values: ts.Expression): Set<string> {
+  const columns = new Set<string>();
+
+  walk(values, (n) => {
+    if (ts.isPropertyAssignment(n) || ts.isShorthandPropertyAssignment(n)) {
+      columns.add(n.name.getText());
+    }
+  });
+
+  return columns;
+}
+
+/**
+ * Collects into `sites` each update keyed only on the id that writes a column
+ * of `name` read before it, in the scope or through a parameter of a method of
+ * the same file.
+ */
+function updatesFromRead(
+  scope: ts.Node,
+  {
+    name,
+    after,
+    local,
+    seen,
+    sites
+  }: {
+    name: string;
+    after: number;
+    local: Map<string, Body>;
+    seen: Set<string>;
+    sites: Set<string>;
+  }
+): void {
+  const reads: { column: string; pos: number }[] = [];
+
+  walk(scope, (n) => {
+    if (
+      ts.isPropertyAccessExpression(n) &&
+      ts.isIdentifier(n.expression) &&
+      n.expression.text === name &&
+      n.getStart() > after
+    ) {
+      reads.push({ column: n.name.text, pos: n.getStart() });
+    }
+  });
+
+  for (const c of calls(scope)) {
+    if (c.getStart() <= after) continue;
+
+    const update = updateArguments(c);
+
+    if (update && keyedOnIdOnly(update.criteria)) {
+      const written = writtenColumns(update.values);
+      const decides = reads.some(
+        (r) => r.pos < c.getStart() && written.has(r.column)
+      );
+
+      if (decides) {
+        const sf = c.getSourceFile();
+        const holder = local
+          .values()
+          .find(
+            (b) => b.getStart() <= c.getStart() && c.getEnd() <= b.getEnd()
+          );
+
+        sites.add(holder?.name?.getText(sf) ?? '<anonymous>');
+      }
+    }
+
+    const helper = localCallee(c, local);
+    const body = helper?.body;
+
+    if (!helper || !body) continue;
+
+    c.arguments.forEach((a, i) => {
+      const param = helper.parameters[i]?.name;
+      const key = `${calleeName(c)}#${i}`;
+
+      if (
+        !ts.isIdentifier(a) ||
+        a.text !== name ||
+        !param ||
+        !ts.isIdentifier(param) ||
+        seen.has(key)
+      ) {
+        return;
+      }
+
+      seen.add(key);
+      updatesFromRead(body, {
+        name: param.text,
+        after: -1,
+        local,
+        seen,
+        sites
+      });
+    });
+  }
 }
 
 type FunctionNode = ts.ArrowFunction | ts.FunctionExpression;
@@ -950,6 +1114,54 @@ const SELF_TEST_CASES: { label: string; source: string; fails: boolean }[] = [
       }
     }`,
     fails: true
+  },
+  {
+    label: 'a status read, then an update keyed only on the id writes it',
+    source: `class S {
+      async replay(id: string) {
+        const event = await this.repository.findOne({ where: { id } });
+        if (event.status !== 'dead_letter') throw notReplayable();
+        await this.repository.update({ id }, { status: 'received' });
+      }
+    }`,
+    fails: true
+  },
+  {
+    label: 'a column of a loaded row written by a helper keyed only on the id',
+    source: `class S {
+      async sweep() {
+        const stuck = await this.repository.find({ where: { status: 'received' } });
+        for (const row of stuck) await this.recordFailure(row);
+      }
+      private async recordFailure(row: Event) {
+        const attempts = row.attempts + 1;
+        await this.repository.update({ id: row.id }, attempts > 5 ? { attempts, status: 'dead' } : { attempts });
+      }
+    }`,
+    fails: true
+  },
+  {
+    label: 'an update that carries the read value in its where',
+    source: `class S {
+      async replay(id: string) {
+        const event = await this.repository.findOne({ where: { id } });
+        if (event.status !== 'dead_letter') throw notReplayable();
+        const { affected } = await this.repository.update({ id, status: 'dead_letter' }, { status: 'received' });
+        if (affected !== 1) throw notReplayable();
+      }
+    }`,
+    fails: false
+  },
+  {
+    label: 'a read of one column, then an update keyed on the id of another',
+    source: `class S {
+      async touch(id: string) {
+        const row = await this.repository.findOne({ where: { id } });
+        if (row.status !== 'open') return;
+        await this.repository.update({ id: row.id }, { seenAt: new Date() });
+      }
+    }`,
+    fails: false
   },
   {
     label: 'a marked method',

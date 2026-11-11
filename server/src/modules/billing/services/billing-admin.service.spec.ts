@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { ApiError } from '../../../common/errors/api-error';
+import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import { In, IsNull } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
@@ -45,6 +46,7 @@ type RepoMock = {
   qb: QueryBuilderMock;
   save: jest.Mock;
   update: jest.Mock;
+  existsBy: jest.Mock;
 };
 
 /** Chainable query-builder stub; `getMany` is what each test drives. */
@@ -69,7 +71,8 @@ function repo(): RepoMock {
     createQueryBuilder: jest.fn().mockReturnValue(qb),
     qb,
     save: jest.fn((entity: object) => Promise.resolve(entity)),
-    update: jest.fn().mockResolvedValue({ affected: 0 })
+    update: jest.fn().mockResolvedValue({ affected: 0 }),
+    existsBy: jest.fn().mockResolvedValue(false)
   };
 }
 
@@ -1181,42 +1184,41 @@ describe('BillingAdminService', () => {
   });
 
   describe('replayWebhookEvent', () => {
-    it('throws 404 when the webhook event does not exist', async () => {
+    it('refuses with WEBHOOK_EVENT_NOT_FOUND when the webhook event does not exist', async () => {
       const ctx = await build();
 
-      ctx.webhookEvents.findOne.mockResolvedValue(null);
-      await expect(ctx.service.replayWebhookEvent('missing')).rejects.toThrow(
-        ApiError
+      await expectApiRejection(
+        ctx.service.replayWebhookEvent('missing'),
+        ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND
+      );
+      expect(ctx.webhookEvents.existsBy).toHaveBeenCalledWith({
+        id: 'missing'
+      });
+    });
+
+    it('refuses with WEBHOOK_EVENT_NOT_REPLAYABLE when the row is not dead-lettered', async () => {
+      const ctx = await build();
+
+      ctx.webhookEvents.existsBy.mockResolvedValue(true);
+
+      await expectApiRejection(
+        ctx.service.replayWebhookEvent('wh-1'),
+        ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE
       );
     });
 
-    it('rejects replaying a row that is not dead-lettered', async () => {
+    it('resets only a row that is still dead-lettered and zeroes its failure history', async () => {
       const ctx = await build();
 
-      ctx.webhookEvents.findOne.mockResolvedValue({
-        id: 'wh-1',
-        status: 'received'
-      });
-      await expect(ctx.service.replayWebhookEvent('wh-1')).rejects.toThrow(
-        ApiError
-      );
-      expect(ctx.webhookEvents.update).not.toHaveBeenCalled();
-    });
-
-    it('resets a dead-lettered row to `received` and zeroes its failure history', async () => {
-      const ctx = await build();
-
-      ctx.webhookEvents.findOne.mockResolvedValue({
-        id: 'wh-1',
-        status: 'dead_letter'
-      });
+      ctx.webhookEvents.update.mockResolvedValue({ affected: 1 });
 
       const result = await ctx.service.replayWebhookEvent('wh-1');
 
       expect(ctx.webhookEvents.update).toHaveBeenCalledWith(
-        { id: 'wh-1' },
+        { id: 'wh-1', status: 'dead_letter' },
         { status: 'received', attempts: 0, lastError: null }
       );
+      expect(ctx.webhookEvents.existsBy).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'wh-1', status: 'received' });
     });
   });

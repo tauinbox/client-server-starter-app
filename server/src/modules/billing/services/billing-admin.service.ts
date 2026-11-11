@@ -101,31 +101,24 @@ export class BillingAdminService {
   async replayWebhookEvent(
     id: string
   ): Promise<{ id: string; status: string }> {
-    const event = await this.webhookEvents.findOne({
-      where: { id },
-      select: { id: true, status: true }
-    });
+    const { affected } = await this.webhookEvents.update(
+      { id, status: 'dead_letter' },
+      { status: 'received', attempts: 0, lastError: null }
+    );
 
-    if (!event) {
+    if (affected === 1) return { id, status: 'received' };
+
+    if (!(await this.webhookEvents.existsBy({ id }))) {
       throw new ApiError(
         ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_FOUND,
         'Webhook event not found'
       );
     }
 
-    if (event.status !== 'dead_letter') {
-      throw new ApiError(
-        ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE,
-        'Only dead-lettered webhook events can be replayed'
-      );
-    }
-
-    await this.webhookEvents.update(
-      { id },
-      { status: 'received', attempts: 0, lastError: null }
+    throw new ApiError(
+      ErrorKeys.BILLING.WEBHOOK_EVENT_NOT_REPLAYABLE,
+      'Only dead-lettered webhook events can be replayed'
     );
-
-    return { id, status: 'received' };
   }
 
   /**

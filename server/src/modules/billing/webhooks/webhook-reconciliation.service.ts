@@ -76,23 +76,35 @@ export class WebhookReconciliationService {
    * delivery has failed `WEBHOOK_MAX_REPLAY_ATTEMPTS` times, quarantines it as
    * `dead_letter` (which the sweep query then excludes) with a single alert on
    * the transition instead of an error every tick.
+   *
+   * The count and the quarantine are computed in one statement from the
+   * current row, so two concurrent sweeps each add an attempt. A row that
+   * left `received` after the sweep read it is not touched.
    */
   private async recordFailure(
     row: WebhookEvent,
     error: unknown
   ): Promise<void> {
-    const attempts = row.attempts + 1;
     const lastError = error instanceof Error ? error.message : String(error);
-    const quarantined = attempts >= WEBHOOK_MAX_REPLAY_ATTEMPTS;
-
-    await this.webhookEvents.update(
-      { id: row.id },
-      quarantined
-        ? { attempts, lastError, status: 'dead_letter' }
-        : { attempts, lastError }
+    const updated = await this.webhookEvents.update(
+      { id: row.id, status: 'received' },
+      {
+        attempts: () => 'attempts + 1',
+        lastError,
+        status: () =>
+          `CASE WHEN attempts + 1 >= ${WEBHOOK_MAX_REPLAY_ATTEMPTS} THEN 'dead_letter' ELSE status END`
+      },
+      { returning: ['attempts', 'status'] }
     );
+    const [counted] = updated.raw as Array<
+      Pick<WebhookEvent, 'attempts' | 'status'>
+    >;
 
-    if (quarantined) {
+    if (!counted) return;
+
+    const { attempts, status } = counted;
+
+    if (status === 'dead_letter') {
       this.logger.warn(
         `Quarantined webhook ${row.id} (${row.provider} ${row.providerEventId}) ` +
           `after ${attempts} failed replays; status -> dead_letter. Last error: ${lastError}`

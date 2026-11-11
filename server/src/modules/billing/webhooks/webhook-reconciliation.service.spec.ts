@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals';
 import { FindOperator, type Repository } from 'typeorm';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import { WebhookReconciliationService } from './webhook-reconciliation.service';
@@ -31,7 +32,7 @@ describe('WebhookReconciliationService', () => {
 
   beforeEach(() => {
     find = jest.fn();
-    update = jest.fn().mockResolvedValue({ affected: 1 });
+    update = jest.fn().mockResolvedValue({ affected: 1, raw: [] });
     processEvent = jest.fn().mockResolvedValue(undefined);
     const repo: Pick<Repository<WebhookEvent>, 'find' | 'update'> = {
       find,
@@ -109,58 +110,65 @@ describe('WebhookReconciliationService', () => {
     expect(processEvent).toHaveBeenCalledTimes(2);
   });
 
-  it('records attempts/last_error on a failed replay without quarantining early', async () => {
+  function quarantineWarns(calls: unknown[][]): unknown[][] {
+    // The per-tick "Replaying..." warn of the sweep is not a quarantine alert.
+    return calls.filter(([message]) => String(message).includes('dead_letter'));
+  }
+
+  it('counts a failed replay in SQL, only on a row that is still `received`', async () => {
+    const error = jest.spyOn(service['logger'], 'error').mockImplementation();
+
     processEvent.mockRejectedValue(new Error('boom'));
     find.mockResolvedValue([row({ attempts: 0 })]);
+    update.mockResolvedValue({ raw: [{ attempts: 1, status: 'received' }] });
 
     await service.sweep();
 
     expect(update).toHaveBeenCalledTimes(1);
-    expect(update).toHaveBeenCalledWith(
-      { id: 'wh-1' },
-      { attempts: 1, lastError: 'boom' }
-    );
+    const [[criteria, values, options]] = update.mock.calls as [
+      [unknown, Record<string, unknown>, unknown]
+    ];
+
+    expect(criteria).toEqual({ id: 'wh-1', status: 'received' });
+    expect(values).toEqual({
+      attempts: expect.any(Function),
+      lastError: 'boom',
+      status: expect.any(Function)
+    });
+    expect(options).toEqual({ returning: ['attempts', 'status'] });
+    expect(error).toHaveBeenCalledTimes(1);
   });
 
-  it('quarantines a delivery on its Nth failure and alerts exactly once', async () => {
+  it('alerts once when the counted failure quarantines the row', async () => {
     const warn = jest.spyOn(service['logger'], 'warn').mockImplementation();
     const error = jest.spyOn(service['logger'], 'error').mockImplementation();
 
     processEvent.mockRejectedValue(new Error('poison'));
+    find.mockResolvedValue([
+      row({ attempts: WEBHOOK_MAX_REPLAY_ATTEMPTS - 1 })
+    ]);
+    update.mockResolvedValue({
+      raw: [{ attempts: WEBHOOK_MAX_REPLAY_ATTEMPTS, status: 'dead_letter' }]
+    });
 
-    // A stateful row whose attempts persist across ticks; once it flips to
-    // `dead_letter` the sweep query (status `received`) no longer returns it.
-    const persisted = row({ attempts: 0 });
+    await service.sweep();
 
-    update.mockImplementation(
-      (_criteria: unknown, patch: Partial<WebhookEvent>) => {
-        Object.assign(persisted, patch);
+    expect(quarantineWarns(warn.mock.calls)).toHaveLength(1);
+    expect(error).not.toHaveBeenCalled();
+  });
 
-        return Promise.resolve({ affected: 1 });
-      }
-    );
-    find.mockImplementation(() =>
-      Promise.resolve(persisted.status === 'received' ? [persisted] : [])
-    );
+  it('logs nothing for a row that left `received` after the sweep read it', async () => {
+    const warn = jest.spyOn(service['logger'], 'warn').mockImplementation();
+    const error = jest.spyOn(service['logger'], 'error').mockImplementation();
 
-    // More ticks than the threshold proves the row stops being swept once
-    // quarantined rather than churning forever.
-    for (let i = 0; i < WEBHOOK_MAX_REPLAY_ATTEMPTS + 3; i++) {
-      await service.sweep();
-    }
+    processEvent.mockRejectedValue(new Error('late'));
+    find.mockResolvedValue([row({})]);
+    update.mockResolvedValue({ raw: [] });
 
-    expect(persisted.status).toBe('dead_letter');
-    expect(persisted.attempts).toBe(WEBHOOK_MAX_REPLAY_ATTEMPTS);
-    expect(processEvent).toHaveBeenCalledTimes(WEBHOOK_MAX_REPLAY_ATTEMPTS);
-    // Exactly one quarantine alert on the transition; the per-attempt failures
-    // before it use error() (the sweep's own per-tick "Replaying..." warns are
-    // not quarantine alerts, so filter the message).
-    const quarantineWarns = warn.mock.calls.filter((c) =>
-      String(c[0]).includes('dead_letter')
-    );
+    await service.sweep();
 
-    expect(quarantineWarns).toHaveLength(1);
-    expect(error).toHaveBeenCalledTimes(WEBHOOK_MAX_REPLAY_ATTEMPTS - 1);
+    expect(quarantineWarns(warn.mock.calls)).toHaveLength(0);
+    expect(error).not.toHaveBeenCalled();
   });
 
   it('does nothing when no deliveries are stuck', async () => {
