@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import type { IncomingHttpHeaders } from 'http';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import {
@@ -126,14 +126,24 @@ export class WebhookIngestionService {
       return;
     }
 
+    // Clear the quarantine / failure history so a redelivered, already-exhausted
+    // row is not instantly re-dead-lettered by the sweep. The status predicate
+    // keeps a row that settled after the read out of the reset.
+    const { affected } = await this.webhookEvents.update(
+      { id: existing.id, status: Not('processed') },
+      { status: 'received', attempts: 0, lastError: null }
+    );
+
+    if (affected !== 1) {
+      this.logger.debug(
+        `Duplicate ${providerId} webhook ${event.providerEventId} settled meanwhile`
+      );
+
+      return;
+    }
+
     this.logger.warn(
       `Reprocessing unfinished ${providerId} webhook ${event.providerEventId}`
-    );
-    // Clear the quarantine / failure history so a redelivered, already-exhausted
-    // row is not instantly re-dead-lettered by the sweep.
-    await this.webhookEvents.update(
-      { id: existing.id },
-      { status: 'received', attempts: 0, lastError: null }
     );
     await this.dispatch({ webhookEventId: existing.id, event });
   }

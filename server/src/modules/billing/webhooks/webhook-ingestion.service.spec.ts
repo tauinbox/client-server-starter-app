@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { getQueueToken } from '@nestjs/bullmq';
+import { Not } from 'typeorm';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import {
   BILLING_PROVIDERS,
@@ -197,10 +198,26 @@ describe('WebhookIngestionService', () => {
     // instantly re-dead-letter the row.
     expect(update).toHaveBeenNthCalledWith(
       1,
-      { id: 'wh-9' },
+      { id: 'wh-9', status: Not('processed') },
       { status: 'received', attempts: 0, lastError: null }
     );
     expect(reduce).toHaveBeenCalledWith(event);
+  });
+
+  it('does not reprocess a row that settled between the read and the reset', async () => {
+    const { service, execute, findOne, update, reduce } = await buildHarness({
+      withQueue: false
+    });
+
+    execute.mockResolvedValueOnce({ raw: [] });
+    findOne.mockResolvedValueOnce({ id: 'wh-9', status: 'received' });
+    // A concurrent worker marked the row `processed` after the read.
+    update.mockResolvedValueOnce({ affected: 0 });
+
+    await service.ingest('paddle', Buffer.from('{}'), {});
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(reduce).not.toHaveBeenCalled();
   });
 
   it('no-ops when the conflicting row is already `processed`', async () => {
