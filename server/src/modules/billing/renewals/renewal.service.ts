@@ -153,7 +153,8 @@ export class RenewalService {
    * list both still see.
    *
    * Provider-managed rows are skipped - Paddle's `subscription.canceled` webhook
-   * closes their period through `UsagePeriodClosedEvent` instead.
+   * closes their period through `UsagePeriodClosedEvent` instead. A row whose
+   * status accrues no usage (`incomplete`) has no window to rate.
    *
    * `endsSubscription` marks an immediate cancel: no renewal follows it, so
    * the part of the window that is already due can share the renewal key.
@@ -166,6 +167,7 @@ export class RenewalService {
     if (
       subscription.billingMode !== 'usage' ||
       subscription.lifecycleOwner !== 'self' ||
+      !ENTITLED_SUBSCRIPTION_STATUSES.includes(subscription.status) ||
       now.getTime() <= meteredWindowStart(subscription).getTime()
     ) {
       return;
