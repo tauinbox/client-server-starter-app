@@ -13,6 +13,7 @@ import { SUBSCRIPTION_LIST_QUERY } from '@app/shared/constants';
 import type { CancelMode } from '@app/shared/types';
 import { NotifyService } from '@core/services/notify.service';
 import { withList } from '@shared/store/with-list';
+import { isStaleStateRefusal } from '@shared/utils/http-error.utils';
 import { BillingAdminService } from '../services/billing-admin.service';
 
 /**
@@ -61,6 +62,8 @@ export const BillingSubscriptionsStore = signalStore(
             error as HttpErrorResponse,
             'admin.billing.errorCancelFailed'
           );
+
+          if (isStaleStateRefusal(error)) store.load();
 
           return false;
         } finally {

@@ -23,9 +23,13 @@ import type {
   SubscriptionResponse,
   UsageSummaryResponse
 } from '@app/shared/types';
-import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
+import {
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  ErrorKeys
+} from '@app/shared/constants';
 import { NotifyService } from '@core/services/notify.service';
 import { withCursorList } from '@shared/store/with-cursor-list';
+import { isStaleStateRefusal } from '@shared/utils/http-error.utils';
 import {
   BillingService,
   type PurchaseRequest
@@ -211,6 +215,14 @@ export const BillingStore = signalStore(
     }
 
     /**
+     * After a refusal that says the subscription on screen is out of date,
+     * read it again, so that the page stops offering the refused action.
+     */
+    async function rereadAfterRefusal(error: unknown): Promise<void> {
+      if (isStaleStateRefusal(error)) await refreshSubscription();
+    }
+
+    /**
      * Start a checkout for a plan and return the provider session (the caller
      * performs the redirect). Returns `null` on failure (error is surfaced).
      */
@@ -226,6 +238,7 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorCheckoutFailed'
         );
+        await rereadAfterRefusal(error);
 
         return null;
       } finally {
@@ -291,6 +304,15 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorChangeFailed'
         );
+        await Promise.all([
+          rereadAfterRefusal(error),
+          // The refused switch may have charged the caller; the message
+          // sends them to the invoices, so the list must show that charge.
+          (error as HttpErrorResponse).error?.errorKey ===
+          ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT
+            ? refreshInvoices()
+            : Promise.resolve()
+        ]);
 
         return false;
       } finally {
@@ -327,6 +349,7 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorPaymentMethodFailed'
         );
+        await rereadAfterRefusal(error);
 
         return null;
       } finally {
@@ -349,6 +372,7 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorCancelFailed'
         );
+        await rereadAfterRefusal(error);
 
         return false;
       } finally {
@@ -370,6 +394,10 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorRegionFailed'
         );
+
+        if (isStaleStateRefusal(error)) {
+          await Promise.all([refreshSubscription(), loadRegion()]);
+        }
 
         return false;
       } finally {
