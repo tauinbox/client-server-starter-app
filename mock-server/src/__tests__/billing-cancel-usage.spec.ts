@@ -204,6 +204,24 @@ describe('cancelling a usage subscription bills the period it closes', () => {
     expect(sub?.currentPeriodStart).toBe(invoices[0].periodStart);
   });
 
+  it('invoices nothing on an immediate cancel of an incomplete usage subscription', async () => {
+    const { token, subscriptionId, customerId } = await selfManagedUsageSub();
+    const sub = getState().billingSubscriptions.get(subscriptionId);
+
+    if (sub) sub.status = 'incomplete';
+
+    await seedUsage(customerId, 42);
+    const before = invoicesOf(subscriptionId);
+
+    const res = await cancel(token, 'immediate');
+
+    expect(res.status).toBe(200);
+    expect(invoicesAddedSince(subscriptionId, before)).toEqual([]);
+    expect(getState().billingSubscriptions.get(subscriptionId)?.status).toBe(
+      'canceled'
+    );
+  });
+
   it('invoices nothing when a fixed subscription is cancelled', async () => {
     const { token, id } = await login('user@example.com');
     const sub = await activate(id, 'pro');

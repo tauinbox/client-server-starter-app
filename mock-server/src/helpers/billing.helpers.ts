@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { meteredWindowStart, rateUsage } from '@app/shared/utils/billing-rules';
 import { getState } from '../state';
 import type { MockInvoice, MockPlan, MockSubscription } from '../types';
@@ -34,13 +35,18 @@ export function sumPlanMeterUnits(
  * the units consumed inside `[windowStart, now)` are owed whether or not the
  * customer stays. Included units and prepaid credits offset the total exactly
  * as the renewal simulation does. Fixed plans prepaid their period and are
- * left alone.
+ * left alone, and so is a row whose status accrues no usage (`incomplete`).
  */
 export function billClosingUsagePeriod(
   subscription: MockSubscription,
   now: Date = new Date()
 ): MockInvoice | null {
-  if (subscription.billingMode !== 'usage') return null;
+  if (
+    subscription.billingMode !== 'usage' ||
+    !ENTITLED_SUBSCRIPTION_STATUSES.includes(subscription.status)
+  ) {
+    return null;
+  }
 
   const state = getState();
   const plan = state.plans.values().find((p) => p.key === subscription.planKey);

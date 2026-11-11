@@ -1607,6 +1607,22 @@ describe('RenewalService', () => {
         );
       });
 
+      it('rates nothing for an incomplete row, which accrues no usage', async () => {
+        const sub = usageSub();
+
+        sub.status = 'incomplete';
+        const store = usageStore(sub);
+        const charge = jest.fn();
+        const sum = jest.fn().mockResolvedValue(142);
+        const { service } = await build(store, charge, { usageSum: sum });
+
+        await service.billClosingUsagePeriod(sub, NOW, true);
+
+        expect(charge).not.toHaveBeenCalled();
+        expect(store.invoices).toEqual([]);
+        expect(store.subscriptions[0].usageSealedUntil ?? null).toBeNull();
+      });
+
       it('seals usage ingest at now before it rates the closing window', async () => {
         const sub = usageSub();
         const store = usageStore(sub);
