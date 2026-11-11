@@ -604,12 +604,12 @@ The module imports `EntitlementsModule` and re-exports it. Thus an importer cont
 `EntitlementService` and `EntitlementGuard` through `BillingModule`. The module exports
 `BillingService`, `BillingConfigService`, `EntitlementsModule`, `UsageService` and `CreditService`.
 
-**Geo-router (`billing.service.ts`).** `resolveProvider()` computes
-`providerOverride ?? geoDefault(country)`. It answers 501 `PROVIDER_NOT_CONFIGURED` when the provider
+**Geo-router (`billing.service.ts`).** `resolveProvider()` takes the provider from
+`effectiveProviderId()`, which computes `providerOverride ?? geoDefault(country)`. It answers 501 `PROVIDER_NOT_CONFIGURED` when the provider
 is not configured, and 503 `PROVIDER_UNAVAILABLE` when it is disabled. "Disabled" is the full evaluation of the kill-switch flag for the user of the customer
 (`FeatureFlagResolverService.isEnabledForUserId`), so the environments and the rules of the flag
-apply. The file also holds the `geoDefaultFor()`, `effectiveProviderId()` and
-`getProviderById()` helpers. `getProviderById()` answers 500 for a provider that is not registered,
+apply. The file also holds the `getProviderById()` helper. A caller that needs only the geo default
+imports `geoDefault` from `@app/shared/utils/billing-rules`. `getProviderById()` answers 500 for a provider that is not registered,
 so a refund or a cancel cannot skip the provider call.
 
 **Controllers.** `BillingPlansController` holds the `@Public()` route `GET /api/v1/billing/plans`. It
