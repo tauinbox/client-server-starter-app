@@ -12,6 +12,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { AuditService } from '../src/modules/audit/audit.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { CustomerGrant } from '../src/modules/billing/entities/customer-grant.entity';
@@ -342,6 +343,7 @@ runWithInfra('billing write paths (e2e)', () => {
             recordUnmatchedOffSessionCharge: jest.fn()
           }
         },
+        { provide: AuditService, useValue: { logFireAndForget: jest.fn() } },
         {
           provide: EventEmitter2,
           useValue: {

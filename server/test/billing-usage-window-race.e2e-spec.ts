@@ -35,6 +35,7 @@ import { UsageInvoicingService } from '../src/modules/billing/services/usage-inv
 import { UsageService } from '../src/modules/billing/services/usage.service';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { AuditService } from '../src/modules/audit/audit.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import {
   BILLING_DB_LOCK_TIMEOUT_MS,
@@ -350,6 +351,7 @@ runWithInfra('Usage ingest vs. the close of its metered window (e2e)', () => {
           provide: MetricsService,
           useValue: { recordUnratedUsage: jest.fn() }
         },
+        { provide: AuditService, useValue: { logFireAndForget: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();

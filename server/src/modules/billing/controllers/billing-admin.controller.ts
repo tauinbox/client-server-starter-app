@@ -6,7 +6,8 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-  Query
+  Query,
+  Req
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -30,6 +31,8 @@ import {
 import { Authorize } from '../../auth/decorators/authorize.decorator';
 import { RegisterResource } from '../../auth/decorators/register-resource.decorator';
 import { LogAudit } from '../../audit/decorators/log-audit.decorator';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { BillingAdminService } from '../services/billing-admin.service';
 import { UsageService } from '../services/usage.service';
 import { CancelSubscriptionRequestDto } from '../dtos/cancel-subscription-request.dto';
@@ -157,16 +160,6 @@ export class BillingAdminController {
 
   @Post('usage')
   @Authorize(['create', 'Billing'])
-  @LogAudit({
-    action: AuditAction.BILLING_USAGE_RECORD,
-    targetType: 'UsageRecord',
-    targetIdFromResponse: (response) => (response as { id?: string })?.id,
-    details: ({ body }) => ({
-      customerId: (body as RecordUsageRequestDto).customerId,
-      meterKey: (body as RecordUsageRequestDto).meterKey,
-      quantity: (body as RecordUsageRequestDto).quantity
-    })
-  })
   @ApiOperation({
     summary:
       'Record a metering usage event against a customer’s active subscription (idempotent).'
@@ -178,7 +171,18 @@ export class BillingAdminController {
     description:
       'Meter not declared by any plan, or occurredAt outside the accepted range'
   })
-  recordUsage(@Body() body: RecordUsageRequestDto) {
-    return this.usage.record(body);
+  recordUsage(@Body() body: RecordUsageRequestDto, @Req() req: JwtAuthRequest) {
+    const { customerId, meterKey, quantity } = body;
+
+    return this.usage.record(body, {
+      audit: {
+        action: AuditAction.BILLING_USAGE_RECORD,
+        actorId: req.user?.userId ?? null,
+        actorEmail: req.user?.email ?? null,
+        targetType: 'UsageRecord',
+        details: { customerId, meterKey, quantity },
+        context: extractAuditContext(req)
+      }
+    });
   }
 }

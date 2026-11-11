@@ -273,7 +273,7 @@ describe('admin billing mutations write audit entries', () => {
     expect(entriesFor('BILLING_INVOICE_REFUND')).toHaveLength(0);
   });
 
-  it('audits recorded usage, including an idempotent replay', async () => {
+  it('audits recorded usage once, and an idempotent replay writes no second row', async () => {
     const { token, userId } = await loginAdmin();
     const { customerId } = await activateSubscription(userId);
     const payload = {
@@ -294,15 +294,12 @@ describe('admin billing mutations write audit entries', () => {
 
     const entries = entriesFor('BILLING_USAGE_RECORD');
 
-    expect(entries).toHaveLength(2);
-
-    for (const entry of entries) {
-      expect(entry).toMatchObject({
-        targetId: record.id,
-        targetType: 'UsageRecord',
-        details: { customerId, meterKey: 'api_calls', quantity: 42 }
-      });
-    }
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      targetId: record.id,
+      targetType: 'UsageRecord',
+      details: { customerId, meterKey: 'api_calls', quantity: 42 }
+    });
   });
 
   it('never audits the usage idempotency key', async () => {

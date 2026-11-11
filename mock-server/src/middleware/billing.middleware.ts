@@ -1745,19 +1745,8 @@ billingAdminRouter.post(
           r.customerId === customerId && r.idempotencyKey === idempotencyKey
       );
 
+    // A replay changes nothing, so it writes no audit row.
     if (existing) {
-      // The server audits by response, so an idempotent replay is recorded too,
-      // pointing at the original record's id.
-      auditAdminAction(req, {
-        action: 'BILLING_USAGE_RECORD',
-        targetType: 'UsageRecord',
-        targetId: existing.id,
-        details: {
-          customerId,
-          meterKey,
-          quantity
-        }
-      });
       res.status(201).json(toUsageResponse(existing));
 
       return;

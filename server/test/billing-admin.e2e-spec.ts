@@ -27,6 +27,7 @@ import { UsageService } from '../src/modules/billing/services/usage.service';
 import { BillingAdminController } from '../src/modules/billing/controllers/billing-admin.controller';
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { AuditService } from '../src/modules/audit/audit.service';
+import type { AuditContext } from '../src/modules/audit/audit.service';
 import { AuditLogInterceptor } from '../src/modules/audit/interceptors/audit-log.interceptor';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MAX_PAGE_SIZE } from '@app/shared/constants';
@@ -100,7 +101,10 @@ describe('Billing admin (e2e)', () => {
     replayWebhookEvent: jest.fn()
   };
   const usage = {
-    record: jest.fn()
+    record: jest.fn<
+      ReturnType<UsageService['record']>,
+      Parameters<UsageService['record']>
+    >()
   };
   const audit = {
     log: jest.fn(),
@@ -306,7 +310,8 @@ describe('Billing admin (e2e)', () => {
         meterKey: 'api_calls',
         quantity: 42,
         idempotencyKey: 'evt-secret'
-      })
+      }),
+      expect.anything()
     );
     expect(res.body).not.toHaveProperty('idempotencyKey');
     expect((res.body as { quantity: number }).quantity).toBe(42);
@@ -370,7 +375,7 @@ describe('Billing admin (e2e)', () => {
     );
   });
 
-  it('audits a recorded usage event with the new record id', async () => {
+  it('hands the audit row of a usage event to the service, which writes it only for a new record', async () => {
     usage.record.mockResolvedValue(
       Object.assign(new UsageRecord(), {
         id: 'usage-1',
@@ -395,15 +400,23 @@ describe('Billing admin (e2e)', () => {
       })
       .expect(201);
 
-    expect(audit.logFireAndForget).toHaveBeenCalledWith(
+    expect(usage.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: AuditAction.BILLING_USAGE_RECORD,
-        actorId: 'admin-1',
-        targetId: 'usage-1',
-        targetType: 'UsageRecord',
-        details: { customerId: uuid, meterKey: 'api_calls', quantity: 42 }
-      })
+        customerId: uuid,
+        idempotencyKey: 'evt-secret'
+      }),
+      {
+        audit: {
+          action: AuditAction.BILLING_USAGE_RECORD,
+          actorId: 'admin-1',
+          actorEmail: null,
+          targetType: 'UsageRecord',
+          details: { customerId: uuid, meterKey: 'api_calls', quantity: 42 },
+          context: expect.any(Object) as AuditContext
+        }
+      }
     );
+    expect(audit.logFireAndForget).not.toHaveBeenCalled();
   });
 
   it('leaves no audit entry when a mutation fails', async () => {

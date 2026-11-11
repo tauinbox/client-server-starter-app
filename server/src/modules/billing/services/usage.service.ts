@@ -12,6 +12,8 @@ import {
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { AuditService } from '../../audit/audit.service';
+import type { AuditLogParams } from '../../audit/audit.service';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
@@ -24,6 +26,11 @@ export interface RecordUsageInput {
   idempotencyKey: string;
   /** ISO 8601 string (HTTP ingest) or Date (in-process producers). Now if omitted. */
   occurredAt?: Date | string;
+}
+
+export interface RecordUsageOptions {
+  /** Written for a new record only; `targetId` is the id of that record. */
+  audit?: Omit<AuditLogParams, 'targetId'>;
 }
 
 /**
@@ -64,10 +71,15 @@ export class UsageService {
     private readonly plans: Repository<Plan>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly credits: CreditService,
-    private readonly metrics: MetricsService
+    private readonly metrics: MetricsService,
+    private readonly auditService: AuditService
   ) {}
 
-  async record(input: RecordUsageInput): Promise<UsageRecord> {
+  /** A replay changes nothing, so it answers the first record and writes no audit row. */
+  async record(
+    input: RecordUsageInput,
+    { audit }: RecordUsageOptions = {}
+  ): Promise<UsageRecord> {
     const existing = await this.usageRecords.findOne({
       where: {
         customerId: input.customerId,
@@ -126,6 +138,10 @@ export class UsageService {
     }
 
     saved.pricedByCurrentPlan = pricedByCurrentPlan;
+
+    if (audit) {
+      this.auditService.logFireAndForget({ ...audit, targetId: saved.id });
+    }
 
     // Stored but not chargeable under the plan in force. Visible rather than
     // fatal: a producer meters what it observes and cannot know the customer's
