@@ -38,11 +38,11 @@ export interface RecordUsageOptions {
  * active subscription; aggregation/rating happens later in UsageRating.
  *
  * Ingest is idempotent on `(customerId, idempotencyKey)` (unique constraint): a
- * replay of the same key returns the original record without inserting a
- * duplicate, so an at-least-once producer (retrying webhook/queue) never
- * double-counts. The key is scoped to the customer because producers namespace
- * their sequences per tenant, and a shared key across customers would otherwise
- * discard the second customer's event. There is no public
+ * replay of the same key and body returns the original record without
+ * inserting a duplicate, so an at-least-once producer (retrying webhook/queue)
+ * never double-counts. The key is scoped to the customer because producers
+ * namespace their sequences per tenant, and a shared key across customers would
+ * otherwise discard the second customer's event. There is no public
  * meter endpoint — the only HTTP surface is the `manage Billing`-gated admin
  * route; this service is also called in-process by usage producers.
  *
@@ -75,7 +75,10 @@ export class UsageService {
     private readonly auditService: AuditService
   ) {}
 
-  /** A replay changes nothing, so it answers the first record and writes no audit row. */
+  /**
+   * A replay changes nothing, so it answers the first record and writes no
+   * audit row. The same key with another body is refused.
+   */
   async record(
     input: RecordUsageInput,
     { audit }: RecordUsageOptions = {}
@@ -88,7 +91,7 @@ export class UsageService {
     });
 
     if (existing) {
-      return this.stampPricing(existing);
+      return this.answerReplay(existing, input);
     }
 
     // A negative balance means a refund clawed back already-spent credits:
@@ -130,7 +133,7 @@ export class UsageService {
             `Idempotent usage replay on key ${input.idempotencyKey}`
           );
 
-          return this.stampPricing(winner);
+          return this.answerReplay(winner, input);
         }
       }
 
@@ -247,6 +250,34 @@ export class UsageService {
       order: { createdAt: 'DESC' },
       ...(lock ? { lock: { mode: 'pessimistic_read' as const } } : {})
     });
+  }
+
+  /**
+   * A key replays one request. Another meter, quantity or `occurredAt` under
+   * the same key is a different record, and answering the first one would drop
+   * its units with no error. A retry that omits `occurredAt` is not compared on
+   * time, because the first call may have taken the default of now.
+   */
+  private answerReplay(
+    existing: UsageRecord,
+    input: RecordUsageInput
+  ): Promise<UsageRecord> {
+    const sameTime =
+      input.occurredAt === undefined ||
+      new Date(input.occurredAt).getTime() === existing.occurredAt.getTime();
+
+    if (
+      existing.meterKey !== input.meterKey ||
+      !existing.quantity.equals(Money.fromMinor(input.quantity)) ||
+      !sameTime
+    ) {
+      throw new ApiError(
+        ErrorKeys.BILLING.USAGE_KEY_REUSED,
+        'This idempotency key was already used for another usage record.'
+      );
+    }
+
+    return this.stampPricing(existing);
   }
 
   /**

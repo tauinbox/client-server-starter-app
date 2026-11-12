@@ -189,6 +189,8 @@ const UNPATTERNED: Readonly<Record<string, string>> = {
   'BILLING.METER_NOT_DECLARED': 'a meter in the body fails a check (422)',
   'BILLING.USAGE_BEFORE_OPEN_WINDOW': 'a time in the body fails a check (422)',
   'BILLING.USAGE_IN_FUTURE': 'a time in the body fails a check (422)',
+  'BILLING.USAGE_KEY_REUSED':
+    'the idempotency key is bound to another record (409)',
   'BILLING.PROVIDER_STATE_UNCERTAIN': 'a bad answer of the provider (502)',
   'BILLING.PROVIDER_ERROR': 'a failed answer of the provider (502)',
   'BILLING.PAYMENT_DECLINED':

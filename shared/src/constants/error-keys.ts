@@ -148,6 +148,7 @@ export const ErrorKeys = {
     METER_NOT_DECLARED: 'errors.billing.meterNotDeclared',
     USAGE_BEFORE_OPEN_WINDOW: 'errors.billing.usageBeforeOpenWindow',
     USAGE_IN_FUTURE: 'errors.billing.usageInFuture',
+    USAGE_KEY_REUSED: 'errors.billing.usageKeyReused',
     PROVIDER_CHECKOUT_FAILED: 'errors.billing.providerCheckoutFailed',
     PROVIDER_REFUND_FAILED: 'errors.billing.providerRefundFailed',
     PROVIDER_STATE_UNCERTAIN: 'errors.billing.providerStateUncertain',
