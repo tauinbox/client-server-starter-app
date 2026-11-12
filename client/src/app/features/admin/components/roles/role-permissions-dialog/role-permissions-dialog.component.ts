@@ -8,7 +8,9 @@ import {
   signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin } from 'rxjs';
+import type { HttpErrorResponse } from '@angular/common/http';
+import { catchError, EMPTY, forkJoin } from 'rxjs';
+import { ErrorKeys } from '@app/shared/constants';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -506,9 +508,13 @@ export class RolePermissionsDialogComponent implements OnInit {
           this.saving.set(false);
           this.#dialogRef.close(true);
         },
-        error: (err) => {
+        error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           this.#notify.error(err, 'admin.rolePermissions.errorSaveFailed');
+
+          if (err.error?.errorKey === ErrorKeys.ROLES.UNKNOWN_PERMISSION) {
+            this.#reloadPermissionCatalog();
+          }
         }
       });
   }
@@ -518,6 +524,24 @@ export class RolePermissionsDialogComponent implements OnInit {
   }
 
   // ─── Private ──────────────────────────────────────────────────────────
+
+  /** A failed read keeps the current state; the error interceptor reports it. */
+  #reloadPermissionCatalog(): void {
+    this.#roleService
+      .getAllPermissions()
+      .pipe(
+        catchError(() => EMPTY),
+        takeUntilDestroyed(this.#destroyRef)
+      )
+      .subscribe((allPermissions) => {
+        const known = new Set(allPermissions.map((p) => p.id));
+
+        this.permissionGroups.set(this.#groupByResource(allPermissions));
+        this.selectedIds.update(
+          (ids) => new Set([...ids].filter((id) => known.has(id)))
+        );
+      });
+  }
 
   #initState(rolePermissions: RolePermissionItem[]): void {
     const ids = new Set(rolePermissions.map((rp) => rp.permissionId));

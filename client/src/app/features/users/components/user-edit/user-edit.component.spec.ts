@@ -1154,6 +1154,51 @@ describe('UserEditComponent', () => {
 
       expect(component['selectedRoleIds']()).toEqual(['role-admin']);
     });
+
+    function refusal(errorKey: string, status: number): HttpErrorResponse {
+      return new HttpErrorResponse({ status, error: { errorKey } });
+    }
+
+    it('reads the roles again and drops a gone role after unknownRole', () => {
+      userRoleServiceMock.assignRole.mockReturnValue(
+        throwError(() => refusal(ErrorKeys.ROLES.UNKNOWN_ROLE, 422))
+      );
+      roleCatalogMock.getAll.mockReturnValue(of([mockRoles[0]]));
+      component.onRolesChange(['role-user', 'role-admin']);
+      component.onSubmit();
+
+      expect(roleCatalogMock.getAll).toHaveBeenCalledTimes(2);
+      expect(component.availableRoles()).toEqual([mockRoles[0]]);
+      expect(component.selectedRoleIds()).toEqual(['role-user']);
+      expect(component.error()).not.toBeNull();
+    });
+
+    it('keeps the roles after another refusal', () => {
+      userRoleServiceMock.assignRole.mockReturnValue(
+        throwError(() =>
+          refusal(ErrorKeys.ROLES.SUPER_ROLE_ASSIGN_FORBIDDEN, 403)
+        )
+      );
+      component.onRolesChange(['role-user', 'role-admin']);
+      component.onSubmit();
+
+      expect(roleCatalogMock.getAll).toHaveBeenCalledOnce();
+      expect(component.selectedRoleIds()).toEqual(['role-user', 'role-admin']);
+    });
+
+    it('keeps the selection when the second read fails', () => {
+      userRoleServiceMock.assignRole.mockReturnValue(
+        throwError(() => refusal(ErrorKeys.ROLES.UNKNOWN_ROLE, 422))
+      );
+      roleCatalogMock.getAll.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 }))
+      );
+      component.onRolesChange(['role-user', 'role-admin']);
+      component.onSubmit();
+
+      expect(component.availableRoles()).toEqual(mockRoles);
+      expect(component.selectedRoleIds()).toEqual(['role-user', 'role-admin']);
+    });
   });
 
   describe('credential step-up', () => {
