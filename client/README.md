@@ -1217,7 +1217,7 @@ and the content offset resolve to the `--nav-width-*` custom properties. An unde
 the layout silently.
 
 **Coverage.** The suite has 347 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1666 Vitest unit tests. They cover login, register and profile.
+keyboard and visual. There are also 1676 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and
