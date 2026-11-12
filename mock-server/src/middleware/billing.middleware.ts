@@ -1736,8 +1736,9 @@ billingAdminRouter.post(
     const state = getState();
 
     // Idempotent replay: this customer already has a record for the key — return
-    // it as-is. Scoped to the customer, like the server's unique constraint: the
-    // same key from another customer is a distinct event, not a replay.
+    // it as-is when the body is the same. Scoped to the customer, like the
+    // server's unique constraint: the same key from another customer is a
+    // distinct event, not a replay.
     const existing = state.billingUsageRecords
       .values()
       .find(
@@ -1745,8 +1746,28 @@ billingAdminRouter.post(
           r.customerId === customerId && r.idempotencyKey === idempotencyKey
       );
 
-    // A replay changes nothing, so it writes no audit row.
+    // A replay changes nothing, so it writes no audit row. The same key with
+    // another body is a different record, like the server.
     if (existing) {
+      const sameTime =
+        typeof occurredAtRaw !== 'string' ||
+        new Date(occurredAtRaw).getTime() ===
+          new Date(existing.occurredAt).getTime();
+
+      if (
+        existing.meterKey !== meterKey ||
+        existing.quantity !== quantity ||
+        !sameTime
+      ) {
+        sendError(
+          res,
+          ErrorKeys.BILLING.USAGE_KEY_REUSED,
+          'This idempotency key was already used for another usage record.'
+        );
+
+        return;
+      }
+
       res.status(201).json(toUsageResponse(existing));
 
       return;

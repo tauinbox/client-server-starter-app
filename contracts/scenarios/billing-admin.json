@@ -250,6 +250,28 @@
       }
     },
     {
+      "name": "the same idempotency key with another quantity is refused and writes no row",
+      "route": "POST /api/v1/admin/billing/usage",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "metered-plan",
+        "usage-record"
+      ],
+      "body": {
+        "customerId": "$customerId",
+        "meterKey": "$meterKey",
+        "quantity": 6,
+        "idempotencyKey": "scenario-usage"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.billing.usageKeyReused",
+        "audit": []
+      }
+    },
+    {
       "name": "usage on a meter that no plan declares is refused",
       "route": "POST /api/v1/admin/billing/usage",
       "actor": "admin",

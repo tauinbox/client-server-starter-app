@@ -799,7 +799,10 @@ service refuses, with a 422, only a record that no rating can charge correctly:
 - An `occurredAt` more than 5 minutes (`USAGE_FUTURE_TOLERANCE_MS`) after the server clock. Such a
   record is rated in a later period.
 
-A replay of a known key answers before these checks.
+A replay of a known key answers before these checks. A known key with another `meterKey`,
+`quantity` or `occurredAt` is not a replay: the service refuses it with a 409
+(`errors.billing.usageKeyReused`) and inserts nothing. A retry that omits `occurredAt` is not
+compared on time.
 
 The checks and the insert run in one transaction that reads the subscription `FOR SHARE`. A close
 that moves the window waits for that lock. The renewal and `billClosingUsagePeriod` rate before they

@@ -70,6 +70,7 @@ import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
+import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BillingConfigService } from '../src/modules/billing/config/billing-config.service';
 import { PADDLE_CLIENT } from '../src/modules/billing/providers/paddle.client';
@@ -729,6 +730,16 @@ runWithInfra('Request scenarios (e2e)', () => {
         trialDays: 0,
         active: true,
         prices: {}
+      });
+    },
+    'usage-record': async (ctx) => {
+      await dataSource.getRepository(UsageRecord).save({
+        customerId: ctx.values.$customerId!,
+        subscriptionId: ctx.values.$subscriptionId!,
+        meterKey: ctx.values.$meterKey!,
+        quantity: Money.fromMinor(5),
+        occurredAt: new Date(),
+        idempotencyKey: 'scenario-usage'
       });
     },
     'fixed-plan': async (ctx) => {

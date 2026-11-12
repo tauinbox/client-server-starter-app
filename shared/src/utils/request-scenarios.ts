@@ -88,6 +88,11 @@ export const STATE_FIXTURES = [
   'paid-invoice',
   /** A plan with the key `$meterKey` that meters `$meterKey`. */
   'metered-plan',
+  /**
+   * A usage record of 5 units under `$meterKey` of the `subscription`, with
+   * the idempotency key `scenario-usage`.
+   */
+  'usage-record',
   /** A webhook event in `dead_letter`; `$webhookEventId`. */
   'dead-letter-webhook-event',
   /*

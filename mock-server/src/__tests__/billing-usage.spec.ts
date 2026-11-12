@@ -214,14 +214,45 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     const first = (await (await postUsage(token, payload)).json()) as {
       id: string;
     };
-    const second = (await (
-      await postUsage(token, { ...payload, quantity: 999 })
-    ).json()) as { id: string; quantity: number };
+    const res = await postUsage(token, payload);
+    const second = (await res.json()) as { id: string; quantity: number };
 
+    expect(res.status).toBe(201);
     expect(second.id).toBe(first.id);
-    // The replay returns the original quantity, not the second call's value.
     expect(second.quantity).toBe(10);
   });
+
+  it.each([
+    ['quantity', { quantity: 999 }],
+    ['meterKey', { meterKey: 'storage_gb' }],
+    ['occurredAt', { occurredAt: new Date(Date.now() - 1000).toISOString() }]
+  ])(
+    'refuses a key reused with another %s and keeps one record',
+    async (_field, change) => {
+      const token = await login('admin@example.com');
+      const customerId = await seedActiveCustomer();
+      const payload = {
+        customerId,
+        meterKey: 'api_calls',
+        quantity: 10,
+        idempotencyKey: 'evt-reused'
+      };
+
+      await postUsage(token, payload);
+      const res = await postUsage(token, { ...payload, ...change });
+
+      expect(res.status).toBe(409);
+      expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
+        ErrorKeys.BILLING.USAGE_KEY_REUSED
+      );
+      expect(
+        getState()
+          .billingUsageRecords.values()
+          .filter((r) => r.idempotencyKey === 'evt-reused')
+          .toArray()
+      ).toHaveLength(1);
+    }
+  );
 
   it('scopes idempotency to the customer: the same key from another customer records a separate event', async () => {
     const token = await login('admin@example.com');

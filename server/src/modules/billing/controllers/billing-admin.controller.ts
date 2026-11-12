@@ -167,7 +167,7 @@ export class BillingAdminController {
   @ApiCreatedResponse({ type: UsageResponseDto })
   @ApiConflictResponse({
     description:
-      'No active subscription for customer, or a negative credit balance'
+      'No active subscription for customer, a negative credit balance, or an idempotency key reused with another body'
   })
   @ApiUnprocessableEntityResponse({
     description:

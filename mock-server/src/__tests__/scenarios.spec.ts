@@ -553,6 +553,23 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     return Promise.resolve();
   },
+  'usage-record': (ctx) => {
+    const now = new Date().toISOString();
+    const id = randomUUID();
+
+    getState().billingUsageRecords.set(id, {
+      id,
+      customerId: ctx.values.$customerId!,
+      subscriptionId: ctx.values.$subscriptionId!,
+      meterKey: ctx.values.$meterKey!,
+      quantity: 5,
+      occurredAt: now,
+      idempotencyKey: 'scenario-usage',
+      recordedAt: now
+    });
+
+    return Promise.resolve();
+  },
   'fixed-plan': (ctx) => addFixedPlan(ctx.values.$meterKey!),
   'other-plan': (ctx) => addFixedPlan(ctx.values.$planKey!),
   product: (ctx) => {

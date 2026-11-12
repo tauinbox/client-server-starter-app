@@ -56,6 +56,21 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
   } as Plan;
 }
 
+const OCCURRED_AT = new Date('2026-01-02T03:04:05.000Z');
+
+/** The record that INPUT wrote first. */
+function stored(overrides: Partial<UsageRecord> = {}): UsageRecord {
+  return {
+    id: 'usage-1',
+    customerId: 'cust-1',
+    meterKey: 'api_calls',
+    quantity: Money.fromMinor(42),
+    occurredAt: OCCURRED_AT,
+    idempotencyKey: 'evt-1',
+    ...overrides
+  } as UsageRecord;
+}
+
 const INPUT = {
   customerId: 'cust-1',
   meterKey: 'api_calls',
@@ -207,12 +222,7 @@ describe('UsageService', () => {
   });
 
   it('is idempotent: a replayed key returns the existing record without re-inserting', async () => {
-    const existing = {
-      id: 'usage-1',
-      customerId: 'cust-1',
-      meterKey: 'api_calls',
-      idempotencyKey: 'evt-1'
-    } as UsageRecord;
+    const existing = stored();
 
     usageRecords.findOne.mockResolvedValue(existing);
     subscriptions.findOne.mockResolvedValue(makeSubscription());
@@ -225,6 +235,47 @@ describe('UsageService', () => {
     // The replay still resolves the pricing verdict, so it reports the plan in
     // force now rather than whatever applied when the row was written.
     expect(existing.pricedByCurrentPlan).toBe(true);
+  });
+
+  it.each([
+    ['quantity', { quantity: 700 }],
+    ['meterKey', { meterKey: 'storage_gb' }],
+    ['occurredAt', { occurredAt: '2026-01-02T03:04:06.000Z' }]
+  ])(
+    'refuses a key reused with another %s and inserts nothing',
+    async (_field, change) => {
+      usageRecords.findOne.mockResolvedValue(stored());
+
+      await expectApiRejection(
+        service.record({ ...INPUT, ...change }, { audit: AUDIT }),
+        ErrorKeys.BILLING.USAGE_KEY_REUSED
+      );
+      expect(usageRecords.save).not.toHaveBeenCalled();
+      expect(audit.logFireAndForget).not.toHaveBeenCalled();
+    }
+  );
+
+  it('answers a retry that repeats the same occurredAt', async () => {
+    const existing = stored();
+
+    usageRecords.findOne.mockResolvedValue(existing);
+
+    await expect(
+      service.record({ ...INPUT, occurredAt: OCCURRED_AT.toISOString() })
+    ).resolves.toBe(existing);
+  });
+
+  it('refuses the winner of the unique-key race when its body differs', async () => {
+    subscriptions.findOne.mockResolvedValue(makeSubscription());
+    usageRecords.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(stored({ quantity: Money.fromMinor(5) }));
+    usageRecords.save.mockRejectedValue({ code: '23505' });
+
+    await expectApiRejection(
+      service.record(INPUT),
+      ErrorKeys.BILLING.USAGE_KEY_REUSED
+    );
   });
 
   it('audits a new record with its id', async () => {
@@ -240,12 +291,7 @@ describe('UsageService', () => {
   });
 
   it('writes no audit row for a replayed key', async () => {
-    usageRecords.findOne.mockResolvedValue({
-      id: 'usage-1',
-      customerId: 'cust-1',
-      meterKey: 'api_calls',
-      idempotencyKey: 'evt-1'
-    });
+    usageRecords.findOne.mockResolvedValue(stored());
 
     await service.record(INPUT, { audit: AUDIT });
 
@@ -256,7 +302,7 @@ describe('UsageService', () => {
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     usageRecords.findOne
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'usage-1', idempotencyKey: 'evt-1' });
+      .mockResolvedValueOnce(stored());
     usageRecords.save.mockRejectedValue({ code: '23505' });
 
     await service.record(INPUT, { audit: AUDIT });
@@ -271,12 +317,7 @@ describe('UsageService', () => {
   });
 
   it('reports a replayed record as unpriced once the customer has moved off the metered plan', async () => {
-    const existing = {
-      id: 'usage-1',
-      customerId: 'cust-1',
-      meterKey: 'api_calls',
-      idempotencyKey: 'evt-1'
-    } as UsageRecord;
+    const existing = stored();
 
     usageRecords.findOne.mockResolvedValue(existing);
     subscriptions.findOne.mockResolvedValue(
@@ -322,7 +363,7 @@ describe('UsageService', () => {
   });
 
   it('returns the winner when an insert loses the unique-key race (23505)', async () => {
-    const winner = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+    const winner = stored();
 
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     // First lookup: no record yet → proceed to insert. Insert hits the unique
@@ -342,7 +383,7 @@ describe('UsageService', () => {
   });
 
   it('recognises the unique violation when TypeORM wraps the driver error', async () => {
-    const winner = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+    const winner = stored();
 
     subscriptions.findOne.mockResolvedValue(makeSubscription());
     usageRecords.findOne
@@ -438,7 +479,7 @@ describe('UsageService', () => {
   });
 
   it('still answers a replayed key while blocked (idempotency wins)', async () => {
-    const existing = { id: 'usage-1', idempotencyKey: 'evt-1' } as UsageRecord;
+    const existing = stored();
 
     usageRecords.findOne.mockResolvedValue(existing);
     credits.isBlocked.mockResolvedValue(true);
@@ -568,10 +609,9 @@ describe('UsageService', () => {
     });
 
     it('still answers a replayed key whose occurredAt is out of range now', async () => {
-      const existing = {
-        id: 'usage-1',
-        idempotencyKey: 'evt-1'
-      } as UsageRecord;
+      const existing = stored({
+        occurredAt: new Date('2025-01-01T00:00:00.000Z')
+      });
 
       usageRecords.findOne.mockResolvedValue(existing);
 
