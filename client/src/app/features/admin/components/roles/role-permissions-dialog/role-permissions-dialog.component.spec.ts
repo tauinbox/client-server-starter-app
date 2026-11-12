@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ErrorKeys } from '@app/shared/constants';
 import { provideNoopMaterialAnimations } from '../../../../../../test-utils/material-animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslocoTestingModuleWithLangs } from '../../../../../../test-utils/transloco-testing';
@@ -390,6 +392,62 @@ describe('RolePermissionsDialogComponent', () => {
       component.save();
 
       expect(dialogRefMock.close).toHaveBeenCalledWith(true);
+    });
+
+    function refusal(errorKey: string, status: number): HttpErrorResponse {
+      return new HttpErrorResponse({ status, error: { errorKey } });
+    }
+
+    it('reads the catalog again and drops a gone permission after unknownPermission', () => {
+      const { component, roleServiceMock, dialogRefMock } = setup([
+        makeRolePermItem('perm-a')
+      ]);
+
+      roleServiceMock.setPermissions.mockReturnValue(
+        throwError(() => refusal(ErrorKeys.ROLES.UNKNOWN_PERMISSION, 422))
+      );
+      roleServiceMock.getAllPermissions.mockReturnValue(of([mockPermissionA]));
+      component.togglePermission('perm-b');
+      component.save();
+
+      expect(roleServiceMock.getAllPermissions).toHaveBeenCalledTimes(2);
+      expect([...component.selectedIds()]).toEqual(['perm-a']);
+      expect(
+        component.permissionGroups().flatMap((g) => g.permissions)
+      ).toEqual([mockPermissionA]);
+      expect(dialogRefMock.close).not.toHaveBeenCalled();
+    });
+
+    it('keeps the catalog after another refusal', () => {
+      const { component, roleServiceMock } = setup([
+        makeRolePermItem('perm-a')
+      ]);
+
+      roleServiceMock.setPermissions.mockReturnValue(
+        throwError(() => refusal(ErrorKeys.ROLES.NOT_FOUND, 404))
+      );
+      component.togglePermission('perm-b');
+      component.save();
+
+      expect(roleServiceMock.getAllPermissions).toHaveBeenCalledOnce();
+      expect([...component.selectedIds()]).toEqual(['perm-a', 'perm-b']);
+    });
+
+    it('keeps the selection when the second read fails', () => {
+      const { component, roleServiceMock } = setup([
+        makeRolePermItem('perm-a')
+      ]);
+
+      roleServiceMock.setPermissions.mockReturnValue(
+        throwError(() => refusal(ErrorKeys.ROLES.UNKNOWN_PERMISSION, 422))
+      );
+      roleServiceMock.getAllPermissions.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 }))
+      );
+      component.togglePermission('perm-b');
+      component.save();
+
+      expect([...component.selectedIds()]).toEqual(['perm-a', 'perm-b']);
     });
   });
 

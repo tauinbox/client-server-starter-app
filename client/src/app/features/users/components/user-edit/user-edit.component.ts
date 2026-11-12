@@ -51,7 +51,7 @@ import {
 import type { UpdateUser, User } from '../../models/user.types';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { Observable } from 'rxjs';
-import { catchError, forkJoin, of, tap } from 'rxjs';
+import { catchError, EMPTY, forkJoin, of, tap } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -59,6 +59,7 @@ import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { UsersStore } from '../../store/users.store';
 import type { RoleAdminResponse } from '@app/shared/types';
 import {
+  ErrorKeys,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
@@ -515,6 +516,26 @@ export class UserEditComponent implements OnInit, OnDestroy {
         'users.edit.errorUpdateFailed'
       )
     );
+
+    if (err.error?.errorKey === ErrorKeys.ROLES.UNKNOWN_ROLE) {
+      this.#reloadRoleCatalog();
+    }
+  }
+
+  /** A failed read keeps the current state; the error interceptor reports it. */
+  #reloadRoleCatalog(): void {
+    this.#roleCatalog
+      .getAll()
+      .pipe(
+        catchError(() => EMPTY),
+        takeUntilDestroyed(this.#destroyRef)
+      )
+      .subscribe((roles) => {
+        this.availableRoles.set(roles);
+        this.selectedRoleIds.update((ids) =>
+          ids.filter((id) => roles.some((role) => role.id === id))
+        );
+      });
   }
 
   unlockAccount(): void {
