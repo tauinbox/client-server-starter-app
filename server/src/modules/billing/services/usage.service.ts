@@ -262,13 +262,14 @@ export class UsageService {
     existing: UsageRecord,
     input: RecordUsageInput
   ): Promise<UsageRecord> {
+    const { meterKey, quantity, occurredAt } = existing;
     const sameTime =
       input.occurredAt === undefined ||
-      new Date(input.occurredAt).getTime() === existing.occurredAt.getTime();
+      new Date(input.occurredAt).getTime() === occurredAt.getTime();
 
     if (
-      existing.meterKey !== input.meterKey ||
-      !existing.quantity.equals(Money.fromMinor(input.quantity)) ||
+      meterKey !== input.meterKey ||
+      !quantity.equals(Money.fromMinor(input.quantity)) ||
       !sameTime
     ) {
       throw new ApiError(
