@@ -806,8 +806,8 @@ the same permission both apply.
 - **Pay-as-you-go tier.** The metered `usage` plan is active in the catalog. The pricing page shows
   its price for each unit. `GET /api/v1/billing/usage` returns the meter of the metered window of the current
   period for the caller. After a switch of billing mode, the window starts at the switch. It gives the total units, the included units, the billable units and the accrued amount.
-- **Usage meter.** The billing settings page shows a usage card for the current period of a usage-mode
-  subscription. It has a large unit readout. It has a quota gauge when the plan includes units, where
+- **Usage meter.** The billing settings page shows a usage card for the current period of an entitled
+  usage-mode subscription (not an unpaid `incomplete` one). It has a large unit readout. It has a quota gauge when the plan includes units, where
   the used quota is in the primary tone and the overage is in the error tone. It ends with a money
   mini-ledger, which multiplies the billable units by the unit price and shows the accrued amount. A
   pure pay-as-you-go plan has no gauge.

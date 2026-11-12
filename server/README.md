@@ -620,7 +620,7 @@ are:
 
 - `GET subscription`, `GET invoices` (cursor-paginated) and `GET payment-method`.
 - `GET usage` returns the metered-usage summary of the metered window of the current period for a
-  usage-mode subscription of the caller. `periodStart` is the window start. It returns null for each other condition.
+  usage-mode subscription of the caller whose status is in `ENTITLED_SUBSCRIPTION_STATUSES`. `periodStart` is the window start. It returns null for each other condition.
 - `POST checkout` makes the local incomplete subscription for the self-managed provider, and then it
   redirects. It reuses an unpaid row that stays from an earlier attempt, through a conditional write
   that matches only while the row is `incomplete`. Thus a first-payment webhook that activates the

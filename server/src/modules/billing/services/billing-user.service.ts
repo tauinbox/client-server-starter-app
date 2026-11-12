@@ -157,9 +157,10 @@ export class BillingUserService {
 
   /**
    * The caller's metered usage aggregated over the current billing period.
-   * Null when there is nothing to meter: no customer, no open subscription, or
-   * a fixed-mode one. A dangling `planKey` also yields null — a read must not
-   * surface a data-integrity error.
+   * Null when there is nothing to meter: no customer, no open subscription, a
+   * fixed-mode one, or one outside `ENTITLED_SUBSCRIPTION_STATUSES` (an unpaid
+   * `incomplete` row accrues no usage). A dangling `planKey` also yields
+   * null — a read must not surface a data-integrity error.
    */
   async getUsageSummary(
     userId: string
@@ -173,7 +174,13 @@ export class BillingUserService {
       customer.id
     );
 
-    if (!subscription || subscription.billingMode !== 'usage') return null;
+    if (
+      !subscription ||
+      subscription.billingMode !== 'usage' ||
+      !ENTITLED_SUBSCRIPTION_STATUSES.includes(subscription.status)
+    ) {
+      return null;
+    }
 
     const plan = await this.plans.findOne({
       where: { key: subscription.planKey }

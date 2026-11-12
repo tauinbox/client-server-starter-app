@@ -1264,6 +1264,22 @@ describe('BillingUserService', () => {
       expect(ctx.usageRating.summarizeForPeriod).not.toHaveBeenCalled();
     });
 
+    it('returns null for an unpaid incomplete usage subscription', async () => {
+      const ctx = await build();
+
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        ...usageSub,
+        status: 'incomplete'
+      });
+      ctx.plans.findOne.mockResolvedValue(
+        makePlan({ key: 'usage', billingMode: 'usage', meterKey: 'api_calls' })
+      );
+
+      expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
+      expect(ctx.usageRating.summarizeForPeriod).not.toHaveBeenCalled();
+    });
+
     it('returns null instead of a 500 when the plan row is gone', async () => {
       const ctx = await build();
 
