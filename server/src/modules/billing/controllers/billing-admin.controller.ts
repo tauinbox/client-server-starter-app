@@ -97,7 +97,10 @@ export class BillingAdminController {
   @ApiBody({ type: CancelSubscriptionRequestDto })
   @ApiOkResponse({ type: SubscriptionResponseDto })
   @ApiNotFoundResponse({ description: 'Subscription not found' })
-  @ApiConflictResponse({ description: 'Subscription is already canceled' })
+  @ApiConflictResponse({
+    description:
+      'Subscription is already canceled, has no paid period to end, or already has a cancellation scheduled'
+  })
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: CancelSubscriptionRequestDto
@@ -153,6 +156,7 @@ export class BillingAdminController {
   @ApiParam({ name: 'id' })
   @ApiOkResponse({ description: 'Webhook event reset to `received`.' })
   @ApiNotFoundResponse({ description: 'Webhook event not found' })
+  @ApiConflictResponse({ description: 'Webhook event is not dead-lettered' })
   replayWebhookEvent(@Param('id', ParseUUIDPipe) id: string) {
     return this.billingAdmin.replayWebhookEvent(id);
   }
