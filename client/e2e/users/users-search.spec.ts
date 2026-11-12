@@ -57,6 +57,8 @@ test.describe('Inline user search (User management page)', () => {
   }) => {
     const searches: string[] = [];
 
+    // Before any navigation, so the page still loads on a running clock.
+    await page.clock.install();
     await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
     await page.route(`**${SEARCH_PATH}*`, (route) => {
       searches.push(new URL(route.request().url()).searchParams.get('q') ?? '');
@@ -65,9 +67,17 @@ test.describe('Inline user search (User management page)', () => {
     });
     await page.goto('/users');
 
+    const searchBox = page.getByLabel('Search');
+
+    await expect(searchBox).toBeVisible();
+    // A paused clock makes the burst independent of the real time between keys.
+    await page.clock.pauseAt(Date.now() + 1000);
+
     const response = listResponse(page, SEARCH_PATH, { q: 'admin@' });
 
-    await page.getByLabel('Search').pressSequentially('admin@', { delay: 30 });
+    await searchBox.pressSequentially('admin@', { delay: 30 });
+    // LIST_SEARCH_DEBOUNCE_MS; its module imports Angular, which the e2e runner does not load.
+    await page.clock.runFor(350);
     await response;
 
     expect(searches).toEqual(['admin@']);
