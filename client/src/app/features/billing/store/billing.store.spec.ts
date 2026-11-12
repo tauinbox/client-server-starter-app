@@ -553,6 +553,51 @@ describe('BillingStore', () => {
 
       expect(await store.checkout('pro')).toBeNull();
       expect(store.subscription()).toEqual(activeSub);
+      expect(billingMock.getPlans).not.toHaveBeenCalled();
+    });
+
+    it('a checkout of a gone plan re-reads the plans', async () => {
+      billingMock.checkout.mockReturnValue(
+        refused(422, ErrorKeys.BILLING.PLAN_NOT_FOUND)
+      );
+      billingMock.getPlans.mockReturnValue(of([]));
+      const store = createStore();
+
+      expect(await store.checkout('pro')).toBeNull();
+      expect(billingMock.getPlans).toHaveBeenCalledTimes(1);
+      expect(store.plans()).toEqual([]);
+      expect(notifyMock.error).toHaveBeenCalledTimes(1);
+      expect(store.working()).toBe(false);
+    });
+
+    it.each([
+      [422, ErrorKeys.BILLING.PRODUCT_NOT_FOUND],
+      [409, ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER]
+    ])(
+      'a purchase refused with %i %s re-reads the products and the region',
+      async (status, errorKey) => {
+        billingMock.purchase.mockReturnValue(refused(status, errorKey));
+        const store = createStore();
+
+        expect(await store.purchase({ productKey: 'credits-100' })).toBeNull();
+        expect(billingMock.getProducts).toHaveBeenCalledTimes(1);
+        expect(billingMock.getRegion).toHaveBeenCalledTimes(1);
+        expect(notifyMock.error).toHaveBeenCalledTimes(1);
+        expect(store.working()).toBe(false);
+      }
+    );
+
+    it('a purchase refused for its amount re-reads no catalog', async () => {
+      billingMock.purchase.mockReturnValue(
+        refused(422, ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE)
+      );
+      const store = createStore();
+
+      expect(
+        await store.purchase({ productKey: 'top-up', amountMinor: 1 })
+      ).toBeNull();
+      expect(billingMock.getProducts).not.toHaveBeenCalled();
+      expect(billingMock.getRegion).not.toHaveBeenCalled();
     });
 
     it('a payment-method update with no subscription clears the subscription', async () => {
@@ -785,7 +830,7 @@ describe('Billing requests through the error interceptor', () => {
       'POST',
       '/purchase',
       'billing.store.errorPurchaseFailed',
-      []
+      ['/products', '/region']
     ],
     [
       'changePlan',

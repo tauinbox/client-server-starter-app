@@ -238,7 +238,13 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorCheckoutFailed'
         );
-        await rereadAfterRefusal(error);
+        await Promise.all([
+          rereadAfterRefusal(error),
+          (error as HttpErrorResponse).error?.errorKey ===
+          ErrorKeys.BILLING.PLAN_NOT_FOUND
+            ? loadPlans()
+            : Promise.resolve()
+        ]);
 
         return null;
       } finally {
@@ -262,6 +268,16 @@ export const BillingStore = signalStore(
           error as HttpErrorResponse,
           'billing.store.errorPurchaseFailed'
         );
+
+        // The catalog depends on the provider of the region, so a product
+        // that is gone or has no price for that provider re-reads both.
+        if (
+          isStaleStateRefusal(error) ||
+          (error as HttpErrorResponse).error?.errorKey ===
+            ErrorKeys.BILLING.PRODUCT_NOT_FOUND
+        ) {
+          await Promise.all([loadProducts(), loadRegion()]);
+        }
 
         return null;
       } finally {
