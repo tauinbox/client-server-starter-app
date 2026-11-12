@@ -247,3 +247,34 @@ describe('cancelling a usage subscription bills the period it closes', () => {
     expect(invoicesAddedSince(sub.id, before)).toEqual([]);
   });
 });
+
+describe('the usage summary', () => {
+  function usage(token: string): Promise<Response> {
+    return fetch(`${baseUrl}/api/v1/billing/usage`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+  }
+
+  it('reports the metered units of an entitled usage subscription', async () => {
+    const { token, customerId } = await selfManagedUsageSub();
+
+    await seedUsage(customerId, 42);
+
+    expect(await (await usage(token)).json()).toMatchObject({
+      totalUnits: 42
+    });
+  });
+
+  it('is null for an unpaid incomplete usage subscription', async () => {
+    const { token, subscriptionId, customerId } = await selfManagedUsageSub();
+    const sub = getState().billingSubscriptions.get(subscriptionId);
+
+    if (sub) sub.status = 'incomplete';
+
+    await seedUsage(customerId, 42);
+    const res = await usage(token);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toBeNull();
+  });
+});

@@ -477,15 +477,19 @@ billingRouter.get(
 );
 
 // GET /billing/usage — metered usage aggregated over the current billing
-// period of the caller's usage-mode subscription, or null. Mirrors the
-// server's UsageRating math: records with occurredAt in [periodStart,
+// period of the caller's entitled usage-mode subscription, or null. Mirrors
+// the server's UsageRating math: records with occurredAt in [periodStart,
 // periodEnd), overage beyond includedUnits charged at unitPriceMinor.
 billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
   const sub = customer ? findCurrentSubscription(customer.id) : undefined;
 
-  if (!sub || sub.billingMode !== 'usage') {
+  if (
+    !sub ||
+    sub.billingMode !== 'usage' ||
+    !ENTITLED_SUBSCRIPTION_STATUSES.includes(sub.status)
+  ) {
     res.json(null);
 
     return;
