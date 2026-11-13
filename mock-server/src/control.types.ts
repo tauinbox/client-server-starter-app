@@ -1,6 +1,7 @@
 import type { StepUpOperation } from '@app/shared/constants';
 import type {
   BillingProviderId,
+  MeteringResponse,
   SubscriptionResponse,
   SubscriptionStatus,
   UsageResponse
@@ -104,6 +105,11 @@ export type ControlApi = {
     subscriptionId?: string;
     idempotencyKey?: string;
   }): Promise<UsageResponse>;
+  // `POST /admin/billing/usage` for `api_calls`, without an admin session.
+  consumeBillingCredits(args: {
+    customerId: string;
+    quantity: number;
+  }): Promise<MeteringResponse>;
   // Mints the payload the real server's provider callback would have signed
   // into the `oauth_data` cookie, and returns its opaque value. The test sets
   // that cookie and loads /oauth/callback to drive POST /oauth/exchange - the

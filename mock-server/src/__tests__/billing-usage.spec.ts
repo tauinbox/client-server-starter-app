@@ -1,9 +1,11 @@
 import type { Server } from 'http';
 import { ErrorKeys } from '@app/shared/constants';
+import type { MeteringResponse } from '@app/shared/types';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
+import * as sseHub from '../sse-hub';
 
 let server: Server;
 let baseUrl: string;
@@ -37,30 +39,6 @@ async function login(email: string): Promise<string> {
   return body.tokens.access_token;
 }
 
-// Activates a subscription for the admin user so a customer with an active
-// subscription exists, and returns its customer id.
-async function seedActiveCustomer(): Promise<string> {
-  const admin = await fetch(`${baseUrl}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@example.com', password: 'Password1' })
-  });
-  const me = (await admin.json()) as { user: { id: string } };
-  const res = await fetch(
-    `${baseUrl}/__control/billing/activate-subscription`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId: me.user.id, planKey: 'pro' })
-    }
-  );
-
-  expect(res.status).toBe(200);
-  const sub = (await res.json()) as { customerId: string };
-
-  return sub.customerId;
-}
-
 function postUsage(token: string, body: unknown): Promise<Response> {
   return fetch(`${baseUrl}/api/v1/admin/billing/usage`, {
     method: 'POST',
@@ -72,11 +50,14 @@ function postUsage(token: string, body: unknown): Promise<Response> {
   });
 }
 
-// Activates a subscription on the given plan for a user and returns ids.
+/**
+ * A subscription on `planKey` for the user with `email`, with the given
+ * status; a `canceled` one leaves a customer with no entitled subscription.
+ */
 async function activateSubscription(
   email: string,
-  planKey: string
-): Promise<{ customerId: string; subscriptionId: string; userId: string }> {
+  { planKey = 'pro', status = 'active' }: { planKey?: string; status?: string }
+): Promise<{ customerId: string; userId: string }> {
   const loginRes = await fetch(`${baseUrl}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -88,32 +69,44 @@ async function activateSubscription(
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId: me.user.id, planKey })
+      body: JSON.stringify({ userId: me.user.id, planKey, status })
     }
   );
 
   expect(res.status).toBe(200);
-  const sub = (await res.json()) as { id: string; customerId: string };
+  const sub = (await res.json()) as { customerId: string };
 
-  return {
-    customerId: sub.customerId,
-    subscriptionId: sub.id,
-    userId: me.user.id
-  };
+  return { customerId: sub.customerId, userId: me.user.id };
 }
 
-async function seedUsage(
-  customerId: string,
-  quantity: number,
-  { occurredAt, meterKey }: { occurredAt?: string; meterKey?: string } = {}
-): Promise<void> {
-  const res = await fetch(`${baseUrl}/__control/billing/seed-usage`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ customerId, quantity, occurredAt, meterKey })
+/** A customer of `email` with no entitled subscription and `units` credits. */
+async function fundedCustomer(
+  email: string,
+  units: number
+): Promise<{ customerId: string; userId: string }> {
+  const ids = await activateSubscription(email, { status: 'canceled' });
+
+  getState().billingCreditBalances.set(ids.customerId, {
+    customerId: ids.customerId,
+    balanceUnits: units,
+    updatedAt: new Date().toISOString()
   });
 
-  expect(res.status).toBe(200);
+  return ids;
+}
+
+function balanceOf(customerId: string): number | undefined {
+  return getState().billingCreditBalances.get(customerId)?.balanceUnits;
+}
+
+function use(customerId: string, overrides: Record<string, unknown> = {}) {
+  return {
+    customerId,
+    meterKey: 'api_calls',
+    quantity: 3,
+    idempotencyKey: 'evt-1',
+    ...overrides
+  };
 }
 
 function getUsage(token?: string): Promise<Response> {
@@ -129,424 +122,210 @@ describe('GET /api/v1/billing/usage parity with server', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns null when the caller has no usage-mode subscription', async () => {
+  it('returns null when the caller has no billing customer', async () => {
     const token = await login('user@example.com');
-
-    // No customer at all.
-    expect(await (await getUsage(token)).json()).toBeNull();
-
-    // A fixed-mode subscription is not metered either.
-    await activateSubscription('user@example.com', 'pro');
-    expect(await (await getUsage(token)).json()).toBeNull();
-  });
-
-  it('aggregates current-period records and rates the overage', async () => {
-    const token = await login('user@example.com');
-    const { customerId, subscriptionId } = await activateSubscription(
-      'user@example.com',
-      'usage'
-    );
-
-    await seedUsage(customerId, 30);
-    await seedUsage(customerId, 12);
-    // Outside the current period — must not count.
-    await seedUsage(customerId, 999, {
-      occurredAt: '2000-01-01T00:00:00.000Z'
-    });
-    // Recorded against the same subscription under another product's meter —
-    // the plan does not price it, so it must not count either.
-    await seedUsage(customerId, 500, { meterKey: 'other_product_calls' });
-
     const res = await getUsage(token);
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as Record<string, unknown>;
+    expect(await res.json()).toBeNull();
+  });
 
-    // user@example.com is non-RU → paddle price: $0.02/unit, 0 included.
-    expect(body).toMatchObject({
-      subscriptionId,
-      meterKey: 'api_calls',
-      totalUnits: 42,
-      includedUnits: 0,
-      billableUnits: 42,
-      unitPriceMinor: 2,
-      amountMinor: 84,
-      currency: 'USD'
-    });
-    expect(typeof body['periodStart']).toBe('string');
-    expect(typeof body['periodEnd']).toBe('string');
+  it('reports the units that metered uses took this month', async () => {
+    const admin = await login('admin@example.com');
+    const { customerId } = await fundedCustomer('user@example.com', 50);
+
+    await postUsage(admin, use(customerId, { quantity: 7 }));
+    await postUsage(
+      admin,
+      use(customerId, { quantity: 5, idempotencyKey: 'evt-2' })
+    );
+
+    const res = await getUsage(await login('user@example.com'));
+
+    expect(await res.json()).toMatchObject({ unitsSpent: 12 });
   });
 });
 
 describe('POST /api/v1/admin/billing/usage parity with server', () => {
-  it('records usage and never serializes the idempotency key', async () => {
+  it('debits the units at once and stores a record with no subscription', async () => {
     const token = await login('admin@example.com');
-    const customerId = await seedActiveCustomer();
+    const { customerId } = await fundedCustomer('user@example.com', 10);
 
-    const res = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 42,
-      idempotencyKey: 'evt-1'
-    });
+    const res = await postUsage(token, use(customerId));
 
     expect(res.status).toBe(201);
-    const body = (await res.json()) as Record<string, unknown>;
+    const body = (await res.json()) as MeteringResponse;
 
-    expect(body['quantity']).toBe(42);
-    expect(body['meterKey']).toBe('api_calls');
-    expect(body).not.toHaveProperty('idempotencyKey');
-    // seedActiveCustomer subscribes to the fixed `pro` plan, which prices no
-    // meter — the record is kept, the response says it will not bill.
-    expect(body['pricedByCurrentPlan']).toBe(false);
+    expect(body).toEqual({
+      recordId: expect.any(String) as string,
+      debited: true,
+      replayed: false,
+      balanceAfter: 7
+    });
+    expect(balanceOf(customerId)).toBe(7);
+    expect(
+      getState().billingUsageRecords.get(body.recordId as string)
+    ).toMatchObject({ subscriptionId: null, quantity: 3 });
   });
 
-  it('is idempotent: a replayed key returns the original record', async () => {
+  it('is idempotent: a replayed key answers the first record and debits once', async () => {
     const token = await login('admin@example.com');
-    const customerId = await seedActiveCustomer();
-    const payload = {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 10,
-      idempotencyKey: 'evt-dup'
-    };
+    const { customerId } = await fundedCustomer('user@example.com', 10);
 
-    const first = (await (await postUsage(token, payload)).json()) as {
-      id: string;
-    };
-    const res = await postUsage(token, payload);
-    const second = (await res.json()) as { id: string; quantity: number };
+    const first = (await (
+      await postUsage(token, use(customerId))
+    ).json()) as MeteringResponse;
+    const replay = await postUsage(token, use(customerId));
 
-    expect(res.status).toBe(201);
-    expect(second.id).toBe(first.id);
-    expect(second.quantity).toBe(10);
+    expect(replay.status).toBe(201);
+    expect(await replay.json()).toEqual({
+      recordId: first.recordId,
+      debited: true,
+      replayed: true,
+      balanceAfter: 7
+    });
+    expect(balanceOf(customerId)).toBe(7);
+    expect(getState().billingUsageRecords.size).toBe(1);
+  });
+
+  it('refuses the same key with another quantity (409)', async () => {
+    const token = await login('admin@example.com');
+    const { customerId } = await fundedCustomer('user@example.com', 10);
+
+    await postUsage(token, use(customerId));
+    const res = await postUsage(token, use(customerId, { quantity: 4 }));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      errorKey: ErrorKeys.BILLING.USAGE_KEY_REUSED
+    });
+    expect(balanceOf(customerId)).toBe(7);
+  });
+
+  it('scopes idempotency to the customer: the same key from another customer is a separate use', async () => {
+    const token = await login('admin@example.com');
+    const a = await fundedCustomer('user@example.com', 10);
+    const b = await fundedCustomer('admin@example.com', 10);
+
+    await postUsage(token, use(a.customerId));
+    const res = await postUsage(token, use(b.customerId));
+
+    expect(await res.json()).toMatchObject({ replayed: false });
+    expect(balanceOf(b.customerId)).toBe(7);
   });
 
   it.each([
-    ['quantity', { quantity: 999 }],
-    ['meterKey', { meterKey: 'storage_gb' }],
-    ['occurredAt', { occurredAt: new Date(Date.now() - 1000).toISOString() }]
-  ])(
-    'refuses a key reused with another %s and keeps one record',
-    async (_field, change) => {
-      const token = await login('admin@example.com');
-      const customerId = await seedActiveCustomer();
-      const payload = {
-        customerId,
-        meterKey: 'api_calls',
-        quantity: 10,
-        idempotencyKey: 'evt-reused'
-      };
-
-      await postUsage(token, payload);
-      const res = await postUsage(token, { ...payload, ...change });
-
-      expect(res.status).toBe(409);
-      expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
-        ErrorKeys.BILLING.USAGE_KEY_REUSED
-      );
-      expect(
-        getState()
-          .billingUsageRecords.values()
-          .filter((r) => r.idempotencyKey === 'evt-reused')
-          .toArray()
-      ).toHaveLength(1);
-    }
-  );
-
-  it('scopes idempotency to the customer: the same key from another customer records a separate event', async () => {
+    ['fewer units than the use', 2],
+    ['a clawed-back debt', -50]
+  ])('refuses a use with %s (409) and writes nothing', async (_name, units) => {
     const token = await login('admin@example.com');
-    const { customerId: first } = await activateSubscription(
-      'admin@example.com',
-      'pro'
-    );
-    const { customerId: second } = await activateSubscription(
-      'user@example.com',
-      'pro'
-    );
-    const payload = {
-      meterKey: 'api_calls',
-      quantity: 10,
-      idempotencyKey: 'req-1001'
-    };
+    const { customerId } = await fundedCustomer('user@example.com', units);
 
-    const a = (await (
-      await postUsage(token, { ...payload, customerId: first })
-    ).json()) as Record<string, unknown>;
-    const b = (await (
-      await postUsage(token, { ...payload, customerId: second, quantity: 25 })
-    ).json()) as Record<string, unknown>;
-
-    expect(b['id']).not.toBe(a['id']);
-    expect(a['customerId']).toBe(first);
-    expect(b['customerId']).toBe(second);
-    expect(b['quantity']).toBe(25);
-  });
-
-  it('bills the newest active subscription when the customer has more than one', async () => {
-    const token = await login('admin@example.com');
-    const { customerId, subscriptionId } = await activateSubscription(
-      'admin@example.com',
-      'pro'
-    );
-    const state = getState();
-    const first = state.billingSubscriptions.get(subscriptionId);
-
-    if (!first) throw new Error('subscription was not seeded');
-
-    first.createdAt = '2026-01-01T00:00:00.000Z';
-    // A second active row for the same customer, as an admin action or a
-    // webhook race can produce. Inserted after the older one, so an unordered
-    // scan returns the wrong subscription first.
-    const newer = {
-      ...first,
-      id: '22222222-2222-2222-2222-222222222222',
-      createdAt: '2026-06-01T00:00:00.000Z'
-    };
-
-    state.billingSubscriptions.set(newer.id, newer);
-
-    const res = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 5,
-      idempotencyKey: 'evt-newest'
-    });
-
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as Record<string, unknown>;
-
-    expect(body['subscriptionId']).toBe(newer.id);
-  });
-
-  it('returns 409 when the customer has no active subscription', async () => {
-    const token = await login('admin@example.com');
-
-    const res = await postUsage(token, {
-      customerId: mockId('no-such-customer'),
-      meterKey: 'api_calls',
-      quantity: 1,
-      idempotencyKey: 'evt-x'
-    });
+    const res = await postUsage(token, use(customerId));
 
     expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      errorKey: ErrorKeys.BILLING.INSUFFICIENT_CREDITS
+    });
+    expect(balanceOf(customerId)).toBe(units);
+    expect(getState().billingUsageRecords.size).toBe(0);
   });
 
-  it('rejects a meter no plan declares (422)', async () => {
+  it('refuses a customer that never bought credits (409)', async () => {
     const token = await login('admin@example.com');
-    const customerId = await seedActiveCustomer();
 
-    const res = await postUsage(token, {
-      customerId,
-      meterKey: 'api_call',
-      quantity: 7,
-      idempotencyKey: 'evt-typo'
+    const res = await postUsage(token, use(mockId('no-such-customer')));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      errorKey: ErrorKeys.BILLING.INSUFFICIENT_CREDITS
     });
+  });
+
+  it('does not debit a subscriber whose plan has the capability of the meter', async () => {
+    const token = await login('admin@example.com');
+    const { customerId } = await activateSubscription('user@example.com', {
+      planKey: 'pro'
+    });
+
+    const res = await postUsage(token, use(customerId));
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      recordId: null,
+      debited: false,
+      replayed: false,
+      balanceAfter: 0
+    });
+    expect(getState().billingUsageRecords.size).toBe(0);
+  });
+
+  it('tells the owner once when a debit takes the balance to 0', async () => {
+    const token = await login('admin@example.com');
+    const { customerId, userId } = await fundedCustomer('user@example.com', 6);
+    const push = jest.spyOn(sseHub, 'pushToUser');
+
+    await postUsage(token, use(customerId));
+    expect(push).not.toHaveBeenCalled();
+
+    await postUsage(token, use(customerId, { idempotencyKey: 'evt-2' }));
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith(userId, {
+      type: 'entitlements_updated'
+    });
+    push.mockRestore();
+  });
+
+  it('rejects a meter outside the meter catalog (422)', async () => {
+    const token = await login('admin@example.com');
+    const { customerId } = await fundedCustomer('user@example.com', 10);
+
+    const res = await postUsage(
+      token,
+      use(customerId, { meterKey: 'typo_calls' })
+    );
 
     expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({
-      message: 'Meter "api_call" is not declared by any plan',
-      statusCode: 422
+      errorKey: ErrorKeys.BILLING.METER_NOT_DECLARED
     });
-    expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
-  });
-
-  it('rejects an occurredAt before the open metered window (422)', async () => {
-    const token = await login('admin@example.com');
-    const { customerId, subscriptionId } = await activateSubscription(
-      'admin@example.com',
-      'usage'
-    );
-    const sub = getState().billingSubscriptions.get(subscriptionId);
-
-    if (!sub) throw new Error('subscription not seeded');
-
-    const before = new Date(
-      new Date(sub.currentPeriodStart).getTime() - 1
-    ).toISOString();
-
-    const res = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 7,
-      occurredAt: before,
-      idempotencyKey: 'evt-before-window'
-    });
-
-    expect(res.status).toBe(422);
-    expect(await res.json()).toMatchObject({
-      message: 'occurredAt is before the open metered window',
-      statusCode: 422,
-      errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
-    });
-    expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
-  });
-
-  it('measures the window from meteredFrom when it is later than the period start', async () => {
-    const token = await login('admin@example.com');
-    const { customerId, subscriptionId } = await activateSubscription(
-      'admin@example.com',
-      'usage'
-    );
-    const sub = getState().billingSubscriptions.get(subscriptionId);
-
-    if (!sub) throw new Error('subscription not seeded');
-
-    const now = Date.now();
-
-    sub.currentPeriodStart = new Date(now - 10 * 86_400_000).toISOString();
-    sub.meteredFrom = new Date(now - 86_400_000).toISOString();
-
-    const refused = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 7,
-      occurredAt: new Date(now - 2 * 86_400_000).toISOString(),
-      idempotencyKey: 'evt-before-metered-from'
-    });
-    const accepted = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 7,
-      occurredAt: sub.meteredFrom,
-      idempotencyKey: 'evt-at-metered-from'
-    });
-
-    expect(refused.status).toBe(422);
-    expect(accepted.status).toBe(201);
-  });
-
-  it('refuses usage inside a window a declined renewal sealed, as the server does', async () => {
-    const token = await login('admin@example.com');
-    const { customerId, subscriptionId } = await activateSubscription(
-      'admin@example.com',
-      'usage'
-    );
-    const declined = await fetch(
-      `${baseUrl}/__control/billing/advance-renewal`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ subscriptionId, outcome: 'failure' })
-      }
-    );
-
-    expect(declined.status).toBe(200);
-    const sealedAt =
-      getState().billingSubscriptions.get(subscriptionId)?.usageSealedUntil;
-
-    if (!sealedAt) throw new Error('renewal did not seal the window');
-
-    const refused = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 7,
-      occurredAt: new Date(new Date(sealedAt).getTime() - 1).toISOString(),
-      idempotencyKey: 'evt-before-seal'
-    });
-    const accepted = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 7,
-      occurredAt: sealedAt,
-      idempotencyKey: 'evt-at-seal'
-    });
-
-    expect(refused.status).toBe(422);
-    expect(await refused.json()).toMatchObject({
-      errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW
-    });
-    expect(accepted.status).toBe(201);
+    expect(balanceOf(customerId)).toBe(10);
   });
 
   it('rejects an occurredAt past the clock skew tolerance (422)', async () => {
     const token = await login('admin@example.com');
-    const { customerId } = await activateSubscription(
-      'admin@example.com',
-      'usage'
-    );
+    const { customerId } = await fundedCustomer('user@example.com', 10);
 
-    const res = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 7,
-      occurredAt: new Date(Date.now() + 10 * 60_000).toISOString(),
-      idempotencyKey: 'evt-future'
-    });
+    const res = await postUsage(
+      token,
+      use(customerId, {
+        occurredAt: new Date(Date.now() + 6 * 60_000).toISOString()
+      })
+    );
 
     expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({
-      message: 'occurredAt is in the future',
-      statusCode: 422,
       errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE
     });
-    expect([...getState().billingUsageRecords.values()]).toHaveLength(0);
   });
 
   it('accepts an occurredAt inside the clock skew tolerance', async () => {
     const token = await login('admin@example.com');
-    const { customerId } = await activateSubscription(
-      'admin@example.com',
-      'usage'
+    const { customerId } = await fundedCustomer('user@example.com', 10);
+
+    const res = await postUsage(
+      token,
+      use(customerId, {
+        occurredAt: new Date(Date.now() + 60_000).toISOString()
+      })
     );
 
-    const res = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 7,
-      occurredAt: new Date(Date.now() + 60_000).toISOString(),
-      idempotencyKey: 'evt-near-future'
-    });
-
     expect(res.status).toBe(201);
-  });
-
-  it('stores a catalog meter the current plan does not price', async () => {
-    const token = await login('admin@example.com');
-    // On the fixed `pro` plan, which meters nothing — the observation is still
-    // recorded, it simply rates to nothing until the customer is on `usage`.
-    const { customerId } = await activateSubscription(
-      'admin@example.com',
-      'pro'
-    );
-
-    const res = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 7,
-      idempotencyKey: 'evt-unpriced'
-    });
-
-    expect(res.status).toBe(201);
-    expect([...getState().billingUsageRecords.values()]).toHaveLength(1);
-    expect(
-      ((await res.json()) as Record<string, unknown>)['pricedByCurrentPlan']
-    ).toBe(false);
-  });
-
-  it('reports a record as priced when the meter is the active plan meter', async () => {
-    const token = await login('admin@example.com');
-    const { customerId } = await activateSubscription(
-      'admin@example.com',
-      'usage'
-    );
-
-    const res = await postUsage(token, {
-      customerId,
-      meterKey: 'api_calls',
-      quantity: 3,
-      idempotencyKey: 'evt-priced'
-    });
-
-    expect(res.status).toBe(201);
-    expect(
-      ((await res.json()) as Record<string, unknown>)['pricedByCurrentPlan']
-    ).toBe(true);
   });
 
   it('rejects an invalid payload (422)', async () => {
     const token = await login('admin@example.com');
-    const customerId = await seedActiveCustomer();
+    const { customerId } = await fundedCustomer('user@example.com', 10);
 
     const res = await postUsage(token, {
       customerId,
@@ -561,12 +340,7 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
   it('denies a non-admin caller (403)', async () => {
     const token = await login('user@example.com');
 
-    const res = await postUsage(token, {
-      customerId: mockId('no-such-customer'),
-      meterKey: 'api_calls',
-      quantity: 1,
-      idempotencyKey: 'evt-y'
-    });
+    const res = await postUsage(token, use(mockId('no-such-customer')));
 
     expect(res.status).toBe(403);
   });

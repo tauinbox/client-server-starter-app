@@ -255,23 +255,59 @@ describe('the usage summary', () => {
     });
   }
 
-  it('reports the metered units of an entitled usage subscription', async () => {
-    const { token, customerId } = await selfManagedUsageSub();
+  function storeRecord(
+    customerId: string,
+    {
+      quantity,
+      subscriptionId = null,
+      recordedAt = new Date()
+    }: {
+      quantity: number;
+      subscriptionId?: string | null;
+      recordedAt?: Date;
+    }
+  ): void {
+    const id = `use-${getState().billingUsageRecords.size}`;
 
-    await seedUsage(customerId, 42);
+    getState().billingUsageRecords.set(id, {
+      id,
+      customerId,
+      subscriptionId,
+      meterKey: 'api_calls',
+      quantity,
+      occurredAt: recordedAt.toISOString(),
+      idempotencyKey: id,
+      recordedAt: recordedAt.toISOString()
+    });
+  }
 
-    expect(await (await usage(token)).json()).toMatchObject({
-      totalUnits: 42
+  it('reports the credit units that metered uses took this calendar month', async () => {
+    const { token, customerId, subscriptionId } = await selfManagedUsageSub();
+    const now = new Date();
+    const monthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+    );
+
+    storeRecord(customerId, { quantity: 40 });
+    storeRecord(customerId, { quantity: 2 });
+    // A postpaid record and a debit of an earlier month do not count.
+    storeRecord(customerId, { quantity: 1000, subscriptionId });
+    storeRecord(customerId, {
+      quantity: 500,
+      recordedAt: new Date(monthStart.getTime() - 1)
+    });
+
+    expect(await (await usage(token)).json()).toEqual({
+      periodStart: monthStart.toISOString(),
+      periodEnd: new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+      ).toISOString(),
+      unitsSpent: 42
     });
   });
 
-  it('is null for an unpaid incomplete usage subscription', async () => {
-    const { token, subscriptionId, customerId } = await selfManagedUsageSub();
-    const sub = getState().billingSubscriptions.get(subscriptionId);
-
-    if (sub) sub.status = 'incomplete';
-
-    await seedUsage(customerId, 42);
+  it('is null for a caller with no billing customer', async () => {
+    const { token } = await login('user@example.com');
     const res = await usage(token);
 
     expect(res.status).toBe(200);

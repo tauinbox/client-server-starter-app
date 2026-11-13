@@ -73,42 +73,33 @@ describe('billing lab', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
     expect(html).toContain('Billing lab');
-    expect(html).toContain('Pay as you go, active, 150 units used');
+    expect(html).toContain('Pay as you go, balance 500');
     expect(html).toContain('No billing customer yet');
   });
 
-  it('puts a user on pay as you go through YooKassa with recorded units', async () => {
-    const { token, userId } = await login();
+  it.each([
+    ['payg-funded', 500, 'usage'],
+    ['payg-empty', 0, 'free']
+  ])(
+    'puts a user on the %s preset: a balance of %i, no subscription, the %s plan',
+    async (preset, units, planKey) => {
+      const { token, userId } = await login();
 
-    expect(
-      await lab('preset', {
-        userId,
-        preset: 'usage-with-units',
-        provider: 'yookassa'
-      })
-    ).toMatchObject({ status: 200 });
+      expect(
+        await lab('preset', { userId, preset, provider: 'auto' })
+      ).toMatchObject({ status: 200 });
 
-    const subscription = await read<SubscriptionResponse>(
-      token,
-      '/billing/subscription'
-    );
-    const usage = await read<UsageSummaryResponse>(token, '/billing/usage');
-    const region = await read<{ effectiveProvider: string }>(
-      token,
-      '/billing/region'
-    );
-
-    expect(subscription).toMatchObject({
-      planKey: 'usage',
-      billingMode: 'usage',
-      provider: 'yookassa',
-      lifecycleOwner: 'self',
-      status: 'active'
-    });
-    expect(usage.totalUnits).toBe(150);
-    // The region follows the provider, so the pricing page agrees with it.
-    expect(region.effectiveProvider).toBe('yookassa');
-  });
+      expect(
+        await read<SubscriptionResponse | null>(token, '/billing/subscription')
+      ).toBeNull();
+      expect(
+        await read<{ balanceUnits: number }>(token, '/billing/credits')
+      ).toMatchObject({ balanceUnits: units });
+      expect(
+        await read<{ planKey: string }>(token, '/billing/entitlements')
+      ).toMatchObject({ planKey });
+    }
+  );
 
   it('starts every preset from Free and closes the open subscription', async () => {
     const { token, userId } = await login();
@@ -136,17 +127,26 @@ describe('billing lab', () => {
     ).toBeNull();
   });
 
-  it('runs the renewal clock into dunning and records usage', async () => {
+  it('uses units from the credits, and refuses a use that the balance does not cover', async () => {
     const { token, userId } = await login();
 
-    await lab('preset', { userId, preset: 'usage', provider: 'auto' });
-    expect(await lab('usage', { userId, quantity: '42' })).toMatchObject({
-      status: 200
+    await lab('preset', { userId, preset: 'payg-funded', provider: 'auto' });
+    expect(await lab('usage', { userId, quantity: '42' })).toEqual({
+      status: 200,
+      message: 'Used 42 units; 458 credits left'
     });
     expect(
-      (await read<UsageSummaryResponse>(token, '/billing/usage')).totalUnits
+      (await read<UsageSummaryResponse>(token, '/billing/usage')).unitsSpent
     ).toBe(42);
+    expect(await lab('usage', { userId, quantity: '459' })).toMatchObject({
+      status: 400
+    });
+  });
 
+  it('runs the renewal clock into dunning', async () => {
+    const { userId } = await login();
+
+    await lab('preset', { userId, preset: 'pro', provider: 'auto' });
     expect(await lab('renewal', { userId, outcome: 'failure' })).toEqual({
       status: 200,
       message: 'Renewal failure: the subscription is past_due'

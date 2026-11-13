@@ -60,6 +60,19 @@ async function activateSubscription(
   return { subscriptionId: sub.id, customerId: sub.customerId };
 }
 
+/** A customer with no entitled subscription and `units` prepaid credits. */
+async function fundCredits(userId: string, units: number): Promise<string> {
+  const { customerId } = await activateSubscription(userId, 'canceled');
+
+  getState().billingCreditBalances.set(customerId, {
+    customerId,
+    balanceUnits: units,
+    updatedAt: new Date().toISOString()
+  });
+
+  return customerId;
+}
+
 function post(token: string, path: string, body?: unknown): Promise<Response> {
   return fetch(`${baseUrl}/api/v1${path}`, {
     method: 'POST',
@@ -275,7 +288,7 @@ describe('admin billing mutations write audit entries', () => {
 
   it('audits recorded usage once, and an idempotent replay writes no second row', async () => {
     const { token, userId } = await loginAdmin();
-    const { customerId } = await activateSubscription(userId);
+    const customerId = await fundCredits(userId, 100);
     const payload = {
       customerId,
       meterKey: 'api_calls',
@@ -286,7 +299,7 @@ describe('admin billing mutations write audit entries', () => {
     const first = await post(token, '/admin/billing/usage', payload);
 
     expect(first.status).toBe(201);
-    const record = (await first.json()) as { id: string };
+    const { recordId } = (await first.json()) as { recordId: string };
 
     const replay = await post(token, '/admin/billing/usage', payload);
 
@@ -296,15 +309,30 @@ describe('admin billing mutations write audit entries', () => {
 
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
-      targetId: record.id,
+      targetId: recordId,
       targetType: 'UsageRecord',
       details: { customerId, meterKey: 'api_calls', quantity: 42 }
     });
   });
 
-  it('never audits the usage idempotency key', async () => {
+  it('writes no audit row for a use that a plan with the capability makes free', async () => {
     const { token, userId } = await loginAdmin();
     const { customerId } = await activateSubscription(userId);
+    const res = await post(token, '/admin/billing/usage', {
+      customerId,
+      meterKey: 'api_calls',
+      quantity: 1,
+      idempotencyKey: 'evt-audit-free'
+    });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ debited: false, recordId: null });
+    expect(entriesFor('BILLING_USAGE_RECORD')).toHaveLength(0);
+  });
+
+  it('never audits the usage idempotency key', async () => {
+    const { token, userId } = await loginAdmin();
+    const customerId = await fundCredits(userId, 100);
 
     await post(token, '/admin/billing/usage', {
       customerId,

@@ -41,6 +41,7 @@ import {
   setProviderEnabled,
   type RenewalOutcome
 } from './helpers/billing-clock.helpers';
+import { consumeCredits } from './helpers/billing-metering.helpers';
 import { notifyRoleHolders } from './middleware/roles.middleware';
 
 const router = Router();
@@ -734,6 +735,36 @@ router.post('/billing/complete-purchase', (req, res) => {
   }
 
   res.json(toInvoiceResponse(settlePurchase(session)));
+});
+
+// POST /__control/billing/consume-credits - one pay-as-you-go use for E2E,
+// through the same helper as the admin usage route.
+router.post('/billing/consume-credits', (req, res) => {
+  const { customerId, quantity } = req.body as {
+    customerId?: string;
+    quantity?: number;
+  };
+
+  if (!customerId || !quantity) {
+    res.status(400).json({ message: 'customerId and quantity are required' });
+
+    return;
+  }
+
+  const outcome = consumeCredits(customerId, {
+    meterKey: 'api_calls',
+    units: quantity,
+    idempotencyKey: `control-${randomUUID()}`,
+    occurredAt: new Date().toISOString()
+  });
+
+  if ('refusal' in outcome) {
+    res.status(409).json(outcome.refusal);
+
+    return;
+  }
+
+  res.json(outcome.response);
 });
 
 // POST /__control/billing/advance-renewal - renewal-clock advance for E2E:

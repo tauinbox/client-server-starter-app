@@ -183,27 +183,23 @@ describe('POST /billing/subscription/change', () => {
     expect(source.refundedMinor).toBeLessThan(source.amountMinor);
   });
 
-  it('switches fixed → usage with a refund and no charge', async () => {
+  it('refuses fixed → usage and its preview: pay as you go is a credit balance', async () => {
     useRussianLocale();
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
+    const invoicesBefore = getState().billingInvoices.size;
 
-    const res = await post(token, 'subscription/change', { planKey: 'usage' });
+    for (const path of ['subscription/change', 'subscription/change/preview']) {
+      const res = await post(token, path, { planKey: 'usage' });
 
-    expect(res.status).toBe(200);
-    const sub = (await res.json()) as { planKey: string; billingMode: string };
+      expect(res.status).toBe(422);
+      expect(await res.json()).toMatchObject({
+        errorKey: ErrorKeys.BILLING.PAY_AS_YOU_GO_IS_PREPAID
+      });
+    }
 
-    expect(sub.billingMode).toBe('usage');
-
-    const invoices = [...getState().billingInvoices.values()].filter(
-      (i) => i.subscriptionId === subId
-    );
-
-    expect(invoices.some((i) => i.status === 'refunded')).toBe(true);
-    // No new paid invoice beyond the activation one (990 RUB).
-    expect(
-      invoices.filter((i) => i.status === 'paid' && i.amountMinor !== 99000)
-    ).toHaveLength(0);
+    expect(getState().billingSubscriptions.get(subId)?.planKey).toBe('pro');
+    expect(getState().billingInvoices.size).toBe(invoicesBefore);
   });
 
   it('rejects switching to the current plan', async () => {
@@ -317,48 +313,6 @@ describe('POST /billing/subscription/change - metered window', () => {
       (i) => i.subscriptionId === subId && i.billingMode === 'usage'
     );
   }
-
-  it('fixed → usage never rates the units consumed on the fixed plan', async () => {
-    const token = await login('user@example.com');
-    const subId = await activateSubscription('pro');
-
-    backdatePeriod(subId);
-    await seedUsage(subId);
-
-    const res = await post(token, 'subscription/change', { planKey: 'usage' });
-
-    expect(res.status).toBe(200);
-
-    const usage = await fetch(`${baseUrl}/api/v1/billing/usage`, {
-      headers: { authorization: `Bearer ${token}` }
-    });
-    const summary = (await usage.json()) as {
-      totalUnits: number;
-      periodStart: string;
-    };
-
-    expect(summary.totalUnits).toBe(0);
-    expect(summary.periodStart).toBe(
-      getState().billingSubscriptions.get(subId)?.meteredFrom
-    );
-
-    const renewal = await fetch(
-      `${baseUrl}/__control/billing/advance-renewal`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ subscriptionId: subId, outcome: 'success' })
-      }
-    );
-
-    expect(renewal.status).toBe(200);
-    const [closed] = usageInvoices(subId);
-
-    expect(closed.amountMinor).toBe(0);
-    expect(getState().billingSubscriptions.get(subId)?.meteredFrom).toBe(
-      undefined
-    );
-  });
 
   it('usage → fixed bills the closing window under the usage plan', async () => {
     const token = await login('user@example.com');

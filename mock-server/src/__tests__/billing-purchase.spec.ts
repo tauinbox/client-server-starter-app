@@ -5,6 +5,7 @@ import type {
   ProductResponse,
   PurchaseSessionResponse
 } from '@app/shared/types';
+import { ErrorKeys } from '@app/shared/constants';
 import { createApp } from '../app';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { getState, resetState } from '../state';
@@ -375,26 +376,13 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     return (await complete.json()) as InvoiceResponse;
   }
 
-  it('claws back the pack on full refund; spent credits drive the balance negative and block usage', async () => {
+  it('claws back the pack on full refund; spent credits drive the balance negative and refuse a use', async () => {
     const token = await login();
     const adminToken = await login('admin@example.com');
-
-    // Usage-mode subscription so credits can be spent at the period close.
-    const activate = await fetch(
-      `${baseUrl}/__control/billing/activate-subscription`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: mockId('user-2'), planKey: 'usage' })
-      }
-    );
-
-    expect(activate.status).toBe(200);
-    const { customerId } = (await activate.json()) as { customerId: string };
-
     const invoice = await buyCredits(token, 'credits-500');
+    const { customerId } = invoice;
 
-    // Meter 200 units, then close the period: the renewal spends 200 credits.
+    // A use takes its units at once: 500 - 200 = 300.
     const first = await recordUsage(adminToken, {
       customerId,
       meterKey: 'api_calls',
@@ -403,36 +391,32 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     });
 
     expect(first.status).toBe(201);
-    const advance = await fetch(
-      `${baseUrl}/__control/billing/advance-renewal`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: mockId('user-2') })
-      }
-    );
-
-    expect(advance.status).toBe(200);
     const spent = (await (await getCredits(token)).json()) as {
       balanceUnits: number;
     };
 
     expect(spent.balanceUnits).toBe(300);
 
-    // Full refund of the pack takes all 500 back: 300 - 500 = -200.
+    // Full refund of the pack takes all 500 back: 300 - 500 = -200. The
+    // balance crosses 0, so the owner is told that the entitlements changed.
+    const push = jest.spyOn(sseHub, 'pushToUser');
     const refunded = await refund(adminToken, invoice.id);
 
     expect(refunded.status).toBe(200);
     expect(((await refunded.json()) as InvoiceResponse).status).toBe(
       'refunded'
     );
+    expect(push).toHaveBeenCalledWith(mockId('user-2'), {
+      type: 'entitlements_updated'
+    });
+    push.mockRestore();
     const negative = (await (await getCredits(token)).json()) as {
       balanceUnits: number;
     };
 
     expect(negative.balanceUnits).toBe(-200);
 
-    // New usage is blocked while the balance is negative…
+    // A new use is refused while the balance does not cover it…
     const blocked = await recordUsage(adminToken, {
       customerId,
       meterKey: 'api_calls',
@@ -441,11 +425,11 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     });
 
     expect(blocked.status).toBe(409);
-    expect(((await blocked.json()) as { message: string }).message).toBe(
-      'Credit balance is negative. Top up credits before recording more usage.'
-    );
+    expect(await blocked.json()).toMatchObject({
+      errorKey: ErrorKeys.BILLING.INSUFFICIENT_CREDITS
+    });
 
-    // …but a replay of an already-recorded key still succeeds (server parity).
+    // …but a replay of an already-recorded key still answers (server parity).
     const replay = await recordUsage(adminToken, {
       customerId,
       meterKey: 'api_calls',
@@ -454,6 +438,10 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     });
 
     expect(replay.status).toBe(201);
+    expect(await replay.json()).toMatchObject({
+      replayed: true,
+      balanceAfter: -200
+    });
   });
 
   it('a partial refund keeps the invoice paid and the credits intact', async () => {

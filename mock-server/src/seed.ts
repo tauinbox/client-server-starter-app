@@ -705,7 +705,12 @@ function generatePlans(): MockPlan[] {
       description: 'Pay only for what you use',
       billingMode: 'usage',
       meterKey: 'api_calls',
-      entitlements: ['reports', 'api-access'],
+      entitlements: [
+        'reports',
+        'api-access',
+        'data-export',
+        'priority-support'
+      ],
       limits: null,
       active: true,
       prices: {

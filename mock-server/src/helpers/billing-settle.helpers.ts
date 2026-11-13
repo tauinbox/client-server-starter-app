@@ -28,6 +28,76 @@ export function notifyEntitlementsChanged(customerId: string): void {
 }
 
 /**
+ * The billing customer of the user. A new one gets the provider of the profile
+ * locale.
+ */
+export function ensureCustomer(user: MockUser): MockCustomer {
+  const state = getState();
+  const existing = state.billingCustomers
+    .values()
+    .find((c) => c.userId === user.id);
+
+  if (existing) return existing;
+
+  const nowIso = new Date().toISOString();
+  const isRu = (user.locale ?? 'en').toLowerCase().startsWith('ru');
+  const customer: MockCustomer = {
+    id: randomUUID(),
+    userId: user.id,
+    provider: isRu ? 'yookassa' : 'paddle',
+    providerOverride: null,
+    country: isRu ? 'RU' : 'US',
+    currency: isRu ? 'RUB' : 'USD',
+    defaultPaymentMethodId: null,
+    trialUsedAt: null,
+    createdAt: nowIso,
+    updatedAt: nowIso
+  };
+
+  state.billingCustomers.set(customer.id, customer);
+
+  return customer;
+}
+
+/** The balance before and after one delta, like `CreditService`. */
+export interface CreditBalanceChange {
+  before: number;
+  after: number;
+}
+
+/** Mirrors `CreditService.applyDelta`: an upsert of the balance by `delta`. */
+export function applyCreditDelta(
+  customerId: string,
+  delta: number
+): CreditBalanceChange {
+  const state = getState();
+  const nowIso = new Date().toISOString();
+  const balance = state.billingCreditBalances.get(customerId);
+  const before = balance?.balanceUnits ?? 0;
+
+  if (balance) {
+    balance.balanceUnits += delta;
+    balance.updatedAt = nowIso;
+  } else {
+    state.billingCreditBalances.set(customerId, {
+      customerId,
+      balanceUnits: delta,
+      updatedAt: nowIso
+    });
+  }
+
+  return { before, after: before + delta };
+}
+
+/**
+ * Mirrors the server's `crossesZero`: the delta moved the balance across 0,
+ * so the pay-as-you-go entitlements start or stop.
+ */
+export function crossesZero({ before, after }: CreditBalanceChange): boolean {
+  return before > 0 !== after > 0;
+}
+
+/**
  * Settles a paid plan checkout the way the provider webhook would. Idempotently
  * brings the subscription of the user to `status`, with a default payment
  * method and a paid invoice. A new customer gets the provider of the profile
@@ -46,28 +116,7 @@ export function activateSubscription(
   const now = new Date();
   const nowIso = now.toISOString();
   const periodEnd = addInterval(now, plan.interval);
-
-  const isRu = (user.locale ?? 'en').toLowerCase().startsWith('ru');
-  let customer = state.billingCustomers
-    .values()
-    .find((c) => c.userId === user.id);
-
-  if (!customer) {
-    customer = {
-      id: randomUUID(),
-      userId: user.id,
-      provider: isRu ? 'yookassa' : 'paddle',
-      providerOverride: null,
-      country: isRu ? 'RU' : 'US',
-      currency: isRu ? 'RUB' : 'USD',
-      defaultPaymentMethodId: null,
-      trialUsedAt: null,
-      createdAt: nowIso,
-      updatedAt: nowIso
-    } satisfies MockCustomer;
-    state.billingCustomers.set(customer.id, customer);
-  }
-
+  const customer = ensureCustomer(user);
   const paidWith = provider ?? customer.provider;
 
   // Default payment method (created once).
@@ -270,18 +319,7 @@ export function settlePurchase(session: MockPurchaseSession): MockInvoice {
   }
 
   if (product?.type === 'credits' && product.grant?.credits) {
-    const balance = state.billingCreditBalances.get(session.customerId);
-
-    if (balance) {
-      balance.balanceUnits += product.grant.credits;
-      balance.updatedAt = nowIso;
-    } else {
-      state.billingCreditBalances.set(session.customerId, {
-        customerId: session.customerId,
-        balanceUnits: product.grant.credits,
-        updatedAt: nowIso
-      });
-    }
+    applyCreditDelta(session.customerId, product.grant.credits);
   }
 
   state.billingPurchaseSessions.delete(session.sessionRef);

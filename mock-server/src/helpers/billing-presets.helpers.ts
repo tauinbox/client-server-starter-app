@@ -4,9 +4,9 @@ import { getState } from '../state';
 import type { MockSubscription, MockUser } from '../types';
 import {
   activateSubscription,
+  ensureCustomer,
   notifyEntitlementsChanged
 } from './billing-settle.helpers';
-import { seedUsage } from './billing-clock.helpers';
 
 /**
  * The billing states that the billing lab page can put a user in. Each one is
@@ -16,8 +16,8 @@ export const BILLING_PRESETS = [
   'free',
   'pro',
   'business',
-  'usage',
-  'usage-with-units',
+  'payg-empty',
+  'payg-funded',
   'trialing',
   'past-due',
   'canceling'
@@ -29,18 +29,30 @@ export function isBillingPreset(value: unknown): value is BillingPreset {
   return BILLING_PRESETS.includes(value as BillingPreset);
 }
 
-const PRESET_PLAN: Record<Exclude<BillingPreset, 'free'>, string> = {
+type PaygPreset = 'payg-empty' | 'payg-funded';
+
+/** The credit balance of each pay-as-you-go preset; no subscription. */
+const PAYG_PRESET_UNITS: Record<PaygPreset, number> = {
+  'payg-empty': 0,
+  'payg-funded': 500
+};
+
+function isPaygPreset(preset: BillingPreset): preset is PaygPreset {
+  return Object.hasOwn(PAYG_PRESET_UNITS, preset);
+}
+
+const PRESET_PLAN: Record<
+  Exclude<BillingPreset, 'free' | PaygPreset>,
+  string
+> = {
   pro: 'pro',
   business: 'business',
-  usage: 'usage',
-  'usage-with-units': 'usage',
   trialing: 'pro',
   'past-due': 'pro',
   canceling: 'pro'
 };
 
 const TRIAL_DAYS = 14;
-const PRESET_USAGE_UNITS = 150;
 
 /**
  * Puts the user in the preset state. Every open subscription of the customer
@@ -77,6 +89,19 @@ export function applyBillingPreset(
   if (preset === 'free') {
     // A user who is on Free already gets no push: nothing changed.
     if (existing && closed > 0) notifyEntitlementsChanged(existing.id);
+
+    return null;
+  }
+
+  if (isPaygPreset(preset)) {
+    const customer = ensureCustomer(user);
+
+    state.billingCreditBalances.set(customer.id, {
+      customerId: customer.id,
+      balanceUnits: PAYG_PRESET_UNITS[preset],
+      updatedAt: nowIso
+    });
+    notifyEntitlementsChanged(customer.id);
 
     return null;
   }
@@ -120,10 +145,6 @@ export function applyBillingPreset(
   if (preset === 'past-due') subscription.dunningAttempts = 1;
 
   if (preset === 'canceling') subscription.cancelAtPeriodEnd = true;
-
-  if (preset === 'usage-with-units') {
-    seedUsage(subscription, { quantity: PRESET_USAGE_UNITS });
-  }
 
   notifyEntitlementsChanged(subscription.customerId);
 

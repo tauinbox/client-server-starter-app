@@ -15,13 +15,10 @@ import type {
 import {
   geoDefault,
   geoFromLocale,
-  meteredWindowStart,
   overrideForRegion,
   prorationAmounts,
-  rateUsage,
   regionForOverride,
-  renewalAnchor,
-  usageIngestStart
+  renewalAnchor
 } from '@app/shared/utils/billing-rules';
 import {
   BILLING_PROVIDER_FLAGS,
@@ -33,8 +30,10 @@ import {
   FREE_PLAN_KEY,
   INVOICE_LIST_QUERY,
   OPEN_SUBSCRIPTION_STATUSES,
+  PAY_AS_YOU_GO_PLAN_KEY,
   SUBSCRIPTION_LIST_QUERY,
-  USAGE_FUTURE_TOLERANCE_MS
+  USAGE_FUTURE_TOLERANCE_MS,
+  isMeterKey
 } from '@app/shared/constants';
 import {
   getState,
@@ -44,15 +43,20 @@ import {
   toPaymentMethodResponse,
   toPlanResponse,
   toProductResponse,
-  toSubscriptionResponse,
-  toUsageResponse
+  toSubscriptionResponse
 } from '../state';
 import { authGuard, permissionGuard } from '../helpers/auth.helpers';
+import { billClosingUsagePeriod } from '../helpers/billing.helpers';
 import {
-  billClosingUsagePeriod,
-  sumPlanMeterUnits
-} from '../helpers/billing.helpers';
-import { notifyEntitlementsChanged } from '../helpers/billing-settle.helpers';
+  applyCreditDelta,
+  crossesZero,
+  notifyEntitlementsChanged
+} from '../helpers/billing-settle.helpers';
+import {
+  consumeCredits,
+  subscriptionPlan,
+  unitsSpentThisMonth
+} from '../helpers/billing-metering.helpers';
 import { mockCheckoutUrl } from '../routes/mock-checkout';
 import {
   listPage,
@@ -67,7 +71,6 @@ import type {
   MockPaymentMethod,
   MockPlan,
   MockSubscription,
-  MockUsageRecord,
   MockUser
 } from '../types';
 import { isFlagEnabledForUser } from './feature-flags.middleware';
@@ -302,6 +305,15 @@ function refuseFreePlan(res: Response): void {
   );
 }
 
+// Mirrors payAsYouGoIsPrepaid: pay as you go is a credit balance.
+function refusePayAsYouGoPlan(res: Response): void {
+  sendError(
+    res,
+    ErrorKeys.BILLING.PAY_AS_YOU_GO_IS_PREPAID,
+    'Pay as you go works on prepayment. To start, top up your credits.'
+  );
+}
+
 function findPlanByKey(key: string): MockPlan | undefined {
   for (const plan of getState().plans.values()) {
     if (plan.key === key) return plan;
@@ -318,12 +330,22 @@ function toResolvedEntitlements(plan: MockPlan): EntitlementsResponse {
   };
 }
 
+/** The pay-as-you-go plan while the credit balance is above 0. */
+function payAsYouGoPlan(customerId: string): MockPlan | undefined {
+  const balance = getState().billingCreditBalances.get(customerId);
+
+  return balance && balance.balanceUnits > 0
+    ? findPlanByKey(PAY_AS_YOU_GO_PLAN_KEY)
+    : undefined;
+}
+
 /**
  * Mirrors the server's EntitlementService.capabilitiesFor: the entitled
- * subscription's plan (or the Free tier when there is none), unioned with the
- * customer's active - non-revoked, non-expired - one-time purchase grants.
- * Deriving this from the plan catalog on the client would get all four rules
- * wrong, which is why the endpoint exists.
+ * subscription's plan, else the pay-as-you-go plan while the credit balance is
+ * above 0, else the Free tier, unioned with the customer's active -
+ * non-revoked, non-expired - one-time purchase grants. Deriving this from the
+ * plan catalog on the client would get these rules wrong, which is why the
+ * endpoint exists.
  */
 function resolveEntitlements(userId: string): EntitlementsResponse {
   const customer = findCustomer(userId);
@@ -334,14 +356,7 @@ function resolveEntitlements(userId: string): EntitlementsResponse {
 
   if (!customer) return free;
 
-  const [subscription] = [...getState().billingSubscriptions.values()]
-    .filter(
-      (s) =>
-        s.customerId === customer.id &&
-        ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
-    )
-    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const plan = subscription ? findPlanByKey(subscription.planKey) : undefined;
+  const plan = subscriptionPlan(customer.id) ?? payAsYouGoPlan(customer.id);
   const base = plan ? toResolvedEntitlements(plan) : free;
 
   const now = Date.now();
@@ -490,45 +505,21 @@ billingRouter.get(
 billingRouter.get('/usage', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
-  const sub = customer ? findCurrentSubscription(customer.id) : undefined;
 
-  if (
-    !sub ||
-    sub.billingMode !== 'usage' ||
-    !ENTITLED_SUBSCRIPTION_STATUSES.includes(sub.status)
-  ) {
+  if (!customer) {
     res.json(null);
 
     return;
   }
 
-  const plan = findPlanByKey(sub.planKey);
-  const price = plan?.prices[sub.provider];
-
-  if (!plan || !price) {
-    res.json(null);
-
-    return;
-  }
-
-  const windowStart = meteredWindowStart(sub);
-  const totalUnits = sumPlanMeterUnits(plan, sub.id, {
-    startIso: windowStart,
-    endIso: sub.currentPeriodEnd
-  });
-
-  const rated = rateUsage({ totalUnits, price });
+  // Mirrors BillingUserService.getUsageSummary.
+  const { periodStart, periodEnd, unitsSpent } = unitsSpentThisMonth(
+    customer.id
+  );
   const summary: UsageSummaryResponse = {
-    subscriptionId: sub.id,
-    meterKey: plan.meterKey,
-    periodStart: windowStart,
-    periodEnd: sub.currentPeriodEnd,
-    totalUnits,
-    includedUnits: rated.includedUnits,
-    billableUnits: rated.billableUnits,
-    unitPriceMinor: rated.unitPriceMinor,
-    amountMinor: rated.amountMinor,
-    currency: price.currency
+    periodStart: periodStart.toISOString(),
+    periodEnd: periodEnd.toISOString(),
+    unitsSpent
   };
 
   res.json(summary);
@@ -845,6 +836,12 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     return;
   }
 
+  if (plan.key === PAY_AS_YOU_GO_PLAN_KEY) {
+    refusePayAsYouGoPlan(res);
+
+    return;
+  }
+
   const customer = getOrCreateCustomer(user.id, user.locale);
 
   const hasActive = getState()
@@ -1025,6 +1022,12 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
 
   if (toPlan.key === FREE_PLAN_KEY) {
     refuseFreePlan(res);
+
+    return null;
+  }
+
+  if (toPlan.key === PAY_AS_YOU_GO_PLAN_KEY) {
+    refusePayAsYouGoPlan(res);
 
     return null;
   }
@@ -1547,7 +1550,7 @@ billingAdminRouter.post(
 // A full refund of a one-time purchase takes back what it granted, mirroring
 // the server's BillingAdminService: the sku's CustomerGrant is revoked, which
 // tells the owner, and a credit pack's units are clawed back (the balance may
-// go negative, which blocks further usage until topped up). Partial refunds
+// go negative, which refuses further metered use until topped up). Partial refunds
 // keep the invoice `paid`, so grants and credits survive them by construction.
 function revokeOneTimeEffects(invoice: MockInvoice): void {
   if (invoice.kind !== 'one_time') return;
@@ -1572,18 +1575,10 @@ function revokeOneTimeEffects(invoice: MockInvoice): void {
 
   if (product?.type !== 'credits' || !product.grant?.credits) return;
 
-  const balance = state.billingCreditBalances.get(invoice.customerId);
+  const change = applyCreditDelta(invoice.customerId, -product.grant.credits);
 
-  if (balance) {
-    balance.balanceUnits -= product.grant.credits;
-    balance.updatedAt = nowIso;
-  } else {
-    state.billingCreditBalances.set(invoice.customerId, {
-      customerId: invoice.customerId,
-      balanceUnits: -product.grant.credits,
-      updatedAt: nowIso
-    });
-  }
+  // The server emits CreditBalanceCrossedEvent here.
+  if (crossesZero(change)) notifyEntitlementsChanged(invoice.customerId);
 }
 
 billingAdminRouter.post(
@@ -1756,115 +1751,26 @@ billingAdminRouter.post(
     const quantity = body['quantity'] as number;
     const idempotencyKey = (body['idempotencyKey'] as string).trim();
 
-    const state = getState();
-
-    // Idempotent replay: this customer already has a record for the key — return
-    // it as-is when the body is the same. Scoped to the customer, like the
-    // server's unique constraint: the same key from another customer is a
-    // distinct event, not a replay.
-    const existing = state.billingUsageRecords
-      .values()
-      .find(
-        (r) =>
-          r.customerId === customerId && r.idempotencyKey === idempotencyKey
-      );
-
-    // A replay changes nothing, so it writes no audit row. The same key with
-    // another body is a different record, like the server.
-    if (existing) {
-      const sameTime =
-        typeof occurredAtRaw !== 'string' ||
-        new Date(occurredAtRaw).getTime() ===
-          new Date(existing.occurredAt).getTime();
-
-      if (
-        existing.meterKey !== meterKey ||
-        existing.quantity !== quantity ||
-        !sameTime
-      ) {
-        sendError(
-          res,
-          ErrorKeys.BILLING.USAGE_KEY_REUSED,
-          'This idempotency key was already used for another usage record.'
-        );
-
-        return;
-      }
-
-      res.status(201).json(toUsageResponse(existing));
-
-      return;
-    }
-
-    // A negative balance means a refund clawed back already-spent credits: no
-    // new usage may accrue until the debt is topped up. Replays above still
-    // succeed — the record predates the block, exactly like the server.
-    const creditBalance = state.billingCreditBalances.get(customerId);
-
-    if (creditBalance && creditBalance.balanceUnits < 0) {
-      sendError(
-        res,
-        ErrorKeys.BILLING.CREDITS_BLOCKED,
-        'Credit balance is negative. Top up credits before recording more usage.'
-      );
-
-      return;
-    }
-
-    // Newest-first like the server, so usage is billed to the same subscription
-    // the entitlement resolver reports.
-    const [subscription] = [...state.billingSubscriptions.values()]
-      .filter(
-        (s) =>
-          s.customerId === customerId &&
-          ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
-      )
-      .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-    if (!subscription) {
-      sendError(
-        res,
-        ErrorKeys.BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION,
-        'No active subscription for customer to record usage against'
-      );
-
-      return;
-    }
-
-    // A record is an observation, so the customer's current plan does not gate it
-    // — rating decides at period close. Only a meter no plan declares is refused:
-    // it can never become chargeable and is a producer typo.
-    if (!state.plans.values().some((p) => p.meterKey === meterKey)) {
+    // Mirrors MeteringService.consume. The meter and the time are checked
+    // before anything is read, like the server.
+    if (!isMeterKey(meterKey)) {
       sendError(
         res,
         ErrorKeys.BILLING.METER_NOT_DECLARED,
-        `Meter "${meterKey}" is not declared by any plan`
+        `Meter "${meterKey}" is not in the meter catalog`
       );
 
       return;
     }
 
-    // The server refuses a record that no rating can reach: one before the
-    // open metered window, and one past the clock skew tolerance.
     const nowMs = Date.now();
     const now = new Date(nowMs).toISOString();
     const occurredAt =
       typeof occurredAtRaw === 'string'
         ? new Date(occurredAtRaw).toISOString()
         : now;
-    const occurredAtMs = new Date(occurredAt).getTime();
 
-    if (occurredAtMs < new Date(usageIngestStart(subscription)).getTime()) {
-      sendError(
-        res,
-        ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW,
-        'occurredAt is before the open metered window'
-      );
-
-      return;
-    }
-
-    if (occurredAtMs > nowMs + USAGE_FUTURE_TOLERANCE_MS) {
+    if (new Date(occurredAt).getTime() > nowMs + USAGE_FUTURE_TOLERANCE_MS) {
       sendError(
         res,
         ErrorKeys.BILLING.USAGE_IN_FUTURE,
@@ -1874,29 +1780,36 @@ billingAdminRouter.post(
       return;
     }
 
-    const record: MockUsageRecord = {
-      id: randomUUID(),
-      customerId,
-      subscriptionId: subscription.id,
+    const outcome = consumeCredits(customerId, {
       meterKey,
-      quantity,
-      occurredAt,
+      units: quantity,
       idempotencyKey,
-      recordedAt: now
-    };
-
-    state.billingUsageRecords.set(record.id, record);
-    auditAdminAction(req, {
-      action: 'BILLING_USAGE_RECORD',
-      targetType: 'UsageRecord',
-      targetId: record.id,
-      details: {
-        customerId,
-        meterKey,
-        quantity
-      }
+      occurredAt,
+      requestedOccurredAt:
+        typeof occurredAtRaw === 'string' ? occurredAtRaw : undefined
     });
-    res.status(201).json(toUsageResponse(record));
+
+    if ('refusal' in outcome) {
+      sendError(res, outcome.refusal.errorKey, outcome.refusal.message);
+
+      return;
+    }
+
+    // A replay or a free use changes nothing, so it writes no audit row.
+    if (outcome.record) {
+      auditAdminAction(req, {
+        action: 'BILLING_USAGE_RECORD',
+        targetType: 'UsageRecord',
+        targetId: outcome.record.id,
+        details: {
+          customerId,
+          meterKey,
+          quantity
+        }
+      });
+    }
+
+    res.status(201).json(outcome.response);
   }
 );
 
