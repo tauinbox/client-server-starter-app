@@ -483,7 +483,14 @@ describe('RenewalService', () => {
       {
         amountMinor: 99000,
         currency: 'RUB',
-        receiptItems: [{ description: 'Pro', amountMinor: 99000, quantity: 1 }],
+        receiptItems: [
+          {
+            description: 'Pro',
+            amountMinor: 99000,
+            quantity: 1,
+            paymentMode: 'full_payment'
+          }
+        ],
         idempotencyKey:
           'renewal:sub-1:' + new Date('2026-06-01T00:00:00Z').getTime()
       }
@@ -1252,7 +1259,8 @@ describe('RenewalService', () => {
             {
               description: 'Pay as you go: api_calls × 42',
               amountMinor: 8400,
-              quantity: 1
+              quantity: 1,
+              paymentMode: 'full_payment'
             }
           ],
           idempotencyKey:
@@ -1371,7 +1379,8 @@ describe('RenewalService', () => {
             {
               description: 'Pay as you go: api_calls × 32',
               amountMinor: 6400,
-              quantity: 1
+              quantity: 1,
+              paymentMode: 'full_payment'
             }
           ],
           idempotencyKey: expect.any(String)

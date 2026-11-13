@@ -162,7 +162,8 @@ describe('UsageRating', () => {
       {
         description: 'Pay as you go: api_calls × 42',
         amountMinor: 8400,
-        quantity: 1
+        quantity: 1,
+        paymentMode: 'full_payment'
       }
     ]);
   });
@@ -198,7 +199,8 @@ describe('UsageRating', () => {
         {
           description: 'Pay as you go: api_calls × 32',
           amountMinor: 6400,
-          quantity: 1
+          quantity: 1,
+          paymentMode: 'full_payment'
         }
       ]);
     });

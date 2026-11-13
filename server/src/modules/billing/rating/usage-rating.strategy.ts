@@ -81,7 +81,8 @@ export class UsageRating {
               {
                 description: `${plan.name}: ${plan.meterKey ?? 'usage'} × ${rated.chargedUnits}`,
                 amountMinor: rated.amountMinor,
-                quantity: 1
+                quantity: 1,
+                paymentMode: 'full_payment'
               }
             ]
           : []

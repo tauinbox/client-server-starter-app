@@ -626,7 +626,12 @@ describe('PaddleProvider', () => {
         currency: 'USD',
         description: 'Pro report pack',
         receiptItems: [
-          { description: 'Pro report pack', amountMinor: 4900, quantity: 1 }
+          {
+            description: 'Pro report pack',
+            amountMinor: 4900,
+            quantity: 1,
+            paymentMode: 'full_payment'
+          }
         ],
         productId: 'prod-1',
         urls,
@@ -661,7 +666,12 @@ describe('PaddleProvider', () => {
         currency: 'USD',
         description: 'Donation',
         receiptItems: [
-          { description: 'Donation', amountMinor: 1500, quantity: 1 }
+          {
+            description: 'Donation',
+            amountMinor: 1500,
+            quantity: 1,
+            paymentMode: 'full_payment'
+          }
         ],
         productId: 'prod-custom',
         urls

@@ -179,11 +179,24 @@ export interface CheckoutSession {
   sessionRef: string;
 }
 
+/**
+ * The 54-FZ settlement method of a receipt line. A credit pack is paid before
+ * the service, so it is a prepayment; every other charge pays for a service
+ * that is given now.
+ */
+export const RECEIPT_PAYMENT_MODES = [
+  'full_payment',
+  'full_prepayment'
+] as const;
+
+export type ReceiptPaymentMode = (typeof RECEIPT_PAYMENT_MODES)[number];
+
 /** A single line on a charge/receipt (54-FZ requires itemised receipts). */
 export interface ReceiptItem {
   description: string;
   amountMinor: number;
   quantity: number;
+  paymentMode: ReceiptPaymentMode;
 }
 
 /**
