@@ -689,7 +689,7 @@ and the usage record checks `create`. No check reads the record, so `Billing` de
 
 - It gets or makes the customer. The geography comes from the registration locale.
 - It does the checkout and the cancel.
-- It makes the usage summary, with `UsageRating` over the metered window of the current period.
+- It makes the usage summary: the credit units that metered uses took this calendar month (`CreditService.spentOnMetering`).
 - It reads and sets the region, with the guard against a cross-provider migration.
 - It lists the one-time catalog (`listProducts`) and does a purchase. The purchase calls
   `resolveProvider` and then `createOneTimePayment`. On Paddle, an `sku` or a `credits` product with

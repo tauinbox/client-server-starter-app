@@ -354,7 +354,9 @@ src/app/
 │                           # billing-format holds formatMoney (minor units to an Intl currency),
 │                           # formatUnits (locale-grouped credit units that keep the sign),
 │                           # resolveDisplayProvider (a heuristic on the region or the language),
-│                           # planPriceFor, productPriceFor and parseAmountToMinor.
+│                           # planPriceFor, productPriceFor, parseAmountToMinor,
+│                           # lowestUnitPrice (the cheapest credit-pack unit) and
+│                           # formatUnitPrice (a unit price below one minor unit).
 │                           # pending-purchase transfers data through sessionStorage between the
 │                           # start of a purchase and the checkout return.
 └── shared/

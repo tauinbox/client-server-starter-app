@@ -22,6 +22,7 @@ import { BillingUserService } from '../src/modules/billing/services/billing-user
 import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
 import { ChargeDeclinedError } from '../src/modules/billing/providers/payment-provider.interface';
 import { ProviderTimeoutError } from '../src/modules/billing/providers/provider-deadline';
+import { payAsYouGoIsPrepaid } from '../src/modules/billing/utils/billing-errors.util';
 import { BillingUserController } from '../src/modules/billing/controllers/billing-user.controller';
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { ErrorKeys, MAX_PAGE_SIZE } from '@app/shared/constants';
@@ -424,6 +425,22 @@ describe('Billing user self-service (e2e)', () => {
       expect((res.body as { errorKey?: string }).errorKey).toBe(errorKey);
     }
   );
+
+  it('answers a checkout and a plan change of the pay-as-you-go plan with 422 and its key', async () => {
+    billingUser.checkout.mockRejectedValue(payAsYouGoIsPrepaid());
+    planChange.changePlan.mockRejectedValue(payAsYouGoIsPrepaid());
+
+    for (const path of ['checkout', 'subscription/change']) {
+      const res = await request(server)
+        .post(`/api/v1/billing/${path}`)
+        .send({ planKey: 'usage' })
+        .expect(422);
+
+      expect((res.body as { errorKey?: string }).errorKey).toBe(
+        ErrorKeys.BILLING.PAY_AS_YOU_GO_IS_PREPAID
+      );
+    }
+  });
 
   it('cancels the current subscription at period end', async () => {
     billingUser.cancelSubscription.mockResolvedValue(
