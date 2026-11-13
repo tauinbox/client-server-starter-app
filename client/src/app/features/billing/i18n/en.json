@@ -10,7 +10,7 @@
     "paymentsUnavailable": "Payments are temporarily unavailable in your billing region.",
     "manageBilling": "Manage billing",
     "paidTitle": "Paid plans",
-    "switchToFree": "Switch to Free",
+    "switchToFree": "Switch to the free plan",
     "freeFrom": "From {{ date }}",
     "usageHow": {
       "title": "How pay as you go works",

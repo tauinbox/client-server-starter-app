@@ -808,7 +808,7 @@ the same permission both apply.
   you go shows the metered `usage` plan at its price for each unit and how it is billed. The toggle
   opens on the mode of the entitled subscription. Free is not purchasable: checkout and plan change
   refuse it with 422 `errors.billing.freePlanNotPurchasable`, and the Free card of a subscriber
-  ("Switch to Free") opens the cancel confirmation of the settings page. A YooKassa checkout of the
+  ("Switch to the free plan") opens the cancel confirmation of the settings page. A YooKassa checkout of the
   usage plan binds the card with a zero-amount payment and no fiscal receipt, as a trial does. `GET /api/v1/billing/usage` returns the meter of the metered window of the current
   period for the caller. After a switch of billing mode, the window starts at the switch. It gives the total units, the included units, the billable units and the accrued amount.
 - **Usage meter.** The billing settings page shows a usage card for the current period of an entitled

@@ -206,7 +206,7 @@ describe('PricingPageComponent', () => {
     showSubscription('past_due', true);
 
     expect(renderedCards()).toEqual([
-      { name: 'Free', current: false, action: 'Switch to Free' },
+      { name: 'Free', current: false, action: 'Switch to the free plan' },
       { name: 'Pro', current: true, action: null },
       { name: 'Business', current: false, action: 'Change plan' }
     ]);
@@ -281,7 +281,7 @@ describe('PricingPageComponent', () => {
     });
 
     expect(renderedCards()).toEqual([
-      { name: 'Free', current: false, action: 'Switch to Free' },
+      { name: 'Free', current: false, action: 'Switch to the free plan' },
       { name: 'Pay as you go', current: true, action: null }
     ]);
   });

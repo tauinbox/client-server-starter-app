@@ -375,7 +375,7 @@ test.describe('Billing', () => {
     await expect(
       page
         .locator('nxs-plan-card', { hasText: 'Free' })
-        .getByRole('button', { name: 'Switch to Free' })
+        .getByRole('button', { name: 'Switch to the free plan' })
     ).toBeVisible();
     await expect(
       page
@@ -861,7 +861,7 @@ test.describe('Billing', () => {
 
     await page
       .locator('.free-column nxs-plan-card')
-      .getByRole('button', { name: 'Switch to Free' })
+      .getByRole('button', { name: 'Switch to the free plan' })
       .click();
     await expect(page.getByText('Metered usage recorded so far')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel subscription' }).click();
