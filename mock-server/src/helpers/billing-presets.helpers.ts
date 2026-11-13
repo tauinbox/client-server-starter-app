@@ -61,18 +61,22 @@ export function applyBillingPreset(
     .values()
     .find((c) => c.userId === user.id);
 
+  let closed = 0;
+
   if (existing) {
     for (const sub of state.billingSubscriptions.values()) {
       if (sub.customerId === existing.id && sub.status !== 'canceled') {
         sub.status = 'canceled';
         sub.cancelAtPeriodEnd = false;
         sub.updatedAt = nowIso;
+        closed++;
       }
     }
   }
 
   if (preset === 'free') {
-    if (existing) notifyEntitlementsChanged(existing.id);
+    // A user who is on Free already gets no push: nothing changed.
+    if (existing && closed > 0) notifyEntitlementsChanged(existing.id);
 
     return null;
   }
