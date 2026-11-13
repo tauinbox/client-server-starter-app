@@ -31,12 +31,13 @@ export class UsageRecord {
   })
   customerId: string;
 
-  @Column({ name: 'subscription_id', type: 'uuid' })
+  /** Null for a use paid from credits, which belongs to no subscription. */
+  @Column({ name: 'subscription_id', type: 'uuid', nullable: true })
   @ForeignKey<Subscription>(() => Subscription, {
     onDelete: 'CASCADE',
     name: 'FK_billing_usage_records_subscription_id'
   })
-  subscriptionId: string;
+  subscriptionId: string | null;
 
   @Column({ name: 'meter_key', type: 'varchar', length: 100 })
   meterKey: string;
@@ -54,12 +55,4 @@ export class UsageRecord {
 
   @CreateDateColumn({ name: 'recorded_at', type: 'timestamptz' })
   recordedAt: Date;
-
-  /**
-   * Not a column: `UsageService` stamps it on every record it hands back, since
-   * whether a meter is priced depends on the plan in force rather than on
-   * anything stored here. Undecorated, so TypeORM neither persists nor hydrates
-   * it - a record read by any other path carries `undefined`.
-   */
-  pricedByCurrentPlan: boolean;
 }

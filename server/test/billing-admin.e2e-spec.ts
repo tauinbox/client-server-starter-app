@@ -19,11 +19,10 @@ import request from 'supertest';
 import type { Server } from 'http';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
-import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
-import { UsageService } from '../src/modules/billing/services/usage.service';
+import { MeteringService } from '../src/modules/billing/services/metering.service';
 import { BillingAdminController } from '../src/modules/billing/controllers/billing-admin.controller';
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -100,11 +99,17 @@ describe('Billing admin (e2e)', () => {
     refundInvoice: jest.fn(),
     replayWebhookEvent: jest.fn()
   };
-  const usage = {
-    record: jest.fn<
-      ReturnType<UsageService['record']>,
-      Parameters<UsageService['record']>
+  const metering = {
+    consume: jest.fn<
+      ReturnType<MeteringService['consume']>,
+      Parameters<MeteringService['consume']>
     >()
+  };
+  const debited = {
+    recordId: 'usage-1',
+    debited: true,
+    replayed: false,
+    balanceAfter: 958
   };
   const audit = {
     log: jest.fn(),
@@ -119,7 +124,7 @@ describe('Billing admin (e2e)', () => {
       providers: [
         RESPONSE_SERIALIZER,
         { provide: BillingAdminService, useValue: billingAdmin },
-        { provide: UsageService, useValue: usage },
+        { provide: MeteringService, useValue: metering },
         { provide: AuditService, useValue: audit },
         { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
         Reflector
@@ -279,19 +284,8 @@ describe('Billing admin (e2e)', () => {
     expect(billingAdmin.refundInvoice).not.toHaveBeenCalled();
   });
 
-  it('records a usage event for an admin and hides the idempotency key', async () => {
-    usage.record.mockResolvedValue(
-      Object.assign(new UsageRecord(), {
-        id: 'usage-1',
-        customerId: uuid,
-        subscriptionId: 'sub-1',
-        meterKey: 'api_calls',
-        quantity: 42,
-        occurredAt: new Date('2026-06-01T00:00:00Z'),
-        idempotencyKey: 'evt-secret',
-        recordedAt: new Date('2026-06-01T00:00:01Z')
-      })
-    );
+  it('debits a metered use for an admin and answers the result of the debit', async () => {
+    metering.consume.mockResolvedValue(debited);
 
     const res = await request(server)
       .post('/api/v1/admin/billing/usage')
@@ -304,17 +298,17 @@ describe('Billing admin (e2e)', () => {
       })
       .expect(201);
 
-    expect(usage.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customerId: uuid,
+    expect(metering.consume).toHaveBeenCalledWith(
+      uuid,
+      {
         meterKey: 'api_calls',
-        quantity: 42,
-        idempotencyKey: 'evt-secret'
-      }),
+        units: 42,
+        idempotencyKey: 'evt-secret',
+        occurredAt: undefined
+      },
       expect.anything()
     );
-    expect(res.body).not.toHaveProperty('idempotencyKey');
-    expect((res.body as { quantity: number }).quantity).toBe(42);
+    expect(res.body).toEqual(debited);
   });
 
   it('denies a non-admin recording usage (403)', async () => {
@@ -327,7 +321,7 @@ describe('Billing admin (e2e)', () => {
         idempotencyKey: 'evt-1'
       })
       .expect(403);
-    expect(usage.record).not.toHaveBeenCalled();
+    expect(metering.consume).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid usage payload via DTO validation (422)', async () => {
@@ -336,7 +330,7 @@ describe('Billing admin (e2e)', () => {
       .set('x-test-role', 'admin')
       .send({ customerId: 'not-a-uuid', meterKey: '', quantity: 0 })
       .expect(422);
-    expect(usage.record).not.toHaveBeenCalled();
+    expect(metering.consume).not.toHaveBeenCalled();
   });
 
   it('replays a dead-lettered webhook event by id', async () => {
@@ -375,19 +369,8 @@ describe('Billing admin (e2e)', () => {
     );
   });
 
-  it('hands the audit row of a usage event to the service, which writes it only for a new record', async () => {
-    usage.record.mockResolvedValue(
-      Object.assign(new UsageRecord(), {
-        id: 'usage-1',
-        customerId: uuid,
-        subscriptionId: 'sub-1',
-        meterKey: 'api_calls',
-        quantity: 42,
-        occurredAt: new Date('2026-06-01T00:00:00Z'),
-        idempotencyKey: 'evt-secret',
-        recordedAt: new Date('2026-06-01T00:00:01Z')
-      })
-    );
+  it('hands the audit row of a usage event to the service, which writes it only for a debit', async () => {
+    metering.consume.mockResolvedValue(debited);
 
     await request(server)
       .post('/api/v1/admin/billing/usage')
@@ -400,11 +383,9 @@ describe('Billing admin (e2e)', () => {
       })
       .expect(201);
 
-    expect(usage.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customerId: uuid,
-        idempotencyKey: 'evt-secret'
-      }),
+    expect(metering.consume).toHaveBeenCalledWith(
+      uuid,
+      expect.objectContaining({ idempotencyKey: 'evt-secret' }),
       {
         audit: {
           action: AuditAction.BILLING_USAGE_RECORD,
@@ -420,7 +401,7 @@ describe('Billing admin (e2e)', () => {
   });
 
   it('leaves no audit entry when a mutation fails', async () => {
-    usage.record.mockRejectedValue(new Error('boom'));
+    metering.consume.mockRejectedValue(new Error('boom'));
 
     await request(server)
       .post('/api/v1/admin/billing/usage')

@@ -6,10 +6,12 @@ import { In, IsNull, Repository } from 'typeorm';
 import type { EntitlementLimitKey } from '@app/shared/types';
 import {
   ENTITLED_SUBSCRIPTION_STATUSES,
-  FREE_PLAN_KEY
+  FREE_PLAN_KEY,
+  PAY_AS_YOU_GO_PLAN_KEY
 } from '@app/shared/constants';
 import { CacheVersionCounter } from '../../common/utils/cache-version-counter';
 import { MetricsService } from '../core/metrics/metrics.service';
+import { CreditBalance } from '../billing/entities/credit-balance.entity';
 import { Customer } from '../billing/entities/customer.entity';
 import { CustomerGrant } from '../billing/entities/customer-grant.entity';
 import { Plan } from '../billing/entities/plan.entity';
@@ -37,6 +39,8 @@ export class EntitlementService {
     private readonly plans: Repository<Plan>,
     @InjectRepository(CustomerGrant)
     private readonly grants: Repository<CustomerGrant>,
+    @InjectRepository(CreditBalance)
+    private readonly balances: Repository<CreditBalance>,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly metrics: MetricsService
   ) {
@@ -100,18 +104,40 @@ export class EntitlementService {
   }
 
   /**
-   * Plan capabilities unioned with active one-time purchase grants: a paid
-   * sku unlocks its entitlement on top of whatever tier the user is on —
+   * The plan of the entitled subscription of the customer, or null when there
+   * is none. The drop to Free happens on the `past_due -> canceled`
+   * transition, not on entering `past_due`: the dunning grace window keeps
+   * full entitlements.
+   */
+  async subscriptionPlan(
+    customerId: string
+  ): Promise<ResolvedEntitlements | null> {
+    const subscription = await this.subscriptions.findOne({
+      where: { customerId, status: In([...ENTITLED_SUBSCRIPTION_STATUSES]) },
+      order: { createdAt: 'DESC' }
+    });
+    const plan = subscription
+      ? await this.plans.findOne({ where: { key: subscription.planKey } })
+      : null;
+
+    return plan ? this.toResolved(plan) : null;
+  }
+
+  /**
+   * The base tier (an entitled subscription, else a positive credit balance as
+   * pay as you go, else Free) unioned with active one-time purchase grants: a
+   * paid sku unlocks its entitlement on top of whatever tier the user is on,
    * including Free.
    */
   private async resolve(userId: string): Promise<ResolvedEntitlements> {
     const customer = await this.customers.findOne({ where: { userId } });
-    const base = customer
-      ? await this.subscriptionEntitlements(customer.id)
-      : await this.freeEntitlements();
 
-    if (!customer) return base;
+    if (!customer) return this.freeEntitlements();
 
+    const base =
+      (await this.subscriptionPlan(customer.id)) ??
+      (await this.payAsYouGoPlan(customer.id)) ??
+      (await this.freeEntitlements());
     const granted = await this.activeGrantEntitlements(customer.id);
 
     if (granted.length === 0) return base;
@@ -122,25 +148,19 @@ export class EntitlementService {
     };
   }
 
-  private async subscriptionEntitlements(
+  /** The pay-as-you-go plan while the credit balance is above 0. */
+  private async payAsYouGoPlan(
     customerId: string
-  ): Promise<ResolvedEntitlements> {
-    // The drop to Free happens on the `past_due -> canceled` transition, not on
-    // entering `past_due` — the dunning grace window keeps full entitlements.
-    const subscription = await this.subscriptions.findOne({
-      where: { customerId, status: In([...ENTITLED_SUBSCRIPTION_STATUSES]) },
-      order: { createdAt: 'DESC' }
+  ): Promise<ResolvedEntitlements | null> {
+    const balance = await this.balances.findOne({ where: { customerId } });
+
+    if (!balance || balance.balanceUnits.toNumber() <= 0) return null;
+
+    const plan = await this.plans.findOne({
+      where: { key: PAY_AS_YOU_GO_PLAN_KEY }
     });
 
-    if (subscription) {
-      const plan = await this.plans.findOne({
-        where: { key: subscription.planKey }
-      });
-
-      if (plan) return this.toResolved(plan);
-    }
-
-    return this.freeEntitlements();
+    return plan ? this.toResolved(plan) : null;
   }
 
   /** Entitlements from non-revoked, non-expired one-time purchase grants. */

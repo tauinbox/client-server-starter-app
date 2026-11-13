@@ -12,7 +12,6 @@ function createUsageRecord(overrides: Partial<UsageRecord> = {}): UsageRecord {
     occurredAt: new Date('2025-01-01T00:00:00Z'),
     idempotencyKey: 'idem_secret_key',
     recordedAt: new Date('2025-01-01T00:00:00Z'),
-    pricedByCurrentPlan: true,
     ...overrides
   });
 }
@@ -30,11 +29,9 @@ describe('UsageRecord entity serialization', () => {
     expect(plain).toMatchObject({ meterKey: 'api_calls', quantity: 42 });
   });
 
-  it('serializes the pricing verdict, which is stamped rather than stored', () => {
-    const plain = instanceToPlain(
-      createUsageRecord({ pricedByCurrentPlan: false })
-    );
+  it('serializes a use paid from credits with no subscription', () => {
+    const plain = instanceToPlain(createUsageRecord({ subscriptionId: null }));
 
-    expect(plain).toMatchObject({ pricedByCurrentPlan: false });
+    expect(plain).toMatchObject({ subscriptionId: null });
   });
 });

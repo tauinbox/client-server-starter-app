@@ -19,7 +19,10 @@ import { Invoice } from '../entities/invoice.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
-import { InvoiceRefundedEvent } from '../events/billing.events';
+import {
+  CreditBalanceCrossedEvent,
+  InvoiceRefundedEvent
+} from '../events/billing.events';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {
   INVOICE_LIST_COLUMNS,
@@ -37,7 +40,11 @@ import type {
 } from '../dtos/billing-cursor-query.dto';
 import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
-import { CreditService } from './credit.service';
+import {
+  CreditService,
+  crossesZero,
+  type BalanceChange
+} from './credit.service';
 
 const ZERO = Money.fromMinor(0);
 
@@ -230,7 +237,7 @@ export class BillingAdminService {
     }
 
     // The money side is already recorded, so settling is only the status flip.
-    const { saved, revokedUserId } = await withTransaction(
+    const { saved, revokedUserId, crossedUserId } = await withTransaction(
       this.dataSource,
       async (manager) => {
         const invoice = await lockInvoice(manager, { where: { id } });
@@ -247,16 +254,19 @@ export class BillingAdminService {
           cumulativeRefunded.compare(invoice.amountMinor) < 0 ||
           invoice.status !== 'paid'
         ) {
-          return { saved: invoice, revokedUserId: null };
+          return { saved: invoice, revokedUserId: null, crossedUserId: null };
         }
 
         invoice.status = 'refunded';
         const revokedUserId = await this.revokeOneTimeGrants(manager, invoice);
-
-        await this.clawbackCreditPurchase(manager, invoice);
+        const clawback = await this.clawbackCreditPurchase(manager, invoice);
+        const crossedUserId =
+          clawback && crossesZero(clawback)
+            ? await this.resolveUserId(invoice.customerId)
+            : null;
         const saved = await manager.save(Invoice, invoice);
 
-        return { saved, revokedUserId };
+        return { saved, revokedUserId, crossedUserId };
       }
     );
 
@@ -266,6 +276,13 @@ export class BillingAdminService {
       this.events.emit(
         InvoiceRefundedEvent.name,
         new InvoiceRefundedEvent(revokedUserId, id)
+      );
+    }
+
+    if (crossedUserId) {
+      this.events.emit(
+        CreditBalanceCrossedEvent.name,
+        new CreditBalanceCrossedEvent(crossedUserId)
       );
     }
 
@@ -334,16 +351,17 @@ export class BillingAdminService {
    * Refunding a credit-pack purchase in full takes the granted units back:
    * the balance is decremented by the pack size and the deduction journaled
    * as a `refund` ledger entry. Already-spent credits drive the balance
-   * negative, which blocks further usage until topped up — there is no
+   * negative, which refuses further metered use until topped up; there is no
    * auto-debt write-off. Exactly-once application is guaranteed by the
-   * invoice's one-way `paid → refunded` flip guarded above.
+   * invoice's one-way `paid → refunded` flip guarded above. Null when the
+   * invoice is not a credit pack.
    */
   private async clawbackCreditPurchase(
     manager: EntityManager,
     invoice: Invoice
-  ): Promise<void> {
+  ): Promise<BalanceChange | null> {
     if (invoice.kind !== 'one_time' || !invoice.productId) {
-      return;
+      return null;
     }
 
     const product = await manager.findOne(Product, {
@@ -351,10 +369,10 @@ export class BillingAdminService {
     });
 
     if (product?.type !== 'credits' || !product.grant?.credits) {
-      return;
+      return null;
     }
 
-    await this.credits.clawbackPurchase(
+    return this.credits.clawbackPurchase(
       manager,
       { customerId: invoice.customerId, invoiceId: invoice.id },
       product.grant.credits

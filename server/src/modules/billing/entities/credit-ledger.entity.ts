@@ -8,6 +8,7 @@ import {
 import { Money } from '@app/shared/utils/money';
 import { Customer } from './customer.entity';
 import { Invoice } from './invoice.entity';
+import { UsageRecord } from './usage-record.entity';
 import { moneyColumnTransformer } from '../../../common/utils/money-column.transformer';
 
 /** Why a credit delta was applied: pack purchase, usage spend, refund clawback. */
@@ -15,9 +16,10 @@ export type CreditLedgerReason = 'purchase' | 'usage' | 'refund';
 
 /**
  * Append-only journal of every credit-balance change. `delta` is positive for
- * purchases and negative for usage spend / refund clawback;
- * `refInvoiceId` ties the entry to the invoice that caused it (the credit-pack
- * purchase, the usage invoice the spend offset, or the refunded purchase).
+ * purchases and negative for usage spend / refund clawback. `refInvoiceId`
+ * ties the entry to the invoice that caused it (the credit-pack purchase, the
+ * usage invoice the spend offset, or the refunded purchase); `refUsageRecordId`
+ * ties a metered debit to the use that it paid for.
  */
 @Entity('billing_credit_ledger')
 export class CreditLedger {
@@ -45,6 +47,13 @@ export class CreditLedger {
     name: 'FK_billing_credit_ledger_ref_invoice_id'
   })
   refInvoiceId: string | null;
+
+  @Column({ name: 'ref_usage_record_id', type: 'uuid', nullable: true })
+  @ForeignKey<UsageRecord>(() => UsageRecord, {
+    onDelete: 'SET NULL',
+    name: 'FK_billing_credit_ledger_ref_usage_record_id'
+  })
+  refUsageRecordId: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

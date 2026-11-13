@@ -48,7 +48,7 @@ import { CreditService } from './services/credit.service';
 import { BillingUserService } from './services/billing-user.service';
 import { PlanChangeService } from './services/plan-change.service';
 import { BillingAdminService } from './services/billing-admin.service';
-import { UsageService } from './services/usage.service';
+import { MeteringService } from './services/metering.service';
 import { UsageInvoicingService } from './services/usage-invoicing.service';
 import { BillingPlansController } from './controllers/billing-plans.controller';
 import { BillingUserController } from './controllers/billing-user.controller';
@@ -136,7 +136,7 @@ export class BillingModule {
         BillingUserService,
         PlanChangeService,
         BillingAdminService,
-        UsageService,
+        MeteringService,
         UsageInvoicingService,
         BillingConfiguredAttributesRegistrar,
         EntitlementChangedListener,
@@ -195,7 +195,7 @@ export class BillingModule {
         // provided by `EntitlementsModule`, so importers of `BillingModule`
         // keep resolving both without changing an import path.
         EntitlementsModule,
-        UsageService,
+        MeteringService,
         CreditService,
         BILLING_PROVIDERS
       ]

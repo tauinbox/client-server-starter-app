@@ -22,6 +22,7 @@ import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import {
+  CreditBalanceCrossedEvent,
   InvoiceRefundedEvent,
   SubscriptionCanceledEvent
 } from '../events/billing.events';
@@ -641,6 +642,53 @@ describe('BillingAdminService', () => {
         500
       );
     });
+
+    it.each([
+      [
+        'takes the balance from above 0 to 0 or below',
+        { before: 300, after: -200 },
+        1
+      ],
+      ['leaves the balance above 0', { before: 900, after: 400 }, 0]
+    ])(
+      'emits the balance crossing after commit when a credit-pack refund %s',
+      async (_name, change, crossings) => {
+        const ctx = await build();
+
+        ctx.invoices.findOne.mockResolvedValue(
+          makeInvoice({
+            kind: 'one_time',
+            subscriptionId: null,
+            productId: 'prod-cr',
+            amountMinor: Money.fromMinor(49000)
+          })
+        );
+        ctx.products.findOne.mockResolvedValue({
+          id: 'prod-cr',
+          type: 'credits',
+          grant: { credits: 500 }
+        });
+        ctx.customers.findOne.mockResolvedValue({
+          id: 'cust-1',
+          userId: 'user-1'
+        });
+        ctx.credits.clawbackPurchase.mockResolvedValue(change);
+        ctx.billing.getProviderById.mockReturnValue(providerStub('yookassa'));
+
+        await ctx.service.refundInvoice('inv-1');
+
+        const emitted = ctx.emit.mock.calls.filter(
+          ([name]) => name === CreditBalanceCrossedEvent.name
+        );
+
+        expect(emitted).toEqual(
+          Array.from({ length: crossings }, () => [
+            CreditBalanceCrossedEvent.name,
+            new CreditBalanceCrossedEvent('user-1')
+          ])
+        );
+      }
+    );
 
     it('calls the provider outside any open transaction', async () => {
       const ctx = await build();

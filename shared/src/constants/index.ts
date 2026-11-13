@@ -148,9 +148,17 @@ export {
   isOpenStatus
 } from './subscription-status.constants';
 
-export { USAGE_FUTURE_TOLERANCE_MS } from './usage.constants';
+export {
+  USAGE_FUTURE_TOLERANCE_MS,
+  METERS,
+  isMeterKey,
+  type MeterKey
+} from './usage.constants';
 
-export { FREE_PLAN_KEY } from './billing-plan.constants';
+export {
+  FREE_PLAN_KEY,
+  PAY_AS_YOU_GO_PLAN_KEY
+} from './billing-plan.constants';
 
 export {
   ALLOWED_INVOICE_SORT_COLUMNS,

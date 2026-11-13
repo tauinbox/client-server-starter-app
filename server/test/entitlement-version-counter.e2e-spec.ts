@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import { createClient } from '@keyv/redis';
 import { buildCacheOptions } from '../src/modules/core/redis-cache.store';
+import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { CustomerGrant } from '../src/modules/billing/entities/customer-grant.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
@@ -46,6 +47,7 @@ runWithRedis('entitlement version counter (real Redis)', () => {
           provide: getRepositoryToken(CustomerGrant),
           useValue: { find: jest.fn().mockResolvedValue([]) }
         },
+        { provide: getRepositoryToken(CreditBalance), useValue: empty },
         { provide: MetricsService, useValue: { recordCacheAccess: jest.fn() } }
       ]
     }).compile();

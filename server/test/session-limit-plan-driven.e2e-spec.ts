@@ -22,6 +22,7 @@ import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity'
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { CustomerGrant } from '../src/modules/billing/entities/customer-grant.entity';
+import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { UsersService } from '../src/modules/users/services/users.service';
@@ -224,6 +225,10 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
         {
           provide: getRepositoryToken(CustomerGrant),
           useValue: { find: jest.fn().mockResolvedValue([]) }
+        },
+        {
+          provide: getRepositoryToken(CreditBalance),
+          useValue: { findOne: jest.fn().mockResolvedValue(null) }
         },
         { provide: CACHE_MANAGER, useValue: cache },
         { provide: DataSource, useValue: { transaction: jest.fn() } },

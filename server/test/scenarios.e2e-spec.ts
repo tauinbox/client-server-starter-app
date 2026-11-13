@@ -65,6 +65,8 @@ import { ResourceRegistryService } from '../src/modules/auth/services/resource-r
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
+import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
+import { CreditLedger } from '../src/modules/billing/entities/credit-ledger.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
@@ -294,7 +296,8 @@ runWithInfra('Request scenarios (e2e)', () => {
 
       if (ids.length > 0) {
         await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
-        // An invoice keeps its customer (RESTRICT); the rest cascades.
+        // An invoice and a ledger row keep their customer (RESTRICT); the rest
+        // cascades.
         const customerIds = (
           await dataSource.getRepository(Customer).findBy({ userId: In(ids) })
         ).map((c) => c.id);
@@ -302,6 +305,9 @@ runWithInfra('Request scenarios (e2e)', () => {
         if (customerIds.length > 0) {
           await dataSource
             .getRepository(Invoice)
+            .delete({ customerId: In(customerIds) });
+          await dataSource
+            .getRepository(CreditLedger)
             .delete({ customerId: In(customerIds) });
         }
 
@@ -717,26 +723,25 @@ runWithInfra('Request scenarios (e2e)', () => {
 
       ctx.values.$invoiceId = invoice.id;
     },
-    'metered-plan': async (ctx) => {
+    'api-access-plan': async (ctx) => {
       await dataSource.getRepository(Plan).save({
-        key: ctx.values.$meterKey!,
-        name: 'Scenario plan',
-        description: null,
-        billingMode: 'usage',
-        interval: 'month',
-        meterKey: ctx.values.$meterKey!,
-        entitlements: [],
-        limits: null,
-        trialDays: 0,
-        active: true,
-        prices: {}
+        ...fixedPlan(ctx.values.$meterKey!),
+        entitlements: ['api-access']
+      });
+    },
+    credits: async (ctx) => {
+      if (!ctx.values.$customerId) await STATES.customer(ctx);
+
+      await dataSource.getRepository(CreditBalance).insert({
+        customerId: ctx.values.$customerId!,
+        balanceUnits: Money.fromMinor(10)
       });
     },
     'usage-record': async (ctx) => {
       await dataSource.getRepository(UsageRecord).save({
         customerId: ctx.values.$customerId!,
-        subscriptionId: ctx.values.$subscriptionId!,
-        meterKey: ctx.values.$meterKey!,
+        subscriptionId: null,
+        meterKey: 'api_calls',
         quantity: Money.fromMinor(5),
         occurredAt: new Date(),
         idempotencyKey: 'scenario-usage'

@@ -8,7 +8,6 @@ import type { Provider } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { ErrorKeys } from '@app/shared/constants';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
@@ -31,7 +30,6 @@ import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy
 import { BillingService } from '../src/modules/billing/billing.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
-import { UsageService } from '../src/modules/billing/services/usage.service';
 import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
@@ -57,6 +55,11 @@ const USAGE_PLAN = 'wp-usage';
 // not the meter of the subscription under test.
 const ALT_USAGE_PLAN = 'wp-usage-alt';
 const ALT_METER = 'wp-alt-meter';
+
+interface SeedRecordKeys {
+  idempotencyKey: string;
+  meterKey?: string;
+}
 
 runWithInfra('billing write paths (e2e)', () => {
   let ds: DataSource;
@@ -250,21 +253,35 @@ runWithInfra('billing write paths (e2e)', () => {
     return `renewal:${subscription.id}:${subscription.currentPeriodEnd.getTime()}`;
   }
 
+  /**
+   * Stores a postpaid record of `quantity` units of `meterKey` against the
+   * shared subscription. No writer creates such a record any more; the cases of
+   * the postpaid close that remain read it.
+   */
+  async function seedRecord(
+    { occurredAt, quantity }: { occurredAt: Date; quantity: number },
+    { idempotencyKey, meterKey = 'api_calls' }: SeedRecordKeys
+  ): Promise<void> {
+    await ds.getRepository(UsageRecord).insert({
+      customerId,
+      subscriptionId,
+      meterKey,
+      quantity: Money.fromMinor(quantity),
+      occurredAt,
+      idempotencyKey
+    });
+  }
+
   /** Meters `quantity` units inside the subscription's open period. */
-  async function seedUnits(
+  function seedUnits(
     periodStart: Date,
     quantity: number,
     idempotencyKey: string
   ): Promise<void> {
-    const usage = await build(UsageService);
-
-    await usage.record({
-      customerId,
-      meterKey: 'api_calls',
-      quantity,
-      occurredAt: new Date(periodStart.getTime() + 60_000),
-      idempotencyKey
-    });
+    return seedRecord(
+      { occurredAt: new Date(periodStart.getTime() + 60_000), quantity },
+      { idempotencyKey }
+    );
   }
 
   /** Puts the shared subscription back on a known plan and lifecycle state. */
@@ -338,10 +355,7 @@ runWithInfra('billing write paths (e2e)', () => {
         { provide: BILLING_PROVIDERS, useValue: [provider] },
         {
           provide: MetricsService,
-          useValue: {
-            recordUnratedUsage: jest.fn(),
-            recordUnmatchedOffSessionCharge: jest.fn()
-          }
+          useValue: { recordUnmatchedOffSessionCharge: jest.fn() }
         },
         { provide: AuditService, useValue: { logFireAndForget: jest.fn() } },
         {
@@ -448,121 +462,24 @@ runWithInfra('billing write paths (e2e)', () => {
   }
 
   describe('metering and credits', () => {
-    it('records a usage event', async () => {
-      const usage = await build(UsageService);
-
-      await usage.record({
-        customerId,
-        meterKey: 'api_calls',
-        quantity: 5,
-        occurredAt: new Date(Date.now() - 2 * DAY).toISOString(),
-        idempotencyKey: 'wp-usage-1'
-      });
-
-      const rows = await ds
-        .getRepository(UsageRecord)
-        .find({ where: { customerId, idempotencyKey: 'wp-usage-1' } });
-
-      expect(rows).toHaveLength(1);
-      expect(rows[0].quantity.toNumber()).toBe(5);
-    }, 30000);
-
-    it('refuses a meter no plan in the catalog declares', async () => {
-      const usage = await build(UsageService);
-
-      await expect(
-        usage.record({
-          customerId,
-          meterKey: 'wp-unknown',
-          quantity: 5,
-          idempotencyKey: 'wp-usage-unknown'
-        })
-      ).rejects.toMatchObject({ status: 422 });
-
-      const rows = await ds
-        .getRepository(UsageRecord)
-        .find({ where: { customerId, idempotencyKey: 'wp-usage-unknown' } });
-
-      expect(rows).toHaveLength(0);
-    }, 30000);
-
-    it('refuses a record that no rating can reach', async () => {
-      const usage = await build(UsageService);
-      const subscription = await ds
-        .getRepository(Subscription)
-        .findOneByOrFail({ id: subscriptionId });
-
-      await expect(
-        usage.record({
-          customerId,
-          meterKey: 'api_calls',
-          quantity: 5,
-          occurredAt: new Date(
-            subscription.currentPeriodStart.getTime() - 1
-          ).toISOString(),
-          idempotencyKey: 'wp-usage-before-window'
-        })
-      ).rejects.toMatchObject({
-        status: 422,
-        response: { errorKey: ErrorKeys.BILLING.USAGE_BEFORE_OPEN_WINDOW }
-      });
-      await expect(
-        usage.record({
-          customerId,
-          meterKey: 'api_calls',
-          quantity: 5,
-          occurredAt: new Date(Date.now() + DAY).toISOString(),
-          idempotencyKey: 'wp-usage-future'
-        })
-      ).rejects.toMatchObject({
-        status: 422,
-        response: { errorKey: ErrorKeys.BILLING.USAGE_IN_FUTURE }
-      });
-
-      const rows = await ds.getRepository(UsageRecord).find({
-        where: [
-          { customerId, idempotencyKey: 'wp-usage-before-window' },
-          { customerId, idempotencyKey: 'wp-usage-future' }
-        ]
-      });
-
-      expect(rows).toHaveLength(0);
-    }, 30000);
-
     it('rates only the plan meter when a foreign-meter row shares the period', async () => {
       // An isolated window, so only these two rows are in scope whatever else
-      // the suite has recorded. Both go in through the real ingest: the foreign
-      // one is another plan's meter, which is stored and simply not priced here.
-      // The ingest refuses a record before the open period, so the window is
-      // inside it, clear of the other rows of this block (two days ago).
+      // the suite has recorded: the foreign one is another plan's meter, which
+      // is stored and simply not priced here.
       const occurredAt = new Date(Date.now() - 30 * DAY);
       const period = {
         start: new Date(occurredAt.getTime() - DAY),
         end: new Date(occurredAt.getTime() + DAY)
       };
-      const usage = await build(UsageService);
-      const own = await usage.record({
-        customerId,
-        meterKey: 'api_calls',
-        quantity: 7,
-        occurredAt,
-        idempotencyKey: 'wp-rate-own'
-      });
-      const foreign = await usage.record({
-        customerId,
-        meterKey: ALT_METER,
-        quantity: 1000,
-        occurredAt,
-        idempotencyKey: 'wp-rate-foreign'
-      });
 
-      expect(own.pricedByCurrentPlan).toBe(true);
-      expect(foreign.pricedByCurrentPlan).toBe(false);
-      const stored = await ds
-        .getRepository(UsageRecord)
-        .find({ where: { customerId, meterKey: ALT_METER } });
-
-      expect(stored).toHaveLength(1);
+      await seedRecord(
+        { occurredAt, quantity: 7 },
+        { idempotencyKey: 'wp-rate-own' }
+      );
+      await seedRecord(
+        { occurredAt, quantity: 1000 },
+        { idempotencyKey: 'wp-rate-foreign', meterKey: ALT_METER }
+      );
 
       const rating = await build(UsageRating);
       const subscription = await ds

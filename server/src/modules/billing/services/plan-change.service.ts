@@ -23,7 +23,8 @@ import {
 import {
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ErrorKeys,
-  FREE_PLAN_KEY
+  FREE_PLAN_KEY,
+  PAY_AS_YOU_GO_PLAN_KEY
 } from '@app/shared/constants';
 import type { PlanPrice, ProrationPreviewResponse } from '@app/shared/types';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -48,6 +49,7 @@ import {
 import {
   currentPlanMissing,
   freePlanNotPurchasable,
+  payAsYouGoIsPrepaid,
   planNotFound,
   subscriptionNotLinked
 } from '../utils/billing-errors.util';
@@ -704,6 +706,10 @@ export class PlanChangeService {
 
     if (toPlan.key === FREE_PLAN_KEY) {
       throw freePlanNotPurchasable();
+    }
+
+    if (toPlan.key === PAY_AS_YOU_GO_PLAN_KEY) {
+      throw payAsYouGoIsPrepaid();
     }
 
     if (toPlan.key === subscription.planKey) {

@@ -319,7 +319,7 @@ other source.
 The metrics are `http_requests_total`, `http_request_duration_seconds`, `auth_events_total`,
 `rbac_permission_denied_total{action,subject,level}`, `mail_queue_jobs{state}`,
 `mail_jobs_processed_total{outcome}`, `db_pool_connections{state}`,
-`cache_requests_total{cache,outcome}`, `billing_usage_records_unrated_total{meter}`,
+`cache_requests_total{cache,outcome}`,
 `password_breach_lookups_total{outcome}`, `audit_write_failures_total{action}` and
 `dependency_up{dependency}`. The module also supplies `HttpMetricsInterceptor`.
 
@@ -438,8 +438,8 @@ logging.
 `interceptors/` holds `AuditLogInterceptor`. It is a global `APP_INTERCEPTOR`. It reads the
 `@LogAudit` metadata and calls `logFireAndForget` after a success. Only three billing
 administrator routes use it: the cancel, the refund and the webhook replay. The usage route does
-not, because a replay of an idempotency key is also a success: `UsageService.record` writes the
-row with `logFireAndForget` only after a new insert. An administrator change to a user, a role, a resource or a feature flag
+not, because a replay of an idempotency key is also a success: `MeteringService.consume` writes
+the row with `logFireAndForget` only after a debit. An administrator change to a user, a role, a resource or a feature flag
 writes its row with `AuditService.log(params, manager)` in the transaction of the change instead.
 
 `entities/` holds the `AuditLog` entity, with `action`, `actorId`, `actorEmail`, `targetId`, `ip`,
@@ -602,7 +602,7 @@ self-managed renewal queue and its processor. The renewal scan schedules itself 
 
 The module imports `EntitlementsModule` and re-exports it. Thus an importer continues to resolve
 `EntitlementService` and `EntitlementGuard` through `BillingModule`. The module exports
-`BillingService`, `BillingConfigService`, `EntitlementsModule`, `UsageService` and `CreditService`.
+`BillingService`, `BillingConfigService`, `EntitlementsModule`, `MeteringService` and `CreditService`.
 
 **Geo-router (`billing.service.ts`).** `resolveProvider()` takes the provider from
 `effectiveProviderId()`, which computes `providerOverride ?? geoDefault(country)`. It answers 501 `PROVIDER_NOT_CONFIGURED` when the provider
@@ -780,49 +780,32 @@ invoice. `remainingRefundable` is the single expression of the bound
 clamp at zero. The policy stays at the call site: the proration caps silently, and this route rejects
 with a 422.
 
-**`UsageService`** does the idempotent metering ingest.
+**`MeteringService`** does the prepaid metering (pay as you go, since 2026-11-13). `consume()` takes
+the units of one use from the credit balance of the customer at the moment of use:
 
-`record()` normalizes `occurredAt` from an ISO string or a Date. It resolves the newest active
-subscription, in the same order as the entitlement resolver. Thus the system bills the usage against
-the subscription whose entitlements are in force.
+- Before the transaction it refuses, with a 422, a meter outside the meter catalog (`METERS`,
+  `errors.billing.meterNotDeclared`) and an `occurredAt` more than 5 minutes
+  (`USAGE_FUTURE_TOLERANCE_MS`) after the server clock (`errors.billing.usageInFuture`).
+- In one transaction it reads the balance row `FOR UPDATE` (`CreditService.lockedBalance`), so two
+  uses of one customer serialize. A known key with the same body is a replay: it answers the first
+  record and debits nothing. A known key with another `meterKey`, `quantity` or `occurredAt` gets a
+  409 (`errors.billing.usageKeyReused`). A subscriber whose plan has the capability of the meter is
+  not debited and nothing is recorded. A balance below the units gets a 409
+  (`errors.billing.insufficientCredits`) and nothing is written. Else it inserts the record (no
+  subscription) and calls `CreditService.spendOnMetering`, which writes the delta and a ledger row
+  tied to the record.
+- After the commit it writes the audit row of a debit and emits `CreditBalanceCrossedEvent` when
+  the debit took the balance to 0.
 
-The method deduplicates on the per-customer unique pair `(customer_id, idempotency_key)`. It also has
-a guard for a unique-violation race. A key that another customer reuses is a distinct event and not a
-replay.
-
-A record is an observation, thus the current plan of the customer does not gate the write. The
-service refuses, with a 422, only a record that no rating can charge correctly:
-
-- A meter that no plan in the catalog declares. Such a meter is a typo of the producer.
-- An `occurredAt` before the open metered window (`usageIngestStart`: `meteredWindowStart`, or
-  `usage_sealed_until` when later). Rating never reads a closed period again.
-- An `occurredAt` more than 5 minutes (`USAGE_FUTURE_TOLERANCE_MS`) after the server clock. Such a
-  record is rated in a later period.
-
-A replay of a known key answers before these checks. A known key with another `meterKey`,
-`quantity` or `occurredAt` is not a replay: the service refuses it with a 409
-(`errors.billing.usageKeyReused`) and inserts nothing. A retry that omits `occurredAt` is not
-compared on time.
-
-The checks and the insert run in one transaction that reads the subscription `FOR SHARE`. A close
-that moves the window waits for that lock. The renewal and `billClosingUsagePeriod` rate before they
-move the window, so they first write `usage_sealed_until` (the end of the window) in a committed
-write. Thus a record is rated by the close, or it gets the 422. It is never stored in a window that
-was already rated.
-
-The service stores a meter that another plan prices. It counts that record on
-`billing_usage_records_unrated_total{meter}` and leaves it for the rating step to ignore.
-
-The response carries `pricedByCurrentPlan`. Thus the operator who uses an incorrect key learns at the
-call site. That field is a verdict about the plan in force. The service resolves it again on an
-idempotent replay and does not store it.
-
-The method answers 409 while the credit balance is negative.
+The answer is `{ recordId, debited, replayed, balanceAfter }`.
+`server/test/billing-metering-race.e2e-spec.ts` proves the lock on a real PostgreSQL.
 
 **`CreditService`** is the single owner of the prepaid balance. Each change is an atomic upsert of
 `balance += delta`, and not a read, modify and write sequence. Each change also appends a
-`CreditLedger` entry with the reason `purchase`, `usage` or `refund`. Each mutator joins the invoice
-transaction of the caller. Thus the exactly-once property rides on the winning `provider_event_id`
+`CreditLedger` entry with the reason `purchase`, `usage` or `refund`. Each mutator joins the
+transaction of the caller and returns the balance before and after the delta; `crossesZero` tells
+when the pay-as-you-go entitlements start or stop. `spentOnMetering` sums the metered debits of a
+period for `GET /billing/usage`. Thus the exactly-once property rides on the winning `provider_event_id`
 insert.
 
 **`UsageInvoicingService`** invoices a closed usage period of a provider-managed (Paddle)
@@ -984,7 +967,7 @@ inside the period. A foreign meter belongs to another product, thus the rating n
 rate of this plan. A plan with no `meter_key` rates to zero. The strategy charges the overage above
 `includedUnits` at `unitPriceMinor`.
 
-`summarizeForPeriod()` supports `GET /billing/usage`. `summarizeForPeriodWithCredits()` supports the
+`summarizeForPeriodWithCredits()` supports the
 usage invoicing of the two providers. The prepaid credits offset the billable units one for one
 before the pricing step, and the caller deducts the applied units. The arithmetic is `rateUsage` in
 `shared/src/utils/billing-rules.ts`, which the mock server also calls.
@@ -1195,9 +1178,12 @@ The module reads four row types from `billing/entities/`. That is a schema depen
 behavioral one.
 
 `entitlement.service.ts` supplies `capabilitiesFor(userId)`. A subscription with the status active,
-trialing or past_due in the grace window gives `plan.entitlements`. Each other condition gives the
-Free entitlements. The result is the union with the active `CustomerGrant` rows, that is the grants
-that are not revoked and not expired, from a paid one-time sku purchase.
+trialing or past_due in the grace window gives `plan.entitlements` (`subscriptionPlan`, which
+`MeteringService` also reads). Else a credit balance above 0 gives the pay-as-you-go plan `usage`,
+which has every capability. Else the result is the Free entitlements. The result is the union with
+the active `CustomerGrant` rows, that is the grants that are not revoked and not expired, from a paid
+one-time sku purchase. A delta that moves the balance across 0 emits `CreditBalanceCrossedEvent`,
+which invalidates the cache of that user.
 
 The per-user cache key carries the `CacheVersionCounter` value of that user
 (`common/utils/cache-version-counter.ts`), which `invalidateUser` increments on a subscription
@@ -2434,7 +2420,6 @@ These are the counters and the histograms:
 | `db_pool_connections` | gauge | `state`, one of `total`, `idle`, `waiting` | The size of the PostgreSQL connection pool, by state. The metric reads the pg pool on the injected `DataSource` object. A `waiting` value above 0 for a long time means that the pool is exhausted and the requests are in a queue |
 | `cache_requests_total` | counter | `cache`, one of `permissions`, `roles`, `resources`, `feature_flags_all`, `entitlements`; and `outcome`, one of `hit` or `miss` | The lookups in each Redis-backed cache, by logical cache and by outcome. The hit ratio of a cache is `hit / (hit + miss)`. A ratio that stays low means that the invalidation is faster than the hits |
 | `dependency_up` | gauge | `dependency`, one of `smtp` or `redis` | The health of an external dependency, as `/health/ready` last observed it. `1` is healthy, and `0` is degraded or down. A series appears only after its indicator runs. Thus a deployment with no SMTP configuration never emits `dependency="smtp"`. This is the only machine-readable signal for a degradation that readiness intentionally reports as up. Refer to [Alerting](../README.md#alerting) |
-| `billing_usage_records_unrated_total` | counter | `meter` | The usage records that the system stored under a meter that the current plan of the customer does not price. A value above zero is expected while a customer meters a product that they do not subscribe to. A rise that continues on one `meter` means that a producer uses an incorrect key, and its units silently do not bill. The plan catalog bounds the label cardinality, because the ingest refuses a meter that no plan declares |
 
 `prom-client` also supplies the default Node.js process metrics. Those cover the heap, the GC, the
 event-loop lag and the file descriptors.

@@ -45,10 +45,6 @@ describe('MetricsService', () => {
           useValue: mockCounter
         },
         {
-          provide: getToken('billing_usage_records_unrated_total'),
-          useValue: mockCounter
-        },
-        {
           provide: getToken('billing_off_session_charges_unmatched_total'),
           useValue: mockCounter
         },
@@ -162,14 +158,6 @@ describe('MetricsService', () => {
       service.recordUnmatchedOffSessionCharge('yookassa');
 
       expect(mockCounter.inc).toHaveBeenCalledWith({ provider: 'yookassa' });
-    });
-  });
-
-  describe('recordUnratedUsage', () => {
-    it('increments the counter labelled by meter', () => {
-      service.recordUnratedUsage('api_calls');
-
-      expect(mockCounter.inc).toHaveBeenCalledWith({ meter: 'api_calls' });
     });
   });
 

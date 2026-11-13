@@ -6,9 +6,12 @@ import { In, IsNull } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
 import {
   ENTITLED_SUBSCRIPTION_STATUSES,
-  FREE_PLAN_KEY
+  FREE_PLAN_KEY,
+  PAY_AS_YOU_GO_PLAN_KEY
 } from '@app/shared/constants';
+import { Money } from '@app/shared/utils/money';
 import { MetricsService } from '../core/metrics/metrics.service';
+import { CreditBalance } from '../billing/entities/credit-balance.entity';
 import { Customer } from '../billing/entities/customer.entity';
 import { CustomerGrant } from '../billing/entities/customer-grant.entity';
 import { Plan } from '../billing/entities/plan.entity';
@@ -21,6 +24,7 @@ describe('EntitlementService', () => {
   let subscriptions: { findOne: jest.Mock };
   let plans: { findOne: jest.Mock };
   let grants: { find: jest.Mock };
+  let balances: { findOne: jest.Mock };
   let cacheStore: Map<string, unknown>;
   let cache: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
   let metrics: { recordCacheAccess: jest.Mock };
@@ -55,6 +59,7 @@ describe('EntitlementService', () => {
     subscriptions = { findOne: jest.fn().mockResolvedValue(null) };
     plans = { findOne: jest.fn().mockResolvedValue(null) };
     grants = { find: jest.fn().mockResolvedValue([]) };
+    balances = { findOne: jest.fn().mockResolvedValue(null) };
     metrics = { recordCacheAccess: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -64,6 +69,7 @@ describe('EntitlementService', () => {
         { provide: getRepositoryToken(Subscription), useValue: subscriptions },
         { provide: getRepositoryToken(Plan), useValue: plans },
         { provide: getRepositoryToken(CustomerGrant), useValue: grants },
+        { provide: getRepositoryToken(CreditBalance), useValue: balances },
         { provide: CACHE_MANAGER, useValue: cache },
         { provide: MetricsService, useValue: metrics }
       ]
@@ -131,6 +137,67 @@ describe('EntitlementService', () => {
 
       expect(resolved.planKey).toBe(FREE_PLAN_KEY);
       expect(resolved.capabilities).toEqual([]);
+    });
+
+    describe('pay as you go', () => {
+      const PAYG_PLAN: Partial<Plan> = {
+        key: PAY_AS_YOU_GO_PLAN_KEY,
+        entitlements: [
+          'reports',
+          'api-access',
+          'data-export',
+          'priority-support'
+        ],
+        limits: null
+      };
+
+      function withBalance(units: number): void {
+        customers.findOne.mockResolvedValue({ id: 'cust-1', userId: 'user-1' });
+        balances.findOne.mockResolvedValue({
+          customerId: 'cust-1',
+          balanceUnits: Money.fromMinor(units)
+        });
+        plans.findOne.mockImplementation(
+          ({ where }: { where: { key: string } }) =>
+            Promise.resolve(
+              where.key === PAY_AS_YOU_GO_PLAN_KEY ? PAYG_PLAN : FREE_PLAN
+            )
+        );
+      }
+
+      it('gives the pay-as-you-go plan while the credit balance is above 0', async () => {
+        withBalance(1);
+
+        await expect(service.capabilitiesFor('user-1')).resolves.toEqual({
+          planKey: PAY_AS_YOU_GO_PLAN_KEY,
+          capabilities: PAYG_PLAN.entitlements,
+          limits: {}
+        });
+        expect(balances.findOne).toHaveBeenCalledWith({
+          where: { customerId: 'cust-1' }
+        });
+      });
+
+      it.each([0, -40])('gives Free at a balance of %i', async (units) => {
+        withBalance(units);
+
+        const resolved = await service.capabilitiesFor('user-1');
+
+        expect(resolved.planKey).toBe(FREE_PLAN_KEY);
+      });
+
+      it('gives the plan of an entitled subscription over the balance', async () => {
+        withProSubscription('active');
+        balances.findOne.mockResolvedValue({
+          customerId: 'cust-1',
+          balanceUnits: Money.fromMinor(500)
+        });
+
+        const resolved = await service.capabilitiesFor('user-1');
+
+        expect(resolved.planKey).toBe('pro');
+        expect(balances.findOne).not.toHaveBeenCalled();
+      });
     });
 
     it('returns an empty capability set when even the Free plan is not seeded', async () => {
@@ -323,6 +390,7 @@ describe('EntitlementService', () => {
           },
           { provide: getRepositoryToken(Plan), useValue: plans },
           { provide: getRepositoryToken(CustomerGrant), useValue: grants },
+          { provide: getRepositoryToken(CreditBalance), useValue: balances },
           { provide: CACHE_MANAGER, useValue: redisCache },
           { provide: MetricsService, useValue: metrics }
         ]

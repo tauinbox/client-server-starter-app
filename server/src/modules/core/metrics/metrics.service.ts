@@ -44,8 +44,6 @@ export class MetricsService {
     private readonly mailJobsCounter: Counter<string>,
     @InjectMetric('cache_requests_total')
     private readonly cacheRequestsCounter: Counter<string>,
-    @InjectMetric('billing_usage_records_unrated_total')
-    private readonly unratedUsageCounter: Counter<string>,
     @InjectMetric('billing_off_session_charges_unmatched_total')
     private readonly unmatchedChargeCounter: Counter<string>,
     @InjectMetric('password_breach_lookups_total')
@@ -92,10 +90,6 @@ export class MetricsService {
 
   recordCacheAccess(cache: CacheName, outcome: CacheOutcome): void {
     this.cacheRequestsCounter.inc({ cache, outcome });
-  }
-
-  recordUnratedUsage(meter: string): void {
-    this.unratedUsageCounter.inc({ meter });
   }
 
   recordUnmatchedOffSessionCharge(provider: BillingProviderId): void {

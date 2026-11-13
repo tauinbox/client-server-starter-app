@@ -7,7 +7,6 @@ import type { QueryDeepPartialEntity } from 'typeorm';
 import {
   geoDefault,
   geoFromLocale,
-  meteredWindowStart,
   overrideForRegion,
   regionForOverride
 } from '@app/shared/utils/billing-rules';
@@ -17,7 +16,8 @@ import {
   ErrorKeys,
   FREE_PLAN_KEY,
   INVOICE_LIST_QUERY,
-  OPEN_SUBSCRIPTION_STATUSES
+  OPEN_SUBSCRIPTION_STATUSES,
+  PAY_AS_YOU_GO_PLAN_KEY
 } from '@app/shared/constants';
 import type {
   BillingRegion,
@@ -38,12 +38,12 @@ import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
-import { UsageRating } from '../rating/usage-rating.strategy';
 import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto';
 import { addInterval } from '../utils/period.util';
 import {
   currentPlanMissing,
   freePlanNotPurchasable,
+  payAsYouGoIsPrepaid,
   planNotFound,
   subscriptionNotLinked
 } from '../utils/billing-errors.util';
@@ -121,7 +121,6 @@ export class BillingUserService {
     private readonly billing: BillingService,
     private readonly renewals: RenewalService,
     private readonly credits: CreditService,
-    private readonly usageRating: UsageRating,
     private readonly config: ConfigService,
     private readonly events: EventEmitter2
   ) {}
@@ -158,11 +157,8 @@ export class BillingUserService {
   }
 
   /**
-   * The caller's metered usage aggregated over the current billing period.
-   * Null when there is nothing to meter: no customer, no open subscription, a
-   * fixed-mode one, or one outside `ENTITLED_SUBSCRIPTION_STATUSES` (an unpaid
-   * `incomplete` row accrues no usage). A dangling `planKey` also yields
-   * null — a read must not surface a data-integrity error.
+   * The credit units that metered uses took in the current calendar month
+   * (UTC). Null when the caller has no billing customer.
    */
   async getUsageSummary(
     userId: string
@@ -171,44 +167,19 @@ export class BillingUserService {
 
     if (!customer) return null;
 
-    const subscription = await findOpenSubscription(
-      this.subscriptions,
-      customer.id
+    const now = new Date();
+    const periodStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
     );
-
-    if (
-      !subscription ||
-      subscription.billingMode !== 'usage' ||
-      !ENTITLED_SUBSCRIPTION_STATUSES.includes(subscription.status)
-    ) {
-      return null;
-    }
-
-    const plan = await this.plans.findOne({
-      where: { key: subscription.planKey }
+    const periodEnd = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+    );
+    const unitsSpent = await this.credits.spentOnMetering(customer.id, {
+      from: periodStart,
+      to: periodEnd
     });
 
-    if (!plan) return null;
-
-    const windowStart = meteredWindowStart(subscription);
-    const summary = await this.usageRating.summarizeForPeriod(
-      subscription,
-      plan,
-      { start: windowStart, end: subscription.currentPeriodEnd }
-    );
-
-    return {
-      subscriptionId: subscription.id,
-      meterKey: plan.meterKey,
-      periodStart: windowStart,
-      periodEnd: subscription.currentPeriodEnd,
-      totalUnits: summary.totalUnits,
-      includedUnits: summary.includedUnits,
-      billableUnits: summary.billableUnits,
-      unitPriceMinor: summary.unitPriceMinor,
-      amountMinor: summary.amountMinor,
-      currency: summary.currency
-    };
+    return { periodStart, periodEnd, unitsSpent };
   }
 
   /**
@@ -417,6 +388,10 @@ export class BillingUserService {
 
     if (plan.key === FREE_PLAN_KEY) {
       throw freePlanNotPurchasable();
+    }
+
+    if (plan.key === PAY_AS_YOU_GO_PLAN_KEY) {
+      throw payAsYouGoIsPrepaid();
     }
 
     const customer = await this.getOrCreateCustomer(userId);
