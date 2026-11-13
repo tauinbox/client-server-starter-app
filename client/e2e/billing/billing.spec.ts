@@ -660,55 +660,6 @@ test.describe('Billing', () => {
     ).toBeDisabled();
   });
 
-  test('usage subscription shows the current-period usage meter', async ({
-    page,
-    _mockServer
-  }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-
-    // Put the user on the pay-as-you-go plan and meter some usage. The seeded
-    // usage plan is paddle/USD with unitPriceMinor 2 and no included units,
-    // so 142 units accrue 284 minor units = $2.84.
-    const subscription = await _mockServer.activateBillingSubscription({
-      userId: USER_ID,
-      planKey: 'usage'
-    });
-
-    await _mockServer.seedBillingUsage({
-      customerId: subscription.customerId,
-      quantity: 142
-    });
-
-    await page.goto('/billing/settings');
-
-    const meter = page.locator('nxs-usage-meter');
-
-    await expect(meter).toBeVisible();
-    await expect(meter.locator('.usage-readout .total')).toHaveText('142');
-    await expect(meter.locator('.meter-key')).toHaveText('api_calls');
-    await expect(meter.locator('.ledger-row.accrued')).toContainText('$2.84');
-    // Pure pay-as-you-go (no included units) renders no quota gauge.
-    await expect(meter.locator('.usage-gauge')).toHaveCount(0);
-  });
-
-  test('usage meter shows the empty state with no metered usage', async ({
-    page,
-    _mockServer
-  }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-    await _mockServer.activateBillingSubscription({
-      userId: USER_ID,
-      planKey: 'usage'
-    });
-
-    await page.goto('/billing/settings');
-
-    const meter = page.locator('nxs-usage-meter');
-
-    await expect(meter).toBeVisible();
-    await expect(meter.locator('.usage-empty')).toBeVisible();
-  });
-
   test('buying a credit pack raises the wallet balance in settings', async ({
     page,
     _mockServer
@@ -738,120 +689,64 @@ test.describe('Billing', () => {
     // The wallet reflects the pack.
     await page.goto('/billing/settings');
     await expect(credits.locator('.credits-units')).toHaveText('1,000');
-    await expect(credits.locator('.credits-hint')).toHaveCount(0);
+    await expect(credits.locator('.credits-hint.active')).toBeVisible();
     await expect(
       credits.getByRole('link', { name: 'Buy credits' })
     ).toBeVisible();
   });
 
-  test('metered usage consumes prepaid credits at the period close', async ({
-    page,
-    _mockServer
-  }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-
-    // Pay-as-you-go subscription + a 1000-unit pack in the wallet.
-    const subscription = await _mockServer.activateBillingSubscription({
-      userId: USER_ID,
-      planKey: 'usage'
-    });
-
-    await page.goto('/billing');
-    await page
-      .locator('nxs-product-card', { hasText: '1000 credits' })
-      .getByRole('button', { name: 'Buy' })
-      .click();
-    await payOnMockCheckout(page);
-    await expect(page).toHaveURL(/\/billing\/success$/);
-
-    // 142 metered units close the period: credits cover them one-for-one,
-    // so the postpaid invoice is zero and the wallet drops to 858.
-    await _mockServer.seedBillingUsage({
-      customerId: subscription.customerId,
-      quantity: 142
-    });
-    await _mockServer.advanceBillingRenewal({ userId: USER_ID });
-
-    await page.goto('/billing/settings');
-    await expect(page.locator('.credits-card .credits-units')).toHaveText(
-      '858'
-    );
-    // Three invoices: $0 activation, the $9.00 pack, and the $0 postpaid
-    // close — without credits the 142 units would have charged $2.84.
-    await expect(page.locator('.invoice-table tbody tr')).toHaveCount(3);
-    await expect(
-      page.locator('.invoice-table tbody tr', { hasText: '$9.00' })
-    ).toHaveCount(1);
-    await expect(
-      page.locator('.invoice-table tbody tr', { hasText: '$2.84' })
-    ).toHaveCount(0);
-  });
-
-  test('a switch from a usage plan shows the credits it spent without a reload', async ({
-    page,
-    _mockServer
-  }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
-
-    const subscription = await _mockServer.activateBillingSubscription({
-      userId: USER_ID,
-      planKey: 'usage'
-    });
-
-    await page.goto('/billing');
-    await page
-      .locator('nxs-product-card', { hasText: '1000 credits' })
-      .getByRole('button', { name: 'Buy' })
-      .click();
-    await payOnMockCheckout(page);
-    await expect(page).toHaveURL(/\/billing\/success$/);
-    await _mockServer.seedBillingUsage({
-      customerId: subscription.customerId,
-      quantity: 142
-    });
-
-    await page.goto('/billing/settings');
-    const units = page.locator('.credits-card .credits-units');
-
-    await expect(units).toHaveText('1,000');
-
-    // The switch bills the 142 units of the closing window with credits.
-    await page.getByRole('button', { name: 'Change plan' }).click();
-    const dialog = page.getByRole('dialog');
-
-    await dialog.getByRole('radio', { name: 'Subscription' }).click();
-    await dialog.getByRole('radio', { name: /^Pro/ }).click();
-    await expect(dialog.locator('.due-now dd')).toBeVisible();
-    await dialog.getByRole('button', { name: 'Confirm' }).click();
-
-    await expect(page.locator('.plan-summary')).toContainText('Pro');
-    await expect(units).toHaveText('858');
-  });
-
-  test('a Free user starts pay as you go and returns to Free through a cancel', async ({
+  test('pay as you go: a credit pack turns it on, each use takes credits, and it stops at 0', async ({
     page,
     _mockServer
   }) => {
     await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.goto('/billing');
 
+    // The pay-as-you-go card sells no subscription: its action opens the packs.
     await page.getByRole('radio', { name: 'Pay as you go' }).click();
-    await expect(page.locator('.usage-how')).toBeVisible();
+    await expect(page.locator('.usage-how')).toContainText(
+      'All capabilities work while your balance is above 0.'
+    );
     await page
       .locator('.paid-grid nxs-plan-card', { hasText: 'Pay as you go' })
-      .getByRole('button', { name: 'Choose' })
+      .getByRole('button', { name: 'Top up credits' })
+      .click();
+    await expect(page.locator('#one-time-purchases')).toBeInViewport();
+
+    await page
+      .locator('nxs-product-card', { hasText: '1000 credits' })
+      .getByRole('button', { name: 'Buy' })
       .click();
     await payOnMockCheckout(page);
     await expect(page).toHaveURL(/\/billing\/success$/);
 
     await page.goto('/billing/settings');
     const summary = page.locator('.plan-summary');
+    const credits = page.locator('.credits-card');
 
-    await expect(summary).toContainText('Pay as you go');
-    await expect(summary).toContainText('/ unit');
-    await expect(summary).toContainText('Next bill');
+    await expect(summary).toContainText(
+      'Pay as you go is on. Each use takes credits.'
+    );
+    await expect(credits.locator('.credits-hint.active')).toBeVisible();
 
-    // The usage subscriber lands on the pay as you go tiers.
+    // Each use takes its units at once.
+    const state = (await _mockServer.getState()) as {
+      billingCustomers: { id: string; userId: string }[];
+    };
+    const customer = state.billingCustomers.find((c) => c.userId === USER_ID);
+
+    expect(customer).toBeDefined();
+    await _mockServer.consumeBillingCredits({
+      customerId: customer!.id,
+      quantity: 142
+    });
+    await page.reload();
+    await expect(credits.locator('.credits-units')).toHaveText('858');
+    await expect(
+      page.locator('nxs-usage-meter .usage-readout .total')
+    ).toHaveText('142');
+
+    // The pricing page marks pay as you go as the current tier.
     await page.goto('/billing');
     await expect(
       page
@@ -859,15 +754,19 @@ test.describe('Billing', () => {
         .locator('.current-badge')
     ).toBeVisible();
 
-    await page
-      .locator('.free-column nxs-plan-card')
-      .getByRole('button', { name: 'Switch to the free plan' })
-      .click();
-    await expect(page.getByText('Metered usage recorded so far')).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel subscription' }).click();
-
+    // The last credits switch it off.
+    await _mockServer.consumeBillingCredits({
+      customerId: customer!.id,
+      quantity: 858
+    });
+    await page.goto('/billing/settings');
+    await expect(credits.locator('.credits-units')).toHaveText('0');
+    await expect(credits.locator('.credits-hint')).toContainText(
+      'Pay as you go is off'
+    );
+    await expect(summary.locator('.empty-state')).toBeVisible();
     await expect(
-      page.locator('.free-column nxs-plan-card .plan-note')
-    ).toContainText('From');
+      page.locator('nxs-usage-meter .usage-readout .total')
+    ).toHaveText('1,000');
   });
 });

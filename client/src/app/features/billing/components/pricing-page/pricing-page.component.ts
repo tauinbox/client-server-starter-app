@@ -16,7 +16,8 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FREE_PLAN_KEY } from '@app/shared/constants';
+import { ViewportScroller } from '@angular/common';
+import { FREE_PLAN_KEY, PAY_AS_YOU_GO_PLAN_KEY } from '@app/shared/constants';
 import type {
   BillingMode,
   PlanResponse,
@@ -32,6 +33,8 @@ import { BillingStore } from '../../store/billing.store';
 import { catalogText } from '../../utils/catalog-text';
 import {
   formatMoney,
+  formatUnitPrice,
+  lowestUnitPrice,
   planPriceFor,
   productPriceFor,
   resolveDisplayProvider
@@ -56,6 +59,9 @@ type PricedPlan = {
   readonly actionKey: string;
   readonly plan: PlanResponse;
 };
+
+/** The anchor of the one-time section, where the credit packs are sold. */
+const ONE_TIME_SECTION_ID = 'one-time-purchases';
 
 type PricedProduct = {
   readonly key: string;
@@ -90,6 +96,9 @@ export class PricingPageComponent implements OnInit {
   readonly #transloco = inject(TranslocoService);
   readonly #checkoutRedirect = inject(CheckoutRedirectService);
   readonly #cancelService = inject(SubscriptionCancelService);
+  readonly #scroller = inject(ViewportScroller);
+
+  protected readonly oneTimeSectionId = ONE_TIME_SECTION_ID;
 
   protected readonly isAuthenticated = this.#authStore.isAuthenticated;
   protected readonly settingsRoute = `/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingSettings}`;
@@ -119,9 +128,10 @@ export class PricingPageComponent implements OnInit {
     () => this.store.working() || !this.paymentsAvailable()
   );
 
-  // The plan that grants the caller access now. Free is the implicit default
-  // for an authenticated user whose subscription grants nothing, for example
-  // an unpaid `incomplete` checkout.
+  // The plan that grants the caller access now: the entitled subscription,
+  // else pay as you go while the credit balance is above 0, else Free. Free
+  // is the default for an authenticated user whose subscription grants
+  // nothing, for example an unpaid `incomplete` checkout.
   protected readonly currentPlanKey = computed(() => {
     if (!this.isAuthenticated()) return null;
 
@@ -129,19 +139,22 @@ export class PricingPageComponent implements OnInit {
 
     if (sub && this.store.hasActiveSubscription()) return sub.planKey;
 
-    return FREE_PLAN_KEY;
+    return this.store.payAsYouGoActive()
+      ? PAY_AS_YOU_GO_PLAN_KEY
+      : FREE_PLAN_KEY;
   });
 
   /**
-   * The paid mode on show: the mode of the entitled subscription, else the
-   * subscription tiers. The toggle overrides it until the subscription changes.
+   * The paid mode on show: the mode of the entitled subscription, pay as you
+   * go while it is on, else the subscription tiers. The toggle overrides it
+   * until the state changes.
    */
   protected readonly paidMode = linkedSignal<BillingMode>(() => {
     const sub = this.store.subscription();
 
-    return sub && this.store.hasActiveSubscription()
-      ? sub.billingMode
-      : 'fixed';
+    if (sub && this.store.hasActiveSubscription()) return sub.billingMode;
+
+    return this.store.payAsYouGoActive() ? 'usage' : 'fixed';
   });
 
   readonly #paidPlans = computed(() =>
@@ -184,12 +197,12 @@ export class PricingPageComponent implements OnInit {
   );
 
   #priced(plan: PlanResponse): PricedPlan {
-    const price = planPriceFor(plan, this.displayProvider());
-    // A usage plan has no flat fee: the card shows the price of one unit.
-    const amountMinor =
-      plan.billingMode === 'usage'
-        ? (price?.unitPriceMinor ?? 0)
-        : (price?.amountMinor ?? 0);
+    // Pay as you go has no price of its own: the credit packs price a unit.
+    const payAsYouGo = plan.key === PAY_AS_YOU_GO_PLAN_KEY;
+    const price = payAsYouGo
+      ? lowestUnitPrice(this.store.products(), this.displayProvider())
+      : planPriceFor(plan, this.displayProvider());
+    const format = payAsYouGo ? formatUnitPrice : formatMoney;
 
     return {
       key: plan.key,
@@ -197,11 +210,13 @@ export class PricingPageComponent implements OnInit {
       featured: plan.key === 'pro',
       current: plan.key === this.currentPlanKey(),
       price: price
-        ? formatMoney(amountMinor, price.currency, this.#lang())
+        ? format(price.amountMinor, price.currency, this.#lang())
         : '',
-      actionKey: this.store.hasActiveSubscription()
-        ? 'billing.settings.changePlan'
-        : 'billing.pricing.choose'
+      actionKey: payAsYouGo
+        ? 'billing.pricing.topUpCredits'
+        : this.store.hasActiveSubscription()
+          ? 'billing.settings.changePlan'
+          : 'billing.pricing.choose'
     };
   }
 
@@ -249,6 +264,13 @@ export class PricingPageComponent implements OnInit {
       void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
         queryParams: { returnUrl: `/${AppRouteSegmentEnum.Billing}` }
       });
+
+      return;
+    }
+
+    // Pay as you go starts with a credit pack from the one-time section.
+    if (planKey === PAY_AS_YOU_GO_PLAN_KEY) {
+      this.#scroller.scrollToAnchor(ONE_TIME_SECTION_ID);
 
       return;
     }

@@ -64,6 +64,59 @@ export function productPriceFor(
 }
 
 /**
+ * The lowest price of one credit unit among the credit packs, in minor units
+ * (a fraction is kept: a unit can cost less than one minor unit), with its
+ * currency. Pay as you go has no price of its own: a unit costs what the packs
+ * charge for it. Null when no pack carries a price for the provider.
+ */
+export function lowestUnitPrice(
+  products: readonly ProductResponse[],
+  provider: BillingProviderId
+): { amountMinor: number; currency: string } | null {
+  const perUnit = products
+    .filter((product) => product.type === 'credits' && product.grant?.credits)
+    .flatMap((product) => {
+      const price = productPriceFor(product, provider);
+      const credits = product.grant?.credits ?? 0;
+
+      return price?.amountMinor
+        ? [
+            {
+              amountMinor: price.amountMinor / credits,
+              currency: price.currency
+            }
+          ]
+        : [];
+    })
+    .toSorted((a, b) => a.amountMinor - b.amountMinor);
+
+  return perUnit[0] ?? null;
+}
+
+/**
+ * Format the price of one unit, which can be a fraction of a minor unit
+ * ($0.008): up to two digits more than the currency uses.
+ */
+export function formatUnitPrice(
+  amountMinor: number,
+  currency: string,
+  locale: string
+): string {
+  const scale =
+    new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency
+    }).resolvedOptions().maximumFractionDigits ?? 2;
+
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: scale,
+    maximumFractionDigits: scale + 2
+  }).format(amountMinor / 10 ** scale);
+}
+
+/**
  * Format a credit-unit count with locale-aware digit grouping (e.g. 1240 →
  * "1,240" / "1 240"). Negative balances keep their sign — a refund clawback
  * may overdraw the balance and the figure must say so.

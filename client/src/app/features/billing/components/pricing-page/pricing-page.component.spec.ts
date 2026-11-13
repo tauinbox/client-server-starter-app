@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
+import { ViewportScroller } from '@angular/common';
 import type {
   BillingRegionResponse,
   PlanResponse,
@@ -58,6 +59,18 @@ const reportPack: ProductResponse = {
   updatedAt: '2024-01-01T00:00:00.000Z'
 };
 
+function creditPack(credits: number, amountMinor: number): ProductResponse {
+  return {
+    ...reportPack,
+    id: `prod-credits-${credits}`,
+    key: `credits-${credits}`,
+    name: `${credits} credits`,
+    type: 'credits',
+    prices: { paddle: { currency: 'USD', amountMinor } },
+    grant: { credits }
+  };
+}
+
 const donation: ProductResponse = {
   id: 'prod-donation',
   key: 'donation',
@@ -80,6 +93,7 @@ describe('PricingPageComponent', () => {
     products: ReturnType<typeof signal<ProductResponse[]>>;
     subscription: ReturnType<typeof signal<SubscriptionResponse | null>>;
     hasActiveSubscription: ReturnType<typeof signal<boolean>>;
+    payAsYouGoActive: ReturnType<typeof signal<boolean>>;
     region: ReturnType<typeof signal<BillingRegionResponse | null>>;
     pageLoading: ReturnType<typeof signal<boolean>>;
     working: ReturnType<typeof signal<boolean>>;
@@ -109,6 +123,7 @@ describe('PricingPageComponent', () => {
       products: signal<ProductResponse[]>(products),
       subscription: signal<SubscriptionResponse | null>(null),
       hasActiveSubscription: signal(false),
+      payAsYouGoActive: signal(false),
       region: signal<BillingRegionResponse | null>(null),
       pageLoading: signal(false),
       working: signal(false),
@@ -234,7 +249,7 @@ describe('PricingPageComponent', () => {
   });
 
   it('switches the paid tiers between the subscription and pay as you go', async () => {
-    await setup(true);
+    await setup(true, [creditPack(500, 50000), creditPack(1000, 90000)]);
     storeMock.plans.update((plans) => [...plans, usagePlan]);
     fixture.detectChanges();
 
@@ -249,18 +264,23 @@ describe('PricingPageComponent', () => {
 
     expect(renderedCards()).toEqual([
       { name: 'Free', current: true, action: null },
-      { name: 'Pay as you go', current: false, action: 'Choose' }
+      { name: 'Pay as you go', current: false, action: 'Top up credits' }
     ]);
+    // The cheapest pack prices a unit: 90000 minor units for 1000 credits.
     expect(
-      fixture.nativeElement.querySelector('nxs-plan-card .interval')
-    ).not.toBeNull();
+      fixture.nativeElement.querySelector('.paid-grid .plan-price')?.textContent
+    ).toMatch(/from\s*\$0\.90\s*\/ unit/);
     expect(
       fixture.nativeElement.querySelector('.usage-how')?.textContent
-    ).toContain('How pay as you go works');
+    ).toContain('All capabilities work while your balance is above 0.');
   });
 
-  it('starts a checkout of the usage plan for a Free user', async () => {
-    await setup(true);
+  it('sends a Free user to the credit packs instead of a checkout of pay as you go', async () => {
+    await setup(true, [creditPack(500, 50000)]);
+    const scroll = vi
+      .spyOn(TestBed.inject(ViewportScroller), 'scrollToAnchor')
+      .mockReturnValue(undefined);
+
     storeMock.plans.update((plans) => [...plans, usagePlan]);
     fixture.detectChanges();
     chooseMode('Pay as you go');
@@ -269,19 +289,23 @@ describe('PricingPageComponent', () => {
       .querySelector<HTMLButtonElement>('.paid-grid .plan-action button')!
       .click();
 
-    expect(storeMock.checkout).toHaveBeenCalledWith('usage');
+    expect(scroll).toHaveBeenCalledWith('one-time-purchases');
+    expect(storeMock.checkout).not.toHaveBeenCalled();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '#one-time-purchases'
+      )
+    ).not.toBeNull();
   });
 
-  it('opens on the pay as you go tiers for a usage subscriber', async () => {
+  it('opens on the pay as you go tiers while the credit balance keeps it on', async () => {
     await setup(true);
     storeMock.plans.update((plans) => [...plans, usagePlan]);
-    showSubscription('active', true, {
-      planKey: 'usage',
-      billingMode: 'usage'
-    });
+    storeMock.payAsYouGoActive.set(true);
+    fixture.detectChanges();
 
     expect(renderedCards()).toEqual([
-      { name: 'Free', current: false, action: 'Switch to the free plan' },
+      { name: 'Free', current: false, action: 'Choose' },
       { name: 'Pay as you go', current: true, action: null }
     ]);
   });

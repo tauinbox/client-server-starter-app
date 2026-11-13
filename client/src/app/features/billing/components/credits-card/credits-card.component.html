@@ -26,6 +26,14 @@
       <p class="credits-hint">
         {{ t('billing.settings.creditsZeroHint') }}
       </p>
+    } @else if (subscribed()) {
+      <p class="credits-hint">
+        {{ t('billing.settings.creditsWaitingHint') }}
+      </p>
+    } @else {
+      <p class="credits-hint active">
+        {{ t('billing.settings.creditsActiveHint') }}
+      </p>
     }
 
     <div class="credits-actions">

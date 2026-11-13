@@ -85,7 +85,18 @@ export const BillingStore = signalStore(
       return (
         sub !== null && ENTITLED_SUBSCRIPTION_STATUSES.includes(sub.status)
       );
-    })
+    }),
+    /** The credit balance in units; a never-bought balance is 0. */
+    creditUnits: computed(() => store.credits()?.balanceUnits ?? 0)
+  })),
+  withComputed((store) => ({
+    /**
+     * True while pay as you go is on: no entitled subscription and a credit
+     * balance above 0, the rule of the server entitlement resolver.
+     */
+    payAsYouGoActive: computed(
+      () => !store.hasActiveSubscription() && store.creditUnits() > 0
+    )
   })),
   withMethods((store) => {
     const billing = inject(BillingService);
@@ -130,10 +141,24 @@ export const BillingStore = signalStore(
       }
     }
 
+    async function loadCredits(): Promise<void> {
+      try {
+        const credits = await firstValueFrom(billing.getCredits());
+
+        patchState(store, { credits });
+      } catch (error) {
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.store.errorLoadFailed'
+        );
+      }
+    }
+
     /**
-     * Pricing page: plans always; region, current subscription and the
-     * one-time catalog only when authenticated (those endpoints require auth;
-     * the subscription drives the "Current" badge on the matching tier).
+     * Pricing page: plans always; region, current subscription, credits and
+     * the one-time catalog only when authenticated (those endpoints require
+     * auth; the subscription and the credits drive the "Current" badge, and
+     * the credit packs price pay as you go).
      */
     async function loadPricing(authenticated: boolean): Promise<void> {
       patchState(store, { pageLoading: true });
@@ -141,6 +166,7 @@ export const BillingStore = signalStore(
         loadPlans(),
         authenticated ? loadRegion() : Promise.resolve(),
         authenticated ? refreshSubscription() : Promise.resolve(),
+        authenticated ? loadCredits() : Promise.resolve(),
         authenticated ? loadProducts() : Promise.resolve()
       ]);
       patchState(store, { pageLoading: false });

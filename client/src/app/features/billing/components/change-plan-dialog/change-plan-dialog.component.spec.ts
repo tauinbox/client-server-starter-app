@@ -137,7 +137,7 @@ describe('ChangePlanDialogComponent', () => {
     billingMock = { previewChange: vi.fn().mockReturnValue(of(splitPreview)) };
   });
 
-  it('lists same-mode targets excluding the current plan and Free', () => {
+  it('lists targets excluding the current plan, Free and pay as you go', () => {
     createComponent();
 
     const names = optionButtons().map((btn) =>
@@ -216,17 +216,15 @@ describe('ChangePlanDialogComponent', () => {
     expect(dueNow.textContent).toContain('430');
   });
 
-  it('auto-selects the single usage target when switching mode', () => {
+  it('never offers pay as you go, which starts with a credit pack', () => {
     createComponent();
 
-    fixture.componentInstance.setMode('usage');
-    fixture.detectChanges();
-
-    expect(billingMock.previewChange).toHaveBeenCalledWith('usage');
-    const options = optionButtons();
-
-    expect(options).toHaveLength(1);
-    expect(options[0].classList.contains('selected')).toBe(true);
+    expect(nativeEl().querySelector('mat-button-toggle-group')).toBeNull();
+    expect(
+      optionButtons().map((btn) =>
+        btn.querySelector('.option-name')?.textContent?.trim()
+      )
+    ).not.toContain('Pay as you go');
   });
 
   it('disables confirm and shows an error when the preview fails', () => {
@@ -335,8 +333,6 @@ describe('ChangePlanDialogComponent', () => {
         currentPlan: plans[3]
       });
 
-      fixture.componentInstance.setMode('fixed');
-      fixture.detectChanges();
       optionButtons()[0].click();
       fixture.detectChanges();
 
@@ -359,8 +355,6 @@ describe('ChangePlanDialogComponent', () => {
         currentPlan: plans[3]
       });
 
-      fixture.componentInstance.setMode('fixed');
-      fixture.detectChanges();
       optionButtons()[0].click();
       fixture.detectChanges();
 
@@ -376,8 +370,6 @@ describe('ChangePlanDialogComponent', () => {
         currentPlan: plans[3]
       });
 
-      fixture.componentInstance.setMode('fixed');
-      fixture.detectChanges();
       optionButtons()[0].click();
       fixture.detectChanges();
 

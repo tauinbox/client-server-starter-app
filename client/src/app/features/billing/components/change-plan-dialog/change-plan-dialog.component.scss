@@ -31,19 +31,6 @@
   }
 }
 
-.mode-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: vars.$spacing-sm;
-  align-items: center;
-  margin-bottom: vars.$spacing-md;
-
-  .mode-label {
-    font-size: vars.$font-size-sm;
-    color: var(--mat-sys-on-surface-variant);
-  }
-}
-
 .plan-options {
   display: flex;
   flex-direction: column;

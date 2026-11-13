@@ -805,19 +805,20 @@ the same permission both apply.
   stacked cards on a handset, and the two layouts have an infinite scroll.
 - **Free, subscription or pay as you go.** The pricing page shows the Free card and a "Paid plans"
   block with a "Subscription | Pay as you go" toggle: the subscription shows the fixed tiers, pay as
-  you go shows the metered `usage` plan at its price for each unit and how it is billed. The toggle
-  opens on the mode of the entitled subscription. Free is not purchasable: checkout and plan change
-  refuse it with 422 `errors.billing.freePlanNotPurchasable`, and the Free card of a subscriber
-  ("Switch to the free plan") opens the cancel confirmation of the settings page. A YooKassa checkout of the
-  usage plan binds the card with a zero-amount payment and no fiscal receipt, as a trial does. `GET /api/v1/billing/usage` returns the meter of the metered window of the current
-  period for the caller. After a switch of billing mode, the window starts at the switch. It gives the total units, the included units, the billable units and the accrued amount.
-- **Usage meter.** The billing settings page shows a usage card for the current period of an entitled
-  usage-mode subscription (not an unpaid `incomplete` one). It has a large unit readout. It has a quota gauge when the plan includes units, where
-  the used quota is in the primary tone and the overage is in the error tone. It ends with a money
-  mini-ledger, which multiplies the billable units by the unit price and shows the accrued amount. A
-  pure pay-as-you-go plan has no gauge.
-- **Plan change with proration.** The change-plan dialog in the billing settings selects a billing
-  mode (subscription or pay as you go) and a target paid plan; Free is not a target. Then it shows a live proration mini-ledger from
+  you go shows the pay-as-you-go card. Pay as you go is prepaid: a credit balance above 0, with no
+  subscription, opens every capability, each use takes credits, and the capabilities stop at 0. The
+  card shows "from <price> / unit", the lowest unit price of the credit packs, and its "Top up
+  credits" action scrolls to the credit packs. The toggle opens on the mode of the entitled
+  subscription, or on pay as you go while it is on. Free and pay as you go are not purchasable as
+  plans: checkout and plan change refuse them with 422 `errors.billing.freePlanNotPurchasable` and
+  `errors.billing.payAsYouGoIsPrepaid`, and the Free card of a subscriber ("Switch to the free
+  plan") opens the cancel confirmation of the settings page. `GET /api/v1/billing/usage` returns the
+  credit units that metered uses took in the current calendar month.
+- **Usage meter.** The billing settings page shows a usage card with the units that metered uses
+  took from the credits this month, when the caller has credits or spent some this month. The
+  credits card states the pay-as-you-go status: on, off, or waiting while a plan is active.
+- **Plan change with proration.** The change-plan dialog in the billing settings selects a target
+  subscription plan; Free and pay as you go are not targets. Then it shows a live proration mini-ledger from
   `/change/preview`. For YooKassa the ledger shows a credit line, a charge line and a bold "Due now"
   line. For Paddle it shows the net amount, because the provider settles the two parts. A negative net
   amount reads "Refund due". A switch from a usage plan to a fixed plan shows a note that the metered
@@ -1709,9 +1710,9 @@ update go there. "Pay" settles the payment and returns to the client, thus these
 by hand on `npm start` in `client/` with the mock.
 
 The mock also serves a billing lab page at `/api/__mock-billing`, through the same dev proxy. It
-puts a user in a billing state (Free; Pro or Business active; pay as you go, with or without
-recorded units; a Pro trial; Pro past due; Pro with a cancel at the period end) on YooKassa or
-Paddle. It also records usage, adds credits, runs the renewal clock (a charge that succeeds, or one
+puts a user in a billing state (Free; Pro or Business active; pay as you go with a balance of 0
+or 500; a Pro trial; Pro past due; Pro with a cancel at the period end) on YooKassa or
+Paddle. It also uses units from the credits, adds credits, runs the renewal clock (a charge that succeeds, or one
 that fails into dunning), sets the trial days of a paid plan, turns a provider on or off and resets
 the state. Sign in to the app in another tab, change the state on the page, then reload `/billing`.
 

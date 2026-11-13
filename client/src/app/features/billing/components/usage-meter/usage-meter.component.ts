@@ -10,13 +10,12 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { UsageSummaryResponse } from '@app/shared/types';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
-import { formatMoney, formatUnits } from '../../utils/billing-format';
+import { formatUnits } from '../../utils/billing-format';
 
 /**
- * Current-period usage meter. Plans with included units get a
- * quota gauge — used quota in the primary tone, overage in the error tone;
- * pure pay-as-you-go plans (no included units) skip the gauge since there is
- * no cap to measure against. The money mini-ledger ends in the accrued amount.
+ * Pay-as-you-go usage meter: the credit units that metered uses took in the
+ * current calendar month (design §22.5). Each use is paid when it happens, so
+ * there is no amount due.
  */
 @Component({
   selector: 'nxs-usage-meter',
@@ -33,48 +32,7 @@ export class UsageMeterComponent {
     initialValue: this.#transloco.getActiveLang()
   });
 
-  protected readonly hasQuota = computed(() => this.usage().includedUnits > 0);
-  protected readonly hasOverage = computed(
-    () => this.usage().billableUnits > 0
-  );
-
-  // Gauge scale: the quota while under it, the actual total once over — the
-  // bar reads "how full" below quota and "how much is overage" above it.
-  readonly #scale = computed(() =>
-    Math.max(this.usage().totalUnits, this.usage().includedUnits)
-  );
-
-  protected readonly includedPct = computed(() => {
-    const { totalUnits, includedUnits } = this.usage();
-
-    return (Math.min(totalUnits, includedUnits) / this.#scale()) * 100;
-  });
-
-  protected readonly overagePct = computed(
-    () => (this.usage().billableUnits / this.#scale()) * 100
-  );
-
-  protected readonly totalLabel = computed(() =>
-    formatUnits(this.usage().totalUnits, this.#lang())
-  );
-
-  protected readonly includedLabel = computed(() =>
-    formatUnits(this.usage().includedUnits, this.#lang())
-  );
-
-  protected readonly billableLabel = computed(() =>
-    formatUnits(this.usage().billableUnits, this.#lang())
-  );
-
-  protected readonly unitPriceLabel = computed(() =>
-    formatMoney(
-      this.usage().unitPriceMinor,
-      this.usage().currency,
-      this.#lang()
-    )
-  );
-
-  protected readonly accruedLabel = computed(() =>
-    formatMoney(this.usage().amountMinor, this.usage().currency, this.#lang())
+  protected readonly spentLabel = computed(() =>
+    formatUnits(this.usage().unitsSpent, this.#lang())
   );
 }
