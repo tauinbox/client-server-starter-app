@@ -937,6 +937,10 @@ images from `cdn.paddle.com` and `sandbox-cdn.paddle.com`, and the checkout fram
 
 `YooKassaProvider` is the true YooKassa client, and it is self-managed:
 
+- Each receipt line states `payment_subject = service` and a `payment_mode` from
+  `ReceiptItem.paymentMode`: a credit pack is `full_prepayment`, every other charge is
+  `full_payment`. A payment with a receipt keeps the mode in its metadata (`receiptPaymentMode`),
+  and `refund` states that mode on the refund receipt (`full_payment` when the key is absent).
 - `startCheckout` calls `createPayment` with `save_payment_method` and a redirect. A trial uses a
   zero-amount binding. The caller decides the trial: a customer gets one trial, thus a checkout
   after `billing_customers.trial_used_at` is set charges the full price with a receipt.
