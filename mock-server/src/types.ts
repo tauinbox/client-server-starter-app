@@ -331,7 +331,8 @@ export interface MockPaymentMethod {
 export interface MockUsageRecord {
   id: string;
   customerId: string;
-  subscriptionId: string;
+  // Null for a use paid from credits, which belongs to no subscription.
+  subscriptionId: string | null;
   meterKey: string;
   quantity: number;
   occurredAt: string;

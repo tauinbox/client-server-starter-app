@@ -115,10 +115,10 @@ export type CustomerGrantResponse = {
 };
 
 /**
- * The customer's prepaid credit balance (credit packs). Topped up by paid
- * `credits` purchases, spent by metered usage before money is charged. A
- * refund of already-spent credits may drive it negative — usage recording is
- * blocked until the balance is topped up back above zero.
+ * The customer's prepaid credit balance (credit packs): the pay-as-you-go
+ * wallet. Topped up by paid `credits` purchases, taken by each metered use. A
+ * balance above zero opens the capabilities of the pay-as-you-go plan. A refund
+ * of already-spent credits may drive it negative; a use then needs a top-up.
  */
 export type CreditBalanceResponse = {
   customerId: string;
@@ -219,44 +219,43 @@ export type InvoiceResponse = {
 
 /**
  * A single metered-usage record on the wire. `idempotencyKey` is an internal
- * dedup token (`@Exclude`d server-side) and is intentionally absent.
- *
- * `pricedByCurrentPlan` is a verdict about *now*, not a permanent property of
- * the record: it says whether the customer's plan at this moment prices this
- * meter. Ingest accepts any meter the catalog declares, so a `false` means the
- * units are stored and will not bill under the current plan - the caller
- * mis-keyed the producer, or the customer is not on the plan that prices it
- * yet. Rating re-decides from the plan in force when the period closes.
+ * dedup token (`@Exclude`d server-side) and is intentionally absent. A use paid
+ * from credits has no subscription.
  */
 export type UsageResponse = {
   id: string;
   customerId: string;
-  subscriptionId: string;
+  subscriptionId: string | null;
   meterKey: string;
   quantity: number;
   occurredAt: string;
   recordedAt: string;
-  pricedByCurrentPlan: boolean;
 };
 
 /**
- * Result of `GET /billing/usage` — the caller's metered usage aggregated over
- * the current billing period of their usage-mode subscription (null when there
- * is no open usage subscription). `billableUnits` is the overage beyond the
- * plan's included units; `amountMinor` is what that overage costs at the
- * plan's unit price.
+ * Result of `POST /admin/billing/usage`. `debited` is false when the plan of
+ * the subscription of the customer has the capability of the meter: the use is
+ * free, and no record is written (`recordId` is null). `replayed` is true when
+ * the idempotency key was already used with the same body; the first record
+ * answers and nothing is debited again. `balanceAfter` is the credit balance
+ * after this call.
+ */
+export type MeteringResponse = {
+  recordId: string | null;
+  debited: boolean;
+  replayed: boolean;
+  balanceAfter: number;
+};
+
+/**
+ * Result of `GET /billing/usage`: the credit units that metered uses took in
+ * the current calendar month (UTC). Null when the caller has no billing
+ * customer.
  */
 export type UsageSummaryResponse = {
-  subscriptionId: string;
-  meterKey: string | null;
   periodStart: string;
   periodEnd: string;
-  totalUnits: number;
-  includedUnits: number;
-  billableUnits: number;
-  unitPriceMinor: number;
-  amountMinor: number;
-  currency: string;
+  unitsSpent: number;
 };
 
 /**

@@ -162,24 +162,28 @@ function makeManager(stores: Stores) {
       return Promise.resolve(entity);
     },
     // Stands in for CreditService's balance upsert (the only raw SQL in the
-    // billing reduce path): params are [customerId, delta].
+    // billing reduce path): params are [customerId, delta], and it returns
+    // the new balance as the `RETURNING` row.
     query: (_sql: string, params: [string, number]) => {
       const [customerId, delta] = params;
-      const balance = stores.creditBalances.find(
+      let balance = stores.creditBalances.find(
         (b) => b.customerId === customerId
       );
 
       if (balance) {
         balance.balanceUnits = balance.balanceUnits.add(Money.fromMinor(delta));
       } else {
-        stores.creditBalances.push({
+        balance = {
           customerId,
           balanceUnits: Money.fromMinor(delta),
           updatedAt: new Date()
-        });
+        };
+        stores.creditBalances.push(balance);
       }
 
-      return Promise.resolve(undefined);
+      return Promise.resolve([
+        { balance_units: balance.balanceUnits.toMinorString() }
+      ]);
     },
     createQueryBuilder: (entity?: unknown) => {
       if (entity === Invoice) {

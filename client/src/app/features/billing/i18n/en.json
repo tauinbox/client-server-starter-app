@@ -12,12 +12,14 @@
     "paidTitle": "Paid plans",
     "switchToFree": "Switch to the free plan",
     "freeFrom": "From {{ date }}",
+    "from": "from",
+    "topUpCredits": "Top up credits",
     "usageHow": {
       "title": "How pay as you go works",
-      "noFee": "No monthly fee: you pay only for the units you use.",
-      "billing": "The bill comes at the end of each period.",
-      "credits": "Prepaid credits are spent first.",
-      "switch": "You can switch to a subscription at any time."
+      "prepaid": "You pay first: buy a credit pack. There is no monthly fee.",
+      "perUse": "Each use takes units from your credits.",
+      "allCapabilities": "All capabilities work while your balance is above 0.",
+      "stopsAtZero": "They stop when the balance reaches 0. Top up to continue."
     }
   },
   "mode": {
@@ -129,8 +131,11 @@
     "paymentMethodUpdated": "Payment method updated.",
     "credits": "Credits",
     "creditsUnits": "units",
-    "creditsZeroHint": "0 credits — top up to cover metered usage.",
-    "creditsNegativeHint": "Balance overdrawn by a refund — usage is paused until you top up.",
+    "creditsZeroHint": "Pay as you go is off. Top up your credits to turn it on.",
+    "creditsNegativeHint": "A refund overdrew the balance. Pay as you go is off until you top up.",
+    "creditsActiveHint": "Pay as you go is on: all capabilities work while your balance is above 0.",
+    "creditsWaitingHint": "Your credits wait while your plan is active. Pay as you go starts when the plan ends.",
+    "payAsYouGoOn": "Pay as you go is on. Each use takes credits.",
     "buyCredits": "Buy credits",
     "topUpCredits": "Top up",
     "invoices": "Invoices",
@@ -144,15 +149,9 @@
     "errorPaymentFormUnavailable": "Could not open the payment form. Please try again later."
   },
   "usage": {
-    "title": "Usage this period",
-    "empty": "No usage yet this period.",
-    "unitsUsed": "units used",
-    "ofIncluded": "of {{ included }} included",
-    "gaugeLabel": "Usage against included units",
-    "billableUnits": "Billable units",
-    "unitPrice": "Unit price",
-    "accrued": "Accrued this period",
-    "billedAtPeriodEnd": "Billed at period end"
+    "title": "Usage this month",
+    "empty": "No usage yet this month.",
+    "unitsUsed": "units taken from your credits"
   },
   "checkout": {
     "processingTitle": "Confirming your subscription…",

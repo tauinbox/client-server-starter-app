@@ -203,17 +203,16 @@
       }
     },
     {
-      "name": "an admin records usage",
+      "name": "an admin records a use, which takes its units from the credits",
       "route": "POST /api/v1/admin/billing/usage",
       "actor": "admin",
       "auth": "bearer",
       "state": [
-        "subscription",
-        "metered-plan"
+        "credits"
       ],
       "body": {
         "customerId": "$customerId",
-        "meterKey": "$meterKey",
+        "meterKey": "api_calls",
         "quantity": 5,
         "idempotencyKey": "scenario-usage"
       },
@@ -226,17 +225,16 @@
       }
     },
     {
-      "name": "a repeat with the same idempotency key answers the first record and writes no second row",
+      "name": "a repeat with the same idempotency key answers the first record and debits once",
       "route": "POST /api/v1/admin/billing/usage",
       "actor": "admin",
       "auth": "bearer",
       "state": [
-        "subscription",
-        "metered-plan"
+        "credits"
       ],
       "body": {
         "customerId": "$customerId",
-        "meterKey": "$meterKey",
+        "meterKey": "api_calls",
         "quantity": 5,
         "idempotencyKey": "scenario-usage"
       },
@@ -255,13 +253,12 @@
       "actor": "admin",
       "auth": "bearer",
       "state": [
-        "subscription",
-        "metered-plan",
+        "credits",
         "usage-record"
       ],
       "body": {
         "customerId": "$customerId",
-        "meterKey": "$meterKey",
+        "meterKey": "api_calls",
         "quantity": 6,
         "idempotencyKey": "scenario-usage"
       },
@@ -272,12 +269,12 @@
       }
     },
     {
-      "name": "usage on a meter that no plan declares is refused",
+      "name": "usage on a meter outside the meter catalog is refused",
       "route": "POST /api/v1/admin/billing/usage",
       "actor": "admin",
       "auth": "bearer",
       "state": [
-        "subscription"
+        "credits"
       ],
       "body": {
         "customerId": "$customerId",
@@ -292,22 +289,43 @@
       }
     },
     {
-      "name": "usage of a customer with no active subscription is refused",
+      "name": "a use that the credit balance does not cover is refused",
       "route": "POST /api/v1/admin/billing/usage",
       "actor": "admin",
       "auth": "bearer",
       "state": [
-        "metered-plan"
+        "customer"
       ],
       "body": {
-        "customerId": "b5b2c1d0-3f4e-4a6b-9c8d-7e6f5a4b3c2d",
-        "meterKey": "$meterKey",
+        "customerId": "$customerId",
+        "meterKey": "api_calls",
         "quantity": 5,
         "idempotencyKey": "scenario-usage"
       },
       "expect": {
         "status": 409,
-        "errorKey": "errors.billing.customerNoActiveSubscription",
+        "errorKey": "errors.billing.insufficientCredits",
+        "audit": []
+      }
+    },
+    {
+      "name": "a use of a subscriber whose plan has the capability of the meter is free and writes no row",
+      "route": "POST /api/v1/admin/billing/usage",
+      "actor": "admin",
+      "auth": "bearer",
+      "state": [
+        "api-access-plan",
+        "subscription"
+      ],
+      "body": {
+        "customerId": "$customerId",
+        "meterKey": "api_calls",
+        "quantity": 5,
+        "idempotencyKey": "scenario-usage"
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
         "audit": []
       }
     }

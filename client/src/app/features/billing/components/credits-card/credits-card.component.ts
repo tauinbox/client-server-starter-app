@@ -16,10 +16,12 @@ import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { formatUnits } from '../../utils/billing-format';
 
 /**
- * Prepaid-credit wallet card for the billing settings page (design §21.2).
- * A never-bought balance reads as zero; a refund clawback can overdraw it,
- * which pauses usage recording until topped up — the card must say so. The
- * buy/top-up action leads to the credit packs on the pricing page.
+ * Prepaid-credit wallet card for the billing settings page (design §21.2 and
+ * §22.5). The balance is the pay-as-you-go status: above 0 with no entitled
+ * subscription, every capability works; at 0 or below, pay as you go is off. A
+ * never-bought balance reads as zero; a refund clawback can overdraw it. A
+ * subscriber's credits wait for the end of the plan. The buy/top-up action
+ * leads to the credit packs on the pricing page.
  */
 @Component({
   selector: 'nxs-credits-card',
@@ -37,6 +39,8 @@ import { formatUnits } from '../../utils/billing-format';
 })
 export class CreditsCardComponent {
   readonly credits = input.required<CreditBalanceResponse | null>();
+  /** True while an entitled subscription is in force: the credits wait. */
+  readonly subscribed = input(false);
 
   readonly #transloco = inject(TranslocoService);
   readonly #lang = toSignal(this.#transloco.langChanges$, {

@@ -208,7 +208,7 @@ function tokenOf(tokens: Map<string, MockIssuedToken>, userId: string) {
   return found[0];
 }
 
-function addFixedPlan(key: string): Promise<void> {
+function addFixedPlan(key: string, entitlements: string[] = []): Promise<void> {
   const now = new Date().toISOString();
   const id = randomUUID();
 
@@ -220,7 +220,7 @@ function addFixedPlan(key: string): Promise<void> {
     billingMode: 'fixed',
     interval: 'month',
     meterKey: null,
-    entitlements: [],
+    entitlements,
     limits: null,
     trialDays: 0,
     active: true,
@@ -530,28 +530,16 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     return Promise.resolve();
   },
-  'metered-plan': (ctx) => {
-    const now = new Date().toISOString();
-    const id = randomUUID();
+  'api-access-plan': (ctx) =>
+    addFixedPlan(ctx.values.$meterKey!, ['api-access']),
+  credits: async (ctx) => {
+    if (!ctx.values.$customerId) await STATES.customer(ctx);
 
-    getState().plans.set(id, {
-      id,
-      key: ctx.values.$meterKey!,
-      name: 'Scenario plan',
-      description: null,
-      billingMode: 'usage',
-      interval: 'month',
-      meterKey: ctx.values.$meterKey!,
-      entitlements: [],
-      limits: null,
-      trialDays: 0,
-      active: true,
-      prices: {},
-      createdAt: now,
-      updatedAt: now
+    getState().billingCreditBalances.set(ctx.values.$customerId!, {
+      customerId: ctx.values.$customerId!,
+      balanceUnits: 10,
+      updatedAt: new Date().toISOString()
     });
-
-    return Promise.resolve();
   },
   'usage-record': (ctx) => {
     const now = new Date().toISOString();
@@ -560,8 +548,8 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     getState().billingUsageRecords.set(id, {
       id,
       customerId: ctx.values.$customerId!,
-      subscriptionId: ctx.values.$subscriptionId!,
-      meterKey: ctx.values.$meterKey!,
+      subscriptionId: null,
+      meterKey: 'api_calls',
       quantity: 5,
       occurredAt: now,
       idempotencyKey: 'scenario-usage',

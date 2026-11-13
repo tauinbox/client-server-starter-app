@@ -27,7 +27,7 @@ import { BillingAdminController } from '../src/modules/billing/controllers/billi
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
-import { UsageService } from '../src/modules/billing/services/usage.service';
+import { MeteringService } from '../src/modules/billing/services/metering.service';
 import { PermissionsGuard } from '../src/modules/auth/guards/permissions.guard';
 import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -73,7 +73,7 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
           useValue: { releaseHolds: () => Promise.resolve() }
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
-        { provide: UsageService, useValue: { record: jest.fn() } },
+        { provide: MeteringService, useValue: { consume: jest.fn() } },
         { provide: AuditService, useValue: audit },
         { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
         Reflector

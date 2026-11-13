@@ -86,11 +86,16 @@ export const STATE_FIXTURES = [
   'providers-disabled',
   /** A paid invoice of 1000 minor units of the `subscription`; `$invoiceId`. */
   'paid-invoice',
-  /** A plan with the key `$meterKey` that meters `$meterKey`. */
-  'metered-plan',
   /**
-   * A usage record of 5 units under `$meterKey` of the `subscription`, with
-   * the idempotency key `scenario-usage`.
+   * A fixed monthly plan `$meterKey` with the capability `api-access`, which
+   * the `api_calls` meter measures.
+   */
+  'api-access-plan',
+  /** A credit balance of 10 units of the `customer`. */
+  'credits',
+  /**
+   * A usage record of 5 units under `api_calls` of the `customer`, paid from
+   * credits, with the idempotency key `scenario-usage`.
    */
   'usage-record',
   /** A webhook event in `dead_letter`; `$webhookEventId`. */

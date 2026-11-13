@@ -92,6 +92,7 @@ export type {
   SubscriptionResponse,
   InvoiceResponse,
   UsageResponse,
+  MeteringResponse,
   UsageSummaryResponse,
   ProrationPreviewResponse,
   CheckoutSessionResponse,

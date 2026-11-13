@@ -83,7 +83,7 @@ const PLANS: SeedPlan[] = [
     billingMode: 'usage',
     interval: 'month',
     meterKey: 'api_calls',
-    entitlements: ['reports', 'api-access'],
+    entitlements: ['reports', 'api-access', 'data-export', 'priority-support'],
     limits: null,
     trialDays: 0,
     active: true,

@@ -22,6 +22,13 @@ export function freePlanNotPurchasable(): ApiError {
   );
 }
 
+export function payAsYouGoIsPrepaid(): ApiError {
+  return new ApiError(
+    ErrorKeys.BILLING.PAY_AS_YOU_GO_IS_PREPAID,
+    'Pay as you go works on prepayment. To start, top up your credits.'
+  );
+}
+
 export function currentPlanMissing(): ApiError {
   return new ApiError(
     ErrorKeys.BILLING.CURRENT_PLAN_MISSING,

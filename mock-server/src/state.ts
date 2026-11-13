@@ -38,7 +38,6 @@ import type {
   RoleAdminResponse,
   SubjectMaps
 } from '@app/shared/types';
-import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import {
   compileAbilityRules,
   dedupPermissions,
@@ -900,25 +899,6 @@ export function toInvoiceResponse(invoice: MockInvoice): InvoiceResponse {
   };
 }
 
-// Mirrors UsageService.stampPricing: the verdict follows the plan in force now,
-// not anything stored on the record, so it is resolved at serialization time.
-function pricedByCurrentPlan(record: MockUsageRecord): boolean {
-  const state = getState();
-  const [subscription] = [...state.billingSubscriptions.values()]
-    .filter(
-      (s) =>
-        s.customerId === record.customerId &&
-        ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
-    )
-    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  if (!subscription) return false;
-
-  const plan = state.plans.values().find((p) => p.key === subscription.planKey);
-
-  return plan?.meterKey === record.meterKey;
-}
-
 export function toUsageResponse(record: MockUsageRecord): UsageResponse {
   return {
     id: record.id,
@@ -927,8 +907,7 @@ export function toUsageResponse(record: MockUsageRecord): UsageResponse {
     meterKey: record.meterKey,
     quantity: record.quantity,
     occurredAt: record.occurredAt,
-    recordedAt: record.recordedAt,
-    pricedByCurrentPlan: pricedByCurrentPlan(record)
+    recordedAt: record.recordedAt
   };
 }
 

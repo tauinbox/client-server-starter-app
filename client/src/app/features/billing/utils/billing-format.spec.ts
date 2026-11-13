@@ -6,7 +6,9 @@ import type {
 import { minorUnitScale } from '@app/shared/utils/money';
 import {
   formatMoney,
+  formatUnitPrice,
   formatUnits,
+  lowestUnitPrice,
   parseAmountToMinor,
   planPriceFor,
   productPriceFor,
@@ -35,7 +37,61 @@ function makePlan(prices: PlanResponse['prices']): PlanResponse {
 const usd: PlanPrice = { currency: 'USD', amountMinor: 1200 };
 const rub: PlanPrice = { currency: 'RUB', amountMinor: 99000 };
 
+function creditPack(
+  credits: number,
+  prices: ProductResponse['prices']
+): ProductResponse {
+  return {
+    id: `prod-${credits}`,
+    key: `credits-${credits}`,
+    name: `${credits} credits`,
+    description: null,
+    type: 'credits',
+    prices,
+    grant: { credits },
+    active: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z'
+  };
+}
+
 describe('billing-format', () => {
+  describe('lowestUnitPrice and formatUnitPrice', () => {
+    // The seeded packs: 500 for 5.00, 1000 for 9.00, 5000 for 40.00.
+    const packs = [
+      creditPack(500, { paddle: { currency: 'USD', amountMinor: 500 } }),
+      creditPack(1000, { paddle: { currency: 'USD', amountMinor: 900 } }),
+      creditPack(5000, {
+        paddle: { currency: 'USD', amountMinor: 4000 },
+        yookassa: { currency: 'RUB', amountMinor: 400000 }
+      })
+    ];
+
+    it('keeps a unit price below one minor unit instead of rounding it to a cent', () => {
+      const price = lowestUnitPrice(packs, 'paddle');
+
+      expect(price).toEqual({ amountMinor: 0.8, currency: 'USD' });
+      expect(formatUnitPrice(price!.amountMinor, 'USD', 'en')).toBe('$0.008');
+    });
+
+    it('keeps the two currency digits for a whole price', () => {
+      expect(formatUnitPrice(80, 'RUB', 'en')).toBe(
+        formatMoney(80, 'RUB', 'en')
+      );
+      expect(formatUnitPrice(100, 'USD', 'en')).toBe('$1.00');
+    });
+
+    it('ignores products that are not credit packs and answers null with none', () => {
+      expect(lowestUnitPrice([], 'paddle')).toBeNull();
+      expect(
+        lowestUnitPrice(
+          [{ ...packs[0], type: 'sku', grant: { entitlement: 'reports' } }],
+          'paddle'
+        )
+      ).toBeNull();
+    });
+  });
+
   describe('formatMoney', () => {
     it('divides minor units by the 2-decimal scale for RUB/USD', () => {
       expect(formatMoney(99000, 'RUB', 'ru')).toContain('990');

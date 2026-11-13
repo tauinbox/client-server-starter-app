@@ -2,7 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { provideRouter, Router } from '@angular/router';
-import { signal } from '@angular/core';
+import { computed, signal, type Signal } from '@angular/core';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import type {
@@ -81,17 +81,16 @@ const invoice: InvoiceResponse = {
   updatedAt: '2026-06-01T00:00:00.000Z'
 };
 
+const creditsResponse: CreditBalanceResponse = {
+  customerId: 'cust-1',
+  balanceUnits: 0,
+  updatedAt: '2026-06-01T00:00:00.000Z'
+};
+
 const usageSummary: UsageSummaryResponse = {
-  subscriptionId: 'sub-1',
-  meterKey: 'api_calls',
   periodStart: '2026-06-01T00:00:00.000Z',
   periodEnd: '2026-07-01T00:00:00.000Z',
-  totalUnits: 142,
-  includedUnits: 100,
-  billableUnits: 42,
-  unitPriceMinor: 200,
-  amountMinor: 8400,
-  currency: 'USD'
+  unitsSpent: 142
 };
 
 describe('BillingSettingsComponent', () => {
@@ -111,6 +110,8 @@ describe('BillingSettingsComponent', () => {
     working: ReturnType<typeof signal<boolean>>;
     currentPlan: ReturnType<typeof signal<PlanResponse | null>>;
     hasActiveSubscription: ReturnType<typeof signal<boolean>>;
+    creditUnits: Signal<number>;
+    payAsYouGoActive: Signal<boolean>;
     loadSettings: ReturnType<typeof vi.fn>;
     loadMoreInvoices: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
@@ -152,16 +153,21 @@ describe('BillingSettingsComponent', () => {
       sessionsLimit?: number | null;
     } = {}
   ): Promise<void> {
+    const creditsSignal = signal<CreditBalanceResponse | null>(credits ?? null);
+    const creditUnits = computed(() => creditsSignal()?.balanceUnits ?? 0);
+
     storeMock = {
       subscription: signal<SubscriptionResponse | null>(
         hasSub ? (subscription ?? activeSub) : null
       ),
+      creditUnits,
+      payAsYouGoActive: computed(() => !hasSub && creditUnits() > 0),
       entities: signal<InvoiceResponse[]>(hasSub ? [invoice] : []),
       hasMore: signal(false),
       isLoadingMore: signal(false),
       paymentMethod: signal(null),
       usage: signal<UsageSummaryResponse | null>(usage ?? null),
-      credits: signal<CreditBalanceResponse | null>(credits ?? null),
+      credits: creditsSignal,
       plans: signal<PlanResponse[]>([proPlan]),
       region: signal<BillingRegionResponse | null>(null),
       pageLoading: signal(false),
@@ -309,11 +315,26 @@ describe('BillingSettingsComponent', () => {
     );
   });
 
-  it('renders the usage meter when a usage summary is present', async () => {
+  it('renders the usage meter when metered uses took credits this month', async () => {
     await setup(true, { usage: usageSummary });
     expect(
       fixture.nativeElement.querySelector('nxs-usage-meter')
     ).not.toBeNull();
+  });
+
+  it('renders the usage meter for a caller with credits and no use yet', async () => {
+    await setup(false, {
+      usage: { ...usageSummary, unitsSpent: 0 },
+      credits: { ...creditsResponse, balanceUnits: 500 }
+    });
+    expect(
+      fixture.nativeElement.querySelector('nxs-usage-meter')
+    ).not.toBeNull();
+  });
+
+  it('hides the usage meter with no credits and no use this month', async () => {
+    await setup(true, { usage: { ...usageSummary, unitsSpent: 0 } });
+    expect(fixture.nativeElement.querySelector('nxs-usage-meter')).toBeNull();
   });
 
   it('hides the usage meter without a usage summary', async () => {
@@ -324,6 +345,19 @@ describe('BillingSettingsComponent', () => {
   it('renders the empty state with no subscription', async () => {
     await setup(false);
     expect(fixture.nativeElement.querySelector('.empty-state')).not.toBeNull();
+  });
+
+  it('shows pay as you go as the plan while the balance is above 0 and no plan is active', async () => {
+    await setup(false, { credits: { ...creditsResponse, balanceUnits: 500 } });
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('.empty-state')).toBeNull();
+    expect(el.querySelector('.plan-summary .plan-name')?.textContent).toContain(
+      'Pay as you go'
+    );
+    expect(el.querySelector('.plan-summary')?.textContent).toContain(
+      'Pay as you go is on. Each use takes credits.'
+    );
   });
 
   it('renders the shared list empty state with no invoice', async () => {

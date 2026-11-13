@@ -85,18 +85,31 @@ describe('PlanCardComponent', () => {
     expect(el.querySelector('button')).toBeNull();
   });
 
-  it('prices a fixed plan per month and a usage plan per unit', () => {
-    const interval = (): string =>
-      (fixture.nativeElement as HTMLElement)
-        .querySelector('.interval')
-        ?.textContent?.trim() ?? '';
+  it('prices a fixed plan per month and pay as you go from a price per unit', () => {
+    const priceLine = (): string[] =>
+      [
+        ...(fixture.nativeElement as HTMLElement).querySelectorAll(
+          '.plan-price span'
+        )
+      ].map((span) => span.textContent?.trim() ?? '');
 
     fixture.detectChanges();
-    expect(interval()).toBe('/mo');
+    expect(priceLine()).toEqual(['$12.00', '/mo']);
 
     fixture.componentRef.setInput('plan', { ...plan, billingMode: 'usage' });
+    fixture.componentRef.setInput('price', '$0.80');
     fixture.detectChanges();
-    expect(interval()).toBe('/ unit');
+    expect(priceLine()).toEqual(['from', '$0.80', '/ unit']);
+  });
+
+  it('shows no price line when no price is known', () => {
+    fixture.componentRef.setInput('plan', { ...plan, billingMode: 'usage' });
+    fixture.componentRef.setInput('price', '');
+    fixture.detectChanges();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('.plan-price')
+    ).toBeNull();
   });
 
   it('emits choose with the plan key on click', () => {

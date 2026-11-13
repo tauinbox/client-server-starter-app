@@ -47,11 +47,16 @@ export class PlanCardComponent {
 
   readonly choose = output<string>();
 
-  /** A usage plan is priced per unit, a fixed plan per month. */
+  /**
+   * Pay as you go is priced per unit, from the cheapest credit pack; a fixed
+   * plan is priced per month.
+   */
+  protected readonly perUnit = computed(
+    () => this.plan().billingMode === 'usage'
+  );
+
   protected readonly priceSuffixKey = computed(() =>
-    this.plan().billingMode === 'usage'
-      ? 'billing.pricing.perUnit'
-      : 'billing.pricing.perMonth'
+    this.perUnit() ? 'billing.pricing.perUnit' : 'billing.pricing.perMonth'
   );
 
   onChoose(): void {

@@ -88,6 +88,11 @@
                 </button>
               }
             </div>
+          } @else if (store.payAsYouGoActive()) {
+            <div class="plan-line">
+              <span class="plan-name">{{ t('billing.mode.usage') }}</span>
+            </div>
+            <p class="plan-meta">{{ t('billing.settings.payAsYouGoOn') }}</p>
           } @else {
             <div class="empty-state">
               <mat-icon aria-hidden="true">workspace_premium</mat-icon>
@@ -112,8 +117,11 @@
         </mat-card-content>
       </mat-card>
 
-      <!-- Credits (prepaid usage units, design §21.2) -->
-      <nxs-credits-card [credits]="store.credits()" />
+      <!-- Credits: the pay-as-you-go wallet (design §22.5) -->
+      <nxs-credits-card
+        [credits]="store.credits()"
+        [subscribed]="store.hasActiveSubscription()"
+      />
 
       <!-- Payment method -->
       @if (showPaymentMethodCard()) {
@@ -151,9 +159,11 @@
       }
     </div>
 
-    <!-- Usage meter (usage-mode subscriptions only) -->
+    <!-- Usage meter: once the caller has credits or spent some this month -->
     @if (store.usage(); as usage) {
-      <nxs-usage-meter class="usage-section" [usage]="usage" />
+      @if (usage.unitsSpent > 0 || store.creditUnits() > 0) {
+        <nxs-usage-meter class="usage-section" [usage]="usage" />
+      }
     }
 
     <!-- Invoices -->

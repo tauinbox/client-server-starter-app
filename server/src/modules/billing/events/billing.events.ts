@@ -96,6 +96,15 @@ export class PaymentFailedEvent {
   ) {}
 }
 
+/**
+ * A credit delta moved the balance across zero: the pay-as-you-go
+ * entitlements start or stop. A purchase is not sent here, because every paid
+ * invoice already sends `InvoicePaidEvent`.
+ */
+export class CreditBalanceCrossedEvent {
+  constructor(public readonly userId: string) {}
+}
+
 /** Event-name keys an entitlement-affecting billing change is published under. */
 export const ENTITLEMENT_CHANGING_EVENTS = [
   SubscriptionActivatedEvent.name,
@@ -105,5 +114,6 @@ export const ENTITLEMENT_CHANGING_EVENTS = [
   PlanChangedEvent.name,
   InvoicePaidEvent.name,
   InvoiceRefundedEvent.name,
-  PaymentFailedEvent.name
+  PaymentFailedEvent.name,
+  CreditBalanceCrossedEvent.name
 ];

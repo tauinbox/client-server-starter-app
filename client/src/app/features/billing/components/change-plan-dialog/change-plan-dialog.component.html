@@ -15,24 +15,6 @@
       </span>
     </p>
 
-    <div class="mode-row">
-      <span class="mode-label" id="change-plan-mode-label">
-        {{ t('billing.mode.label') }}
-      </span>
-      <mat-button-toggle-group
-        aria-labelledby="change-plan-mode-label"
-        [value]="mode()"
-        (change)="setMode($event.value)"
-      >
-        <mat-button-toggle value="fixed">
-          {{ t('billing.mode.fixed') }}
-        </mat-button-toggle>
-        <mat-button-toggle value="usage">
-          {{ t('billing.mode.usage') }}
-        </mat-button-toggle>
-      </mat-button-toggle-group>
-    </div>
-
     <div
       class="plan-options"
       role="radiogroup"
@@ -123,7 +105,7 @@
             {{ t('billing.changePlan.providerSettles') }}
           </p>
         }
-        @if (closesUsage()) {
+        @if (closesUsage) {
           <p class="proration-note">
             {{ t('billing.changePlan.usageClosingNote') }}
           </p>

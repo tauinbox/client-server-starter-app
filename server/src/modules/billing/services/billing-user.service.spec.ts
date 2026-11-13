@@ -10,7 +10,8 @@ import {
   DEFAULT_CURSOR_PAGE_SIZE,
   ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
-  OPEN_SUBSCRIPTION_STATUSES
+  OPEN_SUBSCRIPTION_STATUSES,
+  PAY_AS_YOU_GO_PLAN_KEY
 } from '@app/shared/constants';
 import { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { encodeCursor } from '../../../common/utils/cursor.util';
@@ -24,7 +25,6 @@ import { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
-import { UsageRating } from '../rating/usage-rating.strategy';
 import {
   expectRefusal,
   makePlan,
@@ -57,9 +57,9 @@ async function build() {
   const users = repo();
   const emit = jest.fn();
 
-  const usageRating = { summarizeForPeriod: jest.fn() };
   const credits = {
     getBalance: jest.fn().mockResolvedValue(null),
+    spentOnMetering: jest.fn().mockResolvedValue(0),
     releaseHolds: jest.fn().mockResolvedValue(undefined)
   };
   const renewals = { billClosingUsagePeriod: jest.fn() };
@@ -88,7 +88,6 @@ async function build() {
       { provide: BillingService, useValue: billing },
       { provide: RenewalService, useValue: renewals },
       { provide: CreditService, useValue: credits },
-      { provide: UsageRating, useValue: usageRating },
       {
         provide: ConfigService,
         useValue: { get: () => 'http://localhost:4200' }
@@ -109,7 +108,6 @@ async function build() {
     billing,
     renewals,
     credits,
-    usageRating,
     emit
   };
 }
@@ -669,6 +667,21 @@ describe('BillingUserService', () => {
       await expectRefusal(
         ctx.service.checkout('user-1', 'free'),
         ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE
+      );
+      expect(ctx.customers.save).not.toHaveBeenCalled();
+      expect(ctx.billing.resolveProvider).not.toHaveBeenCalled();
+    });
+
+    it('rejects checkout of the pay-as-you-go plan, which starts with a credit pack', async () => {
+      const ctx = await build();
+
+      ctx.plans.findOne.mockResolvedValue(
+        makePlan({ key: PAY_AS_YOU_GO_PLAN_KEY, billingMode: 'usage' })
+      );
+
+      await expectRefusal(
+        ctx.service.checkout('user-1', PAY_AS_YOU_GO_PLAN_KEY),
+        ErrorKeys.BILLING.PAY_AS_YOU_GO_IS_PREPAID
       );
       expect(ctx.customers.save).not.toHaveBeenCalled();
       expect(ctx.billing.resolveProvider).not.toHaveBeenCalled();
@@ -1283,138 +1296,36 @@ describe('BillingUserService', () => {
   });
 
   describe('getUsageSummary', () => {
-    const usageSub = {
-      id: 'sub-1',
-      customerId: 'cust-1',
-      planKey: 'usage',
-      provider: 'yookassa' as const,
-      billingMode: 'usage' as const,
-      status: 'active',
-      currentPeriodStart: new Date('2026-06-01T00:00:00Z'),
-      currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
-    };
-
-    it('returns null without a customer, subscription, or usage mode', async () => {
+    it('returns null without a customer', async () => {
       const ctx = await build();
 
       ctx.customers.findOne.mockResolvedValue(null);
-      expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
 
-      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
-      ctx.subscriptions.findOne.mockResolvedValue(null);
       expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
-
-      ctx.subscriptions.findOne.mockResolvedValue({
-        ...usageSub,
-        billingMode: 'fixed'
-      });
-      expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
-      expect(ctx.usageRating.summarizeForPeriod).not.toHaveBeenCalled();
+      expect(ctx.credits.spentOnMetering).not.toHaveBeenCalled();
     });
 
-    it('returns null for an unpaid incomplete usage subscription', async () => {
-      const ctx = await build();
+    it('reports the units that metered uses took in the current calendar month', async () => {
+      jest.useFakeTimers({ now: new Date('2026-11-13T10:00:00Z') });
 
-      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
-      ctx.subscriptions.findOne.mockResolvedValue({
-        ...usageSub,
-        status: 'incomplete'
-      });
-      ctx.plans.findOne.mockResolvedValue(
-        makePlan({ key: 'usage', billingMode: 'usage', meterKey: 'api_calls' })
-      );
+      try {
+        const ctx = await build();
 
-      expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
-      expect(ctx.usageRating.summarizeForPeriod).not.toHaveBeenCalled();
-    });
+        ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+        ctx.credits.spentOnMetering.mockResolvedValue(42);
 
-    it('returns null instead of a 500 when the plan row is gone', async () => {
-      const ctx = await build();
-
-      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
-      ctx.subscriptions.findOne.mockResolvedValue(usageSub);
-      ctx.plans.findOne.mockResolvedValue(null);
-
-      expect(await ctx.service.getUsageSummary('user-1')).toBeNull();
-    });
-
-    it('rates the current period of the caller’s usage subscription', async () => {
-      const ctx = await build();
-
-      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
-      ctx.subscriptions.findOne.mockResolvedValue(usageSub);
-      const plan = makePlan({
-        key: 'usage',
-        billingMode: 'usage',
-        meterKey: 'api_calls'
-      });
-
-      ctx.plans.findOne.mockResolvedValue(plan);
-      ctx.usageRating.summarizeForPeriod.mockResolvedValue({
-        totalUnits: 142,
-        includedUnits: 100,
-        billableUnits: 42,
-        unitPriceMinor: 200,
-        amountMinor: 8400,
-        currency: 'RUB',
-        receiptItems: [{ description: 'x', amountMinor: 8400, quantity: 1 }]
-      });
-
-      const summary = await ctx.service.getUsageSummary('user-1');
-
-      expect(ctx.customers.findOne).toHaveBeenCalledWith({
-        where: { userId: 'user-1' }
-      });
-      expect(ctx.usageRating.summarizeForPeriod).toHaveBeenCalledWith(
-        usageSub,
-        plan,
-        {
-          start: usageSub.currentPeriodStart,
-          end: usageSub.currentPeriodEnd
-        }
-      );
-      expect(summary).toEqual({
-        subscriptionId: 'sub-1',
-        meterKey: 'api_calls',
-        periodStart: usageSub.currentPeriodStart,
-        periodEnd: usageSub.currentPeriodEnd,
-        totalUnits: 142,
-        includedUnits: 100,
-        billableUnits: 42,
-        unitPriceMinor: 200,
-        amountMinor: 8400,
-        currency: 'RUB'
-      });
-    });
-
-    it('rates and reports only the window a switch to the usage plan opened', async () => {
-      const ctx = await build();
-      const switchedAt = new Date('2026-06-11T00:00:00Z');
-      const sub = { ...usageSub, meteredFrom: switchedAt };
-
-      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
-      ctx.subscriptions.findOne.mockResolvedValue(sub);
-      const plan = makePlan({ key: 'usage', billingMode: 'usage' });
-
-      ctx.plans.findOne.mockResolvedValue(plan);
-      ctx.usageRating.summarizeForPeriod.mockResolvedValue({
-        totalUnits: 0,
-        includedUnits: 0,
-        billableUnits: 0,
-        unitPriceMinor: 200,
-        amountMinor: 0,
-        currency: 'RUB',
-        receiptItems: []
-      });
-
-      const summary = await ctx.service.getUsageSummary('user-1');
-
-      expect(ctx.usageRating.summarizeForPeriod).toHaveBeenCalledWith(
-        sub,
-        plan,
-        { start: switchedAt, end: usageSub.currentPeriodEnd }
-      );
-      expect(summary?.periodStart).toBe(switchedAt);
+        await expect(ctx.service.getUsageSummary('user-1')).resolves.toEqual({
+          periodStart: new Date('2026-11-01T00:00:00Z'),
+          periodEnd: new Date('2026-12-01T00:00:00Z'),
+          unitsSpent: 42
+        });
+        expect(ctx.credits.spentOnMetering).toHaveBeenCalledWith('cust-1', {
+          from: new Date('2026-11-01T00:00:00Z'),
+          to: new Date('2026-12-01T00:00:00Z')
+        });
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 

@@ -162,6 +162,8 @@ const UNPATTERNED: Readonly<Record<string, string>> = {
   'BILLING.AMOUNT_REQUIRED': 'the body has no amount (422)',
   'BILLING.FREE_PLAN_NOT_PURCHASABLE':
     'the body names the default tier, which no checkout or switch buys (422)',
+  'BILLING.PAY_AS_YOU_GO_IS_PREPAID':
+    'the body names the prepaid tier, which no checkout or switch buys (422)',
   'BILLING.NO_ACTIVE_SUBSCRIPTION':
     'the subscription of the caller does not exist (404)',
   'BILLING.SUBSCRIPTION_NOT_LINKED':
@@ -185,11 +187,8 @@ const UNPATTERNED: Readonly<Record<string, string>> = {
     'the event state refuses the replay (409)',
   'BILLING.INVOICE_NOT_REFUNDABLE':
     'the invoice state refuses the refund (409)',
-  'BILLING.CREDITS_BLOCKED': 'the credit balance refuses the usage (409)',
-  'BILLING.CUSTOMER_NO_ACTIVE_SUBSCRIPTION':
-    'the customer state refuses the usage (409)',
+  'BILLING.INSUFFICIENT_CREDITS': 'the credit balance refuses the usage (409)',
   'BILLING.METER_NOT_DECLARED': 'a meter in the body fails a check (422)',
-  'BILLING.USAGE_BEFORE_OPEN_WINDOW': 'a time in the body fails a check (422)',
   'BILLING.USAGE_IN_FUTURE': 'a time in the body fails a check (422)',
   'BILLING.USAGE_KEY_REUSED':
     'the idempotency key is bound to another record (409)',

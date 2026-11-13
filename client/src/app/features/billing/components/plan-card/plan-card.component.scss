@@ -85,10 +85,18 @@
     line-height: 1;
   }
 
-  .interval {
-    margin-inline-start: vars.$spacing-xxs;
+  .interval,
+  .price-prefix {
     font-size: vars.$font-size-sm;
     color: var(--mat-sys-on-surface-variant);
+  }
+
+  .interval {
+    margin-inline-start: vars.$spacing-xxs;
+  }
+
+  .price-prefix {
+    margin-inline-end: vars.$spacing-xxs;
   }
 }
 

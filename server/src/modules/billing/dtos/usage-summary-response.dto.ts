@@ -7,35 +7,23 @@ import type {
 } from '@app/shared/types';
 
 export class UsageSummaryResponseDto {
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
-  subscriptionId: string;
-
-  @ApiProperty({ example: 'api_calls', nullable: true })
-  meterKey: string | null;
-
-  @ApiProperty({ example: '2023-01-01T00:00:00Z' })
+  @ApiProperty({
+    example: '2023-01-01T00:00:00Z',
+    description: 'The start of the current calendar month (UTC).'
+  })
   periodStart: Date;
 
-  @ApiProperty({ example: '2023-02-01T00:00:00Z' })
+  @ApiProperty({
+    example: '2023-02-01T00:00:00Z',
+    description: 'The start of the next calendar month (UTC).'
+  })
   periodEnd: Date;
 
-  @ApiProperty({ example: 142 })
-  totalUnits: number;
-
-  @ApiProperty({ example: 100 })
-  includedUnits: number;
-
-  @ApiProperty({ example: 42 })
-  billableUnits: number;
-
-  @ApiProperty({ example: 200 })
-  unitPriceMinor: number;
-
-  @ApiProperty({ example: 8400 })
-  amountMinor: number;
-
-  @ApiProperty({ example: 'RUB' })
-  currency: string;
+  @ApiProperty({
+    example: 142,
+    description: 'The credit units that metered uses took in the period.'
+  })
+  unitsSpent: number;
 }
 
 type _DtoMatchesShared = _AssertNever<

@@ -305,7 +305,13 @@ describe('PlanChangeService', () => {
         pro: proPlan,
         business: businessPlan,
         usage: usagePlan,
-        free: makePlan({ key: 'free', name: 'Free' })
+        free: makePlan({ key: 'free', name: 'Free' }),
+        'ru-only': makePlan({
+          id: 'plan-ru-only',
+          key: 'ru-only',
+          name: 'RU only',
+          prices: { yookassa: { currency: 'RUB', amountMinor: 50000 } }
+        })
       };
 
       ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
@@ -633,59 +639,23 @@ describe('PlanChangeService', () => {
       expect(preview).toMatchObject({ currency: 'RUB', dueNowMinor: 0 });
     });
 
-    it('fixed → usage refunds the remainder without charging', async () => {
-      const ctx = await build();
-
-      plansByKey(ctx);
-      ctx.customers.findOne.mockResolvedValue(customer);
-      const sub = makeSub();
-
-      ctx.subscriptions.findOne.mockResolvedValue(sub);
-      ctx.invoices.findOne.mockResolvedValue({
-        id: 'inv-period',
-        amountMinor: Money.fromMinor(99000),
-        refundedMinor: Money.fromMinor(0),
-        providerInvoiceRef: 'pay_period',
-        status: 'paid',
-        billingMode: 'fixed'
-      });
-      const yoo = provider('yookassa', false);
-
-      ctx.billing.getProviderById.mockReturnValue(yoo);
-
-      const result = await ctx.service.changePlan('user-1', 'usage');
-
-      expect(yoo.chargeOffSession).not.toHaveBeenCalled();
-      expect(yoo.refund).toHaveBeenCalledWith(
-        'pay_period',
-        39600,
-        expect.any(String)
-      );
-      expect(result.billingMode).toBe('usage');
-    });
-
-    it('fixed → usage starts the metered window at the switch and bills nothing for it', async () => {
+    it('refuses fixed → usage with no provider call: pay as you go is a credit balance', async () => {
       const ctx = await build();
 
       plansByKey(ctx);
       ctx.customers.findOne.mockResolvedValue(customer);
       ctx.subscriptions.findOne.mockResolvedValue(makeSub());
-      ctx.billing.getProviderById.mockReturnValue(provider('yookassa', false));
+      const yoo = provider('yookassa', false);
 
-      const result = await ctx.service.changePlan('user-1', 'usage');
+      ctx.billing.getProviderById.mockReturnValue(yoo);
 
-      expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
-        Subscription,
-        expect.objectContaining({ id: 'sub-1' }),
-        {
-          planKey: 'usage',
-          billingMode: 'usage',
-          planChangeSeq: expect.any(Function),
-          meteredFrom: frozenNow
-        }
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'usage'),
+        ErrorKeys.BILLING.PAY_AS_YOU_GO_IS_PREPAID
       );
-      expect(result.meteredFrom).toEqual(frozenNow);
-      expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
+      expect(yoo.chargeOffSession).not.toHaveBeenCalled();
+      expect(yoo.refund).not.toHaveBeenCalled();
+      expect(ctx.subscriptions.update).not.toHaveBeenCalled();
     });
 
     it('usage → fixed bills the closing window under the outgoing plan, then moves it', async () => {
@@ -920,13 +890,24 @@ describe('PlanChangeService', () => {
         ErrorKeys.BILLING.CANCELLATION_SCHEDULED
       );
 
-      // The usage plan carries no paddle price → unavailable for a paddle sub.
+      // A plan with no paddle price is unavailable for a paddle sub.
       ctx.subscriptions.findOne.mockResolvedValue(
         makeSub({ provider: 'paddle', providerSubscriptionId: 'sub_ext' })
       );
       await expectRefusal(
-        ctx.service.changePlan('user-1', 'usage'),
+        ctx.service.changePlan('user-1', 'ru-only'),
         ErrorKeys.BILLING.PLAN_UNAVAILABLE_FOR_PROVIDER
+      );
+
+      // Pay as you go is a credit balance, not a plan a subscription moves to.
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'usage'),
+        ErrorKeys.BILLING.PAY_AS_YOU_GO_IS_PREPAID
+      );
+      await expectRefusal(
+        ctx.service.previewChange('user-1', 'usage'),
+        ErrorKeys.BILLING.PAY_AS_YOU_GO_IS_PREPAID
       );
     });
 

@@ -9,7 +9,6 @@ import {
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import {
   MAT_DIALOG_DATA,
   MatDialogModule,
@@ -19,9 +18,8 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
-import { FREE_PLAN_KEY } from '@app/shared/constants';
+import { FREE_PLAN_KEY, PAY_AS_YOU_GO_PLAN_KEY } from '@app/shared/constants';
 import type {
-  BillingMode,
   PlanResponse,
   ProrationPreviewResponse,
   SubscriptionResponse
@@ -63,7 +61,7 @@ const PLUS = '+ ';
 
 /**
  * Change-plan dialog with a live proration preview. The target
- * is picked as billing mode + plan; every selection fetches the prorated cost
+ * is a subscription plan; every selection fetches the prorated cost
  * and renders it as an itemized mini-ledger ending in a bold "Due now". The
  * dialog only previews — it closes with the chosen plan key and the caller
  * applies the change, mirroring the cancel-confirmation pattern.
@@ -74,7 +72,6 @@ const PLUS = '+ ';
     LocalizedDatePipe,
     MatDialogModule,
     MatButtonModule,
-    MatButtonToggleModule,
     MatIcon,
     MatProgressSpinner,
     TranslocoDirective,
@@ -98,10 +95,6 @@ export class ChangePlanDialogComponent {
     initialValue: this.#transloco.getActiveLang()
   });
 
-  protected readonly mode = signal<BillingMode>(
-    this.data.subscription.billingMode
-  );
-
   protected readonly selectedKey = signal<string | null>(null);
   protected readonly preview = signal<ProrationPreviewResponse | null>(null);
   protected readonly previewLoading = signal(false);
@@ -113,7 +106,7 @@ export class ChangePlanDialogComponent {
   protected readonly isTrial = this.data.subscription.status === 'trialing';
   protected readonly periodEnd = this.data.subscription.currentPeriodEnd;
 
-  /** Valid switch targets for the picked mode, priced for the sub's provider. */
+  /** Valid switch targets, priced for the sub's provider. */
   protected readonly options = computed<PlanOption[]>(() => {
     const lang = this.#lang();
     const { provider, planKey } = this.data.subscription;
@@ -122,9 +115,10 @@ export class ChangePlanDialogComponent {
       .filter(
         (plan) =>
           plan.active &&
-          // Free is reached through a cancel, never through a switch.
+          // Free is reached through a cancel and pay as you go through a
+          // credit pack, never through a switch.
           plan.key !== FREE_PLAN_KEY &&
-          plan.billingMode === this.mode() &&
+          plan.key !== PAY_AS_YOU_GO_PLAN_KEY &&
           plan.key !== planKey &&
           !!plan.prices[provider]
       )
@@ -186,10 +180,8 @@ export class ChangePlanDialogComponent {
   });
 
   /** A switch from a usage plan bills the metered window that it closes. */
-  protected readonly closesUsage = computed(
-    () =>
-      this.data.subscription.billingMode === 'usage' && this.mode() === 'fixed'
-  );
+  protected readonly closesUsage =
+    this.data.subscription.billingMode === 'usage';
 
   protected readonly canConfirm = computed(
     () =>
@@ -198,19 +190,6 @@ export class ChangePlanDialogComponent {
       !this.previewLoading() &&
       this.previewError() === null
   );
-
-  setMode(mode: BillingMode): void {
-    if (mode === this.mode()) return;
-
-    this.mode.set(mode);
-    this.selectedKey.set(null);
-    this.preview.set(null);
-    this.previewError.set(null);
-    // A single target (the pay-as-you-go plan) needs no extra click.
-    const options = this.options();
-
-    if (options.length === 1) this.select(options[0].key);
-  }
 
   select(planKey: string): void {
     if (planKey === this.selectedKey() && this.previewError() === null) return;

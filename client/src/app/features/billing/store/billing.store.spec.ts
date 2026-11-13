@@ -103,16 +103,9 @@ const creditBalance: CreditBalanceResponse = {
 };
 
 const usageSummary: UsageSummaryResponse = {
-  subscriptionId: 'sub-1',
-  meterKey: 'api_calls',
   periodStart: '2026-06-01T00:00:00.000Z',
   periodEnd: '2026-07-01T00:00:00.000Z',
-  totalUnits: 142,
-  includedUnits: 100,
-  billableUnits: 42,
-  unitPriceMinor: 200,
-  amountMinor: 8400,
-  currency: 'USD'
+  unitsSpent: 142
 };
 
 describe('BillingStore', () => {
@@ -282,14 +275,49 @@ describe('BillingStore', () => {
     expect(billingMock.getRegion).not.toHaveBeenCalled();
     expect(billingMock.getSubscription).not.toHaveBeenCalled();
     expect(billingMock.getProducts).not.toHaveBeenCalled();
+    expect(billingMock.getCredits).not.toHaveBeenCalled();
   });
 
-  it('loadPricing loads the one-time catalog for authenticated callers', async () => {
+  it('loadPricing loads the one-time catalog and the credits for authenticated callers', async () => {
     const store = createStore();
 
     await store.loadPricing(true);
 
     expect(billingMock.getProducts).toHaveBeenCalled();
+    expect(store.creditUnits()).toBe(creditBalance.balanceUnits);
+  });
+
+  it('turns pay as you go on for a positive balance with no entitled subscription', async () => {
+    billingMock.getSubscription.mockReturnValue(of(null));
+    const store = createStore();
+
+    await store.loadPricing(true);
+
+    expect(store.payAsYouGoActive()).toBe(true);
+  });
+
+  it.each([
+    ['a balance of 0', 0],
+    ['an overdrawn balance', -200]
+  ])('keeps pay as you go off with %s', async (_name, balanceUnits) => {
+    billingMock.getSubscription.mockReturnValue(of(null));
+    billingMock.getCredits.mockReturnValue(
+      of({ ...creditBalance, balanceUnits })
+    );
+    const store = createStore();
+
+    await store.loadPricing(true);
+
+    expect(store.payAsYouGoActive()).toBe(false);
+  });
+
+  it('keeps pay as you go off while a subscription is entitled', async () => {
+    const store = createStore();
+
+    await store.loadPricing(true);
+
+    expect(store.hasActiveSubscription()).toBe(true);
+    expect(store.payAsYouGoActive()).toBe(false);
   });
 
   it('purchase returns the provider session', async () => {

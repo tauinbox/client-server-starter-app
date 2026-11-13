@@ -2,19 +2,24 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { BILLING_PROVIDER_FLAGS, FREE_PLAN_KEY } from '@app/shared/constants';
 import type { BillingProviderId } from '@app/shared/types';
-import {
-  geoDefault,
-  meteredWindowStart
-} from '@app/shared/utils/billing-rules';
+import { randomUUID } from 'crypto';
+import { geoDefault } from '@app/shared/utils/billing-rules';
 import { getState, resetState } from '../state';
 import type { MockSubscription, MockUser } from '../types';
-import { sumPlanMeterUnits } from '../helpers/billing.helpers';
 import {
   advanceRenewal,
   findRenewableSubscription,
-  seedUsage,
   setProviderEnabled
 } from '../helpers/billing-clock.helpers';
+import {
+  consumeCredits,
+  unitsSpentThisMonth
+} from '../helpers/billing-metering.helpers';
+import {
+  applyCreditDelta,
+  crossesZero,
+  notifyEntitlementsChanged
+} from '../helpers/billing-settle.helpers';
 import {
   applyBillingPreset,
   BILLING_PRESETS,
@@ -24,7 +29,7 @@ import {
 import { escapeHtml, formatAmount } from '../utils/html';
 
 // A page for the manual check of every billing mode on the mock: put a user in
-// a billing state, record usage, run the renewal clock, and toggle the
+// a billing state, use units from the credits, run the renewal clock, and toggle the
 // catalog and the providers. It is under /api so that the dev proxy of the
 // client serves it on the client origin. It exists in the mock only.
 export const MOCK_BILLING_LAB_PATH = '/api/__mock-billing';
@@ -33,8 +38,8 @@ const PRESET_LABELS: Record<BillingPreset, string> = {
   free: 'Free (no subscription)',
   pro: 'Pro, active',
   business: 'Business, active',
-  usage: 'Pay as you go, active',
-  'usage-with-units': 'Pay as you go, active, 150 units used',
+  'payg-empty': 'Pay as you go, balance 0',
+  'payg-funded': 'Pay as you go, balance 500',
   trialing: 'Pro, trial (14 days)',
   'past-due': 'Pro, past due (one failed charge)',
   canceling: 'Pro, cancel at period end'
@@ -111,18 +116,32 @@ router.post('/usage', (req, res) => {
   const { userId, quantity } = body(req);
   const user = findUser(userId);
   const units = asPositiveInt(quantity);
-  const subscription = user
-    ? findRenewableSubscription({ userId: user.id })
-    : undefined;
+  const customer = user ? customerOf(user) : undefined;
 
-  if (!subscription || units === null) {
-    refuse(res, 'The user needs an entitled subscription and a unit count.');
+  if (!customer || units === null) {
+    refuse(res, 'The user needs a billing customer (pick a preset first).');
 
     return;
   }
 
-  seedUsage(subscription, { quantity: units });
-  res.json({ message: `Recorded ${units} units` });
+  const outcome = consumeCredits(customer.id, {
+    meterKey: 'api_calls',
+    units,
+    idempotencyKey: `lab-${randomUUID()}`,
+    occurredAt: new Date().toISOString()
+  });
+
+  if ('refusal' in outcome) {
+    refuse(res, outcome.refusal.message);
+
+    return;
+  }
+
+  res.json({
+    message: outcome.response.debited
+      ? `Used ${units} units; ${outcome.response.balanceAfter} credits left`
+      : `Used ${units} units; the plan includes the meter, so no credits were taken`
+  });
 });
 
 router.post('/renewal', (req, res) => {
@@ -163,19 +182,9 @@ router.post('/credits', (req, res) => {
     return;
   }
 
-  const state = getState();
-  const nowIso = new Date().toISOString();
-  const balance = state.billingCreditBalances.get(customer.id);
-
-  if (balance) {
-    balance.balanceUnits += amount;
-    balance.updatedAt = nowIso;
-  } else {
-    state.billingCreditBalances.set(customer.id, {
-      customerId: customer.id,
-      balanceUnits: amount,
-      updatedAt: nowIso
-    });
+  // A paid pack tells the owner through its invoice; the lab has none.
+  if (crossesZero(applyCreditDelta(customer.id, amount))) {
+    notifyEntitlementsChanged(customer.id);
   }
 
   res.json({ message: `Added ${amount} credits` });
@@ -250,6 +259,10 @@ function renderState(user: MockUser): string {
     row(
       'Credits',
       String(state.billingCreditBalances.get(customer.id)?.balanceUnits ?? 0)
+    ),
+    row(
+      'Units spent this month',
+      String(unitsSpentThisMonth(customer.id).unitsSpent)
     )
   ];
 
@@ -257,12 +270,6 @@ function renderState(user: MockUser): string {
     const plan = state.plans
       .values()
       .find((p) => p.key === subscription.planKey);
-    const units = plan
-      ? sumPlanMeterUnits(plan, subscription.id, {
-          startIso: meteredWindowStart(subscription),
-          endIso: new Date().toISOString()
-        })
-      : 0;
 
     rows.push(
       row(
@@ -280,8 +287,7 @@ function renderState(user: MockUser): string {
       ),
       row('Cancel at period end', String(subscription.cancelAtPeriodEnd)),
       row('Trial end', subscription.trialEnd ?? '-'),
-      row('Failed charges', String(subscription.dunningAttempts ?? 0)),
-      row('Units in the open window', String(units))
+      row('Failed charges', String(subscription.dunningAttempts ?? 0))
     );
   } else {
     rows.push(row('Subscription', 'none: the user is on Free'));
@@ -383,7 +389,7 @@ ${
 <form data-action="usage">
 <input type="hidden" name="userId" value="${uid}">
 <input type="number" name="quantity" min="1" value="100" aria-label="Units">
-<button type="submit">Record units</button>
+<button type="submit">Use units (takes credits)</button>
 </form>
 <form data-action="credits">
 <input type="hidden" name="userId" value="${uid}">

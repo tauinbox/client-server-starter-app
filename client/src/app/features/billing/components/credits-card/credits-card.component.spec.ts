@@ -17,7 +17,10 @@ function makeBalance(balanceUnits: number): CreditBalanceResponse {
 describe('CreditsCardComponent', () => {
   let fixture: ComponentFixture<CreditsCardComponent>;
 
-  async function setup(credits: CreditBalanceResponse | null): Promise<void> {
+  async function setup(
+    credits: CreditBalanceResponse | null,
+    subscribed = false
+  ): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [CreditsCardComponent, TranslocoTestingModuleWithLangs],
       providers: [provideNoopMaterialAnimations(), provideRouter([])]
@@ -25,6 +28,7 @@ describe('CreditsCardComponent', () => {
 
     fixture = TestBed.createComponent(CreditsCardComponent);
     fixture.componentRef.setInput('credits', credits);
+    fixture.componentRef.setInput('subscribed', subscribed);
     fixture.detectChanges();
   }
 
@@ -32,16 +36,27 @@ describe('CreditsCardComponent', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('renders a positive balance with locale grouping and a buy action', async () => {
+  it('renders a positive balance as pay as you go on, with locale grouping and a buy action', async () => {
     await setup(makeBalance(1240));
 
     expect(el().querySelector('.credits-units')?.textContent).toContain(
       '1,240'
     );
-    expect(el().querySelector('.credits-hint')).toBeNull();
+    expect(el().querySelector('.credits-hint.active')?.textContent).toContain(
+      'Pay as you go is on'
+    );
     expect(el().querySelector('.credits-readout.negative')).toBeNull();
     expect(el().querySelector('.buy-credits-btn')?.textContent).toContain(
       'Buy credits'
+    );
+  });
+
+  it('says that the credits wait while a plan is active', async () => {
+    await setup(makeBalance(1240), true);
+
+    expect(el().querySelector('.credits-hint.active')).toBeNull();
+    expect(el().querySelector('.credits-hint')?.textContent).toContain(
+      'Your credits wait while your plan is active'
     );
   });
 

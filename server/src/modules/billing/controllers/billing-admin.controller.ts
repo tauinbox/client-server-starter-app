@@ -33,13 +33,13 @@ import { LogAudit } from '../../audit/decorators/log-audit.decorator';
 import { extractAuditContext } from '../../../common/utils/audit-context.util';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { BillingAdminService } from '../services/billing-admin.service';
-import { UsageService } from '../services/usage.service';
+import { MeteringService } from '../services/metering.service';
 import { CancelSubscriptionRequestDto } from '../dtos/cancel-subscription-request.dto';
 import { RefundInvoiceRequestDto } from '../dtos/refund-invoice-request.dto';
 import { RecordUsageRequestDto } from '../dtos/record-usage-request.dto';
 import { SubscriptionResponseDto } from '../dtos/subscription-response.dto';
 import { InvoiceResponseDto } from '../dtos/invoice-response.dto';
-import { UsageResponseDto } from '../dtos/usage-response.dto';
+import { MeteringResponseDto } from '../dtos/metering-response.dto';
 
 @ApiTags('Billing Admin API')
 @ApiBearerAuth()
@@ -59,7 +59,7 @@ import { UsageResponseDto } from '../dtos/usage-response.dto';
 export class BillingAdminController {
   constructor(
     private readonly billingAdmin: BillingAdminService,
-    private readonly usage: UsageService
+    private readonly metering: MeteringService
   ) {}
 
   @Get('subscriptions')
@@ -165,30 +165,33 @@ export class BillingAdminController {
   @Authorize(['create', 'Billing'])
   @ApiOperation({
     summary:
-      'Record a metering usage event against a customer’s active subscription (idempotent).'
+      'Record a metered use and take its units from the prepaid credit balance of the customer (idempotent).'
   })
   @ApiBody({ type: RecordUsageRequestDto })
-  @ApiCreatedResponse({ type: UsageResponseDto })
+  @ApiCreatedResponse({ type: MeteringResponseDto })
   @ApiConflictResponse({
     description:
-      'No active subscription for customer, a negative credit balance, or an idempotency key reused with another body'
+      'The credit balance does not cover the units, or an idempotency key reused with another body'
   })
   @ApiUnprocessableEntityResponse({
-    description:
-      'Meter not declared by any plan, or occurredAt outside the accepted range'
+    description: 'Meter not in the meter catalog, or occurredAt in the future'
   })
   recordUsage(@Body() body: RecordUsageRequestDto, @Req() req: JwtAuthRequest) {
-    const { customerId, meterKey, quantity } = body;
+    const { customerId, meterKey, quantity, idempotencyKey, occurredAt } = body;
 
-    return this.usage.record(body, {
-      audit: {
-        action: AuditAction.BILLING_USAGE_RECORD,
-        actorId: req.user?.userId ?? null,
-        actorEmail: req.user?.email ?? null,
-        targetType: 'UsageRecord',
-        details: { customerId, meterKey, quantity },
-        context: extractAuditContext(req)
+    return this.metering.consume(
+      customerId,
+      { meterKey, units: quantity, idempotencyKey, occurredAt },
+      {
+        audit: {
+          action: AuditAction.BILLING_USAGE_RECORD,
+          actorId: req.user?.userId ?? null,
+          actorEmail: req.user?.email ?? null,
+          targetType: 'UsageRecord',
+          details: { customerId, meterKey, quantity },
+          context: extractAuditContext(req)
+        }
       }
-    });
+    );
   }
 }

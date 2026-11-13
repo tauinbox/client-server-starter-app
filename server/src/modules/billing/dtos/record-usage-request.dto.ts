@@ -13,10 +13,9 @@ import {
 } from 'class-validator';
 
 /**
- * Metering ingest payload. The usage record is attached to the
- * customer's currently-active subscription server-side, so the caller never
- * supplies a subscription id. `idempotencyKey` is the dedup anchor — replaying
- * the same key returns the original record instead of double-counting.
+ * Metering ingest payload: one use of `quantity` units, paid from the prepaid
+ * credit balance of the customer. `idempotencyKey` is the dedup anchor:
+ * replaying the same key answers the original record and debits nothing again.
  */
 export class RecordUsageRequestDto {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
@@ -40,7 +39,7 @@ export class RecordUsageRequestDto {
 
   @ApiPropertyOptional({
     description:
-      'When the usage occurred (ISO 8601). Defaults to now. Must not be before the open metered window of the subscription, and must not be more than 5 minutes after the server clock.',
+      'When the usage occurred (ISO 8601). Defaults to now. Must not be more than 5 minutes after the server clock.',
     example: '2023-01-01T00:00:00.000Z'
   })
   @IsOptional()
