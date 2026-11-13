@@ -4,14 +4,16 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import KeyvRedis from '@keyv/redis';
 import { In, IsNull } from 'typeorm';
 import type { SubscriptionStatus } from '@app/shared/types';
-import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
+import {
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  FREE_PLAN_KEY
+} from '@app/shared/constants';
 import { MetricsService } from '../core/metrics/metrics.service';
 import { Customer } from '../billing/entities/customer.entity';
 import { CustomerGrant } from '../billing/entities/customer-grant.entity';
 import { Plan } from '../billing/entities/plan.entity';
 import { Subscription } from '../billing/entities/subscription.entity';
 import { EntitlementService } from './entitlement.service';
-import { FREE_PLAN_KEY } from './entitlement.types';
 
 describe('EntitlementService', () => {
   let service: EntitlementService;

@@ -150,6 +150,8 @@ export {
 
 export { USAGE_FUTURE_TOLERANCE_MS } from './usage.constants';
 
+export { FREE_PLAN_KEY } from './billing-plan.constants';
+
 export {
   ALLOWED_INVOICE_SORT_COLUMNS,
   ALLOWED_SUBSCRIPTION_SORT_COLUMNS,

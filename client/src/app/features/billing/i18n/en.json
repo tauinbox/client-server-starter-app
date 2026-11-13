@@ -4,11 +4,26 @@
     "subtitle": "Pick what fits — switch anytime.",
     "mostPopular": "Most popular",
     "perMonth": "/mo",
+    "perUnit": "/ unit",
     "choose": "Choose",
     "current": "Current",
-    "usageTeaser": "Pay as you go · {{ price }} / unit — only pay for what you use",
     "paymentsUnavailable": "Payments are temporarily unavailable in your billing region.",
-    "manageBilling": "Manage billing"
+    "manageBilling": "Manage billing",
+    "paidTitle": "Paid plans",
+    "switchToFree": "Switch to the free plan",
+    "freeFrom": "From {{ date }}",
+    "usageHow": {
+      "title": "How pay as you go works",
+      "noFee": "No monthly fee: you pay only for the units you use.",
+      "billing": "The bill comes at the end of each period.",
+      "credits": "Prepaid credits are spent first.",
+      "switch": "You can switch to a subscription at any time."
+    }
+  },
+  "mode": {
+    "label": "Billing",
+    "fixed": "Subscription",
+    "usage": "Pay as you go"
   },
   "oneTime": {
     "title": "One-time purchases",
@@ -97,6 +112,7 @@
     "title": "Billing",
     "currentPlan": "Current plan",
     "renewsOn": "Renews {{ date }}",
+    "nextBillOn": "Next bill {{ date }}",
     "cancelsOn": "Cancels on {{ date }}",
     "changePlan": "Change plan",
     "cancel": "Cancel",
@@ -160,12 +176,8 @@
   },
   "changePlan": {
     "title": "Change plan",
-    "modeLabel": "Billing",
-    "modeFixed": "Fixed",
-    "modeUsage": "Pay as you go",
     "targetLabel": "New plan",
     "pickTarget": "Pick a plan",
-    "perUnit": "/ unit",
     "noTargets": "No other plans are available for your billing provider.",
     "prorationTitle": "Proration (today)",
     "unusedCredit": "Unused {{ plan }} credit",

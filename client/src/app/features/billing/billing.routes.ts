@@ -2,13 +2,14 @@ import type { Routes } from '@angular/router';
 import { authGuard } from '@features/auth/guards/auth.guard';
 import { AppRouteSegmentEnum } from '../../app.route-segment.enum';
 import { billingAvailableGuard } from './guards/billing-available.guard';
+import { SubscriptionCancelService } from './services/subscription-cancel.service';
 import { BillingStore } from './store/billing.store';
 
 export const billingRoutes: Routes = [
   {
     path: '',
     canActivate: [billingAvailableGuard],
-    providers: [BillingStore],
+    providers: [BillingStore, SubscriptionCancelService],
     children: [
       {
         // Public pricing page (anonymous pricing included).

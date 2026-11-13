@@ -19,6 +19,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { FREE_PLAN_KEY } from '@app/shared/constants';
 import type {
   BillingMode,
   PlanResponse,
@@ -121,6 +122,8 @@ export class ChangePlanDialogComponent {
       .filter(
         (plan) =>
           plan.active &&
+          // Free is reached through a cancel, never through a switch.
+          plan.key !== FREE_PLAN_KEY &&
           plan.billingMode === this.mode() &&
           plan.key !== planKey &&
           !!plan.prices[provider]
@@ -138,7 +141,7 @@ export class ChangePlanDialogComponent {
           description: plan.description,
           price: price ? formatMoney(amountMinor, price.currency, lang) : '',
           priceSuffixKey: isUsage
-            ? 'billing.changePlan.perUnit'
+            ? 'billing.pricing.perUnit'
             : 'billing.pricing.perMonth'
         };
       });

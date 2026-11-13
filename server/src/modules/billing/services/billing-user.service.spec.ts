@@ -626,6 +626,21 @@ describe('BillingUserService', () => {
       );
     });
 
+    it('rejects checkout of the Free plan before it creates a customer', async () => {
+      const ctx = await build();
+
+      ctx.plans.findOne.mockResolvedValue(
+        makePlan({ key: 'free', name: 'Free' })
+      );
+
+      await expectRefusal(
+        ctx.service.checkout('user-1', 'free'),
+        ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE
+      );
+      expect(ctx.customers.save).not.toHaveBeenCalled();
+      expect(ctx.billing.resolveProvider).not.toHaveBeenCalled();
+    });
+
     it('rejects checkout when an active subscription already exists', async () => {
       const ctx = await build();
 

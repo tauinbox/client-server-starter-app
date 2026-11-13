@@ -15,6 +15,7 @@ import {
   BILLING_PROVIDER_FLAGS,
   ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
+  FREE_PLAN_KEY,
   INVOICE_LIST_QUERY,
   OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
@@ -42,6 +43,7 @@ import type { UsageSummaryResponseDto } from '../dtos/usage-summary-response.dto
 import { addInterval } from '../utils/period.util';
 import {
   currentPlanMissing,
+  freePlanNotPurchasable,
   planNotFound,
   subscriptionNotLinked
 } from '../utils/billing-errors.util';
@@ -402,6 +404,10 @@ export class BillingUserService {
 
     if (!plan || !plan.active) {
       throw planNotFound(planKey);
+    }
+
+    if (plan.key === FREE_PLAN_KEY) {
+      throw freePlanNotPurchasable();
     }
 
     const customer = await this.getOrCreateCustomer(userId);

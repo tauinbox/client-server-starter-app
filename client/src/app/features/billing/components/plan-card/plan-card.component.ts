@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   input,
   output
 } from '@angular/core';
@@ -14,7 +15,9 @@ import { CatalogTextPipe } from '../../pipes/catalog-text.pipe';
 /**
  * Presentational pricing-tier card. The recommended tier is
  * lifted via the `featured` flag (elevation + accent + "Most popular" chip).
- * Emits `choose` when the call-to-action is pressed; the parent owns checkout.
+ * Emits `choose` when the call-to-action is pressed; the parent owns the
+ * action, so the same card serves a checkout, a plan change and the way back
+ * to Free.
  */
 @Component({
   selector: 'nxs-plan-card',
@@ -36,11 +39,20 @@ export class PlanCardComponent {
   readonly price = input.required<string>();
   readonly featured = input(false);
   readonly current = input(false);
-  /** Labels the action "Change plan" instead of "Choose". */
-  readonly changePlan = input(false);
+  /** Translation key of the action label. */
+  readonly actionKey = input('billing.pricing.choose');
+  /** A status line shown in place of the action, for example a scheduled switch. */
+  readonly note = input<string | null>(null);
   readonly disabled = input(false);
 
   readonly choose = output<string>();
+
+  /** A usage plan is priced per unit, a fixed plan per month. */
+  protected readonly priceSuffixKey = computed(() =>
+    this.plan().billingMode === 'usage'
+      ? 'billing.pricing.perUnit'
+      : 'billing.pricing.perMonth'
+  );
 
   onChoose(): void {
     this.choose.emit(this.plan().key);

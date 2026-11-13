@@ -803,8 +803,13 @@ the same permission both apply.
   The page also shows a prepaid-credits wallet card, the saved payment method with an update action,
   and the invoice history. The invoice history is cursor-paginated. It is a table on a desktop and
   stacked cards on a handset, and the two layouts have an infinite scroll.
-- **Pay-as-you-go tier.** The metered `usage` plan is active in the catalog. The pricing page shows
-  its price for each unit. `GET /api/v1/billing/usage` returns the meter of the metered window of the current
+- **Free, subscription or pay as you go.** The pricing page shows the Free card and a "Paid plans"
+  block with a "Subscription | Pay as you go" toggle: the subscription shows the fixed tiers, pay as
+  you go shows the metered `usage` plan at its price for each unit and how it is billed. The toggle
+  opens on the mode of the entitled subscription. Free is not purchasable: checkout and plan change
+  refuse it with 422 `errors.billing.freePlanNotPurchasable`, and the Free card of a subscriber
+  ("Switch to the free plan") opens the cancel confirmation of the settings page. A YooKassa checkout of the
+  usage plan binds the card with a zero-amount payment and no fiscal receipt, as a trial does. `GET /api/v1/billing/usage` returns the meter of the metered window of the current
   period for the caller. After a switch of billing mode, the window starts at the switch. It gives the total units, the included units, the billable units and the accrued amount.
 - **Usage meter.** The billing settings page shows a usage card for the current period of an entitled
   usage-mode subscription (not an unpaid `incomplete` one). It has a large unit readout. It has a quota gauge when the plan includes units, where
@@ -812,7 +817,7 @@ the same permission both apply.
   mini-ledger, which multiplies the billable units by the unit price and shows the accrued amount. A
   pure pay-as-you-go plan has no gauge.
 - **Plan change with proration.** The change-plan dialog in the billing settings selects a billing
-  mode (fixed or pay as you go) and a target plan. Then it shows a live proration mini-ledger from
+  mode (subscription or pay as you go) and a target paid plan; Free is not a target. Then it shows a live proration mini-ledger from
   `/change/preview`. For YooKassa the ledger shows a credit line, a charge line and a bold "Due now"
   line. For Paddle it shows the net amount, because the provider settles the two parts. A negative net
   amount reads "Refund due". A switch from a usage plan to a fixed plan shows a note that the metered
@@ -1703,6 +1708,13 @@ The mock has no payment provider, so it serves its own hosted checkout page at
 update go there. "Pay" settles the payment and returns to the client, thus these flows complete
 by hand on `npm start` in `client/` with the mock.
 
+The mock also serves a billing lab page at `/api/__mock-billing`, through the same dev proxy. It
+puts a user in a billing state (Free; Pro or Business active; pay as you go, with or without
+recorded units; a Pro trial; Pro past due; Pro with a cancel at the period end) on YooKassa or
+Paddle. It also records usage, adds credits, runs the renewal clock (a charge that succeeds, or one
+that fails into dunning), sets the trial days of a paid plan, turns a provider on or off and resets
+the state. Sign in to the app in another tab, change the state on the page, then reload `/billing`.
+
 ### Server (`cd server`)
 
 ```bash
@@ -1924,11 +1936,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3354 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3356 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 960 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 938 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1676 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 347 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1454 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1685 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 348 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1463 tests pass |
 
 ## CI/CD
 

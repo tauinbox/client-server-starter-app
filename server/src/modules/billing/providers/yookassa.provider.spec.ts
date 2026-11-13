@@ -212,6 +212,36 @@ describe('YooKassaProvider', () => {
       expect(payload.receipt).toBeUndefined();
     });
 
+    it('binds the card with a zero-amount payment and no receipt for a usage plan', async () => {
+      const { provider, client } = await build();
+
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-5',
+        status: 'pending',
+        confirmation: { confirmation_url: 'https://yoomoney/checkout/pay-5' }
+      });
+
+      await provider.startCheckout(
+        customer,
+        {
+          key: 'usage',
+          name: 'Pay as you go',
+          trialDays: 0,
+          billingMode: 'usage',
+          prices: {
+            yookassa: { currency: 'RUB', amountMinor: 0, unitPriceMinor: 200 }
+          }
+        } as Plan,
+        { urls, trial: false }
+      );
+
+      const [payload] = client!.createPayment.mock.calls[0] as [ICreatePayment];
+
+      expect(payload.amount).toEqual({ value: '0.00', currency: 'RUB' });
+      expect(payload.save_payment_method).toBe(true);
+      expect(payload.receipt).toBeUndefined();
+    });
+
     it('charges the full price with a receipt when the trial is not given', async () => {
       const { provider, client } = await build();
 

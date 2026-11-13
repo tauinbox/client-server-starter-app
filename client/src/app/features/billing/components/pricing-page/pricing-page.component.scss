@@ -44,27 +44,118 @@
   @include mix.loading-container;
 }
 
-.plan-grid {
+// Free on its own, then the paid tiers of the chosen mode. Three equal
+// columns on desktop, stacked below tablet-portrait (design section 21.1).
+// The paid column shares the rows of the layout (subgrid), so the Free card
+// lines up with the paid cards under the header of the paid column.
+.plan-layout {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr 2fr;
+  gap: vars.$spacing-md vars.$spacing-lg;
+
+  @media (max-width: vars.$breakpoint-sm) {
+    grid-template-rows: none;
+    grid-template-columns: 1fr;
+    gap: vars.$spacing-xl;
+  }
+}
+
+.free-column {
+  display: flex;
+  grid-row: 2;
+  grid-column: 1;
+
+  nxs-plan-card {
+    flex: 1;
+  }
+
+  @media (max-width: vars.$breakpoint-sm) {
+    grid-row: auto;
+  }
+}
+
+.paid-column {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / span 2;
+  grid-column: 2;
+
+  @media (max-width: vars.$breakpoint-sm) {
+    display: flex;
+    flex-direction: column;
+    grid-row: auto;
+    grid-column: 1;
+    gap: vars.$spacing-md;
+  }
+}
+
+.paid-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-sm;
+  align-items: center;
+  justify-content: space-between;
+
+  h2 {
+    margin: 0;
+    font-size: vars.$font-size-lg;
+    font-weight: vars.$font-weight-bold;
+  }
+}
+
+.paid-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: vars.$spacing-lg;
   align-items: stretch;
 
-  // 3-up → 1-up below tablet-portrait (design §21).
   @media (max-width: vars.$breakpoint-sm) {
     grid-template-columns: 1fr;
     gap: vars.$spacing-xl;
   }
 }
 
-.usage-teaser,
+.usage-how {
+  padding: vars.$spacing-lg;
+  background: var(--mat-sys-surface-container-low);
+  border-radius: vars.$border-radius-md;
+
+  h3 {
+    margin: 0 0 vars.$spacing-md;
+    font-size: vars.$font-size-base;
+    font-weight: vars.$font-weight-medium;
+  }
+
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: vars.$spacing-sm;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    gap: vars.$spacing-sm;
+    align-items: flex-start;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  mat-icon {
+    flex-shrink: 0;
+    color: var(--mat-sys-primary);
+  }
+}
+
 .payments-unavailable {
   display: flex;
   gap: vars.$spacing-xs;
   align-items: center;
   justify-content: center;
   padding: vars.$spacing-md;
-  margin-top: vars.$spacing-xl;
+  margin-bottom: vars.$spacing-lg;
   font-size: vars.$font-size-sm;
   color: var(--mat-sys-on-surface-variant);
   background: var(--mat-sys-surface-container-low);
@@ -73,11 +164,6 @@
   mat-icon {
     color: var(--mat-sys-primary);
   }
-}
-
-.payments-unavailable {
-  margin-top: 0;
-  margin-bottom: vars.$spacing-lg;
 }
 
 // One-time purchases band (design §21.4): catalog column + donation column,
@@ -126,14 +212,18 @@
 
 // Staggered reveal of plan cards on load (design §21, one restrained motion).
 @media (prefers-reduced-motion: no-preference) {
-  .plan-grid nxs-plan-card {
+  .plan-layout nxs-plan-card {
     opacity: 0;
     animation: plan-reveal vars.$transition-medium ease forwards;
   }
 
-  @for $i from 1 through 4 {
-    .plan-grid nxs-plan-card:nth-child(#{$i}) {
-      animation-delay: #{$i * 80}ms;
+  .free-column nxs-plan-card {
+    animation-delay: 80ms;
+  }
+
+  @for $i from 1 through 3 {
+    .paid-grid nxs-plan-card:nth-child(#{$i}) {
+      animation-delay: #{($i + 1) * 80}ms;
     }
   }
 }

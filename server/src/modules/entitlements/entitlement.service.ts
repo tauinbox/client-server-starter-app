@@ -4,17 +4,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import { In, IsNull, Repository } from 'typeorm';
 import type { EntitlementLimitKey } from '@app/shared/types';
-import { ENTITLED_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
+import {
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  FREE_PLAN_KEY
+} from '@app/shared/constants';
 import { CacheVersionCounter } from '../../common/utils/cache-version-counter';
 import { MetricsService } from '../core/metrics/metrics.service';
 import { Customer } from '../billing/entities/customer.entity';
 import { CustomerGrant } from '../billing/entities/customer-grant.entity';
 import { Plan } from '../billing/entities/plan.entity';
 import { Subscription } from '../billing/entities/subscription.entity';
-import {
-  FREE_PLAN_KEY,
-  type EntitlementCapability,
-  type ResolvedEntitlements
+import type {
+  EntitlementCapability,
+  ResolvedEntitlements
 } from './entitlement.types';
 
 const USER_VERSION_KEY = 'entitlements:user-version';

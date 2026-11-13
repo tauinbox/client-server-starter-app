@@ -12,6 +12,7 @@ import type {
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
+import { SubscriptionCancelService } from '../../services/subscription-cancel.service';
 import { BillingStore } from '../../store/billing.store';
 import { readPendingPurchase } from '../../utils/pending-purchase';
 import { PricingPageComponent } from './pricing-page.component';
@@ -34,6 +35,15 @@ function plan(key: string, name: string, amountMinor: number): PlanResponse {
     updatedAt: '2024-01-01T00:00:00.000Z'
   };
 }
+
+const usagePlan: PlanResponse = {
+  ...plan('usage', 'Pay as you go', 0),
+  billingMode: 'usage',
+  meterKey: 'api_calls',
+  prices: {
+    paddle: { currency: 'USD', amountMinor: 0, unitPriceMinor: 2 }
+  }
+};
 
 const reportPack: ProductResponse = {
   id: 'prod-report-pack',
@@ -80,6 +90,7 @@ describe('PricingPageComponent', () => {
   let authMock: { isAuthenticated: ReturnType<typeof signal<boolean>> };
   let router: Router;
   let redirectMock: { redirect: ReturnType<typeof vi.fn> };
+  let cancelMock: { confirmAndCancel: ReturnType<typeof vi.fn> };
 
   afterEach(() => {
     sessionStorage.clear();
@@ -107,6 +118,7 @@ describe('PricingPageComponent', () => {
     };
     authMock = { isAuthenticated: signal(authenticated) };
     redirectMock = { redirect: vi.fn() };
+    cancelMock = { confirmAndCancel: vi.fn().mockResolvedValue(true) };
 
     await TestBed.configureTestingModule({
       imports: [PricingPageComponent, TranslocoTestingModuleWithLangs],
@@ -115,7 +127,8 @@ describe('PricingPageComponent', () => {
         { provide: BillingStore, useValue: storeMock },
         { provide: AuthStore, useValue: authMock },
         provideRouter([]),
-        { provide: CheckoutRedirectService, useValue: redirectMock }
+        { provide: CheckoutRedirectService, useValue: redirectMock },
+        { provide: SubscriptionCancelService, useValue: cancelMock }
       ]
     }).compileComponents();
 
@@ -153,7 +166,8 @@ describe('PricingPageComponent', () => {
 
   function showSubscription(
     status: SubscriptionResponse['status'],
-    entitled: boolean
+    entitled: boolean,
+    overrides: Partial<SubscriptionResponse> = {}
   ): void {
     storeMock.subscription.set({
       id: 'sub-1',
@@ -169,7 +183,8 @@ describe('PricingPageComponent', () => {
       trialEnd: null,
       paymentMethodId: null,
       createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z'
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      ...overrides
     });
     storeMock.hasActiveSubscription.set(entitled);
     fixture.detectChanges();
@@ -191,10 +206,106 @@ describe('PricingPageComponent', () => {
     showSubscription('past_due', true);
 
     expect(renderedCards()).toEqual([
-      { name: 'Free', current: false, action: 'Change plan' },
+      { name: 'Free', current: false, action: 'Switch to the free plan' },
       { name: 'Pro', current: true, action: null },
       { name: 'Business', current: false, action: 'Change plan' }
     ]);
+  });
+
+  function modeToggle(): HTMLElement | null {
+    return (fixture.nativeElement as HTMLElement).querySelector('.mode-toggle');
+  }
+
+  function chooseMode(label: string): void {
+    const buttons: HTMLButtonElement[] = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '.mode-toggle button'
+      )
+    );
+
+    buttons.find((button) => button.textContent?.trim() === label)?.click();
+    fixture.detectChanges();
+  }
+
+  it('shows no mode toggle when the catalog has no usage plan', async () => {
+    await setup(true);
+
+    expect(modeToggle()).toBeNull();
+  });
+
+  it('switches the paid tiers between the subscription and pay as you go', async () => {
+    await setup(true);
+    storeMock.plans.update((plans) => [...plans, usagePlan]);
+    fixture.detectChanges();
+
+    expect(renderedCards().map(({ name }) => name)).toEqual([
+      'Free',
+      'Pro',
+      'Business'
+    ]);
+    expect(fixture.nativeElement.querySelector('.usage-how')).toBeNull();
+
+    chooseMode('Pay as you go');
+
+    expect(renderedCards()).toEqual([
+      { name: 'Free', current: true, action: null },
+      { name: 'Pay as you go', current: false, action: 'Choose' }
+    ]);
+    expect(
+      fixture.nativeElement.querySelector('nxs-plan-card .interval')
+    ).not.toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('.usage-how')?.textContent
+    ).toContain('How pay as you go works');
+  });
+
+  it('starts a checkout of the usage plan for a Free user', async () => {
+    await setup(true);
+    storeMock.plans.update((plans) => [...plans, usagePlan]);
+    fixture.detectChanges();
+    chooseMode('Pay as you go');
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('.paid-grid .plan-action button')!
+      .click();
+
+    expect(storeMock.checkout).toHaveBeenCalledWith('usage');
+  });
+
+  it('opens on the pay as you go tiers for a usage subscriber', async () => {
+    await setup(true);
+    storeMock.plans.update((plans) => [...plans, usagePlan]);
+    showSubscription('active', true, {
+      planKey: 'usage',
+      billingMode: 'usage'
+    });
+
+    expect(renderedCards()).toEqual([
+      { name: 'Free', current: false, action: 'Switch to the free plan' },
+      { name: 'Pay as you go', current: true, action: null }
+    ]);
+  });
+
+  it('returns a subscriber to Free through the confirmed cancel', async () => {
+    await setup(true);
+    showSubscription('active', true);
+
+    fixture.componentInstance.onChoose('free');
+
+    expect(cancelMock.confirmAndCancel).toHaveBeenCalledTimes(1);
+    expect(storeMock.checkout).not.toHaveBeenCalled();
+  });
+
+  it('shows the day of a scheduled return to Free instead of the action', async () => {
+    await setup(true);
+    showSubscription('active', true, { cancelAtPeriodEnd: true });
+
+    const free = (fixture.nativeElement as HTMLElement).querySelector(
+      '.free-column nxs-plan-card'
+    );
+
+    expect(free?.querySelector('button')).toBeNull();
+    expect(free?.querySelector('.plan-note')?.textContent).toContain('From');
   });
 
   it('shows the region control in the page header', async () => {

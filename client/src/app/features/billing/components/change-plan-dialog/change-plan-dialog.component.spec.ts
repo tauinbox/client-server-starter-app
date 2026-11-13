@@ -137,14 +137,14 @@ describe('ChangePlanDialogComponent', () => {
     billingMock = { previewChange: vi.fn().mockReturnValue(of(splitPreview)) };
   });
 
-  it('lists same-mode targets excluding the current plan', () => {
+  it('lists same-mode targets excluding the current plan and Free', () => {
     createComponent();
 
     const names = optionButtons().map((btn) =>
       btn.querySelector('.option-name')?.textContent?.trim()
     );
 
-    expect(names).toEqual(['Free', 'Business']);
+    expect(names).toEqual(['Business']);
     expect(billingMock.previewChange).not.toHaveBeenCalled();
     expect(confirmButton().disabled).toBe(true);
   });
@@ -152,7 +152,7 @@ describe('ChangePlanDialogComponent', () => {
   it('renders the split proration ledger after selecting a target', () => {
     createComponent();
 
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
 
     expect(billingMock.previewChange).toHaveBeenCalledWith('business');
@@ -182,7 +182,7 @@ describe('ChangePlanDialogComponent', () => {
     );
     createComponent();
 
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
 
     const ledger = fixture.nativeElement.querySelector('.ledger');
@@ -199,7 +199,7 @@ describe('ChangePlanDialogComponent', () => {
     billingMock.previewChange.mockReturnValue(
       of({
         ...splitPreview,
-        toPlanKey: 'free',
+        toPlanKey: 'business',
         creditMinor: 43000,
         chargeMinor: 0,
         dueNowMinor: -43000
@@ -235,7 +235,7 @@ describe('ChangePlanDialogComponent', () => {
     );
     createComponent();
 
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
 
     expect(
@@ -250,9 +250,9 @@ describe('ChangePlanDialogComponent', () => {
       .mockReturnValue(of(splitPreview));
     createComponent();
 
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
 
     expect(billingMock.previewChange).toHaveBeenCalledTimes(2);
@@ -264,9 +264,9 @@ describe('ChangePlanDialogComponent', () => {
   it('does not ask again when the plan on screen is picked again', () => {
     createComponent();
 
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
 
     expect(billingMock.previewChange).toHaveBeenCalledTimes(1);
@@ -288,7 +288,7 @@ describe('ChangePlanDialogComponent', () => {
     );
     createComponent();
 
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
 
     expect(
@@ -304,7 +304,7 @@ describe('ChangePlanDialogComponent', () => {
       subscription: { ...subscription, status: 'trialing' }
     });
 
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
 
     expect(
@@ -337,7 +337,7 @@ describe('ChangePlanDialogComponent', () => {
 
       fixture.componentInstance.setMode('fixed');
       fixture.detectChanges();
-      optionButtons()[1].click();
+      optionButtons()[0].click();
       fixture.detectChanges();
 
       expect(notes()).toEqual([usageClosingNote]);
@@ -361,7 +361,7 @@ describe('ChangePlanDialogComponent', () => {
 
       fixture.componentInstance.setMode('fixed');
       fixture.detectChanges();
-      optionButtons()[1].click();
+      optionButtons()[0].click();
       fixture.detectChanges();
 
       expect(notes()).toEqual([
@@ -378,7 +378,7 @@ describe('ChangePlanDialogComponent', () => {
 
       fixture.componentInstance.setMode('fixed');
       fixture.detectChanges();
-      optionButtons()[1].click();
+      optionButtons()[0].click();
       fixture.detectChanges();
 
       expect(notes()).toEqual([
@@ -390,7 +390,7 @@ describe('ChangePlanDialogComponent', () => {
     it('shows no closing charge on a switch between fixed plans', () => {
       createComponent();
 
-      optionButtons()[1].click();
+      optionButtons()[0].click();
       fixture.detectChanges();
 
       expect(notes()).not.toContain(usageClosingNote);
@@ -400,7 +400,7 @@ describe('ChangePlanDialogComponent', () => {
   it('confirm closes the dialog with the selected plan key', () => {
     createComponent();
 
-    optionButtons()[1].click();
+    optionButtons()[0].click();
     fixture.detectChanges();
     confirmButton().click();
 

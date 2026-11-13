@@ -10,9 +10,6 @@ import type { EntitlementLimits } from '@app/shared/types';
 export type EntitlementCapability =
   'reports' | 'api-access' | 'data-export' | 'priority-support';
 
-/** Plan key of the default (no-subscription) tier. */
-export const FREE_PLAN_KEY = 'free';
-
 /**
  * The capability set + numeric limits in effect for a user, resolved from their
  * active/trialing/past_due-in-grace subscription's plan, or the Free tier.

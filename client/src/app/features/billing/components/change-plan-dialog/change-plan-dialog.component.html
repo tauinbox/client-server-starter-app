@@ -17,7 +17,7 @@
 
     <div class="mode-row">
       <span class="mode-label" id="change-plan-mode-label">
-        {{ t('billing.changePlan.modeLabel') }}
+        {{ t('billing.mode.label') }}
       </span>
       <mat-button-toggle-group
         aria-labelledby="change-plan-mode-label"
@@ -25,10 +25,10 @@
         (change)="setMode($event.value)"
       >
         <mat-button-toggle value="fixed">
-          {{ t('billing.changePlan.modeFixed') }}
+          {{ t('billing.mode.fixed') }}
         </mat-button-toggle>
         <mat-button-toggle value="usage">
-          {{ t('billing.changePlan.modeUsage') }}
+          {{ t('billing.mode.usage') }}
         </mat-button-toggle>
       </mat-button-toggle-group>
     </div>

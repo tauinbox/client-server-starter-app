@@ -3,19 +3,31 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  inject
+  inject,
+  linkedSignal
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatButton } from '@angular/material/button';
+import {
+  MatButtonToggle,
+  MatButtonToggleGroup
+} from '@angular/material/button-toggle';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { toSignal } from '@angular/core/rxjs-interop';
-import type { PlanResponse, ProductResponse } from '@app/shared/types';
+import { FREE_PLAN_KEY } from '@app/shared/constants';
+import type {
+  BillingMode,
+  PlanResponse,
+  ProductResponse
+} from '@app/shared/types';
+import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
 import { PADDLE_TRANSACTION_PARAM } from '../../services/paddle-checkout.service';
+import { SubscriptionCancelService } from '../../services/subscription-cancel.service';
 import { BillingStore } from '../../store/billing.store';
 import { catalogText } from '../../utils/catalog-text';
 import {
@@ -41,6 +53,7 @@ type PricedPlan = {
   readonly featured: boolean;
   readonly current: boolean;
   readonly price: string;
+  readonly actionKey: string;
   readonly plan: PlanResponse;
 };
 
@@ -55,7 +68,10 @@ type PricedProduct = {
   imports: [
     RouterLink,
     MatButton,
+    MatButtonToggle,
+    MatButtonToggleGroup,
     MatProgressSpinner,
+    LocalizedDatePipe,
     MatIcon,
     TranslocoDirective,
     PlanCardComponent,
@@ -73,6 +89,7 @@ export class PricingPageComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #transloco = inject(TranslocoService);
   readonly #checkoutRedirect = inject(CheckoutRedirectService);
+  readonly #cancelService = inject(SubscriptionCancelService);
 
   protected readonly isAuthenticated = this.#authStore.isAuthenticated;
   protected readonly settingsRoute = `/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingSettings}`;
@@ -112,49 +129,85 @@ export class PricingPageComponent implements OnInit {
 
     if (sub && this.store.hasActiveSubscription()) return sub.planKey;
 
-    return 'free';
+    return FREE_PLAN_KEY;
   });
 
-  protected readonly pricedPlans = computed<PricedPlan[]>(() => {
-    const provider = this.displayProvider();
-    const lang = this.#lang();
-    const current = this.currentPlanKey();
+  /**
+   * The paid mode on show: the mode of the entitled subscription, else the
+   * subscription tiers. The toggle overrides it until the subscription changes.
+   */
+  protected readonly paidMode = linkedSignal<BillingMode>(() => {
+    const sub = this.store.subscription();
 
-    return this.store
-      .plans()
-      .filter((plan) => plan.billingMode === 'fixed')
-      .map((plan) => {
-        const price = planPriceFor(plan, provider);
-
-        return {
-          key: plan.key,
-          plan,
-          featured: plan.key === 'pro',
-          current: plan.key === current,
-          price: price
-            ? formatMoney(price.amountMinor, price.currency, lang)
-            : ''
-        };
-      });
+    return sub && this.store.hasActiveSubscription()
+      ? sub.billingMode
+      : 'fixed';
   });
 
-  // Usage tier teaser (shown while the usage plan is active in the catalog).
-  protected readonly usagePlan = computed(
-    () =>
-      this.store.plans().find((plan) => plan.billingMode === 'usage') ?? null
+  readonly #paidPlans = computed(() =>
+    this.store.plans().filter((plan) => plan.key !== FREE_PLAN_KEY)
   );
 
-  protected readonly usagePrice = computed(() => {
-    const plan = this.usagePlan();
+  /** The toggle shows only when the catalog offers both paid modes. */
+  protected readonly showModeToggle = computed(() => {
+    const modes = new Set(this.#paidPlans().map((plan) => plan.billingMode));
 
-    if (!plan) return '';
-
-    const price = planPriceFor(plan, this.displayProvider());
-
-    if (!price?.unitPriceMinor) return '';
-
-    return formatMoney(price.unitPriceMinor, price.currency, this.#lang());
+    return modes.has('fixed') && modes.has('usage');
   });
+
+  protected readonly freeCard = computed<PricedPlan | null>(() => {
+    const plan = this.store.plans().find((p) => p.key === FREE_PLAN_KEY);
+
+    if (!plan) return null;
+
+    return {
+      ...this.#priced(plan),
+      actionKey: this.store.hasActiveSubscription()
+        ? 'billing.pricing.switchToFree'
+        : 'billing.pricing.choose'
+    };
+  });
+
+  /** The day a scheduled cancel returns the caller to Free, or null. */
+  protected readonly freeFrom = computed(() => {
+    const sub = this.store.subscription();
+
+    return sub && this.store.hasActiveSubscription() && sub.cancelAtPeriodEnd
+      ? sub.currentPeriodEnd
+      : null;
+  });
+
+  protected readonly paidCards = computed<PricedPlan[]>(() =>
+    this.#paidPlans()
+      .filter((plan) => plan.billingMode === this.paidMode())
+      .map((plan) => this.#priced(plan))
+  );
+
+  #priced(plan: PlanResponse): PricedPlan {
+    const price = planPriceFor(plan, this.displayProvider());
+    // A usage plan has no flat fee: the card shows the price of one unit.
+    const amountMinor =
+      plan.billingMode === 'usage'
+        ? (price?.unitPriceMinor ?? 0)
+        : (price?.amountMinor ?? 0);
+
+    return {
+      key: plan.key,
+      plan,
+      featured: plan.key === 'pro',
+      current: plan.key === this.currentPlanKey(),
+      price: price
+        ? formatMoney(amountMinor, price.currency, this.#lang())
+        : '',
+      actionKey: this.store.hasActiveSubscription()
+        ? 'billing.settings.changePlan'
+        : 'billing.pricing.choose'
+    };
+  }
+
+  setPaidMode(mode: BillingMode): void {
+    this.paidMode.set(mode);
+  }
 
   // One-time purchases: fixed-price products as cards, custom
   // products as donation forms. The catalog endpoint requires auth, so the
@@ -196,6 +249,16 @@ export class PricingPageComponent implements OnInit {
       void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
         queryParams: { returnUrl: `/${AppRouteSegmentEnum.Billing}` }
       });
+
+      return;
+    }
+
+    // Free is the absence of a subscription: a subscriber returns to it
+    // through a cancel at the end of the period.
+    if (planKey === FREE_PLAN_KEY) {
+      if (this.store.hasActiveSubscription()) {
+        void this.#cancelService.confirmAndCancel();
+      }
 
       return;
     }

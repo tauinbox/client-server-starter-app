@@ -99,6 +99,13 @@ const REFUSALS: Refusal[] = [
     errorKey: ErrorKeys.BILLING.PLAN_NOT_FOUND
   },
   {
+    name: 'checkout of the Free plan',
+    path: '/billing/checkout',
+    body: { planKey: 'free' },
+    status: 422,
+    errorKey: ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE
+  },
+  {
     name: 'checkout with a live subscription',
     arrange: async () => void (await activate()),
     path: '/billing/checkout',
@@ -210,6 +217,22 @@ const REFUSALS: Refusal[] = [
     body: { planKey: 'ghost' },
     status: 422,
     errorKey: ErrorKeys.BILLING.PLAN_NOT_FOUND
+  },
+  {
+    name: 'plan change to the Free plan',
+    arrange: async () => void (await activate()),
+    path: '/billing/subscription/change',
+    body: { planKey: 'free' },
+    status: 422,
+    errorKey: ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE
+  },
+  {
+    name: 'preview of a plan change to the Free plan',
+    arrange: async () => void (await activate()),
+    path: '/billing/subscription/change/preview',
+    body: { planKey: 'free' },
+    status: 422,
+    errorKey: ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE
   },
   {
     name: 'plan change to the current plan',

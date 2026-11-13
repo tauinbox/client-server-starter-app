@@ -18,7 +18,7 @@
 
     <p class="plan-price">
       <span class="amount">{{ price() }}</span>
-      <span class="interval">{{ t('billing.pricing.perMonth') }}</span>
+      <span class="interval">{{ t(priceSuffixKey()) }}</span>
     </p>
 
     @if (plan().description) {
@@ -49,6 +49,11 @@
           <mat-icon aria-hidden="true">check_circle</mat-icon>
           {{ t('billing.pricing.current') }}
         </span>
+      } @else if (note(); as note) {
+        <span class="plan-note">
+          <mat-icon aria-hidden="true">schedule</mat-icon>
+          {{ note }}
+        </span>
       } @else {
         <button
           [matButton]="featured() ? 'filled' : 'outlined'"
@@ -56,11 +61,7 @@
           [disabled]="disabled()"
           (click)="onChoose()"
         >
-          {{
-            changePlan()
-              ? t('billing.settings.changePlan')
-              : t('billing.pricing.choose')
-          }}
+          {{ t(actionKey()) }}
         </button>
       }
     </div>

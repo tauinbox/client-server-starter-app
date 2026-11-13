@@ -160,6 +160,8 @@ const UNPATTERNED: Readonly<Record<string, string>> = {
     'an operator closed the provider for a time (503)',
   'BILLING.CURRENT_PLAN_MISSING': 'a catalog defect (500)',
   'BILLING.AMOUNT_REQUIRED': 'the body has no amount (422)',
+  'BILLING.FREE_PLAN_NOT_PURCHASABLE':
+    'the body names the default tier, which no checkout or switch buys (422)',
   'BILLING.NO_ACTIVE_SUBSCRIPTION':
     'the subscription of the caller does not exist (404)',
   'BILLING.SUBSCRIPTION_NOT_LINKED':
