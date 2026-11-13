@@ -22,7 +22,12 @@ export class FixedRating {
       amountMinor: price.amountMinor,
       currency: price.currency,
       receiptItems: [
-        { description: plan.name, amountMinor: price.amountMinor, quantity: 1 }
+        {
+          description: plan.name,
+          amountMinor: price.amountMinor,
+          quantity: 1,
+          paymentMode: 'full_payment'
+        }
       ]
     };
   }

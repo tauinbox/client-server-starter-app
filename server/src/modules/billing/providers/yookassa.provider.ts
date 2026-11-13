@@ -43,8 +43,42 @@ import type {
   OneTimePaymentSession,
   PaymentProvider,
   ReceiptItem,
+  ReceiptPaymentMode,
   WebhookVerificationResult
 } from './payment-provider.interface';
+
+/** Every line this system sells is a service (54-FZ `payment_subject`). */
+const RECEIPT_PAYMENT_SUBJECT = 'service';
+
+/**
+ * Metadata key that keeps the settlement method of the receipt of a payment,
+ * so the refund receipt states the same method. Every receipt of one payment
+ * has lines of one method.
+ */
+const RECEIPT_MODE_KEY = 'receiptPaymentMode';
+
+const RECEIPT_PAYMENT_MODES: readonly ReceiptPaymentMode[] = [
+  'full_payment',
+  'full_prepayment'
+];
+
+function receiptModeMetadata(
+  items: readonly ReceiptItem[]
+): Record<string, ReceiptPaymentMode> {
+  const mode = items[0]?.paymentMode;
+
+  return mode ? { [RECEIPT_MODE_KEY]: mode } : {};
+}
+
+/** A payment created before the key existed was a full payment. */
+function receiptModeFrom(metadata: unknown): ReceiptPaymentMode {
+  const data = (metadata ?? {}) as Record<string, unknown>;
+  const mode = data[RECEIPT_MODE_KEY];
+
+  return (
+    RECEIPT_PAYMENT_MODES.find((known) => known === mode) ?? 'full_payment'
+  );
+}
 
 /**
  * Metadata marker a payment-method-update re-bind payment carries, so its
@@ -279,6 +313,14 @@ export class YooKassaProvider implements PaymentProvider {
     // the method is saved now and the scheduler charges later. No money moves,
     // so no fiscal receipt. A paid first period has a 54-FZ receipt.
     const amountMinor = isTrial ? 0 : price.amountMinor;
+    const receiptItems: ReceiptItem[] = [
+      {
+        description: plan.name,
+        amountMinor,
+        quantity: 1,
+        paymentMode: 'full_payment'
+      }
+    ];
     const payload: ICreatePayment = {
       amount: {
         value: toAmountValue(amountMinor, price.currency),
@@ -288,20 +330,14 @@ export class YooKassaProvider implements PaymentProvider {
       save_payment_method: true,
       confirmation: { type: 'redirect', return_url: urls.successUrl },
       description: plan.name,
-      metadata,
       merchant_customer_id: customer.id,
       ...(amountMinor === 0
-        ? {}
+        ? { metadata }
         : {
+            metadata: { ...metadata, ...receiptModeMetadata(receiptItems) },
             receipt: await this.buildReceipt(
               customer.userId,
-              [
-                {
-                  description: plan.name,
-                  amountMinor,
-                  quantity: 1
-                }
-              ],
+              receiptItems,
               price.currency
             )
           })
@@ -336,7 +372,8 @@ export class YooKassaProvider implements PaymentProvider {
         customerId: customer.id,
         userId: customer.userId,
         purpose: ONE_TIME_PURPOSE,
-        productId: params.productId
+        productId: params.productId,
+        ...receiptModeMetadata(params.receiptItems)
       },
       merchant_customer_id: customer.id,
       receipt: await this.buildReceipt(
@@ -401,7 +438,8 @@ export class YooKassaProvider implements PaymentProvider {
         userId: customer.userId,
         ...(idempotencyKey
           ? { purpose: OFF_SESSION_PURPOSE, chargeKey: idempotencyKey }
-          : {})
+          : {}),
+        ...receiptModeMetadata(receiptItems)
       },
       merchant_customer_id: customer.id,
       receipt: await this.buildReceipt(customer.userId, receiptItems, currency)
@@ -557,7 +595,8 @@ export class YooKassaProvider implements PaymentProvider {
           {
             description: payment.description || 'Subscription refund',
             amountMinor: refundMinor,
-            quantity: 1
+            quantity: 1,
+            paymentMode: receiptModeFrom(payment.metadata)
           }
         ],
         currency
@@ -778,7 +817,9 @@ export class YooKassaProvider implements PaymentProvider {
         value: toAmountValue(item.amountMinor, currency),
         currency
       },
-      vat_code: this.vatCode
+      vat_code: this.vatCode,
+      payment_subject: RECEIPT_PAYMENT_SUBJECT,
+      payment_mode: item.paymentMode
     }));
 
     return {

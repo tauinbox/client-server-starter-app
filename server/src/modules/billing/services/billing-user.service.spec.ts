@@ -188,7 +188,12 @@ describe('BillingUserService', () => {
           currency: 'RUB',
           description: 'Report pack',
           receiptItems: [
-            { description: 'Report pack', amountMinor: 49000, quantity: 1 }
+            {
+              description: 'Report pack',
+              amountMinor: 49000,
+              quantity: 1,
+              paymentMode: 'full_payment'
+            }
           ],
           productId: 'prod-1'
         })
@@ -198,6 +203,33 @@ describe('BillingUserService', () => {
         url: 'https://pay/x',
         sessionRef: 'ot-1'
       });
+    });
+
+    it('fiscalizes a credit pack as a prepayment, because the credits pay for later usage', async () => {
+      const { ctx, yoo } = await setupPurchase(
+        makeProduct({
+          key: 'credits-500',
+          name: '500 credits',
+          type: 'credits',
+          grant: { credits: 500 }
+        })
+      );
+
+      await ctx.service.purchase('user-1', { productKey: 'credits-500' });
+
+      expect(yoo.createOneTimePayment).toHaveBeenCalledWith(
+        RU_CUSTOMER,
+        expect.objectContaining({
+          receiptItems: [
+            {
+              description: '500 credits',
+              amountMinor: 49000,
+              quantity: 1,
+              paymentMode: 'full_prepayment'
+            }
+          ]
+        })
+      );
     });
 
     it('returns a null url when the provider completes client-side (Paddle.js)', async () => {
@@ -402,7 +434,8 @@ describe('BillingUserService', () => {
             {
               description: 'Donation: Keep it up 3',
               amountMinor: 150000,
-              quantity: 1
+              quantity: 1,
+              paymentMode: 'full_payment'
             }
           ]
         })

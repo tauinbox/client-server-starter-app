@@ -97,7 +97,14 @@ describe('withProviderDeadline', () => {
       status: 'captured'
     });
     const provider = withProviderDeadline(inner, TIMEOUT_MS);
-    const items = [{ description: 'Pro', amountMinor: 1000, quantity: 1 }];
+    const items = [
+      {
+        description: 'Pro',
+        amountMinor: 1000,
+        quantity: 1,
+        paymentMode: 'full_payment' as const
+      }
+    ];
 
     await provider.chargeOffSession(customer, {
       amountMinor: 1000,

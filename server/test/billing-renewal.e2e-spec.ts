@@ -401,7 +401,8 @@ describe('Billing renewal scheduler (e2e)', () => {
           {
             description: 'Pay as you go: api_calls × 42',
             amountMinor: 8400,
-            quantity: 1
+            quantity: 1,
+            paymentMode: 'full_payment'
           }
         ],
         idempotencyKey: expect.stringMatching(/^renewal:sub-1:/)

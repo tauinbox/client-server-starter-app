@@ -164,7 +164,12 @@ describe('YooKassaProvider', () => {
         save_payment_method: true,
         confirmation: { type: 'redirect', return_url: urls.successUrl },
         description: 'Pro',
-        metadata: { customerId: 'cust-1', userId: 'user-1', planKey: 'pro' },
+        metadata: {
+          customerId: 'cust-1',
+          userId: 'user-1',
+          planKey: 'pro',
+          receiptPaymentMode: 'full_payment'
+        },
         merchant_customer_id: 'cust-1'
       });
       expect(payload.receipt).toEqual({
@@ -175,7 +180,9 @@ describe('YooKassaProvider', () => {
             description: 'Pro',
             quantity: '1',
             amount: { value: '990.00', currency: 'RUB' },
-            vat_code: 1
+            vat_code: 1,
+            payment_subject: 'service',
+            payment_mode: 'full_payment'
           }
         ]
       });
@@ -368,7 +375,12 @@ describe('YooKassaProvider', () => {
       currency: 'RUB',
       description: 'Pro report pack',
       receiptItems: [
-        { description: 'Pro report pack', amountMinor: 50000, quantity: 1 }
+        {
+          description: 'Pro report pack',
+          amountMinor: 50000,
+          quantity: 1,
+          paymentMode: 'full_payment' as const
+        }
       ],
       productId: 'prod-1',
       urls
@@ -417,6 +429,47 @@ describe('YooKassaProvider', () => {
       });
     });
 
+    it('states the 54-FZ subject and settlement method on each line and keeps the method in metadata', async () => {
+      const { provider, client } = await build();
+
+      client!.createPayment.mockResolvedValue({
+        id: 'pay-cr',
+        status: 'pending',
+        confirmation: { confirmation_url: 'https://yoomoney/checkout/pay-cr' }
+      });
+
+      await provider.createOneTimePayment(customer, {
+        ...params,
+        description: '500 credits',
+        receiptItems: [
+          {
+            description: '500 credits',
+            amountMinor: 50000,
+            quantity: 1,
+            paymentMode: 'full_prepayment'
+          }
+        ]
+      });
+
+      const [[payload]] = client!.createPayment.mock.calls as [
+        [ICreatePayment]
+      ];
+
+      expect(payload.receipt!.items).toEqual([
+        {
+          description: '500 credits',
+          quantity: '1',
+          amount: { value: '500.00', currency: 'RUB' },
+          vat_code: 1,
+          payment_subject: 'service',
+          payment_mode: 'full_prepayment'
+        }
+      ]);
+      expect(payload.metadata).toMatchObject({
+        receiptPaymentMode: 'full_prepayment'
+      });
+    });
+
     it('throws when YooKassa returns no confirmation url', async () => {
       const { provider, client } = await build();
 
@@ -446,7 +499,12 @@ describe('YooKassaProvider', () => {
       defaultPaymentMethodId: 'pmrow-1'
     } as Customer;
     const items: ReceiptItem[] = [
-      { description: 'Pro renewal', amountMinor: 99000, quantity: 1 }
+      {
+        description: 'Pro renewal',
+        amountMinor: 99000,
+        quantity: 1,
+        paymentMode: 'full_payment'
+      }
     ];
 
     it('gives up on a charge the SDK never settles', async () => {
@@ -525,7 +583,12 @@ describe('YooKassaProvider', () => {
         amountMinor: 2_500_000_000,
         currency: 'RUB',
         receiptItems: [
-          { description: 'Bulk', amountMinor: 2_500_000_000, quantity: 1 }
+          {
+            description: 'Bulk',
+            amountMinor: 2_500_000_000,
+            quantity: 1,
+            paymentMode: 'full_payment'
+          }
         ],
         idempotencyKey: 'idem-big'
       });
@@ -550,7 +613,12 @@ describe('YooKassaProvider', () => {
         amountMinor: 1500,
         currency: 'JPY',
         receiptItems: [
-          { description: 'Pro renewal', amountMinor: 1500, quantity: 1 }
+          {
+            description: 'Pro renewal',
+            amountMinor: 1500,
+            quantity: 1,
+            paymentMode: 'full_payment'
+          }
         ],
         idempotencyKey: 'idem-jpy'
       });
@@ -965,6 +1033,47 @@ describe('YooKassaProvider', () => {
       expect(payload.receipt!.email).toBe(USER_EMAIL);
       expect(idempotencyKey).toBe('idem-refund-1');
     });
+
+    it.each([
+      [
+        'a prepayment',
+        { receiptPaymentMode: 'full_prepayment' },
+        'full_prepayment'
+      ],
+      [
+        'a full payment',
+        { receiptPaymentMode: 'full_payment' },
+        'full_payment'
+      ],
+      ['a payment made before the key existed', {}, 'full_payment'],
+      [
+        'an unknown stored value',
+        { receiptPaymentMode: 'credit' },
+        'full_payment'
+      ]
+    ])(
+      'states the settlement method of the original receipt on the refund receipt: %s',
+      async (_case, stored, expected) => {
+        const { provider, client } = await build();
+
+        client!.getPayment.mockResolvedValue({
+          id: 'pay-10',
+          amount: { value: '500.00', currency: 'RUB' },
+          description: '500 credits',
+          metadata: { userId: 'user-1', ...stored }
+        });
+        client!.createRefund.mockResolvedValue({ id: 'ref-3' });
+
+        await provider.refund('pay-10', 0);
+
+        const [payload] = client!.createRefund.mock.calls[0] as [ICreateRefund];
+
+        expect(payload.receipt!.items[0]).toMatchObject({
+          payment_subject: 'service',
+          payment_mode: expected
+        });
+      }
+    );
 
     it('refunds the full payment amount when amount is zero', async () => {
       const { provider, client } = await build();

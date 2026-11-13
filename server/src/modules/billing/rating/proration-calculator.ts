@@ -41,7 +41,8 @@ export class ProrationCalculator {
               {
                 description: `${input.toPlan.name}: prorated (${remainderDays} of ${totalDays} days)`,
                 amountMinor: chargeMinor,
-                quantity: 1
+                quantity: 1,
+                paymentMode: 'full_payment'
               }
             ]
           : []

@@ -315,7 +315,16 @@ export class BillingUserService {
       amountMinor,
       currency: price.currency,
       description,
-      receiptItems: [{ description, amountMinor, quantity: 1 }],
+      receiptItems: [
+        {
+          description,
+          amountMinor,
+          quantity: 1,
+          // Credits are paid before the usage they buy (54-FZ prepayment).
+          paymentMode:
+            product.type === 'credits' ? 'full_prepayment' : 'full_payment'
+        }
+      ],
       productId: product.id,
       urls: {
         successUrl: this.checkoutUrl('success'),
