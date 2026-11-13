@@ -22,7 +22,8 @@ import {
 } from '@app/shared/utils/billing-rules';
 import {
   CHANGEABLE_SUBSCRIPTION_STATUSES,
-  ErrorKeys
+  ErrorKeys,
+  FREE_PLAN_KEY
 } from '@app/shared/constants';
 import type { PlanPrice, ProrationPreviewResponse } from '@app/shared/types';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -46,6 +47,7 @@ import {
 } from '../rating/proration-calculator';
 import {
   currentPlanMissing,
+  freePlanNotPurchasable,
   planNotFound,
   subscriptionNotLinked
 } from '../utils/billing-errors.util';
@@ -698,6 +700,10 @@ export class PlanChangeService {
 
     if (!toPlan || !toPlan.active) {
       throw planNotFound(planKey);
+    }
+
+    if (toPlan.key === FREE_PLAN_KEY) {
+      throw freePlanNotPurchasable();
     }
 
     if (toPlan.key === subscription.planKey) {

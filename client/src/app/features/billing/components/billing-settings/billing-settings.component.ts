@@ -22,13 +22,13 @@ import {
 } from '@app/shared/constants';
 import { LayoutService } from '@core/services/layout.service';
 import { NotifyService } from '@core/services/notify.service';
-import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
 import { ListEmptyComponent } from '@shared/components/list-empty/list-empty.component';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { CatalogTextPipe } from '../../pipes/catalog-text.pipe';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
+import { SubscriptionCancelService } from '../../services/subscription-cancel.service';
 import {
   dropPaddleTransactionId,
   PaddleCheckoutService,
@@ -72,7 +72,7 @@ export class BillingSettingsComponent implements OnInit {
   protected readonly store = inject(BillingStore);
   readonly #entitlements = inject(EntitlementsStore);
   readonly #layout = inject(LayoutService);
-  readonly #dialog = inject(AdaptiveDialogService);
+  readonly #cancelService = inject(SubscriptionCancelService);
   readonly #matDialog = inject(MatDialog);
   readonly #transloco = inject(TranslocoService);
   readonly #destroyRef = inject(DestroyRef);
@@ -116,9 +116,18 @@ export class BillingSettingsComponent implements OnInit {
 
     const price = planPriceFor(plan, sub.provider);
 
-    return price
-      ? formatMoney(price.amountMinor, price.currency, this.#lang())
-      : '';
+    if (!price) return '';
+
+    // A usage plan has no flat fee: its price is the price of one unit.
+    if (plan.billingMode === 'usage') {
+      return formatMoney(
+        price.unitPriceMinor ?? 0,
+        price.currency,
+        this.#lang()
+      );
+    }
+
+    return formatMoney(price.amountMinor, price.currency, this.#lang());
   });
 
   protected readonly canCancel = computed(() => {
@@ -226,28 +235,6 @@ export class BillingSettingsComponent implements OnInit {
   }
 
   onCancel(): void {
-    // A metered plan is postpaid: the units of the period being closed are
-    // charged at the boundary, which the generic copy does not say.
-    const messageKey =
-      this.store.subscription()?.billingMode === 'usage'
-        ? 'billing.settings.cancelMessageUsage'
-        : 'billing.settings.cancelMessage';
-
-    this.#dialog
-      .openConfirm({
-        title: this.#transloco.translate('billing.settings.cancelTitle'),
-        message: this.#transloco.translate(messageKey),
-        confirmButton: this.#transloco.translate(
-          'billing.settings.cancelConfirm'
-        ),
-        cancelButton: this.#transloco.translate('common.cancel'),
-        icon: 'warning'
-      })
-      .pipe(takeUntilDestroyed(this.#destroyRef))
-      .subscribe((confirmed) => {
-        if (confirmed) {
-          void this.store.cancel('period_end');
-        }
-      });
+    void this.#cancelService.confirmAndCancel();
   }
 }

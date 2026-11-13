@@ -275,12 +275,13 @@ export class YooKassaProvider implements PaymentProvider {
       planKey: plan.key
     };
 
-    // Trial = zero-amount card binding (save the method now, charge at trial end
-    // via the scheduler); no money moves, so no fiscal receipt. A paid first
-    // period creates a real payment with a 54-FZ receipt.
+    // A zero first charge (a trial, or a postpaid usage plan) is a card binding:
+    // the method is saved now and the scheduler charges later. No money moves,
+    // so no fiscal receipt. A paid first period has a 54-FZ receipt.
+    const amountMinor = isTrial ? 0 : price.amountMinor;
     const payload: ICreatePayment = {
       amount: {
-        value: toAmountValue(isTrial ? 0 : price.amountMinor, price.currency),
+        value: toAmountValue(amountMinor, price.currency),
         currency: price.currency
       },
       capture: true,
@@ -289,7 +290,7 @@ export class YooKassaProvider implements PaymentProvider {
       description: plan.name,
       metadata,
       merchant_customer_id: customer.id,
-      ...(isTrial
+      ...(amountMinor === 0
         ? {}
         : {
             receipt: await this.buildReceipt(
@@ -297,7 +298,7 @@ export class YooKassaProvider implements PaymentProvider {
               [
                 {
                   description: plan.name,
-                  amountMinor: price.amountMinor,
+                  amountMinor,
                   quantity: 1
                 }
               ],

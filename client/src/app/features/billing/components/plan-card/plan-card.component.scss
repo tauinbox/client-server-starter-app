@@ -129,7 +129,8 @@
   }
 }
 
-.current-badge {
+.current-badge,
+.plan-note {
   display: inline-flex;
   gap: vars.$spacing-xs;
   align-items: center;
@@ -144,4 +145,9 @@
     height: func.rem(20);
     font-size: func.rem(20);
   }
+}
+
+.plan-note {
+  font-weight: vars.$font-weight-regular;
+  color: var(--mat-sys-on-surface-variant);
 }

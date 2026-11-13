@@ -29,28 +29,86 @@
       </div>
     }
 
-    <div class="plan-grid">
-      @for (item of pricedPlans(); track item.key) {
-        <nxs-plan-card
-          [plan]="item.plan"
-          [price]="item.price"
-          [featured]="item.featured"
-          [current]="item.current"
-          [changePlan]="store.hasActiveSubscription()"
-          [disabled]="actionsDisabled()"
-          (choose)="onChoose($event)"
-        />
+    <div class="plan-layout">
+      @if (freeCard(); as free) {
+        <div class="free-column">
+          <nxs-plan-card
+            [plan]="free.plan"
+            [price]="free.price"
+            [current]="free.current"
+            [actionKey]="free.actionKey"
+            [note]="
+              freeFrom()
+                ? t('billing.pricing.freeFrom', {
+                    date: freeFrom() | localizedDate: 'mediumDate' : 'UTC'
+                  })
+                : null
+            "
+            [disabled]="store.working()"
+            (choose)="onChoose($event)"
+          />
+        </div>
       }
-    </div>
 
-    @if (usagePlan()) {
-      <div class="usage-teaser">
-        <mat-icon aria-hidden="true">bolt</mat-icon>
-        <span>{{
-          t('billing.pricing.usageTeaser', { price: usagePrice() })
-        }}</span>
-      </div>
-    }
+      <section class="paid-column" aria-labelledby="paid-plans-title">
+        <header class="paid-header">
+          <h2 id="paid-plans-title">{{ t('billing.pricing.paidTitle') }}</h2>
+          @if (showModeToggle()) {
+            <mat-button-toggle-group
+              class="mode-toggle"
+              [attr.aria-label]="t('billing.mode.label')"
+              [value]="paidMode()"
+              (change)="setPaidMode($event.value)"
+            >
+              <mat-button-toggle value="fixed">
+                {{ t('billing.mode.fixed') }}
+              </mat-button-toggle>
+              <mat-button-toggle value="usage">
+                {{ t('billing.mode.usage') }}
+              </mat-button-toggle>
+            </mat-button-toggle-group>
+          }
+        </header>
+
+        <div class="paid-grid">
+          @for (item of paidCards(); track item.key) {
+            <nxs-plan-card
+              [plan]="item.plan"
+              [price]="item.price"
+              [featured]="item.featured"
+              [current]="item.current"
+              [actionKey]="item.actionKey"
+              [disabled]="actionsDisabled()"
+              (choose)="onChoose($event)"
+            />
+          }
+
+          @if (paidMode() === 'usage') {
+            <aside class="usage-how">
+              <h3>{{ t('billing.pricing.usageHow.title') }}</h3>
+              <ul>
+                <li>
+                  <mat-icon aria-hidden="true">money_off</mat-icon>
+                  {{ t('billing.pricing.usageHow.noFee') }}
+                </li>
+                <li>
+                  <mat-icon aria-hidden="true">event</mat-icon>
+                  {{ t('billing.pricing.usageHow.billing') }}
+                </li>
+                <li>
+                  <mat-icon aria-hidden="true">toll</mat-icon>
+                  {{ t('billing.pricing.usageHow.credits') }}
+                </li>
+                <li>
+                  <mat-icon aria-hidden="true">swap_horiz</mat-icon>
+                  {{ t('billing.pricing.usageHow.switch') }}
+                </li>
+              </ul>
+            </aside>
+          }
+        </div>
+      </section>
+    </div>
 
     <!-- One-time purchases: SKU catalog + donation (design §21.4). -->
     @if (showOneTime()) {

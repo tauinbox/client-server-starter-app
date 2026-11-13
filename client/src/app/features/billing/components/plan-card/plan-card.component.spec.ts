@@ -64,14 +64,39 @@ describe('PlanCardComponent', () => {
     expect(el.querySelector('button')).toBeNull();
   });
 
-  it('labels the action "Change plan" for a plan change', () => {
-    fixture.componentRef.setInput('changePlan', true);
+  it('labels the action with the given key', () => {
+    fixture.componentRef.setInput('actionKey', 'billing.settings.changePlan');
     fixture.detectChanges();
     const button = (fixture.nativeElement as HTMLElement).querySelector(
       'button'
     );
 
     expect(button?.textContent?.trim()).toBe('Change plan');
+  });
+
+  it('shows the note in place of the action', () => {
+    fixture.componentRef.setInput('note', 'From Feb 1, 2024');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('.plan-note')?.textContent).toContain(
+      'From Feb 1, 2024'
+    );
+    expect(el.querySelector('button')).toBeNull();
+  });
+
+  it('prices a fixed plan per month and a usage plan per unit', () => {
+    const interval = (): string =>
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('.interval')
+        ?.textContent?.trim() ?? '';
+
+    fixture.detectChanges();
+    expect(interval()).toBe('/mo');
+
+    fixture.componentRef.setInput('plan', { ...plan, billingMode: 'usage' });
+    fixture.detectChanges();
+    expect(interval()).toBe('/ unit');
   });
 
   it('emits choose with the plan key on click', () => {

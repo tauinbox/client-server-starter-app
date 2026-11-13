@@ -15,6 +15,13 @@ export function planNotFound(planKey: string): ApiError {
   );
 }
 
+export function freePlanNotPurchasable(): ApiError {
+  return new ApiError(
+    ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE,
+    'The Free plan needs no purchase. To return to it, cancel your subscription.'
+  );
+}
+
 export function currentPlanMissing(): ApiError {
   return new ApiError(
     ErrorKeys.BILLING.CURRENT_PLAN_MISSING,

@@ -111,6 +111,7 @@ export const ErrorKeys = {
     PROVIDER_NOT_CONFIGURED: 'errors.billing.providerNotConfigured',
     ALREADY_SUBSCRIBED: 'errors.billing.alreadySubscribed',
     PLAN_NOT_FOUND: 'errors.billing.planNotFound',
+    FREE_PLAN_NOT_PURCHASABLE: 'errors.billing.freePlanNotPurchasable',
     PLAN_UNAVAILABLE_FOR_PROVIDER: 'errors.billing.planUnavailableForProvider',
     PLAN_NOT_CONFIGURED: 'errors.billing.planNotConfigured',
     SAME_PLAN: 'errors.billing.samePlan',

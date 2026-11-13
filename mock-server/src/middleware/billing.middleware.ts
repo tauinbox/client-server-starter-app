@@ -30,6 +30,7 @@ import {
   ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
   type ErrorKey,
+  FREE_PLAN_KEY,
   INVOICE_LIST_QUERY,
   OPEN_SUBSCRIPTION_STATUSES,
   SUBSCRIPTION_LIST_QUERY,
@@ -292,8 +293,14 @@ function findCustomer(userId: string): MockCustomer | undefined {
   return undefined;
 }
 
-/** Plan key of the default (no-subscription) tier - mirrors FREE_PLAN_KEY. */
-const FREE_PLAN_KEY = 'free';
+// Mirrors freePlanNotPurchasable: Free is the absence of a subscription.
+function refuseFreePlan(res: Response): void {
+  sendError(
+    res,
+    ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE,
+    'The Free plan needs no purchase. To return to it, cancel your subscription.'
+  );
+}
 
 function findPlanByKey(key: string): MockPlan | undefined {
   for (const plan of getState().plans.values()) {
@@ -832,6 +839,12 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     return;
   }
 
+  if (plan.key === FREE_PLAN_KEY) {
+    refuseFreePlan(res);
+
+    return;
+  }
+
   const customer = getOrCreateCustomer(user.id, user.locale);
 
   const hasActive = getState()
@@ -1006,6 +1019,12 @@ function guardChange(req: Request, res: Response): ChangeGuardResult | null {
       ErrorKeys.BILLING.PLAN_NOT_FOUND,
       `Plan "${planKey}" was not found`
     );
+
+    return null;
+  }
+
+  if (toPlan.key === FREE_PLAN_KEY) {
+    refuseFreePlan(res);
 
     return null;
   }

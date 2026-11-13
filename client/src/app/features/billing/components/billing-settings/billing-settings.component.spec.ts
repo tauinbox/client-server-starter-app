@@ -20,6 +20,7 @@ import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service'
 import { AuthStore } from '@features/auth/store/auth.store';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { CheckoutRedirectService } from '../../services/checkout-redirect.service';
+import { SubscriptionCancelService } from '../../services/subscription-cancel.service';
 import { PaddleCheckoutService } from '../../services/paddle-checkout.service';
 import { BillingStore } from '../../store/billing.store';
 import { EntitlementsStore } from '../../store/entitlements.store';
@@ -196,6 +197,7 @@ describe('BillingSettingsComponent', () => {
         { provide: AuthStore, useValue: { isAuthenticated: signal(true) } },
         { provide: EntitlementsStore, useValue: entitlementsMock },
         { provide: AdaptiveDialogService, useValue: dialogMock },
+        SubscriptionCancelService,
         { provide: MatDialog, useValue: matDialogMock },
         { provide: LayoutService, useValue: { isHandset: signal(false) } },
         { provide: CheckoutRedirectService, useValue: redirectMock },
@@ -222,6 +224,28 @@ describe('BillingSettingsComponent', () => {
 
     expect(text).toContain('Pro');
     expect(text).toContain('$12.00');
+  });
+
+  it('prices a usage plan per unit and names the next bill instead of a renewal', async () => {
+    await setup(true, { subscription: { ...activeSub, billingMode: 'usage' } });
+    storeMock.currentPlan.set({
+      ...proPlan,
+      key: 'usage',
+      name: 'Pay as you go',
+      billingMode: 'usage',
+      prices: {
+        paddle: { currency: 'USD', amountMinor: 0, unitPriceMinor: 2 }
+      }
+    });
+    fixture.detectChanges();
+    const meta =
+      (fixture.nativeElement as HTMLElement).querySelector('.plan-meta')
+        ?.textContent ?? '';
+
+    expect(meta).toContain('$0.02');
+    expect(meta).toContain('/ unit');
+    expect(meta).toContain('Next bill');
+    expect(meta).not.toContain('Renews');
   });
 
   it('shows the region control in the page header', async () => {
@@ -312,6 +336,7 @@ describe('BillingSettingsComponent', () => {
   it('confirms then cancels the subscription', async () => {
     await setup(true);
     fixture.componentInstance.onCancel();
+    await fixture.whenStable();
     expect(dialogMock.openConfirm).toHaveBeenCalled();
     expect(storeMock.cancel).toHaveBeenCalledWith('period_end');
     expect(dialogMock.openConfirm.mock.calls[0][0].message).not.toContain(

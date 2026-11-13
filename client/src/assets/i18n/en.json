@@ -190,6 +190,7 @@
       "providerNotConfigured": "Payments are not set up on this server.",
       "alreadySubscribed": "You already have an active subscription. Cancel it before you subscribe to another plan.",
       "planNotFound": "This plan was not found.",
+      "freePlanNotPurchasable": "The Free plan needs no purchase. To return to it, cancel your subscription.",
       "planUnavailableForProvider": "This plan is not available in your billing region.",
       "planNotConfigured": "This plan cannot be purchased at the moment. Please contact support.",
       "samePlan": "You are already on this plan.",

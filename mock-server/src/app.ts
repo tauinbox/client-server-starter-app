@@ -6,6 +6,9 @@ import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import { registerRoutes } from './middleware';
 import controlRouter from './control.routes';
 import mockCheckoutRouter, { MOCK_CHECKOUT_PATH } from './routes/mock-checkout';
+import mockBillingLabRouter, {
+  MOCK_BILLING_LAB_PATH
+} from './routes/mock-billing-lab';
 import {
   errorEnvelope,
   routeNotFound,
@@ -78,6 +81,7 @@ export function createApp() {
   app.use('/__control', controlRouter);
 
   app.use(MOCK_CHECKOUT_PATH, mockCheckoutRouter);
+  app.use(MOCK_BILLING_LAB_PATH, mockBillingLabRouter);
 
   // Application routes
   registerRoutes(app);

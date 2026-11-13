@@ -304,7 +304,8 @@ describe('PlanChangeService', () => {
       const byKey: Record<string, Plan> = {
         pro: proPlan,
         business: businessPlan,
-        usage: usagePlan
+        usage: usagePlan,
+        free: makePlan({ key: 'free', name: 'Free' })
       };
 
       ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
@@ -875,7 +876,7 @@ describe('PlanChangeService', () => {
       expect(ctx.emit).not.toHaveBeenCalled();
     });
 
-    it('guards: no subscription, same plan, past_due, scheduled cancel, missing provider price', async () => {
+    it('guards: no subscription, same plan, the Free plan, past_due, scheduled cancel, missing provider price', async () => {
       const ctx = await build();
 
       plansByKey(ctx);
@@ -891,6 +892,16 @@ describe('PlanChangeService', () => {
       await expectRefusal(
         ctx.service.changePlan('user-1', 'pro'),
         ErrorKeys.BILLING.SAME_PLAN
+      );
+
+      // Free is the absence of a subscription: the way back is a cancel.
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'free'),
+        ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE
+      );
+      await expectRefusal(
+        ctx.service.previewChange('user-1', 'free'),
+        ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE
       );
 
       ctx.subscriptions.findOne.mockResolvedValue(

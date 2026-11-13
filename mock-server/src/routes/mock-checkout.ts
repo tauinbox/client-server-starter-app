@@ -7,6 +7,7 @@ import {
   settleSelfManagedCheckout
 } from '../helpers/billing-settle.helpers';
 import type { MockCheckoutSession, MockPurchaseSession } from '../types';
+import { escapeHtml, formatAmount } from '../utils/html';
 
 // Stands in for the hosted checkout page of the provider. The server sends
 // the buyer to the provider; the mock sends the buyer here, so a checkout can
@@ -36,22 +37,6 @@ function findSession(sessionRef: string): OpenSession | undefined {
   const checkout = state.billingCheckoutSessions.get(sessionRef);
 
   return checkout ? { kind: 'checkout', session: checkout } : undefined;
-}
-
-function escapeHtml(value: string): string {
-  return value.replaceAll(
-    /[&<>"']/g,
-    (char) =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[
-        char
-      ] ?? char
-  );
-}
-
-function formatAmount(amountMinor: number, currency: string): string {
-  return new Intl.NumberFormat('en', { style: 'currency', currency }).format(
-    amountMinor / 100
-  );
 }
 
 function describe(open: OpenSession): { title: string; amount: string } {

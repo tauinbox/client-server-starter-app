@@ -13,38 +13,34 @@ import {
 } from './state';
 import type { StateSnapshot } from './control.types';
 import type {
-  MockInvoice,
   MockIssuedToken,
   MockPermission,
   MockRole,
   MockRolePermission,
   MockSubscription,
-  MockUsageRecord,
   MockUser,
   OAuthAccount,
   State
 } from './types';
 import {
-  BILLING_PROVIDER_FLAGS,
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
-  ENTITLED_SUBSCRIPTION_STATUSES,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS
 } from '@app/shared/constants';
 import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
-import { meteredWindowStart, rateUsage } from '@app/shared/utils/billing-rules';
 import { generateMfaPendingToken } from './jwt.utils';
-import {
-  billClosingUsagePeriod,
-  sumPlanMeterUnits
-} from './helpers/billing.helpers';
 import { pushToUser } from './sse-hub';
 import {
   activateSubscription,
-  notifyEntitlementsChanged,
   settlePurchase
 } from './helpers/billing-settle.helpers';
-import { nextPeriodEnd } from './utils/period';
+import {
+  advanceRenewal,
+  findRenewableSubscription,
+  seedUsage,
+  setProviderEnabled,
+  type RenewalOutcome
+} from './helpers/billing-clock.helpers';
 import { notifyRoleHolders } from './middleware/roles.middleware';
 
 const router = Router();
@@ -591,11 +587,11 @@ router.post('/billing/provider-enabled', (req, res) => {
     provider?: string;
     enabled?: boolean;
   };
-  const flagKey = BILLING_PROVIDER_FLAGS.find(
-    (p) => p.provider === provider
-  )?.enabledFlagKey;
 
-  if (!flagKey || typeof enabled !== 'boolean') {
+  if (
+    typeof enabled !== 'boolean' ||
+    !setProviderEnabled(provider ?? '', enabled)
+  ) {
     res.status(400).json({
       message: 'provider (paddle | yookassa) and enabled (boolean) are required'
     });
@@ -603,11 +599,7 @@ router.post('/billing/provider-enabled', (req, res) => {
     return;
   }
 
-  for (const flag of getState().featureFlags.values()) {
-    if (flag.key === flagKey) flag.enabled = enabled;
-  }
-
-  res.json({ message: `${flagKey} ${enabled ? 'enabled' : 'disabled'}` });
+  res.json({ message: `${provider} ${enabled ? 'enabled' : 'disabled'}` });
 });
 
 // POST /__control/billing/activate-subscription - put a user on a plan for E2E
@@ -658,8 +650,8 @@ router.post('/billing/activate-subscription', (req, res) => {
 router.post('/billing/seed-usage', (req, res) => {
   const {
     customerId,
-    meterKey = 'api_calls',
-    quantity = 1,
+    meterKey,
+    quantity,
     occurredAt,
     subscriptionId,
     idempotencyKey
@@ -679,36 +671,28 @@ router.post('/billing/seed-usage', (req, res) => {
   }
 
   const state = getState();
-  const subId =
-    subscriptionId ??
-    state.billingSubscriptions.values().find((s) => s.customerId === customerId)
-      ?.id;
+  const subscription = subscriptionId
+    ? state.billingSubscriptions.get(subscriptionId)
+    : state.billingSubscriptions
+        .values()
+        .find((s) => s.customerId === customerId);
 
-  if (!subId) {
+  if (!subscription) {
     res.status(404).json({ message: 'no subscription for customer' });
 
     return;
   }
 
-  // The default is the start of the open metered window, not the clock. The
-  // window closes at [start, now), so a record stamped "now" and a renewal
-  // advanced in the same millisecond drop the record from the window it was
-  // seeded for.
-  const now = new Date().toISOString();
-  const seededFor = state.billingSubscriptions.get(subId);
-  const record: MockUsageRecord = {
-    id: randomUUID(),
-    customerId,
-    subscriptionId: subId,
-    meterKey,
-    quantity,
-    occurredAt: occurredAt ?? (seededFor ? meteredWindowStart(seededFor) : now),
-    idempotencyKey: idempotencyKey ?? `seed-${randomUUID()}`,
-    recordedAt: now
-  };
-
-  state.billingUsageRecords.set(record.id, record);
-  res.json(toUsageResponse(record));
+  res.json(
+    toUsageResponse(
+      seedUsage(subscription, {
+        meterKey,
+        quantity,
+        occurredAt,
+        idempotencyKey
+      })
+    )
+  );
 });
 
 // POST /__control/billing/complete-purchase - settle a pending purchase for
@@ -752,18 +736,9 @@ router.post('/billing/complete-purchase', (req, res) => {
   res.json(toInvoiceResponse(settlePurchase(session)));
 });
 
-// Mirrors the server's dunning policy (renewal-queue.constants).
-const DUNNING_MAX_ATTEMPTS = 3;
-
-// POST /__control/billing/advance-renewal — renewal-clock advance for E2E:
-// treats the subscription's current period as due NOW and runs one scheduler
-// pass on it, mirroring the server's period-close semantics. `outcome:
-// 'success'` (default) charges and advances: fixed subs get a paid invoice at
-// the plan price covering the NEW period; usage subs get a postpaid invoice
-// covering the CLOSED period (records with occurredAt in [periodStart, now),
-// overage beyond includedUnits at unitPriceMinor; zero usage → zero invoice,
-// no charge). `outcome: 'failure'` simulates a declined off-session charge:
-// past_due + dunning, canceling once the attempts are exhausted.
+// POST /__control/billing/advance-renewal - renewal-clock advance for E2E:
+// one scheduler pass on the current period of the subscription, as if it were
+// due now. The semantics are on advanceRenewal.
 router.post('/billing/advance-renewal', (req, res) => {
   const {
     userId,
@@ -772,7 +747,7 @@ router.post('/billing/advance-renewal', (req, res) => {
   } = req.body as {
     userId?: string;
     subscriptionId?: string;
-    outcome?: 'success' | 'failure';
+    outcome?: RenewalOutcome;
   };
 
   if (outcome !== 'success' && outcome !== 'failure') {
@@ -781,32 +756,7 @@ router.post('/billing/advance-renewal', (req, res) => {
     return;
   }
 
-  // A canceled row is not addressable by either lookup branch — a scan may
-  // only charge and advance what the server's scan would.
-  const state = getState();
-  const byId = subscriptionId
-    ? state.billingSubscriptions.get(subscriptionId)
-    : undefined;
-  let subscription =
-    byId && ENTITLED_SUBSCRIPTION_STATUSES.includes(byId.status)
-      ? byId
-      : undefined;
-
-  if (!subscription && userId) {
-    const customer = state.billingCustomers
-      .values()
-      .find((c) => c.userId === userId);
-
-    subscription = customer
-      ? [...state.billingSubscriptions.values()]
-          .filter(
-            (s) =>
-              s.customerId === customer.id &&
-              ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
-          )
-          .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
-      : undefined;
-  }
+  const subscription = findRenewableSubscription({ userId, subscriptionId });
 
   if (!subscription) {
     res.status(404).json({ message: 'subscription not found' });
@@ -814,129 +764,15 @@ router.post('/billing/advance-renewal', (req, res) => {
     return;
   }
 
-  const now = new Date();
-  const nowIso = now.toISOString();
+  const advanced = advanceRenewal(subscription, outcome);
 
-  if (outcome === 'failure') {
-    // The server seals usage ingest at the anchor before it rates the window,
-    // and the seal outlives the decline: a retry re-rates the same window.
-    if (subscription.billingMode === 'usage') {
-      subscription.usageSealedUntil = nowIso;
-    }
-
-    const attempts = (subscription.dunningAttempts ?? 0) + 1;
-
-    subscription.dunningAttempts = attempts;
-    subscription.status =
-      attempts >= DUNNING_MAX_ATTEMPTS ? 'canceled' : 'past_due';
-
-    if (subscription.status === 'canceled') {
-      subscription.cancelAtPeriodEnd = false;
-    }
-
-    subscription.updatedAt = nowIso;
-    notifyEntitlementsChanged(subscription.customerId);
-    res.json(toSubscriptionResponse(subscription));
-
-    return;
-  }
-
-  const plan = state.plans.values().find((p) => p.key === subscription.planKey);
-  const price = plan?.prices[subscription.provider];
-
-  if (!plan || !price) {
+  if (!advanced) {
     res.status(404).json({ message: 'plan or price not found' });
 
     return;
   }
 
-  // Cancel-at-period-end: the boundary closes the row instead of opening
-  // another period. A postpaid metered period is rated and invoiced first -
-  // its units were consumed and are owed.
-  if (subscription.cancelAtPeriodEnd) {
-    billClosingUsagePeriod(subscription, now);
-    subscription.status = 'canceled';
-    subscription.updatedAt = nowIso;
-    notifyEntitlementsChanged(subscription.customerId);
-    res.json(toSubscriptionResponse(subscription));
-
-    return;
-  }
-
-  // The clock advance anchors the boundary at NOW: the closed window is
-  // [windowStart, now) and the new period [now, now + interval). The new
-  // end still lands on the billing day, as the server's renewal does.
-  const closedStart = meteredWindowStart(subscription);
-  // A trial converts into its first paid period, which re-anchors the billing
-  // day there - the same rule the server's renewal applies at trial_end.
-  const billingAnchor =
-    subscription.status === 'trialing'
-      ? now
-      : new Date(
-          subscription.billingAnchorAt ?? subscription.currentPeriodStart
-        );
-  const newEnd = nextPeriodEnd(billingAnchor, now, plan.interval);
-
-  let { amountMinor } = price;
-  let periodStart = nowIso;
-  let periodEnd = newEnd.toISOString();
-
-  if (subscription.billingMode === 'usage') {
-    const totalUnits = sumPlanMeterUnits(plan, subscription.id, {
-      startIso: closedStart,
-      endIso: nowIso
-    });
-    // The deduction settles with the postpaid invoice below, as the server's
-    // spend commit does.
-    const balance = state.billingCreditBalances.get(subscription.customerId);
-    const rated = rateUsage({
-      totalUnits,
-      price,
-      availableCreditUnits: balance?.balanceUnits ?? 0
-    });
-
-    if (balance && rated.creditUnitsApplied > 0) {
-      balance.balanceUnits -= rated.creditUnitsApplied;
-      balance.updatedAt = nowIso;
-    }
-
-    amountMinor = rated.amountMinor;
-    periodStart = closedStart;
-    periodEnd = nowIso;
-  }
-
-  const invoice: MockInvoice = {
-    id: randomUUID(),
-    customerId: subscription.customerId,
-    subscriptionId: subscription.id,
-    provider: subscription.provider,
-    providerInvoiceRef: `in_${randomUUID()}`,
-    amountMinor,
-    currency: price.currency,
-    status: 'paid',
-    billingMode: subscription.billingMode,
-    kind: 'subscription',
-    productId: null,
-    periodStart,
-    periodEnd,
-    paidAt: nowIso,
-    receiptRef: null,
-    createdAt: nowIso,
-    updatedAt: nowIso
-  };
-
-  state.billingInvoices.set(invoice.id, invoice);
-
-  subscription.status = 'active';
-  subscription.trialEnd = null;
-  subscription.dunningAttempts = 0;
-  subscription.currentPeriodStart = nowIso;
-  subscription.currentPeriodEnd = newEnd.toISOString();
-  subscription.billingAnchorAt = billingAnchor.toISOString();
-  delete subscription.meteredFrom;
-  subscription.updatedAt = nowIso;
-  notifyEntitlementsChanged(subscription.customerId);
-  res.json(toSubscriptionResponse(subscription));
+  res.json(toSubscriptionResponse(advanced));
 });
 
 export default router;

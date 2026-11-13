@@ -372,13 +372,16 @@ test.describe('Billing', () => {
 
     await page.goto('/billing');
 
-    for (const plan of ['Free', 'Business']) {
-      await expect(
-        page
-          .locator('nxs-plan-card', { hasText: plan })
-          .getByRole('button', { name: 'Change plan' })
-      ).toBeVisible();
-    }
+    await expect(
+      page
+        .locator('nxs-plan-card', { hasText: 'Free' })
+        .getByRole('button', { name: 'Switch to Free' })
+    ).toBeVisible();
+    await expect(
+      page
+        .locator('nxs-plan-card', { hasText: 'Business' })
+        .getByRole('button', { name: 'Change plan' })
+    ).toBeVisible();
 
     await expect(page.getByRole('button', { name: 'Choose' })).toHaveCount(0);
 
@@ -816,12 +819,55 @@ test.describe('Billing', () => {
     await page.getByRole('button', { name: 'Change plan' }).click();
     const dialog = page.getByRole('dialog');
 
-    await dialog.getByRole('radio', { name: 'Fixed' }).click();
+    await dialog.getByRole('radio', { name: 'Subscription' }).click();
     await dialog.getByRole('radio', { name: /^Pro/ }).click();
     await expect(dialog.locator('.due-now dd')).toBeVisible();
     await dialog.getByRole('button', { name: 'Confirm' }).click();
 
     await expect(page.locator('.plan-summary')).toContainText('Pro');
     await expect(units).toHaveText('858');
+  });
+
+  test('a Free user starts pay as you go and returns to Free through a cancel', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await page.goto('/billing');
+
+    await page.getByRole('radio', { name: 'Pay as you go' }).click();
+    await expect(page.locator('.usage-how')).toBeVisible();
+    await page
+      .locator('.paid-grid nxs-plan-card', { hasText: 'Pay as you go' })
+      .getByRole('button', { name: 'Choose' })
+      .click();
+    await payOnMockCheckout(page);
+    await expect(page).toHaveURL(/\/billing\/success$/);
+
+    await page.goto('/billing/settings');
+    const summary = page.locator('.plan-summary');
+
+    await expect(summary).toContainText('Pay as you go');
+    await expect(summary).toContainText('/ unit');
+    await expect(summary).toContainText('Next bill');
+
+    // The usage subscriber lands on the pay as you go tiers.
+    await page.goto('/billing');
+    await expect(
+      page
+        .locator('.paid-grid nxs-plan-card', { hasText: 'Pay as you go' })
+        .locator('.current-badge')
+    ).toBeVisible();
+
+    await page
+      .locator('.free-column nxs-plan-card')
+      .getByRole('button', { name: 'Switch to Free' })
+      .click();
+    await expect(page.getByText('Metered usage recorded so far')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel subscription' }).click();
+
+    await expect(
+      page.locator('.free-column nxs-plan-card .plan-note')
+    ).toContainText('From');
   });
 });
