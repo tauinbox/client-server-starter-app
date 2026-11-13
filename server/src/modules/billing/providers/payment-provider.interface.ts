@@ -184,7 +184,12 @@ export interface CheckoutSession {
  * the service, so it is a prepayment; every other charge pays for a service
  * that is given now.
  */
-export type ReceiptPaymentMode = 'full_payment' | 'full_prepayment';
+export const RECEIPT_PAYMENT_MODES = [
+  'full_payment',
+  'full_prepayment'
+] as const;
+
+export type ReceiptPaymentMode = (typeof RECEIPT_PAYMENT_MODES)[number];
 
 /** A single line on a charge/receipt (54-FZ requires itemised receipts). */
 export interface ReceiptItem {

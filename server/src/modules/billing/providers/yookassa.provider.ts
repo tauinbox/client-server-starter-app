@@ -27,6 +27,7 @@ import { ApiError } from '../../../common/errors/api-error';
 import {
   ChargeDeclinedError,
   MANAGES_LIFECYCLE,
+  RECEIPT_PAYMENT_MODES,
   WEBHOOK_IGNORED
 } from './payment-provider.interface';
 import type {
@@ -56,11 +57,6 @@ const RECEIPT_PAYMENT_SUBJECT = 'service';
  * has lines of one method.
  */
 const RECEIPT_MODE_KEY = 'receiptPaymentMode';
-
-const RECEIPT_PAYMENT_MODES: readonly ReceiptPaymentMode[] = [
-  'full_payment',
-  'full_prepayment'
-];
 
 function receiptModeMetadata(
   items: readonly ReceiptItem[]
