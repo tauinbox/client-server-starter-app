@@ -969,6 +969,18 @@ the same permission both apply.
   **Adaptive confirm dialogs.** `AdaptiveDialogService.openConfirm()` opens a confirm dialog as a
   bottom sheet on a handset viewport, and as a standard dialog on a larger screen.
 
+### Legal documents
+
+- A public page `/legal/:jurisdiction/:kind` shows the terms, the privacy policy, the refund policy
+  and the contacts of the seller. There is one set for each jurisdiction: `ru` (YooKassa, 152-FZ)
+  and `intl` (Paddle, GDPR), each in English and Russian. The texts are JSON files in
+  `client/src/assets/legal/`, and the page renders them as text.
+- The app footer, the registration card and the pricing page link the documents. A signed-in user
+  follows the billing region, and an anonymous visitor follows the UI language.
+- `LEGAL_DOCUMENTS` (`shared/src/constants`) holds the version and the status of each document. A
+  production build shows only a `published` version, so the current drafts show only in a
+  development build.
+
 ### Versioning
 
 - The three workspaces share one version. Refer to `package.json`.
@@ -1937,8 +1949,8 @@ activates the git hooks through the `prepare` script.
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3238 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 932 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 910 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1690 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 344 tests |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1747 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 345 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1450 tests pass |
 
 ## CI/CD
