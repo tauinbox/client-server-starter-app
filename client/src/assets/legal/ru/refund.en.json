@@ -1,0 +1,43 @@
+{
+  "title": "Refund terms",
+  "updatedAt": "2026-11-14",
+  "sections": [
+    {
+      "heading": "1. General",
+      "paragraphs": [
+        "These terms are a part of the public offer of [SELLER LEGAL NAME, SOLE PROPRIETOR] and apply to payments taken through the YooKassa payment service.",
+        "These terms do not limit the consumer rights set by the law of the Russian Federation.",
+        "This English text is a translation for convenience. The Russian text prevails."
+      ]
+    },
+    {
+      "heading": "2. Subscription",
+      "paragraphs": [
+        "The User can cancel the subscription at any time. Access stays until the end of the paid period, and the next charge is not made.",
+        "When the User withdraws from the contract during a paid period, the User can demand a refund of the price of the unused part of the period, less the costs that the Provider actually had (Article 32 of the Law of the Russian Federation \"On Protection of Consumer Rights\").",
+        "When the User moves to another plan, the price of the unused part of the period of the old plan is credited or refunded automatically."
+      ]
+    },
+    {
+      "heading": "3. Credits and one-time purchases",
+      "paragraphs": [
+        "Unused credits can be refunded at the request of the User. Spent credits and services already supplied are not refunded.",
+        "Voluntary donations are not refunded, except for a payment made by mistake."
+      ]
+    },
+    {
+      "heading": "4. How to request a refund",
+      "paragraphs": [
+        "Send the request to the email address [EMAIL] from the address of the account, with the date and the amount of the payment.",
+        "The Provider examines the request within [PERIOD] days."
+      ]
+    },
+    {
+      "heading": "5. How the refund is made",
+      "paragraphs": [
+        "The money returns by the same method as the payment. The time of the credit depends on the bank of the User.",
+        "A refund fiscal receipt is issued and sent to the email address of the User."
+      ]
+    }
+  ]
+}

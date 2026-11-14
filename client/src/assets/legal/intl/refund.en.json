@@ -1,0 +1,40 @@
+{
+  "title": "Refund policy",
+  "updatedAt": "2026-11-14",
+  "sections": [
+    {
+      "heading": "1. General",
+      "paragraphs": [
+        "This policy is a part of the Terms and conditions of [SELLER LEGAL NAME]. Paddle.com is the Merchant of Record for our orders and makes the refunds."
+      ]
+    },
+    {
+      "heading": "2. Subscriptions",
+      "paragraphs": [
+        "You can cancel a subscription at any time. Access stays until the end of the paid period, and the next charge is not made.",
+        "You can ask for a refund of a subscription payment within [REFUND PERIOD] days of the payment.",
+        "When you move to another plan, the unused part of the period of the old plan is credited or refunded automatically."
+      ]
+    },
+    {
+      "heading": "3. Credits and one-time purchases",
+      "paragraphs": [
+        "You can ask for a refund of unused credits within [REFUND PERIOD] days of the purchase. Spent credits are not refunded.",
+        "Voluntary donations are not refunded, except for a payment made by mistake."
+      ]
+    },
+    {
+      "heading": "4. Consumers in the EU and the UK",
+      "paragraphs": [
+        "If you are a consumer, you have a legal right to withdraw from a purchase within 14 days without a reason. This right ends when the supply of the digital service has started with your express consent and your acknowledgement that you lose the right."
+      ]
+    },
+    {
+      "heading": "5. How to request a refund",
+      "paragraphs": [
+        "Write to [EMAIL] from the address of your account, with the date and the amount of the payment, or use the link in the receipt from Paddle.",
+        "The money returns to the payment method that you used. The time of the credit depends on your bank."
+      ]
+    }
+  ]
+}

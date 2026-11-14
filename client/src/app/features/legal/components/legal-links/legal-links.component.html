@@ -1,0 +1,12 @@
+@if (links().length > 0) {
+  <div class="legal-links" *transloco="let t">
+    @if (intro(); as introKey) {
+      <span>{{ t(introKey) }}</span>
+    }
+    @for (kind of links(); track kind) {
+      <a [routerLink]="['/', legalSegment, activeJurisdiction(), kind]">{{
+        t('legal.kinds.' + kind)
+      }}</a>
+    }
+  </div>
+}

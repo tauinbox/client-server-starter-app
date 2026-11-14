@@ -1,0 +1,29 @@
+{
+  "title": "Contacts and seller details",
+  "updatedAt": "2026-11-14",
+  "sections": [
+    {
+      "heading": "Seller",
+      "paragraphs": [
+        "[SELLER LEGAL NAME, SOLE PROPRIETOR]",
+        "INN: [INN]",
+        "OGRNIP: [OGRNIP]",
+        "Address: [ADDRESS]"
+      ]
+    },
+    {
+      "heading": "How to reach the seller",
+      "paragraphs": [
+        "Email: [EMAIL]",
+        "Phone: [PHONE]",
+        "These contacts take payment questions, refund requests and personal data requests."
+      ]
+    },
+    {
+      "heading": "How the service is supplied",
+      "paragraphs": [
+        "Nexus is a digital service. Access to the paid functions opens in the account automatically after the payment is confirmed. There is no physical delivery."
+      ]
+    }
+  ]
+}

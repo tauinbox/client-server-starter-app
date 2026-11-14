@@ -23,6 +23,7 @@ import { DEFAULT_CURSOR_PAGE_SIZE, ErrorKeys } from '@app/shared/constants';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { NotifyService } from '@core/services/notify.service';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { LegalJurisdictionService } from '@features/legal/services/legal-jurisdiction.service';
 import { storeOverrideWarnings } from '../../../../test-utils/store-override-warnings';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 import { BILLING_API_V1, BillingService } from '../services/billing.service';
@@ -129,6 +130,7 @@ describe('BillingStore', () => {
     success: ReturnType<typeof vi.fn>;
     error: ReturnType<typeof vi.fn>;
   };
+  let legalMock: { setBillingRegion: ReturnType<typeof vi.fn> };
 
   function createStore() {
     return TestBed.inject(BillingStore);
@@ -185,14 +187,32 @@ describe('BillingStore', () => {
       )
     };
     notifyMock = { success: vi.fn(), error: vi.fn() };
+    legalMock = { setBillingRegion: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
         BillingStore,
         { provide: BillingService, useValue: billingMock },
-        { provide: NotifyService, useValue: notifyMock }
+        { provide: NotifyService, useValue: notifyMock },
+        { provide: LegalJurisdictionService, useValue: legalMock }
       ]
     });
+  });
+
+  it('reports each region it loads or changes to the legal links', async () => {
+    const store = createStore();
+
+    await store.loadRegion();
+    TestBed.tick();
+
+    expect(legalMock.setBillingRegion).toHaveBeenLastCalledWith(store.region());
+
+    await store.setRegion('ru');
+    TestBed.tick();
+
+    expect(legalMock.setBillingRegion).toHaveBeenLastCalledWith(
+      expect.objectContaining({ region: 'ru' })
+    );
   });
 
   it('loadSettings populates state and derives the current plan', async () => {

@@ -40,6 +40,10 @@
   }
 }
 
+.pricing-legal {
+  margin-top: vars.$spacing-xl;
+}
+
 .pricing-loading {
   @include mix.loading-container;
 }

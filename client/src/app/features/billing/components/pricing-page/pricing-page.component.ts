@@ -17,7 +17,12 @@ import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ViewportScroller } from '@angular/common';
-import { FREE_PLAN_KEY, PAY_AS_YOU_GO_PLAN_KEY } from '@app/shared/constants';
+import {
+  FREE_PLAN_KEY,
+  legalJurisdictionForProvider,
+  PAY_AS_YOU_GO_PLAN_KEY
+} from '@app/shared/constants';
+import { LegalLinksComponent } from '@features/legal/components/legal-links/legal-links.component';
 import type {
   BillingMode,
   PlanResponse,
@@ -83,7 +88,8 @@ type PricedProduct = {
     PlanCardComponent,
     RegionControlComponent,
     ProductCardComponent,
-    DonationCardComponent
+    DonationCardComponent,
+    LegalLinksComponent
   ],
   templateUrl: './pricing-page.component.html',
   styleUrl: './pricing-page.component.scss',
@@ -112,6 +118,13 @@ export class PricingPageComponent implements OnInit {
       this.store.region()?.effectiveProvider ?? null,
       this.#lang()
     )
+  );
+
+  protected readonly legalKinds = ['terms', 'refund', 'contacts'] as const;
+
+  /** The documents of the seller behind the prices on show. */
+  protected readonly legalJurisdiction = computed(() =>
+    legalJurisdictionForProvider(this.displayProvider())
   );
 
   // No region (anonymous, or not loaded) keeps the actions enabled; an

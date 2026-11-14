@@ -22,8 +22,14 @@
     @include mix.error-message;
   }
 
-  mat-card-actions p {
-    font-size: vars.$font-size-sm;
+  mat-card-actions {
+    flex-wrap: wrap;
+    row-gap: vars.$spacing-sm;
+
+    p {
+      margin: 0;
+      font-size: vars.$font-size-sm;
+    }
   }
 
   button[type='submit'] {

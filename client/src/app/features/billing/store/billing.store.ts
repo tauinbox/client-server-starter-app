@@ -1,8 +1,9 @@
-import { computed, inject } from '@angular/core';
+import { computed, effect, inject } from '@angular/core';
 import {
   patchState,
   signalStore,
   withComputed,
+  withHooks,
   withMethods,
   withState
 } from '@ngrx/signals';
@@ -30,6 +31,7 @@ import {
 import { NotifyService } from '@core/services/notify.service';
 import { withCursorList } from '@shared/store/with-cursor-list';
 import { isStaleStateRefusal } from '@shared/utils/http-error.utils';
+import { LegalJurisdictionService } from '@features/legal/services/legal-jurisdiction.service';
 import {
   BillingService,
   type PurchaseRequest
@@ -463,5 +465,15 @@ export const BillingStore = signalStore(
       cancel,
       setRegion
     };
-  })
+  }),
+  // The legal links outside the billing pages follow the same region.
+  withHooks((store, legal = inject(LegalJurisdictionService)) => ({
+    onInit(): void {
+      effect(() => {
+        const region = store.region();
+
+        if (region) legal.setBillingRegion(region);
+      });
+    }
+  }))
 );

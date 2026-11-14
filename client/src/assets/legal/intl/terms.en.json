@@ -1,0 +1,75 @@
+{
+  "title": "Terms and conditions",
+  "updatedAt": "2026-11-14",
+  "sections": [
+    {
+      "heading": "1. Who we are",
+      "paragraphs": [
+        "The Nexus service (the Service) is operated by [SELLER LEGAL NAME], a sole proprietor, [ADDRESS] (we, us).",
+        "These terms are a contract between you and us. When you create an account or buy a plan, you accept these terms."
+      ]
+    },
+    {
+      "heading": "2. The Service",
+      "paragraphs": [
+        "The Service is a web application that we supply online. The functions that you can use depend on your plan. The pricing page shows the plans, the credit packs, the one-time products and their prices.",
+        "The Service is digital. Access to the paid functions opens in your account automatically after the payment is confirmed. There is no physical delivery."
+      ]
+    },
+    {
+      "heading": "3. Your account",
+      "paragraphs": [
+        "You give true data at registration and keep your credentials secret. You are responsible for the activity in your account.",
+        "You must be of the age at which you can enter into a contract under the law of your country."
+      ]
+    },
+    {
+      "heading": "4. Orders and payment",
+      "paragraphs": [
+        "Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries about payments and handles returns.",
+        "Paddle calculates and collects the applicable taxes. The Paddle checkout shows the final price before you pay.",
+        "A subscription is paid in advance for a period and renews automatically for the next period until you cancel it. A credit pack is a prepayment; credits are spent as you use the Service."
+      ]
+    },
+    {
+      "heading": "5. Cancellation and refunds",
+      "paragraphs": [
+        "You can cancel a subscription at any time in the billing settings. Access stays until the end of the paid period, and no new charge is made.",
+        "The Refund policy is a part of these terms."
+      ]
+    },
+    {
+      "heading": "6. Acceptable use",
+      "paragraphs": [
+        "You do not use the Service to break the law or the rights of other persons, to get access to data of other users, or to disturb the operation of the Service.",
+        "We can suspend an account that breaks these terms."
+      ]
+    },
+    {
+      "heading": "7. Availability and changes",
+      "paragraphs": [
+        "We work to keep the Service available, but we do not promise that it is free of interruptions or errors. We can change the functions of the Service.",
+        "We can change these terms by publishing a new version in the Service. The version that you accepted at the payment applies to the paid period."
+      ]
+    },
+    {
+      "heading": "8. Liability",
+      "paragraphs": [
+        "To the extent that the law permits, our total liability to you is limited to the amount that you paid for the Service in the 12 months before the claim. Nothing in these terms limits a right that the consumer law of your country gives you and that a contract cannot remove."
+      ]
+    },
+    {
+      "heading": "9. Privacy",
+      "paragraphs": [
+        "The Privacy policy describes how we process your personal data."
+      ]
+    },
+    {
+      "heading": "10. Governing law and contact",
+      "paragraphs": [
+        "These terms are governed by the law of [GOVERNING LAW], without prejudice to the mandatory consumer law of your country of residence.",
+        "Contact us at [EMAIL]."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "title": "Personal data processing policy",
+  "updatedAt": "2026-11-14",
+  "sections": [
+    {
+      "heading": "1. Operator",
+      "paragraphs": [
+        "The operator of the personal data is [SELLER LEGAL NAME, SOLE PROPRIETOR] (INN [INN], OGRNIP [OGRNIP], address: [ADDRESS]), the Operator.",
+        "This policy follows Federal Law No. 152-FZ of 27.07.2006 \"On Personal Data\" and is published under Article 18.1 part 2 of that law.",
+        "This English text is a translation for convenience. The Russian text prevails."
+      ]
+    },
+    {
+      "heading": "2. Data that is processed",
+      "paragraphs": [
+        "Account data: the email address, the name, the password hash, the selected interface language.",
+        "Technical data: the IP address and the browser data (user agent) of each sign-in session and of the records of the activity log.",
+        "Payment data: the plan, the invoices and payments, the identifier of the saved payment method at the payment service. The Operator does not receive or store full bank card data.",
+        "For a sign-in through an external provider (OAuth): the account identifier at the selected provider, the email address and the name.",
+        "The Operator does not process special categories of personal data or biometric personal data."
+      ]
+    },
+    {
+      "heading": "3. Purposes and legal bases",
+      "paragraphs": [
+        "To conclude and perform the contract with the user: registration, sign-in, the functions of the service, payments, receipts and service notices. The basis is Article 6 part 1 point 5 of Law No. 152-FZ; this purpose needs no separate consent.",
+        "To perform the duties that the law sets, such as fiscal receipts and accounting. The basis is Article 6 part 1 point 2 of Law No. 152-FZ.",
+        "To protect the accounts and the service from unauthorized access and abuse.",
+        "For a purpose outside the contract (for example marketing mail), the data is processed only with a separate consent. No such processing occurs now."
+      ]
+    },
+    {
+      "heading": "4. Operations and data location",
+      "paragraphs": [
+        "The Operator collects, records, organizes, accumulates, stores, corrects, retrieves, uses, transfers in the cases of section 5, blocks, deletes and destroys personal data by automated means.",
+        "The recording, organization, accumulation, storage, correction and retrieval of the personal data of citizens of the Russian Federation use databases located in the Russian Federation."
+      ]
+    },
+    {
+      "heading": "5. Transfer to other persons",
+      "paragraphs": [
+        "To the YooKassa payment service (NBCO YooMoney LLC): the data necessary to make a payment and to issue a fiscal receipt.",
+        "To the email provider [NAME]: the email address and the text of the service message.",
+        "To the sign-in provider (OAuth) that the user selects: the data necessary for the sign-in.",
+        "To state authorities: in the cases that the law of the Russian Federation sets.",
+        "No cross-border transfer of personal data occurs."
+      ]
+    },
+    {
+      "heading": "6. Storage periods",
+      "paragraphs": [
+        "Account data is processed during the contract and is deleted after the account is deleted, unless the law requires a longer storage.",
+        "The records of the activity log are stored for [PERIOD] days. Payment documents are stored for the periods that tax and accounting law set."
+      ]
+    },
+    {
+      "heading": "7. Rights of the data subject",
+      "paragraphs": [
+        "The user can get information about the processing of the data, demand its correction, blocking or destruction, withdraw a consent when the processing rests on one, and complain about the Operator to Roskomnadzor or to a court.",
+        "A request is sent to the email address [EMAIL]. The Operator answers within the periods of Law No. 152-FZ."
+      ]
+    },
+    {
+      "heading": "8. Data protection",
+      "paragraphs": [
+        "The Operator takes the legal, organizational and technical measures of Article 19 of Law No. 152-FZ: encrypted connections, passwords stored as hashes, access control, an activity log, two-factor authentication."
+      ]
+    },
+    {
+      "heading": "9. Cookies",
+      "paragraphs": [
+        "The Service uses only the cookies necessary for the sign-in and the security of the session. It uses no advertising or analytics cookies."
+      ]
+    },
+    {
+      "heading": "10. Changes",
+      "paragraphs": [
+        "The Operator publishes a new version of the policy on this page. The date of the version is at the top of the document."
+      ]
+    }
+  ]
+}

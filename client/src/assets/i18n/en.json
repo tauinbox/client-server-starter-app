@@ -86,6 +86,24 @@
     "assign": "Assign",
     "refund": "Refund"
   },
+  "legal": {
+    "kinds": {
+      "terms": "Terms of service",
+      "privacy": "Privacy policy",
+      "refund": "Refund policy",
+      "contacts": "Contacts"
+    },
+    "jurisdictions": {
+      "ru": "Russia",
+      "intl": "Other countries"
+    },
+    "jurisdictionLabel": "Jurisdiction",
+    "draftNotice": "Draft. This text waits for a legal review and is not in force.",
+    "updatedAt": "Version of {{ date }}",
+    "errorLoadFailed": "The document could not be loaded.",
+    "introRegister": "Documents of the service:",
+    "introCheckout": "Purchase terms:"
+  },
   "errors": {
     "auth": {
       "invalidCredentials": "Invalid credentials",
