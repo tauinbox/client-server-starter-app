@@ -835,6 +835,9 @@ the same permission both apply.
   Paddle returns its zero-amount payment-method-change checkout. YooKassa binds the card again with a
   zero-amount payment, and its success webhook changes the default saved method. The old card is
   demoted and not deleted, and the next renewal charges the new token.
+- **Remove card.** While a card is on file, "Remove card" on the payment-method card asks for a
+  confirmation and calls `DELETE /api/v1/billing/payment-method`. The server deletes the saved cards
+  and ends the subscription at the close of its period, so no automatic payment follows.
 
   A `past_due` subscription can use this route, because a correction of the card is how dunning
   recovers.
