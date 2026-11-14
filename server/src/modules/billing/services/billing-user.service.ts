@@ -50,6 +50,7 @@ import {
 } from '../utils/billing-errors.util';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import { cancelFields } from '../utils/cancel-fields.util';
+import { SubscriptionCancelScheduledEvent } from '../events/billing.events';
 import { lockCustomerForCard } from '../utils/saved-card.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { AuditService } from '../../audit/audit.service';
@@ -643,51 +644,66 @@ export class BillingUserService {
       );
     }
 
-    await withTransaction(this.dataSource, async (manager) => {
-      if (!(await lockCustomerForCard(manager, customer.id))) return;
+    const scheduledLocally = await withTransaction(
+      this.dataSource,
+      async (manager) => {
+        if (!(await lockCustomerForCard(manager, customer.id))) return false;
 
-      const removedMethods =
-        (await manager.delete(PaymentMethod, { customerId: customer.id }))
-          .affected ?? 0;
-      let cancelScheduled = canceledAtProvider;
+        const removedMethods =
+          (await manager.delete(PaymentMethod, { customerId: customer.id }))
+            .affected ?? 0;
+        let cancelScheduled = canceledAtProvider;
+        let scheduledHere = false;
 
-      if (removedMethods) {
-        await manager.update(
-          Customer,
-          { id: customer.id },
-          { paymentMethodRemovedAt: new Date() }
-        );
-        const scheduled = await manager.update(
-          Subscription,
+        if (removedMethods) {
+          await manager.update(
+            Customer,
+            { id: customer.id },
+            { paymentMethodRemovedAt: new Date() }
+          );
+          const scheduled = await manager.update(
+            Subscription,
+            {
+              customerId: customer.id,
+              lifecycleOwner: 'self',
+              status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
+              cancelAtPeriodEnd: false
+            },
+            cancelFields('period_end')
+          );
+
+          scheduledHere = Boolean(scheduled.affected);
+          cancelScheduled ||= scheduledHere;
+        }
+
+        if (!removedMethods && !cancelScheduled) return false;
+
+        await this.auditService.log(
           {
-            customerId: customer.id,
-            lifecycleOwner: 'self',
-            status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
-            cancelAtPeriodEnd: false
+            action: AuditAction.BILLING_PAYMENT_METHOD_REMOVE,
+            actorId: userId,
+            actorEmail: audit.actorEmail,
+            targetId: customer.id,
+            targetType: 'BillingCustomer',
+            details: { removedMethods, cancelScheduled },
+            context: audit.context
           },
-          cancelFields('period_end')
+          manager
         );
 
-        cancelScheduled ||= Boolean(scheduled.affected);
+        return scheduledHere;
       }
+    );
+    const current = await findOpenSubscription(this.subscriptions, customer.id);
 
-      if (!removedMethods && !cancelScheduled) return;
-
-      await this.auditService.log(
-        {
-          action: AuditAction.BILLING_PAYMENT_METHOD_REMOVE,
-          actorId: userId,
-          actorEmail: audit.actorEmail,
-          targetId: customer.id,
-          targetType: 'BillingCustomer',
-          details: { removedMethods, cancelScheduled },
-          context: audit.context
-        },
-        manager
+    if (scheduledLocally && current) {
+      this.events.emit(
+        SubscriptionCancelScheduledEvent.name,
+        new SubscriptionCancelScheduledEvent(userId, current.id)
       );
-    });
+    }
 
-    return findOpenSubscription(this.subscriptions, customer.id);
+    return current;
   }
 
   async getRegion(userId: string): Promise<BillingRegionResponse> {

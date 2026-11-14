@@ -258,7 +258,7 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
     expect(emit).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledWith(
       CreditBalanceCrossedEvent.name,
-      new CreditBalanceCrossedEvent(userId as string)
+      new CreditBalanceCrossedEvent(userId as string, 0)
     );
 
     const ledger = await ds

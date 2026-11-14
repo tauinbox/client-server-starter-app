@@ -1,0 +1,43 @@
+{
+  "scenarios": [
+    {
+      "name": "a user marks a notice as read",
+      "route": "POST /api/v1/notifications/1/read",
+      "path": "/api/v1/notifications/$notificationId/read",
+      "actor": "user",
+      "auth": "bearer",
+      "state": ["notification"],
+      "expect": {
+        "status": 204,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a second read of the same notice changes nothing",
+      "route": "POST /api/v1/notifications/1/read",
+      "path": "/api/v1/notifications/$notificationId/read",
+      "actor": "user",
+      "auth": "bearer",
+      "state": ["notification"],
+      "repeat": 2,
+      "expect": {
+        "status": 204,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a notice that the user does not have cannot be marked",
+      "route": "POST /api/v1/notifications/1/read",
+      "path": "/api/v1/notifications/$actorId/read",
+      "actor": "user",
+      "auth": "bearer",
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.notifications.notFound",
+        "audit": []
+      }
+    }
+  ]
+}

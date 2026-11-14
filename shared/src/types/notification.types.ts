@@ -13,4 +13,7 @@ export type NotificationEvent =
   // Deliberately separate from `permissions_updated`: entitlements are a
   // different access axis, and reusing the permissions event would make every
   // billing change re-fetch CASL rules that did not move.
-  | { type: 'entitlements_updated' };
+  | { type: 'entitlements_updated' }
+  // A stored notice was added for this user. The client reloads the notices
+  // and the unread count; the event itself carries no content.
+  | { type: 'notification_created' };

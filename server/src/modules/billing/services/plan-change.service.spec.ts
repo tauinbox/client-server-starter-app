@@ -11,7 +11,11 @@ import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
-import { InvoicePaidEvent, PlanChangedEvent } from '../events/billing.events';
+import {
+  InvoicePaidEvent,
+  PlanChangedEvent,
+  RefundIssuedEvent
+} from '../events/billing.events';
 import { BillingService } from '../billing.service';
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { ChargeDeclinedError } from '../providers/payment-provider.interface';
@@ -431,6 +435,7 @@ describe('PlanChangeService', () => {
         id: 'inv-period',
         amountMinor: Money.fromMinor(99000),
         refundedMinor: Money.fromMinor(0),
+        currency: 'RUB',
         providerInvoiceRef: 'pay_period',
         status: 'paid',
         billingMode: 'fixed'
@@ -441,6 +446,13 @@ describe('PlanChangeService', () => {
 
       const result = await ctx.service.changePlan('user-1', 'business');
 
+      expect(ctx.emit).toHaveBeenCalledWith(
+        RefundIssuedEvent.name,
+        new RefundIssuedEvent('user-1', 'inv-period', {
+          amountMinor: 39600,
+          currency: 'RUB'
+        })
+      );
       // 12 of 30 days: charge 290000*12/30, refund 99000*12/30.
       expect(yoo.chargeOffSession).toHaveBeenCalledWith(customer, {
         amountMinor: 116000,
@@ -1295,6 +1307,11 @@ describe('PlanChangeService', () => {
       expect(ctx.dataSource.manager.update).not.toHaveBeenCalledWith(
         Invoice,
         expect.objectContaining({ id: 'inv-period' }),
+        expect.anything()
+      );
+      // No money moved, so the user gets no refund notice.
+      expect(ctx.emit).not.toHaveBeenCalledWith(
+        RefundIssuedEvent.name,
         expect.anything()
       );
     });

@@ -58,6 +58,15 @@ export type {
 export type { NotificationEvent } from './notification.types';
 
 export type {
+  NoticeAmount,
+  UserNotificationPayloads,
+  UserNotificationKind,
+  UserNotificationContent,
+  UserNotificationResponse,
+  UserNotificationUnreadCountResponse
+} from './user-notification.types';
+
+export type {
   FeatureFlagRulePayload,
   FeatureFlagRuleResponse,
   FeatureFlagResponse,

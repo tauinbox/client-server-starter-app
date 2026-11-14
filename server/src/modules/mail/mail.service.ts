@@ -8,6 +8,8 @@ import * as Handlebars from 'handlebars';
 import { MAIL_QUEUE, MAIL_SEND_JOB, MailJobData } from './mail-queue.constants';
 import { DEFAULT_LOCALE, normalizeLocale } from '@app/shared/constants';
 import type { SupportedLocale } from '@app/shared/constants';
+import type { UserNotificationContent } from '@app/shared/types';
+import { billingNoticeMessage } from './billing-notice-content';
 import { maskEmail } from '../../common/utils/escape-html';
 import { EMAIL_TEMPLATE_SOURCE } from './email.template';
 import {
@@ -264,6 +266,22 @@ export class MailService {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).mfaResetByAdmin(
       credentialChangeDetails(ip)
+    );
+
+    await this.send(email, message, loc);
+  }
+
+  /** The mail copy of a stored notice. The notice row is the record. */
+  async sendUserNotice(
+    email: string,
+    content: UserNotificationContent,
+    locale: string = DEFAULT_LOCALE
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const message = billingNoticeMessage(
+      loc,
+      content,
+      `${this.clientUrl}/billing/settings`
     );
 
     await this.send(email, message, loc);

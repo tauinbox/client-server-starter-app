@@ -83,7 +83,35 @@ export class PaymentFailedEvent {
  * invoice already sends `InvoicePaidEvent`.
  */
 export class CreditBalanceCrossedEvent {
-  constructor(public readonly userId: string) {}
+  constructor(
+    public readonly userId: string,
+    /** The balance after the delta, so a listener knows the direction. */
+    public readonly balanceAfter: number
+  ) {}
+}
+
+/**
+ * A cancel at the end of the period was scheduled on an entitled row. Access
+ * stays until `current_period_end`; `SubscriptionCanceledEvent` follows then.
+ */
+export class SubscriptionCancelScheduledEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly subscriptionId: string
+  ) {}
+}
+
+/**
+ * Money went back to the user: every refund leg that the provider accepted,
+ * partial or full. `InvoiceRefundedEvent` is narrower: it fires only when a
+ * full refund revokes a grant.
+ */
+export class RefundIssuedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly invoiceId: string,
+    public readonly amount: { amountMinor: number; currency: string }
+  ) {}
 }
 
 /** Event-name keys an entitlement-affecting billing change is published under. */

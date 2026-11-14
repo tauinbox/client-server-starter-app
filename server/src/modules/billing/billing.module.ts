@@ -26,6 +26,7 @@ import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { EntitlementChangedListener } from './listeners/entitlement-changed.listener';
 import { BillingUserDeletedListener } from './listeners/billing-user-deleted.listener';
 import { FirstPaymentUnclaimedListener } from './listeners/first-payment-unclaimed.listener';
+import { BillingNoticesListener } from './listeners/billing-notices.listener';
 import { PaddleProvider } from './providers/paddle.provider';
 import { PADDLE_CLIENT, createPaddleClient } from './providers/paddle.client';
 import { YooKassaProvider } from './providers/yookassa.provider';
@@ -148,6 +149,7 @@ export class BillingModule {
         EntitlementChangedListener,
         BillingUserDeletedListener,
         FirstPaymentUnclaimedListener,
+        BillingNoticesListener,
         PaddleProvider,
         YooKassaProvider,
         FixedRating,

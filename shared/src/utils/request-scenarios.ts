@@ -108,6 +108,8 @@ export const STATE_FIXTURES = [
   'usage-record',
   /** A webhook event in `dead_letter`; `$webhookEventId`. */
   'dead-letter-webhook-event',
+  /** An unread `invoice_paid` notice of the actor; `$notificationId`. */
+  'notification',
   /*
    * The account states below change the actor after the fixtures before them
    * in `state`. Put them after the fixtures that sign the actor in, for
@@ -186,6 +188,7 @@ export const SCENARIO_PLACEHOLDERS = [
   /** A meter key, and a plan key, that no plan has before the request. */
   '$meterKey',
   '$webhookEventId',
+  '$notificationId',
   /** A plan key that no plan has before the request. */
   '$planKey',
   /** A product key that no product has before the request. */

@@ -9,7 +9,10 @@ import {
 import type { CancelMode } from '@app/shared/types';
 import type { BillingService } from '../billing.service';
 import type { Subscription } from '../entities/subscription.entity';
-import { SubscriptionCanceledEvent } from '../events/billing.events';
+import {
+  SubscriptionCancelScheduledEvent,
+  SubscriptionCanceledEvent
+} from '../events/billing.events';
 import { cancelFields } from './cancel-fields.util';
 import { ApiError } from '../../../common/errors/api-error';
 
@@ -127,17 +130,23 @@ export async function cancelOpenSubscription(
     (await deps.subscriptions.findOne({ where: { id: subscription.id } })) ??
     subscription;
 
-  // Immediate cancellation revokes access now, so the cached entitlements must
-  // be invalidated; a period-end cancel keeps access until the period closes.
-  if (mode === 'immediate') {
-    const userId = await resolveUserId(saved);
+  const userId = await resolveUserId(saved);
 
-    if (userId) {
-      deps.events.emit(
-        SubscriptionCanceledEvent.name,
-        new SubscriptionCanceledEvent(userId, saved.id)
-      );
-    }
+  if (!userId) return saved;
+
+  // Immediate cancellation revokes access now, so the cached entitlements must
+  // be invalidated; a period-end cancel keeps access until the period closes
+  // and only tells the user the last day.
+  if (mode === 'immediate') {
+    deps.events.emit(
+      SubscriptionCanceledEvent.name,
+      new SubscriptionCanceledEvent(userId, saved.id)
+    );
+  } else {
+    deps.events.emit(
+      SubscriptionCancelScheduledEvent.name,
+      new SubscriptionCancelScheduledEvent(userId, saved.id)
+    );
   }
 
   return saved;

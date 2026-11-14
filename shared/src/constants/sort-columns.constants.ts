@@ -17,6 +17,8 @@
  */
 export const ALLOWED_INVOICE_SORT_COLUMNS = ['createdAt', 'status'] as const;
 
+export const ALLOWED_USER_NOTIFICATION_SORT_COLUMNS = ['createdAt'] as const;
+
 export const ALLOWED_SUBSCRIPTION_SORT_COLUMNS = [
   'createdAt',
   'currentPeriodEnd',
@@ -30,6 +32,8 @@ export const ALLOWED_RESOURCE_SORT_COLUMNS = ['createdAt', 'name'] as const;
 export const ALLOWED_FEATURE_FLAG_SORT_COLUMNS = ['createdAt', 'key'] as const;
 
 export type InvoiceSortColumn = (typeof ALLOWED_INVOICE_SORT_COLUMNS)[number];
+export type UserNotificationSortColumn =
+  (typeof ALLOWED_USER_NOTIFICATION_SORT_COLUMNS)[number];
 export type SubscriptionSortColumn =
   (typeof ALLOWED_SUBSCRIPTION_SORT_COLUMNS)[number];
 export type RoleSortColumn = (typeof ALLOWED_ROLE_SORT_COLUMNS)[number];
