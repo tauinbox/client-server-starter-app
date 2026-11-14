@@ -339,7 +339,7 @@ src/app/
 │       │                   # denies access while the store is not loaded. It is advisory only,
 │       │                   # because the server EntitlementGuard is the boundary.
 │       ├── services/       # BillingService reads /api/v1/billing/*: plans, products,
-│       │                   # subscription, invoices, payment-method (GET and POST), usage,
+│       │                   # subscription, invoices, payment-method (GET, POST, DELETE), usage,
 │       │                   # credits, entitlements, checkout, purchase, subscription/change with
 │       │                   # /preview, subscription/cancel, region and paddle-config.
 │       │                   # PaddleCheckoutService loads the Paddle.js CDN script on the first

@@ -123,6 +123,7 @@ describe('BillingStore', () => {
     purchase: ReturnType<typeof vi.fn>;
     changePlan: ReturnType<typeof vi.fn>;
     updatePaymentMethod: ReturnType<typeof vi.fn>;
+    removePaymentMethod: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
     setRegion: ReturnType<typeof vi.fn>;
   };
@@ -175,6 +176,9 @@ describe('BillingStore', () => {
         .mockReturnValue(
           of({ provider: 'paddle', url: 'https://pm', sessionRef: 'pm-s' })
         ),
+      removePaymentMethod: vi
+        .fn()
+        .mockReturnValue(of({ ...activeSub, cancelAtPeriodEnd: true })),
       cancel: vi
         .fn()
         .mockReturnValue(of({ ...activeSub, cancelAtPeriodEnd: true })),
@@ -469,6 +473,38 @@ describe('BillingStore', () => {
     expect(ok).toBe(true);
     expect(store.subscription()?.cancelAtPeriodEnd).toBe(true);
     expect(notifyMock.success).toHaveBeenCalled();
+  });
+
+  it('removePaymentMethod drops the card, takes the subscription of the answer and notifies success', async () => {
+    billingMock.getPaymentMethod.mockReturnValue(
+      of({ id: 'pm-1', provider: 'yookassa', brand: 'Visa', last4: '4242' })
+    );
+    const store = createStore();
+
+    await store.loadSettings();
+    const ok = await store.removePaymentMethod();
+
+    expect(ok).toBe(true);
+    expect(store.paymentMethod()).toBeNull();
+    expect(store.subscription()?.cancelAtPeriodEnd).toBe(true);
+    expect(notifyMock.success).toHaveBeenCalledWith(
+      'billing.settings.successCardRemoved'
+    );
+    expect(store.working()).toBe(false);
+  });
+
+  it('removePaymentMethod reports a refusal through the error funnel', async () => {
+    const refusal = new HttpErrorResponse({ status: 500 });
+
+    billingMock.removePaymentMethod.mockReturnValue(throwError(() => refusal));
+    const store = createStore();
+
+    await expect(store.removePaymentMethod()).resolves.toBe(false);
+    expect(notifyMock.error).toHaveBeenCalledWith(
+      refusal,
+      'billing.store.errorRemoveCardFailed'
+    );
+    expect(store.working()).toBe(false);
   });
 
   it('changePlan patches the subscription and refreshes invoices, usage and credits', async () => {

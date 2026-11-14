@@ -9,6 +9,7 @@ import type {
   BillingRegionResponse,
   CreditBalanceResponse,
   InvoiceResponse,
+  PaymentMethodResponse,
   PlanResponse,
   SubscriptionResponse,
   UsageSummaryResponse
@@ -100,7 +101,7 @@ describe('BillingSettingsComponent', () => {
     entities: ReturnType<typeof signal<InvoiceResponse[]>>;
     hasMore: ReturnType<typeof signal<boolean>>;
     isLoadingMore: ReturnType<typeof signal<boolean>>;
-    paymentMethod: ReturnType<typeof signal<null>>;
+    paymentMethod: ReturnType<typeof signal<PaymentMethodResponse | null>>;
     usage: ReturnType<typeof signal<UsageSummaryResponse | null>>;
     credits: ReturnType<typeof signal<CreditBalanceResponse | null>>;
     plans: ReturnType<typeof signal<PlanResponse[]>>;
@@ -117,6 +118,7 @@ describe('BillingSettingsComponent', () => {
     cancel: ReturnType<typeof vi.fn>;
     changePlan: ReturnType<typeof vi.fn>;
     startPaymentMethodUpdate: ReturnType<typeof vi.fn>;
+    removePaymentMethod: ReturnType<typeof vi.fn>;
   };
   let dialogMock: { openConfirm: ReturnType<typeof vi.fn> };
   let matDialogMock: { open: ReturnType<typeof vi.fn> };
@@ -145,12 +147,14 @@ describe('BillingSettingsComponent', () => {
       usage,
       subscription,
       credits,
-      sessionsLimit = null
+      sessionsLimit = null,
+      paymentMethod = null
     }: {
       usage?: UsageSummaryResponse;
       subscription?: SubscriptionResponse;
       credits?: CreditBalanceResponse;
       sessionsLimit?: number | null;
+      paymentMethod?: PaymentMethodResponse | null;
     } = {}
   ): Promise<void> {
     const creditsSignal = signal<CreditBalanceResponse | null>(credits ?? null);
@@ -165,7 +169,7 @@ describe('BillingSettingsComponent', () => {
       entities: signal<InvoiceResponse[]>(hasSub ? [invoice] : []),
       hasMore: signal(false),
       isLoadingMore: signal(false),
-      paymentMethod: signal(null),
+      paymentMethod: signal(paymentMethod),
       usage: signal<UsageSummaryResponse | null>(usage ?? null),
       credits: creditsSignal,
       plans: signal<PlanResponse[]>([proPlan]),
@@ -179,7 +183,8 @@ describe('BillingSettingsComponent', () => {
       loadMoreInvoices: vi.fn(),
       cancel: vi.fn().mockResolvedValue(true),
       changePlan: vi.fn().mockResolvedValue(true),
-      startPaymentMethodUpdate: vi.fn().mockResolvedValue(null)
+      startPaymentMethodUpdate: vi.fn().mockResolvedValue(null),
+      removePaymentMethod: vi.fn().mockResolvedValue(true)
     };
     entitlementsMock = {
       load: vi.fn().mockResolvedValue(undefined),
@@ -406,6 +411,61 @@ describe('BillingSettingsComponent', () => {
     expect(redirectMock.redirect).toHaveBeenCalledWith(
       'https://checkout.paddle.com/method/1'
     );
+  });
+
+  describe('remove card', () => {
+    const card: PaymentMethodResponse = {
+      id: 'pm-1',
+      customerId: 'cust-1',
+      provider: 'yookassa',
+      brand: 'Visa',
+      last4: '4242',
+      isDefault: true,
+      createdAt: '2026-06-01T00:00:00Z',
+      updatedAt: '2026-06-01T00:00:00Z'
+    };
+
+    function removeButton(): HTMLButtonElement | null {
+      return fixture.nativeElement.querySelector('.remove-method-btn');
+    }
+
+    it('offers no removal without a saved card', async () => {
+      await setup(true);
+      expect(removeButton()).toBeNull();
+    });
+
+    it('confirms, then removes the saved card', async () => {
+      await setup(true, { paymentMethod: card });
+
+      removeButton()!.click();
+      await fixture.whenStable();
+
+      expect(dialogMock.openConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message:
+            'We will delete the card and stop automatic payments. A subscription stays active until the end of the current billing period, then reverts to Free.'
+        })
+      );
+      expect(storeMock.removePaymentMethod).toHaveBeenCalled();
+    });
+
+    it('keeps the card when the user declines', async () => {
+      await setup(true, { paymentMethod: card });
+      dialogMock.openConfirm.mockReturnValue(of(false));
+
+      removeButton()!.click();
+      await fixture.whenStable();
+
+      expect(storeMock.removePaymentMethod).not.toHaveBeenCalled();
+    });
+
+    it('offers the removal of a card left after the subscription ended', async () => {
+      await setup(false, { paymentMethod: card });
+      expect(removeButton()).not.toBeNull();
+      expect(
+        fixture.nativeElement.querySelector('.update-method-btn')
+      ).toBeNull();
+    });
   });
 
   it('hides the payment-method card without a subscription', async () => {

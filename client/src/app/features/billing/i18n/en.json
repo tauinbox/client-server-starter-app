@@ -129,6 +129,11 @@
     "noPaymentMethod": "No payment method on file.",
     "updatePaymentMethod": "Update",
     "paymentMethodUpdated": "Payment method updated.",
+    "removePaymentMethod": "Remove card",
+    "removeCardTitle": "Remove the saved card?",
+    "removeCardMessage": "We will delete the card and stop automatic payments. A subscription stays active until the end of the current billing period, then reverts to Free.",
+    "removeCardConfirm": "Remove card",
+    "successCardRemoved": "Card removed. Automatic payments are off.",
     "credits": "Credits",
     "creditsUnits": "units",
     "creditsZeroHint": "Pay as you go is off. Top up your credits to turn it on.",
@@ -197,6 +202,7 @@
     "errorRegionFailed": "Could not change the billing region.",
     "errorChangeFailed": "Could not change the plan. Please try again.",
     "errorPaymentMethodFailed": "Could not start the payment-method update. Please try again.",
+    "errorRemoveCardFailed": "Could not remove the card. Please try again.",
     "errorPurchaseFailed": "Could not start the purchase. Please try again."
   }
 }
