@@ -1,0 +1,26 @@
+{
+  "title": "Contacts",
+  "updatedAt": "2026-11-14",
+  "sections": [
+    {
+      "heading": "Operator of the service",
+      "paragraphs": [
+        "[SELLER LEGAL NAME], a sole proprietor",
+        "Address: [ADDRESS]"
+      ]
+    },
+    {
+      "heading": "How to reach us",
+      "paragraphs": [
+        "Email: [EMAIL]",
+        "This address takes support questions, refund requests and privacy requests."
+      ]
+    },
+    {
+      "heading": "Payments",
+      "paragraphs": [
+        "Paddle.com is the Merchant of Record for our orders. For a question about a charge, you can also use the link in the receipt from Paddle."
+      ]
+    }
+  ]
+}

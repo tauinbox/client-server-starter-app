@@ -1,0 +1,81 @@
+{
+  "title": "Public offer (user agreement)",
+  "updatedAt": "2026-11-14",
+  "sections": [
+    {
+      "heading": "1. General",
+      "paragraphs": [
+        "This document is the public offer of [SELLER LEGAL NAME, SOLE PROPRIETOR] (INN [INN], OGRNIP [OGRNIP]), the Provider, to conclude a contract for the use of the Nexus service, the Service.",
+        "The registration of an account or the payment of a plan is a full and unconditional acceptance of the offer under Article 438 of the Civil Code of the Russian Federation.",
+        "This English text is a translation for convenience. The Russian text prevails."
+      ]
+    },
+    {
+      "heading": "2. Subject of the contract",
+      "paragraphs": [
+        "The Provider gives the User remote access to the functions of the Service through the Internet, within the selected plan.",
+        "The plans, the credit packs, the one-time products and their prices are shown on the pricing page of the Service. The prices are in Russian rubles."
+      ]
+    },
+    {
+      "heading": "3. How the service is supplied",
+      "paragraphs": [
+        "The Service is a digital service. Access to the paid functions opens in the account of the User automatically after the payment is confirmed. There is no physical delivery.",
+        "A subscription service is supplied at the end of each paid period. Credits are spent as the User uses the functions of the Service."
+      ]
+    },
+    {
+      "heading": "4. Payment",
+      "paragraphs": [
+        "The User pays by bank card or by another method available through the YooKassa payment service. The payment service processes the card data; the Provider does not receive or store it.",
+        "A subscription is paid in advance for a period and renews automatically for the next period with a charge of the saved payment method, until the User cancels the subscription.",
+        "A subscription period and a credit pack are paid in full. By accepting the offer, the User agrees that one fiscal receipt with the settlement method \"full settlement\" is issued for such a payment. The receipt is sent to the email address of the User."
+      ]
+    },
+    {
+      "heading": "5. Cancellation and refusal of the saved card",
+      "paragraphs": [
+        "The User can cancel the subscription at any time in the billing settings. Access stays until the end of the paid period, and no new charge is made.",
+        "The User can refuse the use of the saved card data for periodic payments. The refusal is accepted in electronic form in the billing settings or at the address in the Contacts document."
+      ]
+    },
+    {
+      "heading": "6. Refunds",
+      "paragraphs": [
+        "The refund terms are in the Refund policy, which is a part of this offer."
+      ]
+    },
+    {
+      "heading": "7. Rights and duties of the parties",
+      "paragraphs": [
+        "The User gives true data at registration, keeps the credentials secret, and does not use the Service to break the law or the rights of other persons.",
+        "The Provider keeps the Service available, except during maintenance, and can restrict access when the User breaks these terms."
+      ]
+    },
+    {
+      "heading": "8. Liability",
+      "paragraphs": [
+        "The parties are liable under the law of the Russian Federation. These terms do not limit the consumer rights set by the Law of the Russian Federation \"On Protection of Consumer Rights\"."
+      ]
+    },
+    {
+      "heading": "9. Personal data",
+      "paragraphs": [
+        "The Provider processes the personal data of the User to conclude and perform the contract, as the Privacy policy describes."
+      ]
+    },
+    {
+      "heading": "10. Changes and disputes",
+      "paragraphs": [
+        "The Provider can change the offer by publishing a new version in the Service. The version accepted at the payment applies to the paid period.",
+        "Claims are sent to the address in the Contacts document. The answer time for a claim is [PERIOD] days. Disputes are heard by a court under the law of the Russian Federation."
+      ]
+    },
+    {
+      "heading": "11. Details of the Provider",
+      "paragraphs": [
+        "[SELLER LEGAL NAME, SOLE PROPRIETOR], INN [INN], OGRNIP [OGRNIP], address: [ADDRESS], email: [EMAIL]."
+      ]
+    }
+  ]
+}

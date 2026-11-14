@@ -4,6 +4,7 @@ import { authGuard } from '@features/auth/guards/auth.guard';
 import { guestGuard } from '@features/auth/guards/guest.guard';
 import { SidenavStateService } from '@core/services/sidenav-state.service';
 import { AuthStore } from '@features/auth/store/auth.store';
+import { legalDocumentGuard } from '@features/legal/guards/legal-document.guard';
 import { AppRouteSegmentEnum } from './app.route-segment.enum';
 import { UsersStore } from '@features/users/store/users.store';
 import { userRoutes } from '@features/users/users.routes';
@@ -107,6 +108,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/components/forbidden/forbidden.component').then(
         (c) => c.ForbiddenComponent
+      )
+  },
+  {
+    path: `${AppRouteSegmentEnum.Legal}/:jurisdiction/:kind`,
+    canMatch: [legalDocumentGuard],
+    loadComponent: () =>
+      import('./features/legal/components/legal-document/legal-document.component').then(
+        (c) => c.LegalDocumentComponent
       )
   },
   {

@@ -1,0 +1,79 @@
+{
+  "title": "Privacy policy",
+  "updatedAt": "2026-11-14",
+  "sections": [
+    {
+      "heading": "1. Controller",
+      "paragraphs": [
+        "The controller of your personal data is [SELLER LEGAL NAME], a sole proprietor, [ADDRESS]. Contact for privacy questions: [EMAIL]."
+      ]
+    },
+    {
+      "heading": "2. Data that we process",
+      "paragraphs": [
+        "Account data: your email address, your name, a hash of your password, your interface language.",
+        "Technical data: the IP address and the browser data (user agent) of each sign-in session and of the records of the activity log.",
+        "Billing data: your plan, your invoices and payments, and the identifiers of your customer and subscription records at the payment provider. We do not receive or store full payment card data.",
+        "When you sign in through an external provider (OAuth): your account identifier at that provider, your email address and your name."
+      ]
+    },
+    {
+      "heading": "3. Purposes and legal bases",
+      "paragraphs": [
+        "To create your account and to supply the Service and the paid functions: the performance of a contract to which you are party (GDPR Article 6(1)(b)).",
+        "To protect accounts and the Service from unauthorized access and abuse, including the activity log and the anti-bot check: our legitimate interests (GDPR Article 6(1)(f)).",
+        "To keep the records that tax and accounting law requires: a legal obligation (GDPR Article 6(1)(c)).",
+        "We send no marketing mail and we do not use your data for automated decisions that have a legal effect on you."
+      ]
+    },
+    {
+      "heading": "4. Recipients",
+      "paragraphs": [
+        "Paddle.com, our reseller and Merchant of Record, which processes orders, payments, taxes and refunds as an independent controller.",
+        "Our email delivery provider [NAME], which sends the service messages.",
+        "Cloudflare Turnstile, which receives your IP address when the anti-bot check is shown.",
+        "The sign-in provider (OAuth) that you select, to the extent necessary for the sign-in.",
+        "Our hosting provider [NAME], which stores the data on our behalf.",
+        "We do not sell personal data."
+      ]
+    },
+    {
+      "heading": "5. Transfers to other countries",
+      "paragraphs": [
+        "Our servers are located in [COUNTRY]. Some recipients process data outside the European Economic Area. Such a transfer rests on an adequacy decision of the European Commission or on the standard contractual clauses of the European Commission. You can ask us for a copy of the safeguards."
+      ]
+    },
+    {
+      "heading": "6. Storage periods",
+      "paragraphs": [
+        "We keep account data while your account exists and delete it after you delete the account, unless the law requires a longer storage.",
+        "We keep the records of the activity log for [PERIOD] days. We keep billing records for the period that tax and accounting law sets."
+      ]
+    },
+    {
+      "heading": "7. Your rights",
+      "paragraphs": [
+        "You have the right to access your data, to have it corrected or erased, to restrict or object to its processing, and to receive it in a portable format.",
+        "To use a right, write to [EMAIL]. You also have the right to lodge a complaint with the data protection authority of your country."
+      ]
+    },
+    {
+      "heading": "8. Whether the data is required",
+      "paragraphs": [
+        "The email address, the name and the password or an external sign-in are a contractual requirement: without them we cannot create an account. Billing data is necessary only when you buy a paid plan or product."
+      ]
+    },
+    {
+      "heading": "9. Cookies",
+      "paragraphs": [
+        "The Service uses only the cookies that are necessary for the sign-in and the security of the session. It uses no advertising or analytics cookies."
+      ]
+    },
+    {
+      "heading": "10. Changes",
+      "paragraphs": [
+        "We publish a new version of this policy on this page. The date of the version is at the top of the document."
+      ]
+    }
+  ]
+}

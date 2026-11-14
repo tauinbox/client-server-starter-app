@@ -1,0 +1,49 @@
+<article class="legal" *transloco="let t">
+  @if (jurisdictions().length > 1) {
+    <nav class="legal-switch" [attr.aria-label]="t('legal.jurisdictionLabel')">
+      @for (item of jurisdictions(); track item) {
+        <a
+          [matButton]="item === jurisdiction() ? 'tonal' : 'text'"
+          [routerLink]="['/', legalSegment, item, kind()]"
+          [attr.aria-current]="item === jurisdiction() ? 'page' : null"
+          >{{ t('legal.jurisdictions.' + item) }}</a
+        >
+      }
+    </nav>
+  }
+
+  @if (document.hasValue()) {
+    @let content = document.value();
+
+    <h1>{{ content.title }}</h1>
+
+    @if (isDraft()) {
+      <p class="legal-draft" role="note">{{ t('legal.draftNotice') }}</p>
+    }
+
+    <p class="legal-updated">
+      {{
+        t('legal.updatedAt', {
+          date: content.updatedAt | localizedDate: 'mediumDate' : 'UTC'
+        })
+      }}
+    </p>
+
+    @for (section of content.sections; track $index) {
+      <section>
+        <h2>{{ section.heading }}</h2>
+        @for (paragraph of section.paragraphs; track $index) {
+          <p>{{ paragraph }}</p>
+        }
+      </section>
+    }
+  } @else if (document.error()) {
+    <p class="legal-error" role="alert">{{ t('legal.errorLoadFailed') }}</p>
+  } @else {
+    <div class="legal-loading">
+      <mat-spinner [attr.aria-label]="t('common.loading')" diameter="40" />
+    </div>
+  }
+
+  <nxs-legal-links class="legal-more" [jurisdiction]="jurisdiction()" />
+</article>

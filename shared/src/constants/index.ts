@@ -161,6 +161,20 @@ export {
 } from './billing-plan.constants';
 
 export {
+  LEGAL_JURISDICTIONS,
+  LEGAL_DOCUMENT_KINDS,
+  LEGAL_DOCUMENT_STATUSES,
+  LEGAL_DOCUMENTS,
+  isLegalJurisdiction,
+  isLegalDocumentKind,
+  legalJurisdictionForProvider,
+  type LegalJurisdiction,
+  type LegalDocumentKind,
+  type LegalDocumentStatus,
+  type LegalDocumentVersion
+} from './legal.constants';
+
+export {
   ALLOWED_INVOICE_SORT_COLUMNS,
   ALLOWED_SUBSCRIPTION_SORT_COLUMNS,
   ALLOWED_ROLE_SORT_COLUMNS,

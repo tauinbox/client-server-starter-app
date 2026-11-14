@@ -11,6 +11,8 @@ import { SidenavStateService } from '@core/services/sidenav-state.service';
 import { KeyboardShortcutsService } from '@core/services/keyboard-shortcuts.service';
 import { KeyboardShortcutsHelpComponent } from '@shared/components/keyboard-shortcuts-help/keyboard-shortcuts-help.component';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
+import { LegalLinksComponent } from '@features/legal/components/legal-links/legal-links.component';
+import { LegalJurisdictionService } from '@features/legal/services/legal-jurisdiction.service';
 
 @Component({
   selector: 'nxs-root',
@@ -18,6 +20,7 @@ import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
     RouterOutlet,
     HeaderComponent,
     SidenavComponent,
+    LegalLinksComponent,
     MatSidenavModule,
     TranslocoDirective
   ],
@@ -28,6 +31,7 @@ import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
 export class AppComponent implements OnInit, OnDestroy {
   protected readonly authStore = inject(AuthStore);
   protected readonly sidenavState = inject(SidenavStateService);
+  protected readonly legal = inject(LegalJurisdictionService);
   readonly #shortcuts = inject(KeyboardShortcutsService);
   readonly #dialog = inject(MatDialog);
 

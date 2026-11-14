@@ -38,6 +38,7 @@ import {
   MIN_PASSWORD_LENGTH
 } from '@app/shared/constants';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
+import { LegalLinksComponent } from '@features/legal/components/legal-links/legal-links.component';
 
 type RegisterData = {
   email: string;
@@ -60,6 +61,7 @@ type RegisterData = {
     PasswordToggleComponent,
     PasswordStrengthComponent,
     CaptchaWidgetComponent,
+    LegalLinksComponent,
     TranslocoDirective
   ],
   templateUrl: './register.component.html',
@@ -78,6 +80,7 @@ export class RegisterComponent {
   protected readonly captchaToken = signal<string | null>(null);
 
   protected readonly appRouteSegmentEnum = AppRouteSegmentEnum;
+  protected readonly legalKinds = ['terms', 'privacy'] as const;
 
   readonly registerModel = signal<RegisterData>({
     email: '',

@@ -219,6 +219,26 @@ src/app/
 │                           # withEntities<FeatureFlagResponse>).
 │                           # BillingSubscriptionsStore and BillingInvoicesStore (route level, one
 │                           # store for each list: withList, plus cancel and refund).
+│   ├── legal/              # Legal documents for each jurisdiction (`ru` for YooKassa and
+│   │                       # 152-FZ, `intl` for Paddle and GDPR): terms, privacy, refund and
+│   │                       # contacts. The texts are JSON assets in
+│   │                       # assets/legal/<jurisdiction>/<kind>.<locale>.json, shaped
+│   │                       # { title, updatedAt, sections: [{ heading, paragraphs }] }.
+│   │                       # The page renders them with text bindings only, no innerHTML.
+│   │                       # LEGAL_DOCUMENTS (shared constants) holds the version and the
+│   │                       # status of each document. A draft is on show only outside a
+│   │                       # production build (LEGAL_DRAFTS_VISIBLE), so a production user
+│   │                       # sees no page and no link until a version is published.
+│   │                       # legal-documents.spec.ts keeps each file in step with its version.
+│   │   ├── components/     # LegalDocumentComponent (/legal/:jurisdiction/:kind) and
+│   │   │                   # LegalLinksComponent (the links in the app footer, on the
+│   │   │                   # registration card and on the pricing page).
+│   │   ├── guards/         # legalDocumentGuard (canMatch): a known document that is on show,
+│   │   │                   # else the route falls through to the not-found page.
+│   │   └── services/       # LegalJurisdictionService: a signed-in user follows the billing
+│   │                       # region (GET /billing/region, and each region that BillingStore
+│   │                       # loads or sets); an anonymous visitor follows the UI language.
+│   │                       # LegalDocumentsService loads one document asset.
 │   └── billing/            # Self-service billing: pricing, checkout return and settings. The
 │       │                   # routes and the navigation entry are gated on the public `billing`
 │       │                   # flag, thus they stay hidden until a provider is configured.
@@ -343,7 +363,8 @@ src/app/
 │       │                   # invoice collection through withCursorList. Its methods are
 │       │                   # loadPricing, loadSettings, checkout, purchase, refreshInvoices,
 │       │                   # loadMoreInvoices, changePlan, startPaymentMethodUpdate, cancel and
-│       │                   # setRegion.
+│       │                   # setRegion. Each region that it holds goes to
+│       │                   # LegalJurisdictionService, so the legal links follow it.
 │       ├── guards/         # billingAvailableGuard waits for the flag load. It permits access
 │       │                   # when the `billing` flag is true. If not, it goes to the home page.
 │       │                   # It does not require authentication, thus the pricing page is public.
@@ -459,6 +480,7 @@ src/app/
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |
+| `/legal/:jurisdiction/:kind` | LegalDocumentComponent | legalDocumentGuard (canMatch; public; a draft only outside a production build) |
 | `/forbidden` | ForbiddenComponent | - |
 | `/**` | PageNotFoundComponent | - |
 

@@ -1,0 +1,59 @@
+@use 'abstracts/functions' as func;
+@use 'abstracts/variables' as vars;
+@use 'abstracts/mixins' as mix;
+
+:host {
+  display: block;
+}
+
+.legal {
+  max-width: func.rem(800);
+  margin: 0 auto;
+  overflow-wrap: anywhere;
+
+  h1 {
+    margin: vars.$spacing-md 0;
+    font-size: vars.$font-size-xxl;
+    font-weight: vars.$font-weight-bold;
+  }
+
+  h2 {
+    margin: vars.$spacing-lg 0 vars.$spacing-sm;
+    font-size: vars.$font-size-lg;
+    font-weight: vars.$font-weight-bold;
+  }
+
+  p {
+    margin: 0 0 vars.$spacing-sm;
+    line-height: 1.6;
+  }
+}
+
+.legal-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-sm;
+}
+
+.legal-draft {
+  padding: vars.$spacing-sm vars.$spacing-md;
+  color: var(--mat-sys-on-error-container);
+  background: var(--mat-sys-error-container);
+  border-radius: var(--mat-sys-corner-small);
+}
+
+.legal-updated {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.legal-error {
+  @include mix.error-message;
+}
+
+.legal-loading {
+  @include mix.loading-container;
+}
+
+.legal-more {
+  margin-top: vars.$spacing-xl;
+}
