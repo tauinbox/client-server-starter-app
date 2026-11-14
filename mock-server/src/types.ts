@@ -1,5 +1,9 @@
 import type { Request } from 'express';
-import type { StepUpOperation } from '@app/shared/constants';
+import type {
+  LegalDocumentVersion,
+  LegalJurisdiction,
+  StepUpOperation
+} from '@app/shared/constants';
 import type {
   MfaRequiredResponse,
   PaddleClientConfigResponse
@@ -229,6 +233,16 @@ export interface MockWebhookEvent {
   attempts: number;
   lastError: string | null;
   receivedAt: string;
+}
+
+/** A row of `billing_consents`: one accepted version of a document. */
+export interface MockBillingConsent {
+  id: string;
+  userId: string;
+  kind: 'terms';
+  jurisdiction: LegalJurisdiction;
+  documentVersion: string;
+  acceptedAt: string;
 }
 
 export interface MockCreditBalance {
@@ -463,6 +477,11 @@ export interface State {
   // The webhook ledger, keyed by id. The mock receiver writes no row, so only
   // a test adds one, to reach the admin replay route.
   billingWebhookEvents: Map<string, MockWebhookEvent>;
+  // Accepted versions of the terms, mirroring the append-only table.
+  billingConsents: MockBillingConsent[];
+  // The terms versions that replace LEGAL_DOCUMENTS. Default: none. Tests set
+  // one through /__control/billing/terms to reach a published version.
+  legalTermsOverrides: Partial<Record<LegalJurisdiction, LegalDocumentVersion>>;
   // Paddle.js public configuration advertised via /api/v1/billing/paddle-config.
   // Default: no client token. E2E sets one via /__control/billing/paddle-config.
   paddleClientConfig: PaddleClientConfigResponse;

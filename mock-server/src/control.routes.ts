@@ -24,6 +24,7 @@ import type {
 } from './types';
 import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
+  isLegalJurisdiction,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS
 } from '@app/shared/constants';
 import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
@@ -93,7 +94,9 @@ function buildStateSnapshot(state: State): StateSnapshot {
     billingPurchaseSessions: Array.from(state.billingPurchaseSessions.values()),
     billingCheckoutSessions: Array.from(state.billingCheckoutSessions.values()),
     billingCreditBalances: Array.from(state.billingCreditBalances.values()),
-    billingWebhookEvents: Array.from(state.billingWebhookEvents.values())
+    billingWebhookEvents: Array.from(state.billingWebhookEvents.values()),
+    billingConsents: state.billingConsents,
+    legalTermsOverrides: state.legalTermsOverrides
   };
 }
 
@@ -578,6 +581,38 @@ router.post('/billing/paddle-config', (req, res) => {
     clientToken: clientToken || null
   };
   res.json(state.paddleClientConfig);
+});
+
+// POST /__control/billing/terms - publish the terms of one jurisdiction at a
+// version, as a deploy with a published text would. `version: null` restores
+// the version of LEGAL_DOCUMENTS.
+router.post('/billing/terms', (req, res) => {
+  const { jurisdiction, version } = req.body as {
+    jurisdiction?: unknown;
+    version?: unknown;
+  };
+
+  if (
+    !isLegalJurisdiction(jurisdiction) ||
+    (version !== null && typeof version !== 'string')
+  ) {
+    res.status(400).json({
+      message:
+        'jurisdiction (ru | intl) and version (string | null) are required'
+    });
+
+    return;
+  }
+
+  const overrides = getState().legalTermsOverrides;
+
+  if (version === null) {
+    delete overrides[jurisdiction];
+  } else {
+    overrides[jurisdiction] = { version, status: 'published' };
+  }
+
+  res.json({ jurisdiction, version });
 });
 
 // POST /__control/billing/provider-enabled — set the admin kill-switch flag of

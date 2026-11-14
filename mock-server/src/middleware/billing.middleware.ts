@@ -80,9 +80,15 @@ import {
 } from '../helpers/validation-error.helpers';
 import { sendError } from '../helpers/error-envelope.helpers';
 import {
+  checkTerms,
+  recordTerms,
+  requiredTermsVersion
+} from '../helpers/billing-consent.helpers';
+import {
   intErrors,
   iso8601Errors,
   oneOfErrors,
+  stringErrors,
   trimmedStringErrors,
   unknownPropertyErrors,
   uuidErrors
@@ -118,6 +124,16 @@ function planKeyBodyErrors(body: unknown): string[] {
     ...unknownPropertyErrors(body, ['planKey']),
     ...trimmedStringErrors('planKey', fields?.['planKey'], { min: 1, max: 100 })
   ];
+}
+
+/** Mirrors `@AcceptedTermsVersion()` of the checkout and purchase DTOs. */
+function acceptedTermsVersionErrors(
+  body: Record<string, unknown> | undefined
+): string[] {
+  return stringErrors('acceptedTermsVersion', body?.['acceptedTermsVersion'], {
+    max: 32,
+    optional: 'definedOnly'
+  });
 }
 
 /** Both cancel routes take the same optional `mode` DTO. */
@@ -277,13 +293,16 @@ function regionView(
   user: MockUser,
   customer: Pick<MockCustomer, 'providerOverride' | 'country'>
 ): BillingRegionResponse {
+  const provider = effectiveProvider(customer);
+
   return {
     region: regionForOverride(customer.providerOverride),
     detectedProvider: geoDefault(customer.country),
-    effectiveProvider: effectiveProvider(customer),
+    effectiveProvider: provider,
     availableProviders: BILLING_PROVIDER_FLAGS.map(
-      ({ provider }) => provider
-    ).filter((provider) => isProviderAvailable(provider, user))
+      ({ provider: id }) => id
+    ).filter((id) => isProviderAvailable(id, user)),
+    termsVersion: requiredTermsVersion(provider)
   };
 }
 
@@ -655,7 +674,8 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
       ...unknownPropertyErrors(body, [
         'productKey',
         'amountMinor',
-        'description'
+        'description',
+        'acceptedTermsVersion'
       ]),
       ...trimmedStringErrors('productKey', body?.['productKey'], {
         min: 1,
@@ -668,7 +688,8 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
       ...trimmedStringErrors('description', body?.['description'], {
         max: 128,
         optional: 'nullable'
-      })
+      }),
+      ...acceptedTermsVersionErrors(body)
     ])
   ) {
     return;
@@ -695,6 +716,14 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   const provider = effectiveProvider(customer);
 
   if (rejectUnavailableProvider(res, provider, user)) return;
+
+  const termsVersion = checkTerms(
+    res,
+    provider,
+    body?.['acceptedTermsVersion']
+  );
+
+  if (termsVersion === false) return;
 
   const price = product.prices[provider];
 
@@ -779,6 +808,8 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
     return;
   }
 
+  recordTerms(req, provider, termsVersion);
+
   const sessionRef = randomUUID();
 
   getState().billingPurchaseSessions.set(sessionRef, {
@@ -809,11 +840,22 @@ function refuseAlreadySubscribed(res: Response): void {
 billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
 
-  if (rejectInvalid(res, planKeyBodyErrors(req.body))) return;
+  const body = req.body as Record<string, unknown> | undefined;
 
-  const planKey = (
-    (req.body as Record<string, unknown>)['planKey'] as string
-  ).trim();
+  if (
+    rejectInvalid(res, [
+      ...unknownPropertyErrors(body, ['planKey', 'acceptedTermsVersion']),
+      ...trimmedStringErrors('planKey', body?.['planKey'], {
+        min: 1,
+        max: 100
+      }),
+      ...acceptedTermsVersionErrors(body)
+    ])
+  ) {
+    return;
+  }
+
+  const planKey = (body?.['planKey'] as string).trim();
 
   const plan = findPlanByKey(planKey);
 
@@ -858,6 +900,14 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
   const provider = effectiveProvider(customer);
 
   if (rejectUnavailableProvider(res, provider, user)) return;
+
+  const termsVersion = checkTerms(
+    res,
+    provider,
+    body?.['acceptedTermsVersion']
+  );
+
+  if (termsVersion === false) return;
 
   // A prior unpaid checkout leaves an `incomplete` row. Reuse it rather than
   // stack a second open subscription (the server enforces this with a partial
@@ -914,6 +964,10 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     pending.status = 'canceled';
     pending.updatedAt = new Date().toISOString();
   }
+
+  // The server records the consent before the provider call, and its Paddle
+  // provider refuses a plan with no price inside that call.
+  recordTerms(req, provider, termsVersion);
 
   if (rejectMissingPaddlePrice(res, provider, plan)) return;
 
