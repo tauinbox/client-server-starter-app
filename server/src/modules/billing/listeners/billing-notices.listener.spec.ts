@@ -160,12 +160,26 @@ describe('BillingNoticesListener', () => {
       sub: subscription({ status: 'canceled' })
     });
 
-    await listener.onCanceled(new SubscriptionCanceledEvent('user-1', 'sub-1'));
+    await listener.onCanceled(
+      new SubscriptionCanceledEvent('user-1', 'sub-1', true)
+    );
 
     expect(notify).toHaveBeenCalledWith('user-1', {
       kind: 'subscription_canceled',
       payload: { subscriptionId: 'sub-1', planName: 'Pro' }
     });
+  });
+
+  it('stores nothing for the cancel of a row that never gave access', async () => {
+    const { listener, notify } = build({
+      sub: subscription({ status: 'canceled' })
+    });
+
+    await listener.onCanceled(
+      new SubscriptionCanceledEvent('user-1', 'sub-1', false)
+    );
+
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it('stores the amount of each refund leg', async () => {

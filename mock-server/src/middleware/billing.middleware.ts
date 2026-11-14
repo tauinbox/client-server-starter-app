@@ -1418,6 +1418,9 @@ function cancelOpenSubscription(
     return false;
   }
 
+  // An unpaid `incomplete` row ends no access, so it gets no notice of an end.
+  const endedAccess = ENTITLED_SUBSCRIPTION_STATUSES.includes(sub.status);
+
   if (mode === 'immediate') {
     sub.status = 'canceled';
     sub.cancelAtPeriodEnd = false;
@@ -1431,7 +1434,8 @@ function cancelOpenSubscription(
   // entitlements untouched until the boundary and only tells the last day.
   if (mode === 'immediate') {
     notifyEntitlementsChanged(sub.customerId);
-    noticeCanceled(sub);
+
+    if (endedAccess) noticeCanceled(sub);
   } else {
     noticeCancelScheduled(sub);
   }

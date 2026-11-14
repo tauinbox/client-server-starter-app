@@ -127,7 +127,7 @@ describe('BillingUserDeletedListener', () => {
     );
     expect(emit).toHaveBeenCalledWith(
       SubscriptionCanceledEvent.name,
-      new SubscriptionCanceledEvent('user-1', 'sub-2')
+      new SubscriptionCanceledEvent('user-1', 'sub-2', true)
     );
     expect(yookassaCancel).not.toHaveBeenCalled();
   });

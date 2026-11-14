@@ -353,23 +353,34 @@ describe('BillingEventReducer', () => {
       );
     });
 
-    it('emits SubscriptionCanceled on cancellation', async () => {
-      const existing = {
-        id: 'sub-1',
-        providerSubscriptionId: 'sub_123',
-        currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
-      } as Subscription;
-      const { reducer, emit } = await build({ subscription: existing });
+    it.each([
+      ['an active row: access ends', 'active', true],
+      [
+        'the echo of a cancel already written: nothing ends again',
+        'canceled',
+        false
+      ]
+    ] as const)(
+      'emits SubscriptionCanceled on cancellation of %s',
+      async (_name, status, endedAccess) => {
+        const existing = {
+          id: 'sub-1',
+          status,
+          providerSubscriptionId: 'sub_123',
+          currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
+        } as Subscription;
+        const { reducer, emit } = await build({ subscription: existing });
 
-      await reducer.reduce(
-        event('subscription.canceled', subPayload({ status: 'canceled' }))
-      );
+        await reducer.reduce(
+          event('subscription.canceled', subPayload({ status: 'canceled' }))
+        );
 
-      expect(emit).toHaveBeenCalledWith(
-        SubscriptionCanceledEvent.name,
-        expect.objectContaining({ subscriptionId: 'sub-1' })
-      );
-    });
+        expect(emit).toHaveBeenCalledWith(
+          SubscriptionCanceledEvent.name,
+          new SubscriptionCanceledEvent('user-1', 'sub-1', endedAccess)
+        );
+      }
+    );
 
     it('skips when the event carries no customer reference', async () => {
       const { reducer, manager, emit } = await build();

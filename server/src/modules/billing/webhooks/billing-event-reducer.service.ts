@@ -284,7 +284,8 @@ export class BillingEventReducer {
         return {
           subscriptionId: created.id,
           userId,
-          cancelScheduled: false
+          cancelScheduled: false,
+          endedAccess: false
         };
       }
 
@@ -336,22 +337,30 @@ export class BillingEventReducer {
         await this.markTrialUsed(manager, subscription.customerId, now);
       }
 
-      return { subscriptionId: subscription.id, userId, cancelScheduled };
+      return {
+        subscriptionId: subscription.id,
+        userId,
+        cancelScheduled,
+        // The status before this snapshot: the echo of a cancel that this
+        // server already wrote ends nothing a second time.
+        endedAccess: ENTITLED_SUBSCRIPTION_STATUSES.includes(
+          subscription.status
+        )
+      };
     });
 
     if (!result?.userId) {
       return;
     }
 
-    this.emitSubscriptionEvent(type, result.userId, result.subscriptionId);
+    const { userId, subscriptionId, endedAccess } = result;
+
+    this.emitSubscriptionEvent(type, { userId, subscriptionId, endedAccess });
 
     if (result.cancelScheduled) {
       this.events.emit(
         SubscriptionCancelScheduledEvent.name,
-        new SubscriptionCancelScheduledEvent(
-          result.userId,
-          result.subscriptionId
-        )
+        new SubscriptionCancelScheduledEvent(userId, subscriptionId)
       );
     }
   }
@@ -362,8 +371,11 @@ export class BillingEventReducer {
       | 'subscription.renewed'
       | 'subscription.past_due'
       | 'subscription.canceled',
-    userId: string,
-    subscriptionId: string
+    {
+      userId,
+      subscriptionId,
+      endedAccess
+    }: { userId: string; subscriptionId: string; endedAccess: boolean }
   ): void {
     switch (type) {
       case 'subscription.activated':
@@ -387,7 +399,7 @@ export class BillingEventReducer {
       case 'subscription.canceled':
         this.events.emit(
           SubscriptionCanceledEvent.name,
-          new SubscriptionCanceledEvent(userId, subscriptionId)
+          new SubscriptionCanceledEvent(userId, subscriptionId, endedAccess)
         );
         break;
     }

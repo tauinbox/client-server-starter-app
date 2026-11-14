@@ -354,7 +354,27 @@ describe('BillingAdminService', () => {
       );
       expect(ctx.emit).toHaveBeenCalledWith(
         SubscriptionCanceledEvent.name,
-        expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
+        new SubscriptionCanceledEvent('user-1', 'sub-1', true)
+      );
+    });
+
+    it('marks the immediate cancel of an unpaid checkout as ending no access', async () => {
+      const ctx = await build();
+
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSubscription({ status: 'incomplete', providerSubscriptionId: null })
+      );
+      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1'
+      });
+
+      await ctx.service.cancelSubscription('sub-1', 'immediate');
+
+      expect(ctx.emit).toHaveBeenCalledWith(
+        SubscriptionCanceledEvent.name,
+        new SubscriptionCanceledEvent('user-1', 'sub-1', false)
       );
     });
 

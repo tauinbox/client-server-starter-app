@@ -106,8 +106,12 @@ export class BillingNoticesListener {
   @OnEvent(SubscriptionCanceledEvent.name)
   async onCanceled({
     userId,
-    subscriptionId
+    subscriptionId,
+    endedAccess
   }: SubscriptionCanceledEvent): Promise<void> {
+    // A row that never gave access (an unpaid checkout) ends nothing.
+    if (!endedAccess) return;
+
     await this.notify(userId, async () => {
       const subscription = await this.subscriptions.findOne({
         where: { id: subscriptionId }

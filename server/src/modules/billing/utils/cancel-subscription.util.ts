@@ -96,6 +96,12 @@ export async function cancelOpenSubscription(
     throw refusal;
   }
 
+  // Read before the write: an immediate cancel of an unpaid `incomplete` row
+  // ends no access, so it gets no notice of an end.
+  const endedAccess = ENTITLED_SUBSCRIPTION_STATUSES.includes(
+    subscription.status
+  );
+
   // Provider-managed lifecycle: ask the provider to cancel; the resulting
   // webhook reconciles status. Self-managed: there is no provider object — the
   // renewal scheduler simply stops charging the saved card.
@@ -140,7 +146,7 @@ export async function cancelOpenSubscription(
   if (mode === 'immediate') {
     deps.events.emit(
       SubscriptionCanceledEvent.name,
-      new SubscriptionCanceledEvent(userId, saved.id)
+      new SubscriptionCanceledEvent(userId, saved.id, endedAccess)
     );
   } else {
     deps.events.emit(

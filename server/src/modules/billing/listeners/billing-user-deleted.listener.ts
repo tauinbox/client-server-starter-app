@@ -2,7 +2,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
+import {
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  OPEN_SUBSCRIPTION_STATUSES
+} from '@app/shared/constants';
 import { UserDeletedEvent } from '../../users/events/user-deleted.event';
 import { Customer } from '../entities/customer.entity';
 import { Subscription } from '../entities/subscription.entity';
@@ -88,7 +91,11 @@ export class BillingUserDeletedListener {
 
       this.events.emit(
         SubscriptionCanceledEvent.name,
-        new SubscriptionCanceledEvent(userId, subscription.id)
+        new SubscriptionCanceledEvent(
+          userId,
+          subscription.id,
+          ENTITLED_SUBSCRIPTION_STATUSES.includes(subscription.status)
+        )
       );
     } catch (err) {
       this.logger.error(

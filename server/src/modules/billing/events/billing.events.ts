@@ -30,7 +30,12 @@ export class SubscriptionPastDueEvent {
 export class SubscriptionCanceledEvent {
   constructor(
     public readonly userId: string,
-    public readonly subscriptionId: string
+    public readonly subscriptionId: string,
+    /**
+     * The row was entitled before the cancel. False for a row that never
+     * gave access (an unpaid `incomplete` checkout), which ends nothing.
+     */
+    public readonly endedAccess: boolean
   ) {}
 }
 
