@@ -621,6 +621,77 @@ billingRouter.post(
   }
 );
 
+// DELETE /billing/payment-method — mirrors BillingUserService.removePaymentMethod.
+// The mock saves a card only when a payment settles, so it keeps no removal time.
+billingRouter.delete(
+  '/payment-method',
+  authGuard,
+  (req: Request, res: Response) => {
+    const { user } = req as AuthenticatedRequest;
+    const customer = findCustomer(user.id);
+
+    if (!customer) {
+      res.json(null);
+
+      return;
+    }
+
+    const state = getState();
+    const sub = findCurrentSubscription(customer.id);
+    const cancelable =
+      sub !== undefined &&
+      ENTITLED_SUBSCRIPTION_STATUSES.includes(sub.status) &&
+      !sub.cancelAtPeriodEnd;
+    const atProvider = cancelable && sub.lifecycleOwner === 'provider';
+
+    if (atProvider && !cancelOpenSubscription(res, sub, 'period_end')) return;
+
+    let cancelScheduled = atProvider;
+
+    const removed = [...state.billingPaymentMethods.values()].filter(
+      (method) => method.customerId === customer.id
+    );
+    const nowIso = new Date().toISOString();
+
+    if (removed.length > 0) {
+      const removedIds = new Set(removed.map(({ id }) => id));
+
+      for (const { id } of removed) state.billingPaymentMethods.delete(id);
+
+      customer.defaultPaymentMethodId = null;
+      customer.updatedAt = nowIso;
+
+      for (const subscription of state.billingSubscriptions.values()) {
+        if (
+          subscription.paymentMethodId &&
+          removedIds.has(subscription.paymentMethodId)
+        ) {
+          subscription.paymentMethodId = null;
+        }
+      }
+
+      if (cancelable && sub.lifecycleOwner === 'self') {
+        sub.cancelAtPeriodEnd = true;
+        sub.updatedAt = nowIso;
+        cancelScheduled = true;
+      }
+    }
+
+    if (removed.length > 0 || cancelScheduled) {
+      logAudit('BILLING_PAYMENT_METHOD_REMOVE', {
+        actorId: user.id,
+        actorEmail: user.email,
+        targetId: customer.id,
+        targetType: 'BillingCustomer',
+        details: { removedMethods: removed.length, cancelScheduled },
+        ip: req.ip
+      });
+    }
+
+    res.json(sub ? toSubscriptionResponse(sub) : null);
+  }
+);
+
 // GET /billing/products — one-time purchase catalog: active products carrying
 // a price entry for the caller's effective provider (sku/credits fixed prices
 // plus custom amount bounds), oldest first. Like /region this is a read — no
