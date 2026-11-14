@@ -4,7 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ApiError } from '../../../common/errors/api-error';
-import { In } from 'typeorm';
+import { DataSource, In } from 'typeorm';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { AuditService } from '../../audit/audit.service';
 import type { BillingProviderId } from '@app/shared/types';
 import {
   DEFAULT_CURSOR_PAGE_SIZE,
@@ -76,6 +78,19 @@ async function build() {
     record: jest.fn().mockResolvedValue(undefined)
   };
 
+  const manager = {
+    findOne: jest.fn().mockResolvedValue({ id: 'cust-1' }),
+    delete: jest.fn().mockResolvedValue({ affected: 0 }),
+    update: jest.fn().mockResolvedValue({ affected: 0 })
+  };
+  const dataSource = {
+    transaction: jest.fn(
+      (operation: (entityManager: typeof manager) => Promise<unknown>) =>
+        operation(manager)
+    )
+  };
+  const audit = { log: jest.fn().mockResolvedValue(undefined) };
+
   const module = await Test.createTestingModule({
     providers: [
       BillingUserService,
@@ -93,7 +108,9 @@ async function build() {
         provide: ConfigService,
         useValue: { get: () => 'http://localhost:4200' }
       },
-      { provide: EventEmitter2, useValue: { emit } }
+      { provide: EventEmitter2, useValue: { emit } },
+      { provide: DataSource, useValue: dataSource },
+      { provide: AuditService, useValue: audit }
     ]
   }).compile();
 
@@ -109,7 +126,9 @@ async function build() {
     billing,
     credits,
     consents,
-    emit
+    emit,
+    manager,
+    audit
   };
 }
 
@@ -1050,6 +1069,169 @@ describe('BillingUserService', () => {
         expect(resolved.startCheckout).not.toHaveBeenCalled();
       }
     );
+  });
+
+  describe('removePaymentMethod', () => {
+    const AUDIT = {
+      actorEmail: 'user@example.com',
+      context: { ip: '1.2.3.4' }
+    };
+
+    it('does nothing for a user with no billing customer', async () => {
+      const ctx = await build();
+
+      await expect(
+        ctx.service.removePaymentMethod('user-1', AUDIT)
+      ).resolves.toBeNull();
+      expect(ctx.manager.delete).not.toHaveBeenCalled();
+      expect(ctx.audit.log).not.toHaveBeenCalled();
+    });
+
+    it('deletes the cards, stamps the refusal and schedules the self-managed cancel in one transaction', async () => {
+      const ctx = await build();
+      const open = { id: 'sub-1', lifecycleOwner: 'self', status: 'active' };
+
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue(open);
+      ctx.manager.delete.mockResolvedValue({ affected: 2 });
+      ctx.manager.update.mockResolvedValue({ affected: 1 });
+
+      await expect(
+        ctx.service.removePaymentMethod('user-1', AUDIT)
+      ).resolves.toBe(open);
+
+      expect(ctx.manager.findOne).toHaveBeenCalledWith(Customer, {
+        where: { id: 'cust-1' },
+        lock: { mode: 'for_no_key_update' }
+      });
+      expect(ctx.manager.delete).toHaveBeenCalledWith(PaymentMethod, {
+        customerId: 'cust-1'
+      });
+      expect(ctx.manager.update).toHaveBeenCalledWith(
+        Customer,
+        { id: 'cust-1' },
+        { paymentMethodRemovedAt: expect.any(Date) }
+      );
+      expect(ctx.manager.update).toHaveBeenCalledWith(
+        Subscription,
+        {
+          customerId: 'cust-1',
+          lifecycleOwner: 'self',
+          status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
+          cancelAtPeriodEnd: false
+        },
+        { cancelAtPeriodEnd: true }
+      );
+      expect(ctx.audit.log).toHaveBeenCalledWith(
+        {
+          action: AuditAction.BILLING_PAYMENT_METHOD_REMOVE,
+          actorId: 'user-1',
+          actorEmail: 'user@example.com',
+          targetId: 'cust-1',
+          targetType: 'BillingCustomer',
+          details: { removedMethods: 2, cancelScheduled: true },
+          context: { ip: '1.2.3.4' }
+        },
+        ctx.manager
+      );
+      expect(ctx.billing.getProviderById).not.toHaveBeenCalled();
+    });
+
+    it('writes nothing when a self-managed customer has no card', async () => {
+      const ctx = await build();
+
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        lifecycleOwner: 'self',
+        status: 'active',
+        cancelAtPeriodEnd: false
+      });
+
+      await ctx.service.removePaymentMethod('user-1', AUDIT);
+
+      expect(ctx.manager.update).not.toHaveBeenCalled();
+      expect(ctx.audit.log).not.toHaveBeenCalled();
+    });
+
+    it('cancels a provider-managed subscription at the period end through the provider', async () => {
+      const ctx = await build();
+      const paddle = provider('paddle', true);
+
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'paddle',
+        providerSubscriptionId: 'sub_ext',
+        lifecycleOwner: 'provider',
+        status: 'active',
+        cancelAtPeriodEnd: false
+      });
+      ctx.billing.getProviderById.mockReturnValue(paddle);
+
+      await ctx.service.removePaymentMethod('user-1', AUDIT);
+
+      expect(paddle.cancel).toHaveBeenCalledWith('sub_ext', 'period_end');
+      expect(ctx.audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.BILLING_PAYMENT_METHOD_REMOVE,
+          details: { removedMethods: 0, cancelScheduled: true }
+        }),
+        ctx.manager
+      );
+    });
+
+    it('also deletes a local card left beside a provider-managed subscription', async () => {
+      // A card of an earlier YooKassa subscription stays after a move to Paddle.
+      const ctx = await build();
+      const paddle = provider('paddle', true);
+
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'paddle',
+        providerSubscriptionId: 'sub_ext',
+        lifecycleOwner: 'provider',
+        status: 'active',
+        cancelAtPeriodEnd: false
+      });
+      ctx.billing.getProviderById.mockReturnValue(paddle);
+      ctx.manager.delete.mockResolvedValue({ affected: 1 });
+
+      await ctx.service.removePaymentMethod('user-1', AUDIT);
+
+      expect(paddle.cancel).toHaveBeenCalledWith('sub_ext', 'period_end');
+      expect(ctx.manager.delete).toHaveBeenCalledWith(PaymentMethod, {
+        customerId: 'cust-1'
+      });
+      expect(ctx.audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: { removedMethods: 1, cancelScheduled: true }
+        }),
+        ctx.manager
+      );
+    });
+
+    it('does nothing for a provider-managed subscription whose cancel is already scheduled', async () => {
+      const ctx = await build();
+      const paddle = provider('paddle', true);
+
+      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
+      ctx.subscriptions.findOne.mockResolvedValue({
+        id: 'sub-1',
+        provider: 'paddle',
+        providerSubscriptionId: 'sub_ext',
+        lifecycleOwner: 'provider',
+        status: 'active',
+        cancelAtPeriodEnd: true
+      });
+      ctx.billing.getProviderById.mockReturnValue(paddle);
+
+      await ctx.service.removePaymentMethod('user-1', AUDIT);
+
+      expect(paddle.cancel).not.toHaveBeenCalled();
+      expect(ctx.audit.log).not.toHaveBeenCalled();
+    });
   });
 
   describe('cancelSubscription', () => {

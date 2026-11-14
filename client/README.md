@@ -339,7 +339,7 @@ src/app/
 │       │                   # denies access while the store is not loaded. It is advisory only,
 │       │                   # because the server EntitlementGuard is the boundary.
 │       ├── services/       # BillingService reads /api/v1/billing/*: plans, products,
-│       │                   # subscription, invoices, payment-method (GET and POST), usage,
+│       │                   # subscription, invoices, payment-method (GET, POST, DELETE), usage,
 │       │                   # credits, entitlements, checkout, purchase, subscription/change with
 │       │                   # /preview, subscription/cancel, region and paddle-config.
 │       │                   # PaddleCheckoutService loads the Paddle.js CDN script on the first
@@ -1243,7 +1243,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 344 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 348 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1685 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an

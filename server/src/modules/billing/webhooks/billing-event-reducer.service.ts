@@ -15,13 +15,17 @@ import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
 import { Invoice, UNPAID_INVOICE_STATUSES } from '../entities/invoice.entity';
-import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { isPlantedBeforeCharge } from '../utils/charge-keys.util';
 import { insertInvoiceOnce } from '../utils/invoice-insert.util';
+import {
+  isCardRefused,
+  lockCustomerForCard,
+  saveDefaultCard
+} from '../utils/saved-card.util';
 import { CreditService } from '../services/credit.service';
 import {
   FirstPaymentUnclaimedEvent,
@@ -668,12 +672,22 @@ export class BillingEventReducer {
    * activated it, a later checkout moved it to another plan, or a cancel
    * landed. Postgres re-checks the predicate after the row lock, so of two
    * concurrent first payments only one activates.
+   *
+   * A card that the customer refused after this payment was created is not
+   * stored; the period still activates, because it is paid, and ends at its
+   * close, because no card can renew it.
    */
   private async activateSelfManaged(
     manager: EntityManager,
     subscription: Subscription,
     { payload, now }: { payload: NormalizedInvoicePayload; now: Date }
   ): Promise<string | null> {
+    const { savedPaymentMethod: saved } = payload;
+    // Locked before the subscription row, in the order of the card removal.
+    const customer = saved
+      ? await lockCustomerForCard(manager, subscription.customerId)
+      : null;
+    const refused = saved && customer ? isCardRefused(customer, saved) : false;
     const trialing =
       subscription.trialEnd != null &&
       subscription.trialEnd.getTime() > now.getTime();
@@ -684,7 +698,10 @@ export class BillingEventReducer {
         status: 'incomplete',
         ...(payload.planKey ? { planKey: payload.planKey } : {})
       },
-      { status: trialing ? 'trialing' : 'active' }
+      {
+        status: trialing ? 'trialing' : 'active',
+        ...(refused ? { cancelAtPeriodEnd: true } : {})
+      }
     );
 
     if (!applied.affected) {
@@ -695,30 +712,17 @@ export class BillingEventReducer {
       await this.markTrialUsed(manager, subscription.customerId, now);
     }
 
-    if (payload.savedPaymentMethod) {
-      // Demote the current default before inserting the new one (mirrors
-      // reducePaymentMethodUpdated) so defaults never accumulate.
-      await manager.update(
-        PaymentMethod,
-        { customerId: subscription.customerId, isDefault: true },
-        { isDefault: false }
+    if (refused) {
+      this.logger.warn(
+        `Subscription ${subscription.id} activated without the card: the customer removed it after the payment was created`
       );
-      const method = await manager.save(
-        manager.create(PaymentMethod, {
-          customerId: subscription.customerId,
-          provider: subscription.provider,
-          providerMethodRef: payload.savedPaymentMethod.providerMethodRef,
-          brand: payload.savedPaymentMethod.brand,
-          last4: payload.savedPaymentMethod.last4,
-          isDefault: true
-        })
-      );
+    } else if (saved) {
+      const method = await saveDefaultCard(manager, {
+        customerId: subscription.customerId,
+        provider: subscription.provider,
+        saved
+      });
 
-      await manager.update(
-        Customer,
-        { id: subscription.customerId },
-        { defaultPaymentMethodId: method.id }
-      );
       await manager.update(
         Subscription,
         { id: subscription.id },
@@ -768,27 +772,29 @@ export class BillingEventReducer {
     }
 
     await withTransaction(this.dataSource, async (manager) => {
-      await manager.update(
-        PaymentMethod,
-        { customerId, isDefault: true },
-        { isDefault: false }
-      );
-      const method = await manager.save(
-        manager.create(PaymentMethod, {
-          customerId,
-          provider,
-          providerMethodRef: saved.providerMethodRef,
-          brand: saved.brand,
-          last4: saved.last4,
-          isDefault: true
-        })
-      );
+      const customer = await lockCustomerForCard(manager, customerId);
 
-      await manager.update(
-        Customer,
-        { id: customerId },
-        { defaultPaymentMethodId: method.id }
-      );
+      if (!customer) {
+        this.logger.warn(
+          `Skipping payment_method.updated: customer ${customerId} not found`
+        );
+
+        return;
+      }
+
+      if (isCardRefused(customer, saved)) {
+        this.logger.warn(
+          `Skipping payment_method.updated: customer ${customerId} removed the card after the re-bind was created`
+        );
+
+        return;
+      }
+
+      const method = await saveDefaultCard(manager, {
+        customerId,
+        provider,
+        saved
+      });
 
       const subscription = await manager.findOne(Subscription, {
         where: { customerId, status: In([...OPEN_SUBSCRIPTION_STATUSES]) },

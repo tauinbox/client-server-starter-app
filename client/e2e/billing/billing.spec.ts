@@ -630,6 +630,45 @@ test.describe('Billing', () => {
     await expect(page.locator('.payment-method')).toContainText('4444');
   });
 
+  test('removing the saved card stops autopay and schedules the end of the plan', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'pro'
+    });
+
+    await page.goto('/billing/settings');
+    await expect(page.locator('.payment-method')).toContainText('4242');
+    await expect(page.locator('.plan-summary')).toContainText('Renews');
+
+    await page.getByRole('button', { name: 'Remove card' }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Remove card' })
+      .click();
+
+    await expect(
+      page.getByText('Card removed. Automatic payments are off.')
+    ).toBeVisible();
+    await expect(page.locator('.payment-method')).toContainText(
+      'No payment method on file.'
+    );
+    await expect(page.locator('.plan-summary')).toContainText('Cancels on');
+    await expect(page.getByRole('button', { name: 'Remove card' })).toHaveCount(
+      0
+    );
+
+    // The refusal is stored: a reload shows the same state.
+    await page.reload();
+    await expect(page.locator('.payment-method')).toContainText(
+      'No payment method on file.'
+    );
+    await expect(page.locator('.plan-summary')).toContainText('Cancels on');
+  });
+
   test('one-time SKU purchase settles into a paid invoice and a thank-you return', async ({
     page,
     _mockServer

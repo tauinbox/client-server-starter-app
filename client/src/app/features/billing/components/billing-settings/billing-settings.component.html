@@ -130,17 +130,30 @@
                 {{ t('billing.settings.noPaymentMethod') }}
               </p>
             }
-            @if (store.hasActiveSubscription()) {
+            @if (store.hasActiveSubscription() || store.paymentMethod()) {
               <div class="card-actions">
-                <button
-                  matButton="outlined"
-                  type="button"
-                  class="update-method-btn"
-                  [disabled]="store.working()"
-                  (click)="onUpdatePaymentMethod()"
-                >
-                  {{ t('billing.settings.updatePaymentMethod') }}
-                </button>
+                @if (store.hasActiveSubscription()) {
+                  <button
+                    matButton="outlined"
+                    type="button"
+                    class="update-method-btn"
+                    [disabled]="store.working()"
+                    (click)="onUpdatePaymentMethod()"
+                  >
+                    {{ t('billing.settings.updatePaymentMethod') }}
+                  </button>
+                }
+                @if (store.paymentMethod()) {
+                  <button
+                    matButton="text"
+                    type="button"
+                    class="remove-method-btn"
+                    [disabled]="store.working()"
+                    (click)="onRemovePaymentMethod()"
+                  >
+                    {{ t('billing.settings.removePaymentMethod') }}
+                  </button>
+                }
               </div>
             }
           </mat-card-content>

@@ -84,6 +84,12 @@ export interface NormalizedSavedPaymentMethod {
   providerMethodRef: string;
   brand: string;
   last4: string;
+  /**
+   * When the payment that saved the card was created, which is when the buyer
+   * agreed to save it. Null when the provider did not send it. The reducer
+   * does not save a card that the customer refused after this moment.
+   */
+  consentedAt: string | null;
 }
 
 /** Invoice state carried by an `invoice.paid` normalized event. */

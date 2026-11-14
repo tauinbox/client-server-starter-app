@@ -415,6 +415,31 @@ export const BillingStore = signalStore(
       }
     }
 
+    async function removePaymentMethod(): Promise<boolean> {
+      patchState(store, { working: true });
+
+      try {
+        const subscription = await firstValueFrom(
+          billing.removePaymentMethod()
+        );
+
+        patchState(store, { subscription, paymentMethod: null });
+        notify.success('billing.settings.successCardRemoved');
+
+        return true;
+      } catch (error) {
+        notify.error(
+          error as HttpErrorResponse,
+          'billing.store.errorRemoveCardFailed'
+        );
+        await rereadAfterRefusal(error);
+
+        return false;
+      } finally {
+        patchState(store, { working: false });
+      }
+    }
+
     async function cancel(mode: CancelMode = 'period_end'): Promise<boolean> {
       patchState(store, { working: true });
 
@@ -476,6 +501,7 @@ export const BillingStore = signalStore(
       purchase,
       changePlan,
       startPaymentMethodUpdate,
+      removePaymentMethod,
       cancel,
       setRegion
     };

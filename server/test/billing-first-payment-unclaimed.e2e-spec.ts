@@ -184,7 +184,8 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
       savedPaymentMethod: {
         providerMethodRef: `pm_${paymentId}`,
         brand: 'Visa',
-        last4: '4242'
+        last4: '4242',
+        consentedAt: new Date().toISOString()
       },
       planKey
     };

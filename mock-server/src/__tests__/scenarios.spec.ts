@@ -503,6 +503,26 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     });
     ctx.values.$subscriptionId = subscriptionId;
   },
+  'saved-card': async (ctx) => {
+    if (!ctx.values.$customerId) await STATES.customer(ctx);
+
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    const customer = getState().billingCustomers.get(ctx.values.$customerId!)!;
+
+    getState().billingPaymentMethods.set(id, {
+      id,
+      customerId: customer.id,
+      provider: 'yookassa',
+      providerMethodRef: `scenario-card-${sequence}`,
+      brand: 'Visa',
+      last4: '4242',
+      isDefault: true,
+      createdAt: now,
+      updatedAt: now
+    });
+    customer.defaultPaymentMethodId = id;
+  },
   'paid-invoice': (ctx) => {
     const nowMs = Date.now();
     const now = new Date(nowMs).toISOString();

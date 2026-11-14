@@ -1347,6 +1347,7 @@ describe('YooKassaProvider', () => {
         id: 'pay-mu',
         status: 'succeeded',
         amount: { value: '0.00', currency: 'RUB' },
+        created_at: '2026-06-01T00:00:00Z',
         payment_method: {
           id: 'tok-new',
           saved: true,
@@ -1363,6 +1364,7 @@ describe('YooKassaProvider', () => {
         notification('payment.succeeded', 'pay-mu')
       );
 
+      // The creation time of the payment orders the card against a removal.
       expect(result).toMatchObject({
         provider: 'yookassa',
         providerEventId: 'payment.succeeded:pay-mu',
@@ -1372,7 +1374,8 @@ describe('YooKassaProvider', () => {
           savedPaymentMethod: {
             providerMethodRef: 'tok-new',
             brand: 'MasterCard',
-            last4: '4444'
+            last4: '4444',
+            consentedAt: '2026-06-01T00:00:00Z'
           }
         }
       });

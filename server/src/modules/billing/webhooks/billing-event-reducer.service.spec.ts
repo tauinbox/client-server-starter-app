@@ -555,10 +555,60 @@ describe('BillingEventReducer', () => {
       savedPaymentMethod: {
         providerMethodRef: 'pm_tok',
         brand: 'Visa',
-        last4: '4242'
+        last4: '4242',
+        consentedAt: null
       },
       planKey: 'pro'
     };
+
+    it('activates with no card and schedules the cancel when the card was removed after the payment was created', async () => {
+      const { reducer, manager, emit } = await build({
+        subscription: {
+          id: 'sub-1',
+          customerId: 'cust-1',
+          provider: 'yookassa',
+          billingMode: 'fixed',
+          status: 'incomplete',
+          trialEnd: null
+        } as Subscription,
+        customer: {
+          id: 'cust-1',
+          paymentMethodRemovedAt: new Date('2026-06-01T00:03:00Z')
+        } as Customer,
+        invoiceInsertRows: [{ id: 'inv-1' }],
+        updateAffected: 1
+      });
+
+      await reducer.reduce(
+        event(
+          'invoice.paid',
+          {
+            ...selfManagedPayload,
+            savedPaymentMethod: {
+              ...selfManagedPayload.savedPaymentMethod!,
+              consentedAt: '2026-06-01T00:01:00Z'
+            }
+          },
+          'yookassa'
+        )
+      );
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1', status: 'incomplete', planKey: 'pro' },
+        { status: 'active', cancelAtPeriodEnd: true }
+      );
+      expect(manager.save).not.toHaveBeenCalled();
+      expect(manager.update).not.toHaveBeenCalledWith(
+        Customer,
+        expect.anything(),
+        expect.objectContaining({ defaultPaymentMethodId: expect.anything() })
+      );
+      expect(emit).toHaveBeenCalledWith(
+        SubscriptionActivatedEvent.name,
+        expect.anything()
+      );
+    });
 
     it('persists the saved card, activates the incomplete subscription, and emits both events', async () => {
       const { reducer, manager, emit } = await build({
@@ -1224,9 +1274,15 @@ describe('BillingEventReducer', () => {
       savedPaymentMethod: {
         providerMethodRef: 'tok-new',
         brand: 'MasterCard',
-        last4: '4444'
+        last4: '4444',
+        consentedAt: null
       }
     };
+
+    const customer = {
+      id: 'cust-1',
+      paymentMethodRemovedAt: null
+    } as Customer;
 
     it('demotes the old default, saves the new card as default, and re-points the customer + subscription', async () => {
       const subscription = {
@@ -1234,7 +1290,10 @@ describe('BillingEventReducer', () => {
         customerId: 'cust-1',
         paymentMethodId: 'pm-old'
       } as Subscription;
-      const { reducer, manager, emit } = await build({ subscription });
+      const { reducer, manager, emit } = await build({
+        subscription,
+        customer
+      });
 
       await reducer.reduce(
         event('payment_method.updated', methodPayload, 'yookassa')
@@ -1271,8 +1330,66 @@ describe('BillingEventReducer', () => {
       expect(emit).not.toHaveBeenCalled();
     });
 
+    it('saves no card from a re-bind created before the customer removed the card', async () => {
+      const { reducer, manager } = await build({
+        customer: {
+          ...customer,
+          paymentMethodRemovedAt: new Date('2026-06-01T00:10:00Z')
+        }
+      });
+
+      await reducer.reduce(
+        event(
+          'payment_method.updated',
+          {
+            ...methodPayload,
+            savedPaymentMethod: {
+              ...methodPayload.savedPaymentMethod!,
+              consentedAt: '2026-06-01T00:09:59Z'
+            }
+          },
+          'yookassa'
+        )
+      );
+
+      expect(manager.findOne).toHaveBeenCalledWith(Customer, {
+        where: { id: 'cust-1' },
+        lock: { mode: 'for_no_key_update' }
+      });
+      expect(manager.save).not.toHaveBeenCalled();
+      expect(manager.update).not.toHaveBeenCalled();
+    });
+
+    it('saves the card from a re-bind created after the removal', async () => {
+      const { reducer, manager } = await build({
+        customer: {
+          ...customer,
+          paymentMethodRemovedAt: new Date('2026-06-01T00:10:00Z')
+        }
+      });
+
+      await reducer.reduce(
+        event(
+          'payment_method.updated',
+          {
+            ...methodPayload,
+            savedPaymentMethod: {
+              ...methodPayload.savedPaymentMethod!,
+              consentedAt: '2026-06-01T00:10:01Z'
+            }
+          },
+          'yookassa'
+        )
+      );
+
+      expect(manager.save).toHaveBeenCalledTimes(1);
+    });
+
     it('leaves the subscription untouched when the customer has none open', async () => {
-      const { reducer, manager } = await build({ subscription: null });
+      const { reducer, manager } = await build({
+        subscription: null,
+        customer
+      });
 
       await reducer.reduce(
         event('payment_method.updated', methodPayload, 'yookassa')

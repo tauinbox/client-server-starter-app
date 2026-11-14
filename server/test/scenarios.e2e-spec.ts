@@ -77,6 +77,7 @@ import { CreditBalance } from '../src/modules/billing/entities/credit-balance.en
 import { CreditLedger } from '../src/modules/billing/entities/credit-ledger.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
+import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
@@ -717,6 +718,25 @@ runWithInfra('Request scenarios (e2e)', () => {
       });
 
       ctx.values.$subscriptionId = subscription.id;
+    },
+    'saved-card': async (ctx) => {
+      if (!ctx.values.$customerId) await STATES.customer(ctx);
+
+      const method = await dataSource.getRepository(PaymentMethod).save({
+        customerId: ctx.values.$customerId!,
+        provider: 'yookassa',
+        providerMethodRef: `${emailPrefix}card-${sequence}`,
+        brand: 'Visa',
+        last4: '4242',
+        isDefault: true
+      });
+
+      await dataSource
+        .getRepository(Customer)
+        .update(
+          { id: ctx.values.$customerId! },
+          { defaultPaymentMethodId: method.id }
+        );
     },
     'paid-invoice': async (ctx) => {
       const now = Date.now();

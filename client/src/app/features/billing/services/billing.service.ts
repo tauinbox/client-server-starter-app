@@ -159,6 +159,14 @@ export class BillingService {
     );
   }
 
+  /** Refuses the saved card; answers the subscription after the refusal. */
+  removePaymentMethod(): Observable<SubscriptionResponse | null> {
+    return this.#http.delete<SubscriptionResponse | null>(
+      `${BILLING_API_V1}/payment-method`,
+      { context: silentContext() }
+    );
+  }
+
   cancel(mode: CancelMode = 'period_end'): Observable<SubscriptionResponse> {
     return this.#http.post<SubscriptionResponse>(
       `${BILLING_API_V1}/subscription/cancel`,

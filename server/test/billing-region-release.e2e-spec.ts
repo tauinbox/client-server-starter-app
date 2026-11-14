@@ -22,6 +22,7 @@ import { BillingService } from '../src/modules/billing/billing.service';
 import { FirstPaymentUnclaimedEvent } from '../src/modules/billing/events/billing.events';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { AuditService } from '../src/modules/audit/audit.service';
 import {
   DRAFT_TERMS_CONSENTS,
   TERMS_NOT_SENT
@@ -117,7 +118,8 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
           provide: ConfigService,
           useValue: { get: () => 'http://localhost:4200' }
         },
-        { provide: EventEmitter2, useValue: { emit } }
+        { provide: EventEmitter2, useValue: { emit } },
+        { provide: AuditService, useValue: { log: jest.fn() } }
       ]
     }).compile();
 

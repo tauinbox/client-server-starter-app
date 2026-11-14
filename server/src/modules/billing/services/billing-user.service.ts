@@ -2,8 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   geoDefault,
   geoFromLocale,
@@ -48,6 +49,11 @@ import {
   subscriptionNotLinked
 } from '../utils/billing-errors.util';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
+import { cancelFields } from '../utils/cancel-fields.util';
+import { lockCustomerForCard } from '../utils/saved-card.util';
+import { withTransaction } from '../../../common/utils/with-transaction.util';
+import { AuditService } from '../../audit/audit.service';
+import type { AuditContext } from '../../audit/audit.service';
 import {
   findOpenSubscription,
   requireOpenSubscription
@@ -59,6 +65,12 @@ import { CreditService } from './credit.service';
 import { BillingConsentService } from './billing-consent.service';
 import type { TermsAcceptance } from './billing-consent.service';
 import { ApiError } from '../../../common/errors/api-error';
+
+/** The fields of the audit row of a card removal. */
+export type PaymentMethodRemovalAudit = {
+  actorEmail: string;
+  context: AuditContext;
+};
 
 function alreadySubscribed(): ApiError {
   return new ApiError(
@@ -123,7 +135,9 @@ export class BillingUserService {
     private readonly credits: CreditService,
     private readonly consents: BillingConsentService,
     private readonly config: ConfigService,
-    private readonly events: EventEmitter2
+    private readonly events: EventEmitter2,
+    private readonly dataSource: DataSource,
+    private readonly auditService: AuditService
   ) {}
 
   private readonly logger = new Logger(BillingUserService.name);
@@ -593,6 +607,89 @@ export class BillingUserService {
     );
   }
 
+  /**
+   * The refusal of the saved card (consumer law, Article 16.1 p. 4.2): no
+   * automatic payment follows it. A provider-managed subscription keeps its
+   * card at the provider, so it is first canceled at the period end there.
+   * Then one transaction, under the customer lock that the card writers also
+   * take, deletes the local cards and sets a self-managed subscription to end
+   * at the close of its period. A charge that read the card before the commit
+   * completes; every later charge fails before the provider call, because no
+   * saved method is left. A request that changes nothing writes no audit row.
+   */
+  async removePaymentMethod(
+    userId: string,
+    audit: PaymentMethodRemovalAudit
+  ): Promise<Subscription | null> {
+    const customer = await this.customerFor(userId);
+
+    if (!customer) return null;
+
+    const open = await findOpenSubscription(this.subscriptions, customer.id);
+    const canceledAtProvider =
+      open?.lifecycleOwner === 'provider' &&
+      ENTITLED_SUBSCRIPTION_STATUSES.includes(open.status) &&
+      !open.cancelAtPeriodEnd;
+
+    if (canceledAtProvider) {
+      await cancelOpenSubscription(
+        {
+          subscriptions: this.subscriptions,
+          billing: this.billing,
+          events: this.events
+        },
+        open,
+        { mode: 'period_end', resolveUserId: () => Promise.resolve(userId) }
+      );
+    }
+
+    await withTransaction(this.dataSource, async (manager) => {
+      if (!(await lockCustomerForCard(manager, customer.id))) return;
+
+      const removedMethods =
+        (await manager.delete(PaymentMethod, { customerId: customer.id }))
+          .affected ?? 0;
+      let cancelScheduled = canceledAtProvider;
+
+      if (removedMethods) {
+        await manager.update(
+          Customer,
+          { id: customer.id },
+          { paymentMethodRemovedAt: new Date() }
+        );
+        const scheduled = await manager.update(
+          Subscription,
+          {
+            customerId: customer.id,
+            lifecycleOwner: 'self',
+            status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
+            cancelAtPeriodEnd: false
+          },
+          cancelFields('period_end')
+        );
+
+        cancelScheduled ||= Boolean(scheduled.affected);
+      }
+
+      if (!removedMethods && !cancelScheduled) return;
+
+      await this.auditService.log(
+        {
+          action: AuditAction.BILLING_PAYMENT_METHOD_REMOVE,
+          actorId: userId,
+          actorEmail: audit.actorEmail,
+          targetId: customer.id,
+          targetType: 'BillingCustomer',
+          details: { removedMethods, cancelScheduled },
+          context: audit.context
+        },
+        manager
+      );
+    });
+
+    return findOpenSubscription(this.subscriptions, customer.id);
+  }
+
   async getRegion(userId: string): Promise<BillingRegionResponse> {
     const customer = await this.customerFor(userId);
 
@@ -707,7 +804,8 @@ export class BillingUserService {
           currency,
           providerCustomerId: null,
           defaultPaymentMethodId: null,
-          trialUsedAt: null
+          trialUsedAt: null,
+          paymentMethodRemovedAt: null
         })
       );
     } catch (error: unknown) {

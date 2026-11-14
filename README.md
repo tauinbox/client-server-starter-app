@@ -835,6 +835,9 @@ the same permission both apply.
   Paddle returns its zero-amount payment-method-change checkout. YooKassa binds the card again with a
   zero-amount payment, and its success webhook changes the default saved method. The old card is
   demoted and not deleted, and the next renewal charges the new token.
+- **Remove card.** While a card is on file, "Remove card" on the payment-method card asks for a
+  confirmation and calls `DELETE /api/v1/billing/payment-method`. The server deletes the saved cards
+  and ends the subscription at the close of its period, so no automatic payment follows.
 
   A `past_due` subscription can use this route, because a correction of the card is how dunning
   recovers.
@@ -1947,11 +1950,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3244 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 947 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 925 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1754 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 347 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1462 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3253 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 955 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 933 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1760 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 348 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1465 tests pass |
 
 ## CI/CD
 

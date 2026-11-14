@@ -14,6 +14,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
+import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import type { InvoiceResponse } from '@app/shared/types';
 import {
@@ -81,6 +83,7 @@ export class BillingSettingsComponent implements OnInit {
   readonly #route = inject(ActivatedRoute);
   readonly #router = inject(Router);
   readonly #notify = inject(NotifyService);
+  readonly #dialog = inject(AdaptiveDialogService);
 
   protected readonly billingRoute = `/${AppRouteSegmentEnum.Billing}`;
   protected readonly isHandset = this.#layout.isHandset;
@@ -223,6 +226,26 @@ export class BillingSettingsComponent implements OnInit {
         this.#checkoutRedirect.redirect(session.url);
       }
     });
+  }
+
+  async onRemovePaymentMethod(): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.#dialog.openConfirm({
+        title: this.#transloco.translate('billing.settings.removeCardTitle'),
+        message: this.#transloco.translate(
+          'billing.settings.removeCardMessage'
+        ),
+        confirmButton: this.#transloco.translate(
+          'billing.settings.removeCardConfirm'
+        ),
+        cancelButton: this.#transloco.translate('common.cancel'),
+        icon: 'warning'
+      })
+    );
+
+    if (confirmed) {
+      await this.store.removePaymentMethod();
+    }
   }
 
   onCancel(): void {
