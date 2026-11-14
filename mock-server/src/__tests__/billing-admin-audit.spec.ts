@@ -217,6 +217,25 @@ describe('admin billing mutations write audit entries', () => {
     }
   });
 
+  it('stores no end notice for the immediate cancel of an unpaid checkout', async () => {
+    const { token, userId } = await loginAdmin();
+    const { subscriptionId } = await activateSubscription(userId, 'incomplete');
+    const before = getState().userNotifications.size;
+
+    const res = await post(
+      token,
+      `/admin/billing/subscriptions/${subscriptionId}/cancel`,
+      { mode: 'immediate' }
+    );
+
+    expect(res.status).toBe(200);
+    expect(
+      [...getState().userNotifications.values()]
+        .slice(before)
+        .map(({ kind }) => kind)
+    ).toEqual([]);
+  });
+
   it('audits a refund with the requested amount', async () => {
     const { token, userId } = await loginAdmin();
     const { customerId } = await activateSubscription(userId);
