@@ -682,7 +682,7 @@ export class BillingEventReducer {
     subscription: Subscription,
     { payload, now }: { payload: NormalizedInvoicePayload; now: Date }
   ): Promise<string | null> {
-    const saved = payload.savedPaymentMethod;
+    const { savedPaymentMethod: saved } = payload;
     // Locked before the subscription row, in the order of the card removal.
     const customer = saved
       ? await lockCustomerForCard(manager, subscription.customerId)

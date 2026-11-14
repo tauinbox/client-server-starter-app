@@ -29,7 +29,7 @@ export function isCardRefused(
   customer: Pick<Customer, 'paymentMethodRemovedAt'>,
   saved: NormalizedSavedPaymentMethod
 ): boolean {
-  const removedAt = customer.paymentMethodRemovedAt;
+  const { paymentMethodRemovedAt: removedAt } = customer;
 
   if (!removedAt) {
     return false;
