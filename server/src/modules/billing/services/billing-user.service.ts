@@ -56,6 +56,8 @@ import { INVOICE_LIST_COLUMNS } from '../utils/list-order.util';
 import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
+import { BillingConsentService } from './billing-consent.service';
+import type { TermsAcceptance } from './billing-consent.service';
 import { ApiError } from '../../../common/errors/api-error';
 
 function alreadySubscribed(): ApiError {
@@ -119,6 +121,7 @@ export class BillingUserService {
     private readonly users: Repository<User>,
     private readonly billing: BillingService,
     private readonly credits: CreditService,
+    private readonly consents: BillingConsentService,
     private readonly config: ConfigService,
     private readonly events: EventEmitter2
   ) {}
@@ -234,7 +237,8 @@ export class BillingUserService {
    */
   async purchase(
     userId: string,
-    request: { productKey: string; amountMinor?: number; description?: string }
+    request: { productKey: string; amountMinor?: number; description?: string },
+    terms: TermsAcceptance = {}
   ): Promise<PurchaseSessionResponse> {
     const product = await this.products.findOne({
       where: { key: request.productKey }
@@ -249,6 +253,7 @@ export class BillingUserService {
 
     const customer = await this.getOrCreateCustomer(userId);
     const provider = await this.billing.resolveProvider(customer);
+    const consent = this.consents.check(provider.id, terms);
 
     const price = product.prices[provider.id];
 
@@ -279,6 +284,8 @@ export class BillingUserService {
     }
 
     const description = this.purchaseDescription(product, request.description);
+
+    await this.consents.record(userId, consent);
 
     const session = await provider.createOneTimePayment(customer, {
       amountMinor,
@@ -376,7 +383,8 @@ export class BillingUserService {
 
   async checkout(
     userId: string,
-    planKey: string
+    planKey: string,
+    terms: TermsAcceptance = {}
   ): Promise<CheckoutSessionResponse> {
     const plan = await this.plans.findOne({ where: { key: planKey } });
 
@@ -410,6 +418,7 @@ export class BillingUserService {
     // (`PROVIDER_NOT_CONFIGURED`) and enabled (`PROVIDER_UNAVAILABLE`), the
     // server-side enforcement behind the UI availability gating.
     const provider = await this.billing.resolveProvider(customer);
+    const consent = this.consents.check(provider.id, terms);
     const trial = plan.trialDays > 0 && !customer.trialUsedAt;
 
     // A prior unpaid checkout leaves an `incomplete` row. Reuse it rather than
@@ -470,6 +479,8 @@ export class BillingUserService {
       // self `incomplete` so the provider's activation webhook isn't blocked.
       await this.reuseIncompleteRow(pending, { status: 'canceled' });
     }
+
+    await this.consents.record(userId, consent);
 
     const session = await provider.startCheckout(customer, plan, {
       urls: {
@@ -659,13 +670,16 @@ export class BillingUserService {
       )
     );
 
+    const effectiveProvider = this.billing.effectiveProviderId(customer);
+
     return {
       region: regionForOverride(customer.providerOverride),
       detectedProvider: geoDefault(customer.country),
-      effectiveProvider: this.billing.effectiveProviderId(customer),
+      effectiveProvider,
       availableProviders: BILLING_PROVIDER_FLAGS.filter(
         (_, i) => availability[i]
-      ).map(({ provider }) => provider)
+      ).map(({ provider }) => provider),
+      termsVersion: this.consents.requiredTermsVersion(effectiveProvider)
     };
   }
 

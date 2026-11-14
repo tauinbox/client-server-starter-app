@@ -10,6 +10,7 @@ import { parseRedisConnection } from '../../common/utils/parse-redis-connection'
 import { BillingService } from './billing.service';
 import { BillingConfigService } from './config/billing-config.service';
 import { BillingConfiguredAttributesRegistrar } from './registrars/billing-configured-attributes.registrar';
+import { BillingConsent } from './entities/billing-consent.entity';
 import { CreditBalance } from './entities/credit-balance.entity';
 import { CreditLedger } from './entities/credit-ledger.entity';
 import { Customer } from './entities/customer.entity';
@@ -44,6 +45,11 @@ import { FixedRating } from './rating/fixed-rating.strategy';
 import { ProrationCalculator } from './rating/proration-calculator';
 import { PlanService } from './services/plan.service';
 import { CreditService } from './services/credit.service';
+import { LEGAL_DOCUMENTS } from '@app/shared/constants';
+import {
+  BillingConsentService,
+  LEGAL_DOCUMENT_VERSIONS
+} from './services/billing-consent.service';
 import { BillingUserService } from './services/billing-user.service';
 import { PlanChangeService } from './services/plan-change.service';
 import { BillingAdminService } from './services/billing-admin.service';
@@ -88,6 +94,7 @@ export class BillingModule {
         FeatureFlagsModule,
         NotificationsModule,
         TypeOrmModule.forFeature([
+          BillingConsent,
           CreditBalance,
           CreditLedger,
           Customer,
@@ -131,6 +138,8 @@ export class BillingModule {
         BillingConfigService,
         PlanService,
         CreditService,
+        { provide: LEGAL_DOCUMENT_VERSIONS, useValue: LEGAL_DOCUMENTS },
+        BillingConsentService,
         BillingUserService,
         PlanChangeService,
         BillingAdminService,

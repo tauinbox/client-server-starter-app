@@ -32,6 +32,8 @@ import {
 } from '../testing/billing-service.fixtures';
 import { BillingUserService } from './billing-user.service';
 import { CreditService } from './credit.service';
+import { BillingConsentService } from './billing-consent.service';
+import type { CheckedTermsAcceptance } from './billing-consent.service';
 
 function cursorQuery(overrides: Partial<InvoiceCursorQueryDto> = {}) {
   return Object.assign(new InvoiceCursorQueryDto(), overrides);
@@ -63,9 +65,20 @@ async function build() {
     )
   };
 
+  const consents = {
+    requiredTermsVersion: jest.fn<string | null, [BillingProviderId]>(
+      () => null
+    ),
+    check: jest.fn<CheckedTermsAcceptance, [BillingProviderId, unknown]>(
+      () => null
+    ),
+    record: jest.fn().mockResolvedValue(undefined)
+  };
+
   const module = await Test.createTestingModule({
     providers: [
       BillingUserService,
+      { provide: BillingConsentService, useValue: consents },
       { provide: getRepositoryToken(Customer), useValue: customers },
       { provide: getRepositoryToken(Subscription), useValue: subscriptions },
       { provide: getRepositoryToken(Invoice), useValue: invoices },
@@ -94,6 +107,7 @@ async function build() {
     users,
     billing,
     credits,
+    consents,
     emit
   };
 }
@@ -529,6 +543,131 @@ describe('BillingUserService', () => {
         provider: 'yookassa',
         url: 'https://checkout/x',
         sessionRef: 'sess-1'
+      });
+    });
+
+    describe('terms consent', () => {
+      const terms = {
+        acceptedVersion: '2026-12-01',
+        actorEmail: 'user@example.com',
+        context: { ip: '127.0.0.1' }
+      };
+      const checked = {
+        provider: 'yookassa' as const,
+        version: '2026-12-01',
+        actorEmail: 'user@example.com',
+        context: { ip: '127.0.0.1' }
+      };
+
+      async function setupCheckout() {
+        const ctx = await build();
+
+        ctx.plans.findOne.mockResolvedValue(makePlan());
+        ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+        const yoo = provider('yookassa', false);
+
+        ctx.billing.resolveProvider.mockResolvedValue(yoo);
+
+        return { ctx, yoo };
+      }
+
+      it('checks the terms of the resolved provider and records them before the provider call', async () => {
+        const { ctx, yoo } = await setupCheckout();
+
+        ctx.consents.check.mockReturnValue(checked);
+
+        await ctx.service.checkout('user-1', 'pro', terms);
+
+        expect(ctx.consents.check).toHaveBeenCalledWith('yookassa', terms);
+        expect(ctx.consents.record).toHaveBeenCalledWith('user-1', checked);
+        const [recordOrder] = ctx.consents.record.mock.invocationCallOrder;
+        const [startOrder] = yoo.startCheckout.mock.invocationCallOrder;
+
+        expect(recordOrder).toBeLessThan(startOrder);
+      });
+
+      it('writes nothing and calls no provider when the terms are refused', async () => {
+        const { ctx, yoo } = await setupCheckout();
+
+        ctx.consents.check.mockImplementation(() => {
+          throw new ApiError(
+            ErrorKeys.BILLING.TERMS_NOT_ACCEPTED,
+            'Accept the current terms of service to continue.'
+          );
+        });
+
+        await expectRefusal(
+          ctx.service.checkout('user-1', 'pro', terms),
+          ErrorKeys.BILLING.TERMS_NOT_ACCEPTED
+        );
+        expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+        expect(ctx.consents.record).not.toHaveBeenCalled();
+        expect(yoo.startCheckout).not.toHaveBeenCalled();
+      });
+
+      it('records no consent when a later check refuses the checkout', async () => {
+        const { ctx, yoo } = await setupCheckout();
+
+        ctx.consents.check.mockReturnValue(checked);
+        ctx.subscriptions.findOne.mockImplementation(
+          ({ where }: { where: { status: unknown } }) =>
+            Promise.resolve(
+              where.status === 'incomplete'
+                ? {
+                    id: 'sub-p',
+                    status: 'incomplete',
+                    lifecycleOwner: 'provider'
+                  }
+                : null
+            )
+        );
+
+        await expectRefusal(
+          ctx.service.checkout('user-1', 'pro', terms),
+          ErrorKeys.BILLING.ALREADY_SUBSCRIBED
+        );
+        expect(ctx.consents.record).not.toHaveBeenCalled();
+        expect(yoo.startCheckout).not.toHaveBeenCalled();
+      });
+
+      it('checks and records the terms of a purchase before the provider call', async () => {
+        const ctx = await build();
+
+        ctx.products.findOne.mockResolvedValue(makeProduct());
+        ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+        const yoo = provider('yookassa', false);
+
+        ctx.billing.resolveProvider.mockResolvedValue(yoo);
+        ctx.consents.check.mockReturnValue(checked);
+
+        await ctx.service.purchase(
+          'user-1',
+          { productKey: 'report-pack' },
+          terms
+        );
+
+        expect(ctx.consents.check).toHaveBeenCalledWith('yookassa', terms);
+        const [recordOrder] = ctx.consents.record.mock.invocationCallOrder;
+        const [payOrder] = yoo.createOneTimePayment.mock.invocationCallOrder;
+
+        expect(recordOrder).toBeLessThan(payOrder);
+      });
+
+      it('records no consent when the purchase amount is refused', async () => {
+        const ctx = await build();
+
+        ctx.products.findOne.mockResolvedValue(makeDonation());
+        ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+        ctx.billing.resolveProvider.mockResolvedValue(
+          provider('yookassa', false)
+        );
+        ctx.consents.check.mockReturnValue(checked);
+
+        await expectRefusal(
+          ctx.service.purchase('user-1', { productKey: 'donation' }, terms),
+          ErrorKeys.BILLING.AMOUNT_REQUIRED
+        );
+        expect(ctx.consents.record).not.toHaveBeenCalled();
       });
     });
 
@@ -1262,8 +1401,25 @@ describe('BillingUserService', () => {
         region: 'auto',
         detectedProvider: 'yookassa',
         effectiveProvider: 'yookassa',
-        availableProviders: ['paddle', 'yookassa']
+        availableProviders: ['paddle', 'yookassa'],
+        termsVersion: null
       });
+    });
+
+    it('reports the terms version that a payment on the effective provider must accept', async () => {
+      const ctx = await build();
+
+      ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+      ctx.consents.requiredTermsVersion.mockImplementation((id) =>
+        id === 'yookassa' ? '2026-12-01' : null
+      );
+
+      const region = await ctx.service.getRegion('user-1');
+
+      expect(region.termsVersion).toBe('2026-12-01');
+      expect(ctx.consents.requiredTermsVersion).toHaveBeenCalledWith(
+        'yookassa'
+      );
     });
 
     it('lists only the providers that a checkout can use now', async () => {

@@ -6,6 +6,7 @@
 // check-auth-coverage.e2e-spec.ts; here a tiny middleware injects req.user so
 // the protected handlers can be exercised without a live PostgreSQL.
 
+import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
@@ -128,7 +129,10 @@ describe('Billing user self-service (e2e)', () => {
     app.use((req: Request, _res: Response, next: NextFunction) => {
       const userId = (req.headers['x-test-user'] as string) ?? 'user-1';
 
-      (req as Request & { user: { userId: string } }).user = { userId };
+      (req as Request & { user: { userId: string; email: string } }).user = {
+        userId,
+        email: `${userId}@example.com`
+      };
       next();
     });
     await app.init();
@@ -261,10 +265,14 @@ describe('Billing user self-service (e2e)', () => {
 
     const res = await request(server)
       .post('/api/v1/billing/checkout')
-      .send({ planKey: 'pro' })
+      .send({ planKey: 'pro', acceptedTermsVersion: '2026-12-01' })
       .expect(200);
 
-    expect(billingUser.checkout).toHaveBeenCalledWith('user-1', 'pro');
+    expect(billingUser.checkout).toHaveBeenCalledWith('user-1', 'pro', {
+      acceptedVersion: '2026-12-01',
+      actorEmail: 'user-1@example.com',
+      context: expect.objectContaining({ ip: expect.any(String) })
+    });
     expect(res.body).toEqual({
       provider: 'yookassa',
       url: 'https://checkout/x',
@@ -297,10 +305,15 @@ describe('Billing user self-service (e2e)', () => {
       .send({ productKey: 'donation', amountMinor: 150000 })
       .expect(200);
 
-    expect(billingUser.purchase).toHaveBeenCalledWith('user-7', {
-      productKey: 'donation',
-      amountMinor: 150000
-    });
+    expect(billingUser.purchase).toHaveBeenCalledWith(
+      'user-7',
+      { productKey: 'donation', amountMinor: 150000 },
+      {
+        acceptedVersion: undefined,
+        actorEmail: 'user-7@example.com',
+        context: expect.objectContaining({ ip: expect.any(String) })
+      }
+    );
     expect(res.body).toEqual({
       provider: 'yookassa',
       url: 'https://pay/x',
@@ -316,6 +329,50 @@ describe('Billing user self-service (e2e)', () => {
 
     expect(billingUser.purchase).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['checkout', { planKey: 'pro' }],
+    ['purchase', { productKey: 'report-pack' }]
+  ] as const)(
+    'rejects a %s whose accepted terms version is not a short string',
+    async (route, body) => {
+      for (const acceptedTermsVersion of [42, null, 'x'.repeat(33)]) {
+        await request(server)
+          .post(`/api/v1/billing/${route}`)
+          .send({ ...body, acceptedTermsVersion })
+          .expect(422);
+      }
+
+      expect(billingUser[route]).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    [
+      'checkout',
+      { planKey: 'pro', acceptedTermsVersion: 'v'.repeat(33) },
+      ['acceptedTermsVersion must be shorter than or equal to 32 characters']
+    ],
+    [
+      'purchase',
+      { productKey: 'report-pack', acceptedTermsVersion: 7 },
+      [
+        'acceptedTermsVersion must be shorter than or equal to 32 characters',
+        'acceptedTermsVersion must be a string'
+      ]
+    ]
+  ] as const)(
+    'reports the %s terms version errors in the order the mock server does',
+    async (route, body, errors) => {
+      const res = await request(server)
+        .post(`/api/v1/billing/${route}`)
+        .send(body)
+        .expect(422);
+
+      // No global exception filter here: the pipe messages stay in `message`.
+      expect((res.body as { message: string[] }).message).toEqual(errors);
+    }
+  );
 
   it('rejects a purchase with a non-positive amount', async () => {
     await request(server)

@@ -16,6 +16,8 @@ import { DataSource, In } from 'typeorm';
 import { generateSync } from 'otplib';
 import {
   BILLING_PROVIDER_FLAGS,
+  LEGAL_DOCUMENTS,
+  LEGAL_JURISDICTIONS,
   MAX_FAILED_ATTEMPTS,
   requiresSecureCookies
 } from '@app/shared/constants';
@@ -33,6 +35,7 @@ import {
   SCENARIO_PASSWORD,
   SCENARIO_RECOVERY_CODE,
   ScenarioPlaceholder,
+  PUBLISHED_SCENARIO_TERMS,
   scenarioMethod,
   scenarioPath,
   StateFixture,
@@ -65,6 +68,11 @@ import { ResourceRegistryService } from '../src/modules/auth/services/resource-r
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
+import { BillingConsent } from '../src/modules/billing/entities/billing-consent.entity';
+import {
+  LEGAL_DOCUMENT_VERSIONS,
+  type LegalDocumentVersions
+} from '../src/modules/billing/services/billing-consent.service';
 import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
 import { CreditLedger } from '../src/modules/billing/entities/credit-ledger.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
@@ -140,6 +148,10 @@ runWithInfra('Request scenarios (e2e)', () => {
   // The mock seeds every provider kill switch on; `providers-disabled` turns
   // them off for one scenario.
   let providersEnabled = true;
+  // The server reads the versions at each request; `published-terms` changes
+  // them for one scenario.
+  const legalDocuments: LegalDocumentVersions =
+    structuredClone(LEGAL_DOCUMENTS);
   const stamp = `${Date.now()}-${randomBytes(3).toString('hex')}`;
   const emailPrefix = `scenario-${stamp}-`;
   let sequence = 0;
@@ -194,6 +206,8 @@ runWithInfra('Request scenarios (e2e)', () => {
       .useValue(paddleClient)
       .overrideProvider(YOOKASSA_CLIENT)
       .useValue(yooKassaClient)
+      .overrideProvider(LEGAL_DOCUMENT_VERSIONS)
+      .useValue(legalDocuments)
       .compile();
 
     const expressApp = moduleRef.createNestApplication<NestExpressApplication>(
@@ -296,8 +310,11 @@ runWithInfra('Request scenarios (e2e)', () => {
 
       if (ids.length > 0) {
         await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
-        // An invoice and a ledger row keep their customer (RESTRICT); the rest
-        // cascades.
+        // A consent row keeps its user, and an invoice and a ledger row keep
+        // their customer (RESTRICT); the rest cascades.
+        await dataSource
+          .getRepository(BillingConsent)
+          .delete({ userId: In(ids) });
         const customerIds = (
           await dataSource.getRepository(Customer).findBy({ userId: In(ids) })
         ).map((c) => c.id);
@@ -773,6 +790,13 @@ runWithInfra('Request scenarios (e2e)', () => {
 
       return Promise.resolve();
     },
+    'published-terms': () => {
+      for (const jurisdiction of LEGAL_JURISDICTIONS) {
+        legalDocuments[jurisdiction].terms = PUBLISHED_SCENARIO_TERMS;
+      }
+
+      return Promise.resolve();
+    },
     'dead-letter-webhook-event': async (ctx) => {
       const event = await dataSource.getRepository(WebhookEvent).save({
         provider: 'yookassa',
@@ -845,6 +869,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     ctx.values.$productKey = freshKey('product');
     ctx.values.$permissionId = permissionId;
     providersEnabled = true;
+    Object.assign(legalDocuments, structuredClone(LEGAL_DOCUMENTS));
     emails.push(ctx.values.$newEmail);
 
     if (scenario.actor) {

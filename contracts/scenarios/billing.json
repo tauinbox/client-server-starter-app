@@ -117,6 +117,89 @@
       }
     },
     {
+      "name": "a checkout without the accepted terms is refused while the terms are published",
+      "route": "POST /api/v1/billing/checkout",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "customer",
+        "fixed-plan",
+        "published-terms"
+      ],
+      "body": {
+        "planKey": "$meterKey"
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": "errors.billing.termsNotAccepted",
+        "audit": []
+      }
+    },
+    {
+      "name": "a checkout with the accepted terms records the consent",
+      "route": "POST /api/v1/billing/checkout",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "customer",
+        "fixed-plan",
+        "published-terms"
+      ],
+      "body": {
+        "planKey": "$meterKey",
+        "acceptedTermsVersion": "2030-01-01"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "BILLING_TERMS_ACCEPT"
+        ]
+      }
+    },
+    {
+      "name": "a purchase with a stale version of the terms is refused",
+      "route": "POST /api/v1/billing/purchase",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "customer",
+        "product",
+        "published-terms"
+      ],
+      "body": {
+        "productKey": "$productKey",
+        "acceptedTermsVersion": "2029-01-01"
+      },
+      "expect": {
+        "status": 422,
+        "errorKey": "errors.billing.termsNotAccepted",
+        "audit": []
+      }
+    },
+    {
+      "name": "a purchase with the accepted terms records the consent",
+      "route": "POST /api/v1/billing/purchase",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "customer",
+        "product",
+        "published-terms"
+      ],
+      "body": {
+        "productKey": "$productKey",
+        "acceptedTermsVersion": "2030-01-01"
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "BILLING_TERMS_ACCEPT"
+        ]
+      }
+    },
+    {
       "name": "a subscriber switches to another plan",
       "route": "POST /api/v1/billing/subscription/change",
       "actor": "user",

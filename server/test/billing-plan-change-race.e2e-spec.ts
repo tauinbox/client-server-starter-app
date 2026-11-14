@@ -25,6 +25,7 @@ import {
   type OffSessionCharge
 } from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { DRAFT_TERMS_CONSENTS } from '../src/modules/billing/testing/billing-service.fixtures';
 import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import {
@@ -220,6 +221,7 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       providers: [
         PlanChangeService,
         BillingUserService,
+        DRAFT_TERMS_CONSENTS,
         ProrationCalculator,
         { provide: getDataSourceToken(), useValue: ds },
         {

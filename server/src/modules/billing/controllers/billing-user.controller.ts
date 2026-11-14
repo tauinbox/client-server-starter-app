@@ -37,6 +37,19 @@ import { CreditBalanceResponseDto } from '../dtos/credit-balance-response.dto';
 import { ProductResponseDto } from '../dtos/product-response.dto';
 import { PurchaseRequestDto } from '../dtos/purchase-request.dto';
 import { PurchaseSessionResponseDto } from '../dtos/purchase-session-response.dto';
+import { extractAuditContext } from '../../../common/utils/audit-context.util';
+import type { TermsAcceptance } from '../services/billing-consent.service';
+
+function termsAcceptance(
+  req: JwtAuthRequest,
+  acceptedVersion: string | undefined
+): TermsAcceptance {
+  return {
+    acceptedVersion,
+    actorEmail: req.user.email,
+    context: extractAuditContext(req)
+  };
+}
 
 @ApiTags('Billing API')
 @ApiBearerAuth()
@@ -147,7 +160,13 @@ export class BillingUserController {
   })
   @ApiOkResponse({ type: PurchaseSessionResponseDto })
   purchase(@Req() req: JwtAuthRequest, @Body() body: PurchaseRequestDto) {
-    return this.billingUser.purchase(req.user.userId, body);
+    const { acceptedTermsVersion, ...request } = body;
+
+    return this.billingUser.purchase(
+      req.user.userId,
+      request,
+      termsAcceptance(req, acceptedTermsVersion)
+    );
   }
 
   @Post('checkout')
@@ -157,7 +176,11 @@ export class BillingUserController {
   })
   @ApiOkResponse({ type: CheckoutSessionResponseDto })
   checkout(@Req() req: JwtAuthRequest, @Body() body: CheckoutRequestDto) {
-    return this.billingUser.checkout(req.user.userId, body.planKey);
+    return this.billingUser.checkout(
+      req.user.userId,
+      body.planKey,
+      termsAcceptance(req, body.acceptedTermsVersion)
+    );
   }
 
   @Post('subscription/change')

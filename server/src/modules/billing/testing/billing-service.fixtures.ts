@@ -2,6 +2,20 @@ import { ERROR_STATUS, type ErrorKey } from '@app/shared/constants';
 import type { BillingProviderId } from '@app/shared/types';
 import { ApiError } from '../../../common/errors/api-error';
 import type { Plan } from '../entities/plan.entity';
+import { BillingConsentService } from '../services/billing-consent.service';
+
+/**
+ * A consent service for a test that is not about the terms: every document is
+ * a draft, so no checkout and no purchase asks for a consent.
+ */
+export const DRAFT_TERMS_CONSENTS = {
+  provide: BillingConsentService,
+  useValue: {
+    requiredTermsVersion: () => null,
+    check: () => null,
+    record: () => Promise.resolve()
+  }
+};
 
 /** A refusal answers the key that the client translates, with its status. */
 export async function expectRefusal(

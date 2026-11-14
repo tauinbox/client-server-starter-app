@@ -1,6 +1,7 @@
 import { IsString, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+import { AcceptedTermsVersion } from './accepted-terms-version.decorator';
 
 export class CheckoutRequestDto {
   @ApiProperty({
@@ -14,4 +15,7 @@ export class CheckoutRequestDto {
   @MinLength(1)
   @MaxLength(100)
   planKey: string;
+
+  @AcceptedTermsVersion()
+  acceptedTermsVersion?: string;
 }

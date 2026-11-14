@@ -22,6 +22,7 @@ import { BillingService } from '../src/modules/billing/billing.service';
 import { FirstPaymentUnclaimedEvent } from '../src/modules/billing/events/billing.events';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { DRAFT_TERMS_CONSENTS } from '../src/modules/billing/testing/billing-service.fixtures';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import {
@@ -76,6 +77,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
     const module = await Test.createTestingModule({
       providers: [
         BillingUserService,
+        DRAFT_TERMS_CONSENTS,
         BillingEventReducer,
         { provide: getDataSourceToken(), useValue: ds },
         ...[
