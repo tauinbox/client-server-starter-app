@@ -4,11 +4,9 @@ import {
   ENTITLED_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
 import type { BillingProviderId } from '@app/shared/types';
-import { meteredWindowStart, rateUsage } from '@app/shared/utils/billing-rules';
 import { getState } from '../state';
-import type { MockInvoice, MockSubscription, MockUsageRecord } from '../types';
+import type { MockInvoice, MockSubscription } from '../types';
 import { nextPeriodEnd } from '../utils/period';
-import { billClosingUsagePeriod, sumPlanMeterUnits } from './billing.helpers';
 import { notifyEntitlementsChanged } from './billing-settle.helpers';
 
 // The test and manual-check clock of the mock billing. The control routes
@@ -60,10 +58,8 @@ export function findRenewableSubscription({
 /**
  * Treats the current period of the subscription as due NOW and runs one
  * scheduler pass on it, with the period-close semantics of the server.
- * `success` charges and advances: a fixed subscription gets a paid invoice at
- * the plan price for the NEW period; a usage subscription gets a postpaid
- * invoice for the CLOSED period (records with occurredAt in [window start,
- * now), overage beyond includedUnits at unitPriceMinor, prepaid credits first).
+ * `success` charges and advances: the subscription gets a paid invoice at the
+ * plan price for the NEW period.
  * `failure` is a declined off-session charge: past_due and dunning, then
  * canceled when the attempts are exhausted. Returns null when the plan or its
  * price is missing.
@@ -77,12 +73,6 @@ export function advanceRenewal(
   const nowIso = now.toISOString();
 
   if (outcome === 'failure') {
-    // The server seals usage ingest at the anchor before it rates the window,
-    // and the seal outlives the decline: a retry re-rates the same window.
-    if (subscription.billingMode === 'usage') {
-      subscription.usageSealedUntil = nowIso;
-    }
-
     const attempts = (subscription.dunningAttempts ?? 0) + 1;
 
     subscription.dunningAttempts = attempts;
@@ -105,10 +95,8 @@ export function advanceRenewal(
   if (!plan || !price) return null;
 
   // Cancel-at-period-end: the boundary closes the row instead of opening
-  // another period. A postpaid metered period is rated and invoiced first -
-  // its units were consumed and are owed.
+  // another period.
   if (subscription.cancelAtPeriodEnd) {
-    billClosingUsagePeriod(subscription, now);
     subscription.status = 'canceled';
     subscription.updatedAt = nowIso;
     notifyEntitlementsChanged(subscription.customerId);
@@ -116,10 +104,9 @@ export function advanceRenewal(
     return subscription;
   }
 
-  // The clock advance anchors the boundary at NOW: the closed window is
-  // [windowStart, now) and the new period [now, now + interval). The new
-  // end still lands on the billing day, as the server's renewal does.
-  const closedStart = meteredWindowStart(subscription);
+  // The clock advance anchors the boundary at NOW: the new period is
+  // [now, now + interval). The new end still lands on the billing day, as the
+  // server's renewal does.
   // A trial converts into its first paid period, which re-anchors the billing
   // day there - the same rule the server's renewal applies at trial_end.
   const billingAnchor =
@@ -130,48 +117,20 @@ export function advanceRenewal(
         );
   const newEnd = nextPeriodEnd(billingAnchor, now, plan.interval);
 
-  let { amountMinor } = price;
-  let periodStart = nowIso;
-  let periodEnd = newEnd.toISOString();
-
-  if (subscription.billingMode === 'usage') {
-    const totalUnits = sumPlanMeterUnits(plan, subscription.id, {
-      startIso: closedStart,
-      endIso: nowIso
-    });
-    // The deduction settles with the postpaid invoice below, as the server's
-    // spend commit does.
-    const balance = state.billingCreditBalances.get(subscription.customerId);
-    const rated = rateUsage({
-      totalUnits,
-      price,
-      availableCreditUnits: balance?.balanceUnits ?? 0
-    });
-
-    if (balance && rated.creditUnitsApplied > 0) {
-      balance.balanceUnits -= rated.creditUnitsApplied;
-      balance.updatedAt = nowIso;
-    }
-
-    amountMinor = rated.amountMinor;
-    periodStart = closedStart;
-    periodEnd = nowIso;
-  }
-
   const invoice: MockInvoice = {
     id: randomUUID(),
     customerId: subscription.customerId,
     subscriptionId: subscription.id,
     provider: subscription.provider,
     providerInvoiceRef: `in_${randomUUID()}`,
-    amountMinor,
+    amountMinor: price.amountMinor,
     currency: price.currency,
     status: 'paid',
     billingMode: subscription.billingMode,
     kind: 'subscription',
     productId: null,
-    periodStart,
-    periodEnd,
+    periodStart: nowIso,
+    periodEnd: newEnd.toISOString(),
     paidAt: nowIso,
     receiptRef: null,
     createdAt: nowIso,
@@ -186,49 +145,10 @@ export function advanceRenewal(
   subscription.currentPeriodStart = nowIso;
   subscription.currentPeriodEnd = newEnd.toISOString();
   subscription.billingAnchorAt = billingAnchor.toISOString();
-  delete subscription.meteredFrom;
   subscription.updatedAt = nowIso;
   notifyEntitlementsChanged(subscription.customerId);
 
   return subscription;
-}
-
-/**
- * Records usage against the subscription without the admin ingest endpoint.
- * The default `occurredAt` is the start of the open metered window, not the
- * clock: the window closes at [start, now), so a record stamped "now" and a
- * renewal advanced in the same millisecond drop the record from the window it
- * was seeded for.
- */
-export function seedUsage(
-  subscription: MockSubscription,
-  {
-    meterKey = 'api_calls',
-    quantity = 1,
-    occurredAt,
-    idempotencyKey
-  }: {
-    meterKey?: string;
-    quantity?: number;
-    occurredAt?: string;
-    idempotencyKey?: string;
-  } = {}
-): MockUsageRecord {
-  const now = new Date().toISOString();
-  const record: MockUsageRecord = {
-    id: randomUUID(),
-    customerId: subscription.customerId,
-    subscriptionId: subscription.id,
-    meterKey,
-    quantity,
-    occurredAt: occurredAt ?? meteredWindowStart(subscription),
-    idempotencyKey: idempotencyKey ?? `seed-${randomUUID()}`,
-    recordedAt: now
-  };
-
-  getState().billingUsageRecords.set(record.id, record);
-
-  return record;
 }
 
 /**

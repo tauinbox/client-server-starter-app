@@ -3,8 +3,7 @@ import type {
   BillingProviderId,
   MeteringResponse,
   SubscriptionResponse,
-  SubscriptionStatus,
-  UsageResponse
+  SubscriptionStatus
 } from '@app/shared/types';
 import type {
   MockPermission,
@@ -94,17 +93,6 @@ export type ControlApi = {
     planKey?: string;
     status?: SubscriptionStatus;
   }): Promise<SubscriptionResponse>;
-  // Seeds a metered-usage record on the customer's subscription (defaults:
-  // meterKey 'api_calls', quantity 1, occurredAt now) so usage views and
-  // rating have data without going through the admin ingest endpoint.
-  seedBillingUsage(args: {
-    customerId: string;
-    meterKey?: string;
-    quantity?: number;
-    occurredAt?: string;
-    subscriptionId?: string;
-    idempotencyKey?: string;
-  }): Promise<UsageResponse>;
   // `POST /admin/billing/usage` for `api_calls`, without an admin session.
   consumeBillingCredits(args: {
     customerId: string;
@@ -124,10 +112,8 @@ export type ControlApi = {
     operation: StepUpOperation
   ): Promise<{ token: string }>;
   // Renewal-clock advance: treats the current period as due NOW and runs one
-  // scheduler pass. `success` charges and advances (usage subs settle the
-  // closed period postpaid, with prepaid credits offsetting billable units
-  // before pricing); `failure` walks the dunning ladder. Returns the
-  // subscription after the pass.
+  // scheduler pass. `success` charges the plan price and advances; `failure`
+  // walks the dunning ladder. Returns the subscription after the pass.
   advanceBillingRenewal(args: {
     userId?: string;
     subscriptionId?: string;

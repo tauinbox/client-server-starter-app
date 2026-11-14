@@ -73,116 +73,6 @@ async function listInvoices(
 }
 
 describe('POST /__control/billing/advance-renewal', () => {
-  it('closes a usage period postpaid: invoice covers the closed period at overage pricing', async () => {
-    const { token, id } = await login('user@example.com');
-    const { customerId } = await activate(id, 'usage');
-
-    await control('seed-usage', { customerId, quantity: 30 });
-    await control('seed-usage', { customerId, quantity: 12 });
-    // Outside the current period — must not be billed.
-    await control('seed-usage', {
-      customerId,
-      quantity: 999,
-      occurredAt: '2000-01-01T00:00:00.000Z'
-    });
-
-    const before = await listInvoices(token);
-    const res = await control('advance-renewal', { userId: id });
-
-    expect(res.status).toBe(200);
-    const sub = (await res.json()) as Record<string, unknown>;
-
-    expect(sub['status']).toBe('active');
-
-    const invoices = await listInvoices(token);
-
-    expect(invoices).toHaveLength(before.length + 1);
-    // user@example.com is non-RU → paddle price: $0.02/unit, 0 included.
-    const usageInvoice = invoices.find((i) => i['amountMinor'] === 84);
-
-    expect(usageInvoice).toMatchObject({
-      billingMode: 'usage',
-      status: 'paid',
-      currency: 'USD'
-    });
-    // Postpaid: the invoice's period ends where the new subscription period begins.
-    expect(usageInvoice!['periodEnd']).toBe(sub['currentPeriodStart']);
-  });
-
-  it('rates the closing period on the plan meter only, ignoring a foreign meter', async () => {
-    const { token, id } = await login('user@example.com');
-    const { customerId } = await activate(id, 'usage');
-
-    await control('seed-usage', { customerId, quantity: 30 });
-    // A meter the plan does not name belongs to another product and is priced
-    // at that product's rate, never at this plan's.
-    await control('seed-usage', {
-      customerId,
-      meterKey: 'storage_gb',
-      quantity: 500
-    });
-
-    const before = await listInvoices(token);
-    const res = await control('advance-renewal', { userId: id });
-
-    expect(res.status).toBe(200);
-
-    const invoices = await listInvoices(token);
-    const added = invoices.filter(
-      (i) => !before.some((b) => b['id'] === i['id'])
-    );
-
-    expect(added).toHaveLength(1);
-    // 30 api_calls × $0.02. The 500 storage units add nothing.
-    expect(added[0]).toMatchObject({ amountMinor: 60, billingMode: 'usage' });
-  });
-
-  it('rates a usage plan that names no meter to zero', async () => {
-    const { token, id } = await login('user@example.com');
-    const { customerId } = await activate(id, 'usage');
-    const plan = getState()
-      .plans.values()
-      .find((p) => p.key === 'usage')!;
-
-    plan.meterKey = null;
-    await control('seed-usage', { customerId, quantity: 30 });
-
-    const before = await listInvoices(token);
-
-    await control('advance-renewal', { userId: id });
-
-    const invoices = await listInvoices(token);
-    const added = invoices.filter(
-      (i) => !before.some((b) => b['id'] === i['id'])
-    );
-
-    expect(added).toHaveLength(1);
-    expect(added[0]).toMatchObject({ amountMinor: 0, billingMode: 'usage' });
-  });
-
-  it('closes a zero-usage period with a zero invoice and still advances', async () => {
-    const { token, id } = await login('user@example.com');
-
-    await activate(id, 'usage');
-
-    const before = await listInvoices(token);
-    const res = await control('advance-renewal', { userId: id });
-
-    expect(res.status).toBe(200);
-
-    const invoices = await listInvoices(token);
-
-    expect(invoices).toHaveLength(before.length + 1);
-    expect(
-      invoices.some(
-        (i) =>
-          i['amountMinor'] === 0 &&
-          i['billingMode'] === 'usage' &&
-          i['status'] === 'paid'
-      )
-    ).toBe(true);
-  });
-
   it('renews a fixed subscription at the plan price', async () => {
     const { token, id } = await login('user@example.com');
 
@@ -231,7 +121,7 @@ describe('POST /__control/billing/advance-renewal', () => {
   it('walks the dunning ladder on failures: past_due, then canceled after 3', async () => {
     const { id } = await login('user@example.com');
 
-    await activate(id, 'usage');
+    await activate(id, 'pro');
 
     for (const expected of ['past_due', 'past_due', 'canceled']) {
       const res = await control('advance-renewal', {
@@ -281,58 +171,5 @@ describe('POST /__control/billing/advance-renewal', () => {
     const res = await control('advance-renewal', { subscriptionId });
 
     expect(res.status).toBe(404);
-  });
-
-  it('spends prepaid credits before charging: full cover first, then the remainder priced', async () => {
-    const { token, id } = await login('user@example.com');
-    const { customerId } = await activate(id, 'usage');
-
-    // Buy a 500-unit pack and settle it the way the paid webhook would.
-    const purchase = await fetch(`${baseUrl}/api/v1/billing/purchase`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ productKey: 'credits-500' })
-    });
-    const session = (await purchase.json()) as { sessionRef: string };
-
-    await control('complete-purchase', { sessionRef: session.sessionRef });
-
-    async function balanceUnits(): Promise<number> {
-      const res = await fetch(`${baseUrl}/api/v1/billing/credits`, {
-        headers: { authorization: `Bearer ${token}` }
-      });
-      const body = (await res.json()) as { balanceUnits: number } | null;
-
-      return body?.balanceUnits ?? 0;
-    }
-
-    // Pass 1 — 30 billable units, 500 credits: fully covered, zero invoice.
-    await control('seed-usage', { customerId, quantity: 30 });
-    let res = await control('advance-renewal', { userId: id });
-
-    expect(res.status).toBe(200);
-    expect(await balanceUnits()).toBe(470);
-    let invoices = await listInvoices(token);
-
-    expect(
-      invoices.some(
-        (i) => i['billingMode'] === 'usage' && i['amountMinor'] === 0
-      )
-    ).toBe(true);
-
-    // Pass 2 — 600 billable units, 470 credits left: 130 charged at $0.02.
-    await control('seed-usage', { customerId, quantity: 600 });
-    res = await control('advance-renewal', { userId: id });
-    expect(res.status).toBe(200);
-    expect(await balanceUnits()).toBe(0);
-    invoices = await listInvoices(token);
-    expect(
-      invoices.some(
-        (i) => i['billingMode'] === 'usage' && i['amountMinor'] === 260
-      )
-    ).toBe(true);
   });
 });

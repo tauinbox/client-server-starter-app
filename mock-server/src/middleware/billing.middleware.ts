@@ -46,7 +46,6 @@ import {
   toSubscriptionResponse
 } from '../state';
 import { authGuard, permissionGuard } from '../helpers/auth.helpers';
-import { billClosingUsagePeriod } from '../helpers/billing.helpers';
 import {
   applyCreditDelta,
   crossesZero,
@@ -1104,13 +1103,6 @@ billingRouter.post(
     const { customer, sub, fromPlan, toPlan } = ctx;
     const now = new Date();
     const nowIso = now.toISOString();
-    const modeChanges = toPlan.billingMode !== sub.billingMode;
-
-    // Units metered before the switch are billed under the outgoing plan. The
-    // server charges a Paddle window after the switch; the mock settles now.
-    if (modeChanges && sub.billingMode === 'usage') {
-      billClosingUsagePeriod(sub, now);
-    }
 
     // Trial moves no fixed money, and a provider-managed row is prorated by the
     // provider; a self-managed paid period settles the charge + refund legs.
@@ -1189,9 +1181,6 @@ billingRouter.post(
 
     sub.planKey = toPlan.key;
     sub.billingMode = toPlan.billingMode;
-
-    if (modeChanges) sub.meteredFrom = nowIso;
-
     sub.updatedAt = nowIso;
     notifyEntitlementsChanged(customer.id);
     res.json(toSubscriptionResponse(sub));
@@ -1290,11 +1279,6 @@ function cancelOpenSubscription(
   }
 
   if (mode === 'immediate') {
-    // Ending a metered period now means its postpaid units are owed now. A
-    // provider-managed row is billed by its cancel webhook instead, and a
-    // period-end cancel by the renewal scan at the boundary.
-    if (sub.lifecycleOwner === 'self') billClosingUsagePeriod(sub);
-
     sub.status = 'canceled';
     sub.cancelAtPeriodEnd = false;
   } else {
