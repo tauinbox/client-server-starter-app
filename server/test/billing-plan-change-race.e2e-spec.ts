@@ -25,7 +25,10 @@ import {
   type OffSessionCharge
 } from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
-import { DRAFT_TERMS_CONSENTS } from '../src/modules/billing/testing/billing-service.fixtures';
+import {
+  DRAFT_TERMS_CONSENTS,
+  TERMS_NOT_SENT
+} from '../src/modules/billing/testing/billing-service.fixtures';
 import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import {
@@ -565,7 +568,9 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
       return row;
     });
 
-    await expect(users.checkout(user, 'race-business')).rejects.toMatchObject({
+    await expect(
+      users.checkout(user, 'race-business', TERMS_NOT_SENT)
+    ).rejects.toMatchObject({
       status: 409
     });
 

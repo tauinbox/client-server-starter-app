@@ -22,7 +22,10 @@ import { BillingService } from '../src/modules/billing/billing.service';
 import { FirstPaymentUnclaimedEvent } from '../src/modules/billing/events/billing.events';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
-import { DRAFT_TERMS_CONSENTS } from '../src/modules/billing/testing/billing-service.fixtures';
+import {
+  DRAFT_TERMS_CONSENTS,
+  TERMS_NOT_SENT
+} from '../src/modules/billing/testing/billing-service.fixtures';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import {
@@ -171,7 +174,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
   }
 
   it('cancels the unpaid row and stores the new region', async () => {
-    await service.checkout(userId!, PLAN);
+    await service.checkout(userId!, PLAN, TERMS_NOT_SENT);
     expect((await rows()).map((r) => r.status)).toEqual(['incomplete']);
 
     const region = await service.setRegion(userId!, 'world');
@@ -189,7 +192,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
   });
 
   it('activates nothing when the first payment arrives after the release', async () => {
-    await service.checkout(userId!, PLAN);
+    await service.checkout(userId!, PLAN, TERMS_NOT_SENT);
     await service.setRegion(userId!, 'world');
 
     await reducer.reduce({
@@ -218,7 +221,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
   });
 
   it('keeps the block once the checkout is paid', async () => {
-    await service.checkout(userId!, PLAN);
+    await service.checkout(userId!, PLAN, TERMS_NOT_SENT);
     await ds
       .getRepository(Subscription)
       .update({ customerId }, { status: 'active' });

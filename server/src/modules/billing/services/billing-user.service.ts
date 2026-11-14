@@ -238,7 +238,7 @@ export class BillingUserService {
   async purchase(
     userId: string,
     request: { productKey: string; amountMinor?: number; description?: string },
-    terms: TermsAcceptance = {}
+    terms: TermsAcceptance
   ): Promise<PurchaseSessionResponse> {
     const product = await this.products.findOne({
       where: { key: request.productKey }
@@ -384,7 +384,7 @@ export class BillingUserService {
   async checkout(
     userId: string,
     planKey: string,
-    terms: TermsAcceptance = {}
+    terms: TermsAcceptance
   ): Promise<CheckoutSessionResponse> {
     const plan = await this.plans.findOne({ where: { key: planKey } });
 

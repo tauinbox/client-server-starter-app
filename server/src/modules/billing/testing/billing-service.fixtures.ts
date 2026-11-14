@@ -3,6 +3,13 @@ import type { BillingProviderId } from '@app/shared/types';
 import { ApiError } from '../../../common/errors/api-error';
 import type { Plan } from '../entities/plan.entity';
 import { BillingConsentService } from '../services/billing-consent.service';
+import type { TermsAcceptance } from '../services/billing-consent.service';
+
+/** A checkout or a purchase whose buyer sent no terms version. */
+export const TERMS_NOT_SENT: TermsAcceptance = {
+  actorEmail: 'user@example.com',
+  context: {}
+};
 
 /**
  * A consent service for a test that is not about the terms: every document is

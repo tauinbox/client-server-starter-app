@@ -24,8 +24,8 @@ export type LegalDocumentVersions = typeof LEGAL_DOCUMENTS;
  */
 export type TermsAcceptance = {
   acceptedVersion?: string;
-  actorEmail?: string | null;
-  context?: AuditContext;
+  actorEmail: string;
+  context: AuditContext;
 };
 
 /** The checked acceptance; `record` writes it. Null when no terms apply. */
