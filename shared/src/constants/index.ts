@@ -168,6 +168,7 @@ export {
   isLegalJurisdiction,
   isLegalDocumentKind,
   legalJurisdictionForProvider,
+  publishedLegalVersion,
   type LegalJurisdiction,
   type LegalDocumentKind,
   type LegalDocumentStatus,

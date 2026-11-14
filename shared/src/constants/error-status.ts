@@ -181,6 +181,7 @@ export const ERROR_STATUS: Readonly<Record<ErrorKey, ErrorStatus>> = {
   [ErrorKeys.BILLING.PROVIDER_ERROR]: 502,
   [ErrorKeys.BILLING.PAYMENT_DECLINED]: 409,
   [ErrorKeys.BILLING.PAYMENT_METHOD_MISSING]: 409,
+  [ErrorKeys.BILLING.TERMS_NOT_ACCEPTED]: 422,
 
   [ErrorKeys.DB.UNIQUE_VIOLATION]: 409,
   [ErrorKeys.DB.FOREIGN_KEY_VIOLATION]: 409,

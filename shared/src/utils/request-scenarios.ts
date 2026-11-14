@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import type { LegalDocumentVersion } from '../constants/legal.constants';
 
 /**
  * Request scenarios: one request, its actor and its expected result, written
@@ -84,6 +85,11 @@ export const STATE_FIXTURES = [
   'product',
   /** The kill switches of all billing providers are off for the actor. */
   'providers-disabled',
+  /**
+   * The terms of every jurisdiction are published at the version of
+   * `PUBLISHED_SCENARIO_TERMS`, so a checkout and a purchase must accept it.
+   */
+  'published-terms',
   /** A paid invoice of 1000 minor units of the `subscription`; `$invoiceId`. */
   'paid-invoice',
   /**
@@ -190,6 +196,11 @@ export const SCENARIO_PASSWORD = 'Lantern-Orchard-47';
 export const SCENARIO_NEW_PASSWORD = 'Copper-Meadow-83';
 /** The unused recovery code of `user-mfa`. */
 export const SCENARIO_RECOVERY_CODE = 'AAAAAAAA-AAAAAAAA-AAAAAAAA';
+/** The terms of every jurisdiction under the `published-terms` state. */
+export const PUBLISHED_SCENARIO_TERMS: LegalDocumentVersion = {
+  version: '2030-01-01',
+  status: 'published'
+};
 
 export interface RequestScenario {
   name: string;
