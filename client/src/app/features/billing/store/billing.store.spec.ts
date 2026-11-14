@@ -149,7 +149,8 @@ describe('BillingStore', () => {
           region: 'auto',
           detectedProvider: 'paddle',
           effectiveProvider: 'paddle',
-          availableProviders: ['paddle', 'yookassa']
+          availableProviders: ['paddle', 'yookassa'],
+          termsVersion: null
         })
       ),
       checkout: vi
@@ -603,6 +604,44 @@ describe('BillingStore', () => {
       expect(store.subscription()).toEqual(activeSub);
       expect(billingMock.getPlans).not.toHaveBeenCalled();
     });
+
+    it.each([
+      [
+        'checkout',
+        (store: ReturnType<typeof createStore>) =>
+          store.checkout('pro', '2030-01-01')
+      ],
+      [
+        'purchase',
+        (store: ReturnType<typeof createStore>) =>
+          store.purchase({
+            productKey: 'report-pack',
+            acceptedTermsVersion: '2030-01-01'
+          })
+      ]
+    ] as const)(
+      'a %s refused for stale terms re-reads the region, which has the new version',
+      async (route, start) => {
+        billingMock[route].mockReturnValue(
+          refused(422, ErrorKeys.BILLING.TERMS_NOT_ACCEPTED)
+        );
+        const newRegion = {
+          region: 'auto' as const,
+          detectedProvider: 'paddle' as const,
+          effectiveProvider: 'paddle' as const,
+          availableProviders: ['paddle' as const],
+          termsVersion: '2030-02-01'
+        };
+
+        billingMock.getRegion.mockReturnValue(of(newRegion));
+        const store = createStore();
+
+        expect(await start(store)).toBeNull();
+        expect(billingMock.getRegion).toHaveBeenCalledTimes(1);
+        expect(store.region()).toEqual(newRegion);
+        expect(notifyMock.error).toHaveBeenCalledTimes(1);
+      }
+    );
 
     it('a checkout of a gone plan re-reads the plans', async () => {
       billingMock.checkout.mockReturnValue(

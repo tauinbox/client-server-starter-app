@@ -37,6 +37,14 @@ import {
   type PurchaseRequest
 } from '../services/billing.service';
 
+/** The terms changed after the page read them: the region has the new version. */
+function isTermsRefusal(error: unknown): boolean {
+  return (
+    (error as HttpErrorResponse).error?.errorKey ===
+    ErrorKeys.BILLING.TERMS_NOT_ACCEPTED
+  );
+}
+
 type BillingState = {
   plans: PlanResponse[];
   products: ProductResponse[];
@@ -255,12 +263,15 @@ export const BillingStore = signalStore(
      * performs the redirect). Returns `null` on failure (error is surfaced).
      */
     async function checkout(
-      planKey: string
+      planKey: string,
+      acceptedTermsVersion?: string
     ): Promise<CheckoutSessionResponse | null> {
       patchState(store, { working: true });
 
       try {
-        return await firstValueFrom(billing.checkout(planKey));
+        return await firstValueFrom(
+          billing.checkout(planKey, acceptedTermsVersion)
+        );
       } catch (error) {
         notify.error(
           error as HttpErrorResponse,
@@ -268,6 +279,7 @@ export const BillingStore = signalStore(
         );
         await Promise.all([
           rereadAfterRefusal(error),
+          isTermsRefusal(error) ? loadRegion() : Promise.resolve(),
           (error as HttpErrorResponse).error?.errorKey ===
           ErrorKeys.BILLING.PLAN_NOT_FOUND
             ? loadPlans()
@@ -305,6 +317,8 @@ export const BillingStore = signalStore(
             ErrorKeys.BILLING.PRODUCT_NOT_FOUND
         ) {
           await Promise.all([loadProducts(), loadRegion()]);
+        } else if (isTermsRefusal(error)) {
+          await loadRegion();
         }
 
         return null;

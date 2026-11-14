@@ -12,6 +12,7 @@ import {
   MatButtonToggle,
   MatButtonToggleGroup
 } from '@angular/material/button-toggle';
+import { MatCheckbox } from '@angular/material/checkbox';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatIcon } from '@angular/material/icon';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
@@ -81,6 +82,7 @@ type PricedProduct = {
     MatButton,
     MatButtonToggle,
     MatButtonToggleGroup,
+    MatCheckbox,
     MatProgressSpinner,
     LocalizedDatePipe,
     MatIcon,
@@ -137,8 +139,28 @@ export class PricingPageComponent implements OnInit {
     );
   });
 
+  protected readonly termsKinds = ['terms'] as const;
+
+  /** The terms that a payment must accept, or null while they are a draft. */
+  protected readonly termsVersion = computed(
+    () => this.store.region()?.termsVersion ?? null
+  );
+
+  /** A new version asks for a new consent. */
+  protected readonly termsAccepted = linkedSignal({
+    source: this.termsVersion,
+    computation: () => false
+  });
+
+  readonly #acceptedTermsVersion = computed(() =>
+    this.termsAccepted() ? (this.termsVersion() ?? undefined) : undefined
+  );
+
   protected readonly actionsDisabled = computed(
-    () => this.store.working() || !this.paymentsAvailable()
+    () =>
+      this.store.working() ||
+      !this.paymentsAvailable() ||
+      (this.termsVersion() !== null && !this.termsAccepted())
   );
 
   // The plan that grants the caller access now: the entitled subscription,
@@ -306,11 +328,13 @@ export class PricingPageComponent implements OnInit {
       return;
     }
 
-    void this.store.checkout(planKey).then((session) => {
-      if (session) {
-        this.#checkoutRedirect.redirect(session.url);
-      }
-    });
+    void this.store
+      .checkout(planKey, this.#acceptedTermsVersion())
+      .then((session) => {
+        if (session) {
+          this.#checkoutRedirect.redirect(session.url);
+        }
+      });
   }
 
   onBuy(item: PricedProduct): void {
@@ -361,7 +385,10 @@ export class PricingPageComponent implements OnInit {
     request: { productKey: string; amountMinor?: number; description?: string },
     pending: Omit<PendingPurchase, 'sessionRef'>
   ): Promise<void> {
-    const session = await this.store.purchase(request);
+    const session = await this.store.purchase({
+      ...request,
+      acceptedTermsVersion: this.#acceptedTermsVersion()
+    });
 
     if (!session) return;
 

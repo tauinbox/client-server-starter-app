@@ -248,7 +248,8 @@
       "providerTimeout": "The payment provider did not answer in time. The payment may have gone through, so check your invoices before you try again.",
       "providerError": "The payment provider returned an error. Please try again later.",
       "paymentDeclined": "Your card was declined. Update the payment method and try again.",
-      "paymentMethodMissing": "No saved payment method was found. Add a payment method and try again."
+      "paymentMethodMissing": "No saved payment method was found. Add a payment method and try again.",
+      "termsNotAccepted": "Accept the current terms of service to continue. Reload the page if the terms changed."
     },
     "db": {
       "uniqueViolation": "A record with this value already exists",

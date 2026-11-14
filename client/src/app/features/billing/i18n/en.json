@@ -8,6 +8,8 @@
     "choose": "Choose",
     "current": "Current",
     "paymentsUnavailable": "Payments are temporarily unavailable in your billing region.",
+    "acceptTerms": "I accept the terms of service",
+    "termsRequired": "To choose a paid plan or to buy, accept the terms of service.",
     "manageBilling": "Manage billing",
     "paidTitle": "Paid plans",
     "switchToFree": "Switch to the free plan",

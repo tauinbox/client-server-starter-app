@@ -29,6 +29,24 @@
       </div>
     }
 
+    @if (termsVersion()) {
+      <div class="terms-consent">
+        <mat-checkbox
+          [checked]="termsAccepted()"
+          (change)="termsAccepted.set($event.checked)"
+        >
+          {{ t('billing.pricing.acceptTerms') }}
+        </mat-checkbox>
+        <nxs-legal-links
+          [kinds]="termsKinds"
+          [jurisdiction]="legalJurisdiction()"
+        />
+        @if (!termsAccepted()) {
+          <p class="terms-hint">{{ t('billing.pricing.termsRequired') }}</p>
+        }
+      </div>
+    }
+
     <div class="plan-layout">
       @if (freeCard(); as free) {
         <div class="free-column">

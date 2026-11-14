@@ -153,6 +153,24 @@
   }
 }
 
+.terms-consent {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: vars.$spacing-md;
+  align-items: center;
+  padding: vars.$spacing-sm vars.$spacing-md;
+  margin-bottom: vars.$spacing-lg;
+  background: var(--mat-sys-surface-container-low);
+  border-radius: vars.$border-radius-md;
+}
+
+.terms-hint {
+  flex-basis: 100%;
+  margin: 0 0 vars.$spacing-xs;
+  font-size: vars.$font-size-sm;
+  color: var(--mat-sys-on-surface-variant);
+}
+
 .payments-unavailable {
   display: flex;
   gap: vars.$spacing-xs;

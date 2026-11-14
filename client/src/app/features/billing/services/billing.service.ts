@@ -31,11 +31,14 @@ export const BILLING_API_V1 = '/api/v1/billing';
  * One-time purchase request. `amountMinor` is required for
  * custom-amount products and ignored for fixed-price ones (the server price
  * is authoritative); `description` is the optional buyer note on the receipt.
+ * `acceptedTermsVersion` is the `termsVersion` of the region that the buyer
+ * accepted; the server requires it while the terms are published.
  */
 export type PurchaseRequest = {
   productKey: string;
   amountMinor?: number;
   description?: string;
+  acceptedTermsVersion?: string;
 };
 
 /**
@@ -120,10 +123,13 @@ export class BillingService {
     );
   }
 
-  checkout(planKey: string): Observable<CheckoutSessionResponse> {
+  checkout(
+    planKey: string,
+    acceptedTermsVersion?: string
+  ): Observable<CheckoutSessionResponse> {
     return this.#http.post<CheckoutSessionResponse>(
       `${BILLING_API_V1}/checkout`,
-      { planKey },
+      { planKey, acceptedTermsVersion },
       { context: silentContext() }
     );
   }

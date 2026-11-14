@@ -19,6 +19,7 @@ const RU_REGION: BillingRegionResponse = {
   region: 'ru',
   detectedProvider: 'paddle',
   effectiveProvider: 'yookassa',
+  termsVersion: null,
   availableProviders: ['yookassa', 'paddle']
 };
 

@@ -238,6 +238,7 @@ describe('BillingSettingsComponent', () => {
       region: 'auto',
       detectedProvider: 'paddle',
       effectiveProvider: 'paddle',
+      termsVersion: null,
       availableProviders: ['paddle', 'yookassa']
     });
     fixture.detectChanges();

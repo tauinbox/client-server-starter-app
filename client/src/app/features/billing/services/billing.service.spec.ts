@@ -97,6 +97,17 @@ describe('BillingService', () => {
     req.flush({ provider: 'paddle', url: 'https://x', sessionRef: 's' });
   });
 
+  it('POSTs a checkout with the accepted terms version', () => {
+    service.checkout('pro', '2030-01-01').subscribe();
+    const req = httpMock.expectOne(`${BILLING_API_V1}/checkout`);
+
+    expect(req.request.body).toEqual({
+      planKey: 'pro',
+      acceptedTermsVersion: '2030-01-01'
+    });
+    req.flush({ provider: 'paddle', url: 'https://x', sessionRef: 's' });
+  });
+
   it('POSTs a plan change with the target plan key', () => {
     service.changePlan('business').subscribe();
     const req = httpMock.expectOne(`${BILLING_API_V1}/subscription/change`);

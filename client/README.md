@@ -254,6 +254,9 @@ src/app/
 │       │   │                      # /billing/settings. The
 │       │   │                      # Choose button
 │       │   │                      # starts the checkout. An anonymous visitor goes to /login.
+│       │   │                      # While the region reports a termsVersion, a terms checkbox
+│       │   │                      # holds Choose, Buy and Pay until it is checked, and each
+│       │   │                      # checkout and purchase sends that version.
 │       │   │                      # A subscriber sees "Change plan", which opens
 │       │   │                      # /billing/settings and starts no checkout.
 │       │   │                      # An authenticated user with a non-empty catalog also sees the
