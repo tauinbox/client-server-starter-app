@@ -44,7 +44,6 @@ type PlanOption = {
   name: string;
   description: string | null;
   price: string;
-  priceSuffixKey: string;
 };
 
 type ProrationLedger = {
@@ -124,19 +123,14 @@ export class ChangePlanDialogComponent {
       )
       .map((plan) => {
         const price = planPriceFor(plan, provider);
-        const isUsage = plan.billingMode === 'usage';
-        const amountMinor = isUsage
-          ? (price?.unitPriceMinor ?? 0)
-          : (price?.amountMinor ?? 0);
 
         return {
           key: plan.key,
           name: plan.name,
           description: plan.description,
-          price: price ? formatMoney(amountMinor, price.currency, lang) : '',
-          priceSuffixKey: isUsage
-            ? 'billing.pricing.perUnit'
-            : 'billing.pricing.perMonth'
+          price: price
+            ? formatMoney(price.amountMinor, price.currency, lang)
+            : ''
         };
       });
   });
@@ -178,10 +172,6 @@ export class ChangePlanDialogComponent {
       refundDue
     };
   });
-
-  /** A switch from a usage plan bills the metered window that it closes. */
-  protected readonly closesUsage =
-    this.data.subscription.billingMode === 'usage';
 
   protected readonly canConfirm = computed(
     () =>

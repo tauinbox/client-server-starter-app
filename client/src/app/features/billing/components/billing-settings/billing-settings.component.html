@@ -16,7 +16,6 @@
           <h2 class="card-heading">{{ t('billing.settings.currentPlan') }}</h2>
 
           @if (store.hasActiveSubscription() && store.currentPlan(); as plan) {
-            @let isUsage = plan.billingMode === 'usage';
             <div class="plan-line">
               <span class="plan-name">{{
                 plan | catalogText: 'plans' : 'name'
@@ -30,12 +29,7 @@
             </div>
 
             <p class="plan-meta">
-              <span class="price"
-                >{{ currentPriceLabel() }}
-                @if (isUsage) {
-                  {{ t('billing.pricing.perUnit') }}
-                }
-              </span>
+              <span class="price">{{ currentPriceLabel() }}</span>
               @if (store.subscription()!.cancelAtPeriodEnd) {
                 <span class="renewal cancels">
                   {{
@@ -49,16 +43,11 @@
               } @else {
                 <span class="renewal">
                   {{
-                    t(
-                      isUsage
-                        ? 'billing.settings.nextBillOn'
-                        : 'billing.settings.renewsOn',
-                      {
-                        date:
-                          store.subscription()!.currentPeriodEnd
-                          | localizedDate: 'mediumDate' : 'UTC'
-                      }
-                    )
+                    t('billing.settings.renewsOn', {
+                      date:
+                        store.subscription()!.currentPeriodEnd
+                        | localizedDate: 'mediumDate' : 'UTC'
+                    })
                   }}
                 </span>
               }
