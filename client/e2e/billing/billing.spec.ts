@@ -350,6 +350,72 @@ test.describe('Billing', () => {
     await expect(page.locator('.plan-summary')).toContainText('Cancels on');
   });
 
+  test('published terms hold the checkout until the buyer accepts them, and the consent is recorded', async ({
+    page,
+    _mockServer
+  }) => {
+    await _mockServer.setTermsVersion('intl', '2030-01-01');
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+
+    await page.goto('/billing');
+    const choosePro = page
+      .locator('nxs-plan-card', { hasText: 'Pro' })
+      .getByRole('button', { name: 'Choose' });
+    const consent = page.locator('.terms-consent');
+
+    await expect(consent).toContainText(
+      'To choose a paid plan or to buy, accept the terms of service.'
+    );
+    await expect(choosePro).toBeDisabled();
+
+    await consent
+      .getByRole('checkbox', { name: 'I accept the terms of service' })
+      .check();
+    await expect(choosePro).toBeEnabled();
+    await choosePro.click();
+
+    await payOnMockCheckout(page);
+    await expect(page).toHaveURL(/\/billing\/success$/);
+
+    const state = await _mockServer.getState();
+
+    expect(state.billingConsents).toEqual([
+      expect.objectContaining({
+        userId: USER_ID,
+        kind: 'terms',
+        jurisdiction: 'intl',
+        documentVersion: '2030-01-01'
+      })
+    ]);
+  });
+
+  test('terms that change while the page is open refuse the checkout and ask for a new consent', async ({
+    page,
+    _mockServer
+  }) => {
+    await _mockServer.setTermsVersion('intl', '2030-01-01');
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+
+    await page.goto('/billing');
+    const checkbox = page.getByRole('checkbox', {
+      name: 'I accept the terms of service'
+    });
+    const choosePro = page
+      .locator('nxs-plan-card', { hasText: 'Pro' })
+      .getByRole('button', { name: 'Choose' });
+
+    await checkbox.check();
+    await _mockServer.setTermsVersion('intl', '2030-02-01');
+    await choosePro.click();
+
+    await expect(page.locator('mat-snack-bar-container')).toContainText(
+      'Accept the current terms of service to continue.'
+    );
+    await expect(checkbox).not.toBeChecked();
+    await expect(choosePro).toBeDisabled();
+    await expect(page).toHaveURL(/\/billing$/);
+  });
+
   test('a subscriber is sent from the pricing page to the plan change in settings', async ({
     page,
     _mockServer

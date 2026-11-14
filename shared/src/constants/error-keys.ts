@@ -154,7 +154,8 @@ export const ErrorKeys = {
     PROVIDER_TIMEOUT: 'errors.billing.providerTimeout',
     PROVIDER_ERROR: 'errors.billing.providerError',
     PAYMENT_DECLINED: 'errors.billing.paymentDeclined',
-    PAYMENT_METHOD_MISSING: 'errors.billing.paymentMethodMissing'
+    PAYMENT_METHOD_MISSING: 'errors.billing.paymentMethodMissing',
+    TERMS_NOT_ACCEPTED: 'errors.billing.termsNotAccepted'
   },
   DB: {
     UNIQUE_VIOLATION: 'errors.db.uniqueViolation',

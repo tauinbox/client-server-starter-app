@@ -46,6 +46,13 @@ export const LEGAL_DOCUMENTS: Record<
   }
 };
 
+/** The version that a user can accept, or null while the text is a draft. */
+export function publishedLegalVersion(
+  document: LegalDocumentVersion
+): string | null {
+  return document.status === 'published' ? document.version : null;
+}
+
 export function isLegalJurisdiction(
   value: unknown
 ): value is LegalJurisdiction {

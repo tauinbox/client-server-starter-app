@@ -198,6 +198,8 @@ const UNPATTERNED: Readonly<Record<string, string>> = {
     'the payment method of the customer refuses the charge (409)',
   'BILLING.PAYMENT_METHOD_MISSING':
     'the customer state refuses the charge (409)',
+  'BILLING.TERMS_NOT_ACCEPTED':
+    'the body has no accepted version of the current terms (422)',
   'DB.UNIQUE_VIOLATION': 'a taken value (409)',
   'DB.FOREIGN_KEY_VIOLATION': 'related rows refuse the change (409)',
   'DB.NOT_NULL_VIOLATION': 'the body has no value for a required field (422)',

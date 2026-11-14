@@ -6,6 +6,7 @@ import {
   LEGAL_DOCUMENTS,
   LEGAL_JURISDICTIONS,
   legalJurisdictionForProvider,
+  publishedLegalVersion,
   type LegalDocumentKind,
   type LegalJurisdiction
 } from '@app/shared/constants';
@@ -61,7 +62,7 @@ export class LegalJurisdictionService {
   isVisible(jurisdiction: LegalJurisdiction, kind: LegalDocumentKind): boolean {
     return (
       this.#draftsVisible ||
-      LEGAL_DOCUMENTS[jurisdiction][kind].status === 'published'
+      publishedLegalVersion(LEGAL_DOCUMENTS[jurisdiction][kind]) !== null
     );
   }
 

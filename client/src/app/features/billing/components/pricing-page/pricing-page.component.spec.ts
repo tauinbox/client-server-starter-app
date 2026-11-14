@@ -338,6 +338,7 @@ describe('PricingPageComponent', () => {
       region: 'auto',
       detectedProvider: 'paddle',
       effectiveProvider: 'paddle',
+      termsVersion: null,
       availableProviders: ['paddle', 'yookassa']
     });
     fixture.detectChanges();
@@ -391,6 +392,7 @@ describe('PricingPageComponent', () => {
       region: 'auto',
       detectedProvider: 'paddle',
       effectiveProvider: 'paddle',
+      termsVersion: null,
       availableProviders: ['yookassa']
     });
     fixture.detectChanges();
@@ -433,6 +435,7 @@ describe('PricingPageComponent', () => {
       region: 'auto',
       detectedProvider: 'paddle',
       effectiveProvider: 'paddle',
+      termsVersion: null,
       availableProviders: ['paddle']
     });
     fixture.detectChanges();
@@ -456,7 +459,94 @@ describe('PricingPageComponent', () => {
   it('starts checkout for authenticated users on choose', async () => {
     await setup(true);
     fixture.componentInstance.onChoose('pro');
-    expect(storeMock.checkout).toHaveBeenCalledWith('pro');
+    // No region read yet, so no terms version to send.
+    expect(storeMock.checkout).toHaveBeenCalledWith('pro', undefined);
+  });
+
+  describe('consent to the terms', () => {
+    function showTerms(termsVersion: string | null): void {
+      storeMock.region.set({
+        region: 'auto',
+        detectedProvider: 'paddle',
+        effectiveProvider: 'paddle',
+        termsVersion,
+        availableProviders: ['paddle', 'yookassa']
+      });
+      fixture.detectChanges();
+    }
+
+    function consent(): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector(
+        '.terms-consent'
+      );
+    }
+
+    function accept(): void {
+      consent()
+        ?.querySelector<HTMLInputElement>('input[type="checkbox"]')
+        ?.click();
+      fixture.detectChanges();
+    }
+
+    it('shows no consent and sends no version while the terms are a draft', async () => {
+      await setup(true, [reportPack]);
+      showTerms(null);
+
+      expect(consent()).toBeNull();
+      expect(actionButtons().some((button) => button.disabled)).toBe(false);
+    });
+
+    it('holds every purchase action until the buyer accepts the published terms', async () => {
+      await setup(true, [reportPack, donation]);
+      showTerms('2030-01-01');
+
+      expect(consent()?.textContent).toContain('I accept the terms of service');
+      expect(consent()?.querySelector('.terms-hint')?.textContent).toContain(
+        'accept the terms of service'
+      );
+      expect(actionButtons().length).toBe(3);
+      expect(actionButtons().every((button) => button.disabled)).toBe(true);
+      expect(donationPresets().every((button) => button.disabled)).toBe(true);
+
+      accept();
+
+      expect(consent()?.querySelector('.terms-hint')).toBeNull();
+      expect(actionButtons().some((button) => button.disabled)).toBe(false);
+    });
+
+    it('sends the accepted version with a checkout and a purchase', async () => {
+      await setup(true, [reportPack]);
+      showTerms('2030-01-01');
+      accept();
+
+      fixture.componentInstance.onChoose('pro');
+      fixture.componentInstance.onBuy({
+        key: reportPack.key,
+        price: '$5.00',
+        product: reportPack
+      });
+      await fixture.whenStable();
+
+      expect(storeMock.checkout).toHaveBeenCalledWith('pro', '2030-01-01');
+      expect(storeMock.purchase).toHaveBeenCalledWith({
+        productKey: 'report-pack',
+        acceptedTermsVersion: '2030-01-01'
+      });
+    });
+
+    it('asks again for a consent when the version changes', async () => {
+      await setup(true, [reportPack]);
+      showTerms('2030-01-01');
+      accept();
+
+      showTerms('2030-02-01');
+
+      expect(actionButtons().every((button) => button.disabled)).toBe(true);
+      expect(
+        consent()?.querySelector<HTMLInputElement>('input[type="checkbox"]')
+          ?.checked
+      ).toBe(false);
+    });
   });
 
   it('sends a subscriber to billing settings on choose instead of a checkout', async () => {

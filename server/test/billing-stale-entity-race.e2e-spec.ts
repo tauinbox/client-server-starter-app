@@ -24,6 +24,7 @@ import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { DRAFT_TERMS_CONSENTS } from '../src/modules/billing/testing/billing-service.fixtures';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
@@ -269,6 +270,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
     const module = await Test.createTestingModule({
       providers: [
         BillingUserService,
+        DRAFT_TERMS_CONSENTS,
         { provide: getDataSourceToken(), useValue: ds },
         {
           provide: getRepositoryToken(Customer),

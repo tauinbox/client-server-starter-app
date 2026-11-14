@@ -628,6 +628,11 @@ are:
   stale row on the provider-managed path uses the same guard. Only a self-managed row is reused or
   released: over a provider-owned `incomplete` row checkout answers 409
   `errors.billing.alreadySubscribed` and writes nothing.
+- `POST checkout` and `POST purchase` take `acceptedTermsVersion`. While the terms of the
+  jurisdiction of the resolved provider are published, a missing or different version answers 422
+  `errors.billing.termsNotAccepted` before any write, and an accepted version adds a
+  `billing_consents` row and a `BILLING_TERMS_ACCEPT` audit row just before the provider call
+  (`doc/billing-design.md` section 23).
 - `POST subscription/change` does an immediate prorated change of the plan or of the mode.
   `POST subscription/change/preview` gives the cost and applies nothing.
 - `POST subscription/cancel` cancels at the end of the period by default. A second period-end
@@ -637,7 +642,8 @@ are:
   default method. A `past_due` subscription can use this route, because it is how dunning recovers.
 - `GET region` and `PUT region` read and write the `auto`, `ru` or `world` override. The write has an
   active-subscription guard, as in section 19 of the billing design. Both responses carry
-  `availableProviders`: the providers that `BillingService.isProviderAvailable` accepts now.
+  `availableProviders`: the providers that `BillingService.isProviderAvailable` accepts now, and
+  `termsVersion`: the terms version that a checkout or a purchase must accept, or null for a draft.
 - `GET products` returns the one-time catalog. It holds each active product that carries a price for
   the effective provider, that is a fixed-price `sku` or `credits` entry, and a `custom` entry whose
   price holds the donation bounds. The route resolves the provider without the availability
@@ -2046,6 +2052,7 @@ a currency with zero decimals and a currency with three decimals correctly.
 | `billing_customer_grants` | UUID PK, `customer_id` (FK, CASCADE, indexed), `entitlement`, `source_invoice_id` (FK to `billing_invoices`, CASCADE, for the idempotency and the refund revocation), `expires_at`, `revoked_at` |
 | `billing_credit_balances` | `customer_id` PK (FK, CASCADE), `balance_units`, `updated_at`. The balance can become negative after a refund clawback, which blocks usage until the customer adds credits |
 | `billing_credit_ledger` | UUID PK, `customer_id` (FK, RESTRICT, indexed), `delta`, `reason` (`purchase`, `usage` or `refund`), `ref_invoice_id` (FK to `billing_invoices`, SET NULL). The FK to the customer uses RESTRICT, because an audit journal must survive the deletion of a customer. The table is an append-only journal of each change of the balance |
+| `billing_consents` | UUID PK, `user_id` (FK to `users`, RESTRICT), `kind` (`terms`), `jurisdiction` (`ru` or `intl`), `document_version`, `accepted_at`. The tuple `(user_id, kind, jurisdiction, document_version)` is unique, thus a version that a user accepts again adds no row. The FK uses RESTRICT, because the row is the proof of the consent. The table is append-only |
 | `billing_usage_records` | UUID PK, `customer_id` (FK, CASCADE), `subscription_id` (FK, CASCADE, indexed), `meter_key`, `quantity`, `occurred_at`, `idempotency_key`, `recorded_at`. The pair `(customer_id, idempotency_key)` is unique, and its index also serves the cascade lookup on `customer_id` |
 | `billing_webhook_events` | UUID PK, `provider`, `provider_event_id`, `type`, nullable jsonb `payload`, `status` (`received`, `processed` or `dead_letter`, indexed with `received_at` for the reconciliation sweep), `attempts`, `last_error`, `received_at`, `processed_at`. The `payload` column holds the verified `NormalizedEvent` object, which the reconciliation sweep replays. The system keeps no form of the raw delivery body. The unique pair `(provider, provider_event_id)` makes a replay of a `processed` row a no-op, while the sweep reprocesses a stuck `received` row. A delivery that fails the sweep `WEBHOOK_MAX_REPLAY_ATTEMPTS` times becomes `dead_letter`. Such a row stops the churn and alerts one time. A person can still replay it with `POST /admin/billing/webhook-events/:id/replay`, or with a redelivery from the provider. The daily retention sweep bounds a settled row: it drops the payload, and then it deletes the row. A `received` row and a `dead_letter` row are exempt |
 

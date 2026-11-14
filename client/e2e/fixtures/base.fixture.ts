@@ -197,6 +197,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           body: JSON.stringify({ provider, enabled })
         });
       },
+      async setTermsVersion(jurisdiction, version) {
+        await fetch(`${baseUrl}/__control/billing/terms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jurisdiction, version })
+        });
+      },
       async setPaddleClientToken(clientToken) {
         await fetch(`${baseUrl}/__control/billing/paddle-config`, {
           method: 'POST',

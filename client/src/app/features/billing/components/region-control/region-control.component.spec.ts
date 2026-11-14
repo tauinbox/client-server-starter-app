@@ -18,6 +18,7 @@ function regionView(
     region: 'auto',
     detectedProvider: 'paddle',
     effectiveProvider: 'paddle',
+    termsVersion: null,
     availableProviders
   };
 }

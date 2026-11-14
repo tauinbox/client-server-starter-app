@@ -322,4 +322,9 @@ export type BillingRegionResponse = {
   detectedProvider: BillingProviderId;
   effectiveProvider: BillingProviderId;
   availableProviders: BillingProviderId[];
+  /**
+   * The version of the terms that a checkout or purchase must accept on the
+   * effective provider, or null while the terms are a draft.
+   */
+  termsVersion: string | null;
 };

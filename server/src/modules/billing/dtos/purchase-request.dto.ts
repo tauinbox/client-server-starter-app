@@ -10,6 +10,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { propertyIsDefined } from '../../../common/validators/property-is-defined';
+import { AcceptedTermsVersion } from './accepted-terms-version.decorator';
 
 export class PurchaseRequestDto {
   @ApiProperty({
@@ -48,4 +49,7 @@ export class PurchaseRequestDto {
   @IsString()
   @MaxLength(128)
   description?: string;
+
+  @AcceptedTermsVersion()
+  acceptedTermsVersion?: string;
 }

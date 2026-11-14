@@ -28,10 +28,13 @@ import {
   expectRefusal,
   makePlan,
   provider,
-  repo
+  repo,
+  TERMS_NOT_SENT
 } from '../testing/billing-service.fixtures';
 import { BillingUserService } from './billing-user.service';
 import { CreditService } from './credit.service';
+import { BillingConsentService } from './billing-consent.service';
+import type { CheckedTermsAcceptance } from './billing-consent.service';
 
 function cursorQuery(overrides: Partial<InvoiceCursorQueryDto> = {}) {
   return Object.assign(new InvoiceCursorQueryDto(), overrides);
@@ -63,9 +66,20 @@ async function build() {
     )
   };
 
+  const consents = {
+    requiredTermsVersion: jest.fn<string | null, [BillingProviderId]>(
+      () => null
+    ),
+    check: jest.fn<CheckedTermsAcceptance, [BillingProviderId, unknown]>(
+      () => null
+    ),
+    record: jest.fn().mockResolvedValue(undefined)
+  };
+
   const module = await Test.createTestingModule({
     providers: [
       BillingUserService,
+      { provide: BillingConsentService, useValue: consents },
       { provide: getRepositoryToken(Customer), useValue: customers },
       { provide: getRepositoryToken(Subscription), useValue: subscriptions },
       { provide: getRepositoryToken(Invoice), useValue: invoices },
@@ -94,6 +108,7 @@ async function build() {
     users,
     billing,
     credits,
+    consents,
     emit
   };
 }
@@ -160,10 +175,11 @@ describe('BillingUserService', () => {
     it('charges the catalog price for an sku — a client-sent amount is ignored', async () => {
       const { ctx, yoo } = await setupPurchase(makeProduct());
 
-      const result = await ctx.service.purchase('user-1', {
-        productKey: 'report-pack',
-        amountMinor: 1
-      });
+      const result = await ctx.service.purchase(
+        'user-1',
+        { productKey: 'report-pack', amountMinor: 1 },
+        TERMS_NOT_SENT
+      );
 
       expect(yoo.createOneTimePayment).toHaveBeenCalledWith(
         RU_CUSTOMER,
@@ -199,7 +215,11 @@ describe('BillingUserService', () => {
         })
       );
 
-      await ctx.service.purchase('user-1', { productKey: 'credits-500' });
+      await ctx.service.purchase(
+        'user-1',
+        { productKey: 'credits-500' },
+        TERMS_NOT_SENT
+      );
 
       expect(yoo.createOneTimePayment).toHaveBeenCalledWith(
         RU_CUSTOMER,
@@ -221,9 +241,11 @@ describe('BillingUserService', () => {
 
       yoo.createOneTimePayment.mockResolvedValue({ sessionRef: 'txn-1' });
 
-      const result = await ctx.service.purchase('user-1', {
-        productKey: 'report-pack'
-      });
+      const result = await ctx.service.purchase(
+        'user-1',
+        { productKey: 'report-pack' },
+        TERMS_NOT_SENT
+      );
 
       expect(result).toEqual({
         provider: 'yookassa',
@@ -238,7 +260,7 @@ describe('BillingUserService', () => {
       ctx.products.findOne.mockResolvedValue(null);
 
       await expectRefusal(
-        ctx.service.purchase('user-1', { productKey: 'nope' }),
+        ctx.service.purchase('user-1', { productKey: 'nope' }, TERMS_NOT_SENT),
         ErrorKeys.BILLING.PRODUCT_NOT_FOUND
       );
     });
@@ -247,7 +269,11 @@ describe('BillingUserService', () => {
       const { ctx } = await setupPurchase(makeProduct({ active: false }));
 
       await expectRefusal(
-        ctx.service.purchase('user-1', { productKey: 'report-pack' }),
+        ctx.service.purchase(
+          'user-1',
+          { productKey: 'report-pack' },
+          TERMS_NOT_SENT
+        ),
         ErrorKeys.BILLING.PRODUCT_NOT_FOUND
       );
     });
@@ -260,7 +286,11 @@ describe('BillingUserService', () => {
       );
 
       await expectRefusal(
-        ctx.service.purchase('user-1', { productKey: 'report-pack' }),
+        ctx.service.purchase(
+          'user-1',
+          { productKey: 'report-pack' },
+          TERMS_NOT_SENT
+        ),
         ErrorKeys.BILLING.PRODUCT_UNAVAILABLE_FOR_PROVIDER
       );
     });
@@ -271,7 +301,11 @@ describe('BillingUserService', () => {
       );
 
       await expectRefusal(
-        ctx.service.purchase('user-1', { productKey: 'report-pack' }),
+        ctx.service.purchase(
+          'user-1',
+          { productKey: 'report-pack' },
+          TERMS_NOT_SENT
+        ),
         ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
       );
     });
@@ -300,7 +334,11 @@ describe('BillingUserService', () => {
           );
 
           await expectRefusal(
-            ctx.service.purchase('user-1', { productKey: 'report-pack' }),
+            ctx.service.purchase(
+              'user-1',
+              { productKey: 'report-pack' },
+              TERMS_NOT_SENT
+            ),
             ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
           );
           expect(paddle.createOneTimePayment).not.toHaveBeenCalled();
@@ -320,10 +358,11 @@ describe('BillingUserService', () => {
           })
         );
 
-        await ctx.service.purchase('user-1', {
-          productKey: 'donation',
-          amountMinor: 1500
-        });
+        await ctx.service.purchase(
+          'user-1',
+          { productKey: 'donation', amountMinor: 1500 },
+          TERMS_NOT_SENT
+        );
 
         expect(paddle.createOneTimePayment).toHaveBeenCalledWith(
           RU_CUSTOMER,
@@ -339,7 +378,11 @@ describe('BillingUserService', () => {
       const { ctx } = await setupPurchase(makeDonation());
 
       await expectRefusal(
-        ctx.service.purchase('user-1', { productKey: 'donation' }),
+        ctx.service.purchase(
+          'user-1',
+          { productKey: 'donation' },
+          TERMS_NOT_SENT
+        ),
         ErrorKeys.BILLING.AMOUNT_REQUIRED
       );
     });
@@ -350,10 +393,11 @@ describe('BillingUserService', () => {
         const { ctx, yoo } = await setupPurchase(makeDonation());
 
         await expectRefusal(
-          ctx.service.purchase('user-1', {
-            productKey: 'donation',
-            amountMinor
-          }),
+          ctx.service.purchase(
+            'user-1',
+            { productKey: 'donation', amountMinor },
+            TERMS_NOT_SENT
+          ),
           ErrorKeys.BILLING.AMOUNT_OUT_OF_RANGE
         );
         expect(yoo.createOneTimePayment).not.toHaveBeenCalled();
@@ -375,10 +419,11 @@ describe('BillingUserService', () => {
         })
       );
 
-      await ctx.service.purchase('user-1', {
-        productKey: 'donation',
-        amountMinor: 500
-      });
+      await ctx.service.purchase(
+        'user-1',
+        { productKey: 'donation', amountMinor: 500 },
+        TERMS_NOT_SENT
+      );
 
       expect(yoo.createOneTimePayment).toHaveBeenCalledWith(
         RU_CUSTOMER,
@@ -392,10 +437,11 @@ describe('BillingUserService', () => {
       );
 
       await expectRefusal(
-        ctx.service.purchase('user-1', {
-          productKey: 'donation',
-          amountMinor: 500
-        }),
+        ctx.service.purchase(
+          'user-1',
+          { productKey: 'donation', amountMinor: 500 },
+          TERMS_NOT_SENT
+        ),
         ErrorKeys.BILLING.PRODUCT_NOT_CONFIGURED
       );
     });
@@ -403,11 +449,15 @@ describe('BillingUserService', () => {
     it('charges a bounded custom amount with the sanitized note on the receipt', async () => {
       const { ctx, yoo } = await setupPurchase(makeDonation());
 
-      await ctx.service.purchase('user-1', {
-        productKey: 'donation',
-        amountMinor: 150000,
-        description: '  Keep\nit  up <3 '
-      });
+      await ctx.service.purchase(
+        'user-1',
+        {
+          productKey: 'donation',
+          amountMinor: 150000,
+          description: '  Keep\nit  up <3 '
+        },
+        TERMS_NOT_SENT
+      );
 
       expect(yoo.createOneTimePayment).toHaveBeenCalledWith(
         RU_CUSTOMER,
@@ -514,7 +564,11 @@ describe('BillingUserService', () => {
 
       ctx.billing.resolveProvider.mockResolvedValue(yoo);
 
-      const result = await ctx.service.checkout('user-1', 'pro');
+      const result = await ctx.service.checkout(
+        'user-1',
+        'pro',
+        TERMS_NOT_SENT
+      );
 
       expect(ctx.subscriptions.save).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -532,6 +586,131 @@ describe('BillingUserService', () => {
       });
     });
 
+    describe('terms consent', () => {
+      const terms = {
+        acceptedVersion: '2026-12-01',
+        actorEmail: 'user@example.com',
+        context: { ip: '127.0.0.1' }
+      };
+      const checked = {
+        provider: 'yookassa' as const,
+        version: '2026-12-01',
+        actorEmail: 'user@example.com',
+        context: { ip: '127.0.0.1' }
+      };
+
+      async function setupCheckout() {
+        const ctx = await build();
+
+        ctx.plans.findOne.mockResolvedValue(makePlan());
+        ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+        const yoo = provider('yookassa', false);
+
+        ctx.billing.resolveProvider.mockResolvedValue(yoo);
+
+        return { ctx, yoo };
+      }
+
+      it('checks the terms of the resolved provider and records them before the provider call', async () => {
+        const { ctx, yoo } = await setupCheckout();
+
+        ctx.consents.check.mockReturnValue(checked);
+
+        await ctx.service.checkout('user-1', 'pro', terms);
+
+        expect(ctx.consents.check).toHaveBeenCalledWith('yookassa', terms);
+        expect(ctx.consents.record).toHaveBeenCalledWith('user-1', checked);
+        const [recordOrder] = ctx.consents.record.mock.invocationCallOrder;
+        const [startOrder] = yoo.startCheckout.mock.invocationCallOrder;
+
+        expect(recordOrder).toBeLessThan(startOrder);
+      });
+
+      it('writes nothing and calls no provider when the terms are refused', async () => {
+        const { ctx, yoo } = await setupCheckout();
+
+        ctx.consents.check.mockImplementation(() => {
+          throw new ApiError(
+            ErrorKeys.BILLING.TERMS_NOT_ACCEPTED,
+            'Accept the current terms of service to continue.'
+          );
+        });
+
+        await expectRefusal(
+          ctx.service.checkout('user-1', 'pro', terms),
+          ErrorKeys.BILLING.TERMS_NOT_ACCEPTED
+        );
+        expect(ctx.subscriptions.save).not.toHaveBeenCalled();
+        expect(ctx.consents.record).not.toHaveBeenCalled();
+        expect(yoo.startCheckout).not.toHaveBeenCalled();
+      });
+
+      it('records no consent when a later check refuses the checkout', async () => {
+        const { ctx, yoo } = await setupCheckout();
+
+        ctx.consents.check.mockReturnValue(checked);
+        ctx.subscriptions.findOne.mockImplementation(
+          ({ where }: { where: { status: unknown } }) =>
+            Promise.resolve(
+              where.status === 'incomplete'
+                ? {
+                    id: 'sub-p',
+                    status: 'incomplete',
+                    lifecycleOwner: 'provider'
+                  }
+                : null
+            )
+        );
+
+        await expectRefusal(
+          ctx.service.checkout('user-1', 'pro', terms),
+          ErrorKeys.BILLING.ALREADY_SUBSCRIBED
+        );
+        expect(ctx.consents.record).not.toHaveBeenCalled();
+        expect(yoo.startCheckout).not.toHaveBeenCalled();
+      });
+
+      it('checks and records the terms of a purchase before the provider call', async () => {
+        const ctx = await build();
+
+        ctx.products.findOne.mockResolvedValue(makeProduct());
+        ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+        const yoo = provider('yookassa', false);
+
+        ctx.billing.resolveProvider.mockResolvedValue(yoo);
+        ctx.consents.check.mockReturnValue(checked);
+
+        await ctx.service.purchase(
+          'user-1',
+          { productKey: 'report-pack' },
+          terms
+        );
+
+        expect(ctx.consents.check).toHaveBeenCalledWith('yookassa', terms);
+        const [recordOrder] = ctx.consents.record.mock.invocationCallOrder;
+        const [payOrder] = yoo.createOneTimePayment.mock.invocationCallOrder;
+
+        expect(recordOrder).toBeLessThan(payOrder);
+      });
+
+      it('records no consent when the purchase amount is refused', async () => {
+        const ctx = await build();
+
+        ctx.products.findOne.mockResolvedValue(makeDonation());
+        ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+        ctx.billing.resolveProvider.mockResolvedValue(
+          provider('yookassa', false)
+        );
+        ctx.consents.check.mockReturnValue(checked);
+
+        await expectRefusal(
+          ctx.service.purchase('user-1', { productKey: 'donation' }, terms),
+          ErrorKeys.BILLING.AMOUNT_REQUIRED
+        );
+        expect(ctx.consents.record).not.toHaveBeenCalled();
+      });
+    });
+
     it('does not create a local subscription for a provider-managed provider', async () => {
       const ctx = await build();
 
@@ -544,7 +723,7 @@ describe('BillingUserService', () => {
       });
       ctx.billing.resolveProvider.mockResolvedValue(provider('paddle', true));
 
-      await ctx.service.checkout('user-1', 'pro');
+      await ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT);
 
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
     });
@@ -563,7 +742,7 @@ describe('BillingUserService', () => {
 
       ctx.billing.resolveProvider.mockResolvedValue(paddle);
 
-      await ctx.service.checkout('user-1', 'pro');
+      await ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT);
 
       expect(paddle.startCheckout).toHaveBeenCalledWith(
         expect.anything(),
@@ -593,7 +772,7 @@ describe('BillingUserService', () => {
 
       ctx.billing.resolveProvider.mockResolvedValue(yoo);
 
-      await ctx.service.checkout('user-1', 'pro');
+      await ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT);
 
       expect(ctx.subscriptions.save).toHaveBeenCalledWith(
         expect.objectContaining({ trialEnd: expect.any(Date) })
@@ -620,7 +799,7 @@ describe('BillingUserService', () => {
 
       ctx.billing.resolveProvider.mockResolvedValue(yoo);
 
-      await ctx.service.checkout('user-1', 'pro');
+      await ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT);
 
       expect(ctx.subscriptions.save).toHaveBeenCalledWith(
         expect.objectContaining({ trialEnd: null })
@@ -638,7 +817,7 @@ describe('BillingUserService', () => {
       ctx.plans.findOne.mockResolvedValue(null);
 
       await expectRefusal(
-        ctx.service.checkout('user-1', 'ghost'),
+        ctx.service.checkout('user-1', 'ghost', TERMS_NOT_SENT),
         ErrorKeys.BILLING.PLAN_NOT_FOUND
       );
     });
@@ -651,7 +830,7 @@ describe('BillingUserService', () => {
       );
 
       await expectRefusal(
-        ctx.service.checkout('user-1', 'free'),
+        ctx.service.checkout('user-1', 'free', TERMS_NOT_SENT),
         ErrorKeys.BILLING.FREE_PLAN_NOT_PURCHASABLE
       );
       expect(ctx.customers.save).not.toHaveBeenCalled();
@@ -666,7 +845,7 @@ describe('BillingUserService', () => {
       );
 
       await expectRefusal(
-        ctx.service.checkout('user-1', PAY_AS_YOU_GO_PLAN_KEY),
+        ctx.service.checkout('user-1', PAY_AS_YOU_GO_PLAN_KEY, TERMS_NOT_SENT),
         ErrorKeys.BILLING.PAY_AS_YOU_GO_IS_PREPAID
       );
       expect(ctx.customers.save).not.toHaveBeenCalled();
@@ -686,7 +865,7 @@ describe('BillingUserService', () => {
       ctx.subscriptions.findOne.mockResolvedValue({ id: 'sub-1' });
 
       await expectRefusal(
-        ctx.service.checkout('user-1', 'pro'),
+        ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT),
         ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
       expect(ctx.billing.resolveProvider).not.toHaveBeenCalled();
@@ -714,7 +893,7 @@ describe('BillingUserService', () => {
           lifecycleOwner: 'self'
         });
 
-      await ctx.service.checkout('user-1', 'pro');
+      await ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT);
 
       expect(ctx.subscriptions.create).not.toHaveBeenCalled();
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
@@ -749,7 +928,7 @@ describe('BillingUserService', () => {
       ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
 
       await expectRefusal(
-        ctx.service.checkout('user-1', 'pro'),
+        ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT),
         ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
@@ -772,7 +951,7 @@ describe('BillingUserService', () => {
       ctx.subscriptions.save.mockRejectedValueOnce({ code: '23505' });
 
       await expectRefusal(
-        ctx.service.checkout('user-1', 'pro'),
+        ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT),
         ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
     });
@@ -796,7 +975,7 @@ describe('BillingUserService', () => {
           lifecycleOwner: 'self'
         });
 
-      await ctx.service.checkout('user-1', 'pro');
+      await ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT);
 
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();
       expect(ctx.subscriptions.update).toHaveBeenCalledWith(
@@ -828,7 +1007,7 @@ describe('BillingUserService', () => {
       ctx.subscriptions.update.mockResolvedValue({ affected: 0 });
 
       await expectRefusal(
-        ctx.service.checkout('user-1', 'pro'),
+        ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT),
         ErrorKeys.BILLING.ALREADY_SUBSCRIBED
       );
       expect(paddle.startCheckout).not.toHaveBeenCalled();
@@ -863,7 +1042,7 @@ describe('BillingUserService', () => {
           });
 
         await expectRefusal(
-          ctx.service.checkout('user-1', 'pro'),
+          ctx.service.checkout('user-1', 'pro', TERMS_NOT_SENT),
           ErrorKeys.BILLING.ALREADY_SUBSCRIBED
         );
         expect(ctx.subscriptions.update).not.toHaveBeenCalled();
@@ -1262,8 +1441,25 @@ describe('BillingUserService', () => {
         region: 'auto',
         detectedProvider: 'yookassa',
         effectiveProvider: 'yookassa',
-        availableProviders: ['paddle', 'yookassa']
+        availableProviders: ['paddle', 'yookassa'],
+        termsVersion: null
       });
+    });
+
+    it('reports the terms version that a payment on the effective provider must accept', async () => {
+      const ctx = await build();
+
+      ctx.customers.findOne.mockResolvedValue(RU_CUSTOMER);
+      ctx.consents.requiredTermsVersion.mockImplementation((id) =>
+        id === 'yookassa' ? '2026-12-01' : null
+      );
+
+      const region = await ctx.service.getRegion('user-1');
+
+      expect(region.termsVersion).toBe('2026-12-01');
+      expect(ctx.consents.requiredTermsVersion).toHaveBeenCalledWith(
+        'yookassa'
+      );
     });
 
     it('lists only the providers that a checkout can use now', async () => {

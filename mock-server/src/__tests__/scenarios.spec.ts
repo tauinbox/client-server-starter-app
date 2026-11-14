@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import { randomUUID } from 'crypto';
 import {
   BILLING_PROVIDER_FLAGS,
+  LEGAL_JURISDICTIONS,
   MAX_FAILED_ATTEMPTS
 } from '@app/shared/constants';
 import {
@@ -16,6 +17,7 @@ import {
   SCENARIO_PASSWORD,
   SCENARIO_RECOVERY_CODE,
   ScenarioPlaceholder,
+  PUBLISHED_SCENARIO_TERMS,
   scenarioMethod,
   scenarioPath,
   scenarioClock,
@@ -584,6 +586,13 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     for (const flag of getState().featureFlags.values()) {
       if (keys.includes(flag.key)) flag.enabled = false;
+    }
+
+    return Promise.resolve();
+  },
+  'published-terms': () => {
+    for (const jurisdiction of LEGAL_JURISDICTIONS) {
+      getState().legalTermsOverrides[jurisdiction] = PUBLISHED_SCENARIO_TERMS;
     }
 
     return Promise.resolve();

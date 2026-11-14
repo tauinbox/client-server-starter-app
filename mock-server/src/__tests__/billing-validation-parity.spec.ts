@@ -240,6 +240,25 @@ describe('billing request-body validation parity with server', () => {
         ]
       },
       {
+        name: 'checkout acceptedTermsVersion over 32 chars',
+        method: 'POST',
+        path: '/billing/checkout',
+        body: { planKey: 'pro', acceptedTermsVersion: 'v'.repeat(33) },
+        errors: [
+          'acceptedTermsVersion must be shorter than or equal to 32 characters'
+        ]
+      },
+      {
+        name: 'purchase acceptedTermsVersion that is not a string',
+        method: 'POST',
+        path: '/billing/purchase',
+        body: { productKey: 'report-pack', acceptedTermsVersion: 7 },
+        errors: [
+          'acceptedTermsVersion must be shorter than or equal to 32 characters',
+          'acceptedTermsVersion must be a string'
+        ]
+      },
+      {
         name: 'cancel mode outside the enum',
         method: 'POST',
         path: '/billing/subscription/cancel',

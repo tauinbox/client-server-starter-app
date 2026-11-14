@@ -1,4 +1,4 @@
-import type { StepUpOperation } from '@app/shared/constants';
+import type { LegalJurisdiction, StepUpOperation } from '@app/shared/constants';
 import type {
   BillingProviderId,
   MeteringResponse,
@@ -80,6 +80,12 @@ export type ControlApi = {
   setBillingProviderEnabled(
     provider: BillingProviderId,
     enabled: boolean
+  ): Promise<void>;
+  // Publishes the terms of a jurisdiction at `version` (null restores the
+  // version of LEGAL_DOCUMENTS), so a checkout and a purchase must accept it.
+  setTermsVersion(
+    jurisdiction: LegalJurisdiction,
+    version: string | null
   ): Promise<void>;
   // Sets the Paddle.js client token that /api/v1/billing/paddle-config
   // advertises. `null` means that the Paddle checkout cannot open.
