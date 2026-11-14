@@ -16,14 +16,11 @@ import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
 import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy';
-import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
-import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { DUNNING_MAX_ATTEMPTS } from '../src/modules/billing/renewals/renewal-queue.constants';
 import { EntitlementChangedListener } from '../src/modules/billing/listeners/entitlement-changed.listener';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
-import { CreditService } from '../src/modules/billing/services/credit.service';
 
 interface StoredInvoice {
   [column: string]: unknown;
@@ -31,7 +28,6 @@ interface StoredInvoice {
   providerEventId: string | null;
   status?: string;
   providerInvoiceRef?: string;
-  creditUnitsApplied?: number;
 }
 
 interface Store {
@@ -156,8 +152,7 @@ function makeManager(store: Store) {
             id,
             providerEventId: (v['providerEventId'] as string) ?? null,
             status: v['status'] as string,
-            providerInvoiceRef: v['providerInvoiceRef'] as string,
-            creditUnitsApplied: (v['creditUnitsApplied'] as number) ?? 0
+            providerInvoiceRef: v['providerInvoiceRef'] as string
           });
 
           return Promise.resolve({ raw: [{ id }] });
@@ -230,7 +225,6 @@ describe('Billing renewal scheduler (e2e)', () => {
   let store: Store;
   let invalidateUser: jest.Mock;
   let chargeOffSession: jest.Mock;
-  let usageSum: jest.Mock;
 
   beforeEach(async () => {
     store = {
@@ -249,21 +243,6 @@ describe('Billing renewal scheduler (e2e)', () => {
           billingMode: 'fixed',
           interval: 'month',
           prices: { yookassa: { currency: 'RUB', amountMinor: 99000 } }
-        }),
-        Object.assign(new Plan(), {
-          key: 'usage',
-          name: 'Pay as you go',
-          billingMode: 'usage',
-          interval: 'month',
-          meterKey: 'api_calls',
-          prices: {
-            yookassa: {
-              currency: 'RUB',
-              amountMinor: 0,
-              unitPriceMinor: 200,
-              includedUnits: 100
-            }
-          }
         })
       ],
       invoices: []
@@ -272,7 +251,6 @@ describe('Billing renewal scheduler (e2e)', () => {
     chargeOffSession = jest
       .fn()
       .mockResolvedValue({ providerInvoiceRef: 'pay_1', status: 'captured' });
-    usageSum = jest.fn().mockResolvedValue(null);
 
     const manager = makeManager(store);
     const moduleRef = await Test.createTestingModule({
@@ -280,26 +258,6 @@ describe('Billing renewal scheduler (e2e)', () => {
       providers: [
         RenewalService,
         FixedRating,
-        UsageRating,
-        {
-          // UsageRating aggregates via a raw bigint SUM query; drive the same
-          // `usageSum` knob through the query-builder's getRawOne wire shape.
-          provide: getRepositoryToken(UsageRecord),
-          useValue: {
-            createQueryBuilder: () => {
-              const qb = {
-                select: () => qb,
-                where: () => qb,
-                andWhere: () => qb,
-                getRawOne: async () => ({
-                  total: String((await usageSum()) ?? 0)
-                })
-              };
-
-              return qb;
-            }
-          }
-        },
         EntitlementChangedListener,
         {
           provide: getRepositoryToken(Subscription),
@@ -346,17 +304,7 @@ describe('Billing renewal scheduler (e2e)', () => {
           ]
         },
         { provide: EntitlementService, useValue: { invalidateUser } },
-        { provide: NotificationsService, useValue: { push: jest.fn() } },
-        // No prepaid credits in this scenario set — the credits-as-usage flow
-        // has its own coverage in billing-webhook.e2e-spec and the unit specs.
-        {
-          provide: CreditService,
-          useValue: {
-            availableUnitsForUpdate: jest.fn().mockResolvedValue(0),
-            releaseHolds: jest.fn(),
-            spendOnUsage: jest.fn()
-          }
-        }
+        { provide: NotificationsService, useValue: { push: jest.fn() } }
       ]
     }).compile();
 
@@ -381,37 +329,6 @@ describe('Billing renewal scheduler (e2e)', () => {
       new Date('2026-07-01T00:00:00Z')
     );
     // The renewed event reached the entitlement-cache listener over the real bus.
-    expect(invalidateUser).toHaveBeenCalledWith('user-1');
-  });
-
-  it('closes a usage period postpaid: charges the overage and advances', async () => {
-    usageSum.mockResolvedValue(142);
-    store.subscriptions.push(
-      makeSub({ planKey: 'usage', billingMode: 'usage' })
-    );
-
-    await service.runDueRenewals(NOW);
-
-    expect(chargeOffSession).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'cust-1' }),
-      {
-        amountMinor: 8400,
-        currency: 'RUB',
-        receiptItems: [
-          {
-            description: 'Pay as you go: api_calls × 42',
-            amountMinor: 8400,
-            quantity: 1,
-            paymentMode: 'full_payment'
-          }
-        ],
-        idempotencyKey: expect.stringMatching(/^renewal:sub-1:/)
-      }
-    );
-    expect(store.invoices).toHaveLength(1);
-    expect(store.subscriptions[0].currentPeriodEnd).toEqual(
-      new Date('2026-07-01T00:00:00Z')
-    );
     expect(invalidateUser).toHaveBeenCalledWith('user-1');
   });
 

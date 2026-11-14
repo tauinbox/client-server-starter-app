@@ -37,7 +37,6 @@ import {
 import {
   advanceRenewal,
   findRenewableSubscription,
-  seedUsage,
   setProviderEnabled,
   type RenewalOutcome
 } from './helpers/billing-clock.helpers';
@@ -642,57 +641,6 @@ router.post('/billing/activate-subscription', (req, res) => {
 
   res.json(
     toSubscriptionResponse(activateSubscription(user, plan, { status }))
-  );
-});
-
-// POST /__control/billing/seed-usage — pre-seed a usage record for E2E without
-// going through the admin ingest endpoint. Attaches to the customer's active
-// subscription (or an explicit subscriptionId) so usage views/rating have data.
-router.post('/billing/seed-usage', (req, res) => {
-  const {
-    customerId,
-    meterKey,
-    quantity,
-    occurredAt,
-    subscriptionId,
-    idempotencyKey
-  } = req.body as {
-    customerId?: string;
-    meterKey?: string;
-    quantity?: number;
-    occurredAt?: string;
-    subscriptionId?: string;
-    idempotencyKey?: string;
-  };
-
-  if (!customerId) {
-    res.status(400).json({ message: 'customerId is required' });
-
-    return;
-  }
-
-  const state = getState();
-  const subscription = subscriptionId
-    ? state.billingSubscriptions.get(subscriptionId)
-    : state.billingSubscriptions
-        .values()
-        .find((s) => s.customerId === customerId);
-
-  if (!subscription) {
-    res.status(404).json({ message: 'no subscription for customer' });
-
-    return;
-  }
-
-  res.json(
-    toUsageResponse(
-      seedUsage(subscription, {
-        meterKey,
-        quantity,
-        occurredAt,
-        idempotencyKey
-      })
-    )
   );
 });
 

@@ -23,10 +23,8 @@ import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
-import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
-import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import {
@@ -242,11 +240,7 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         },
         {
           provide: CreditService,
-          useValue: {
-            addPurchase: jest.fn(),
-            spendOnUsage: jest.fn(),
-            releaseHolds: jest.fn()
-          }
+          useValue: { addPurchase: jest.fn() }
         },
         { provide: EventEmitter2, useValue: { emit } }
       ]
@@ -312,11 +306,6 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
           provide: CreditService,
           useValue: { getBalance: () => Promise.resolve(null) }
         },
-        {
-          provide: RenewalService,
-          useValue: { billClosingUsagePeriod: jest.fn() }
-        },
-        { provide: UsageRating, useValue: { summarizeForPeriod: jest.fn() } },
         {
           provide: ConfigService,
           useValue: { get: () => 'http://localhost:4200' }

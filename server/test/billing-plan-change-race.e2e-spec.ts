@@ -20,8 +20,6 @@ import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { ProrationCalculator } from '../src/modules/billing/rating/proration-calculator';
-import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
-import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import {
   ChargeDeclinedError,
   type OffSessionCharge
@@ -257,11 +255,6 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
           provide: CreditService,
           useValue: { getBalance: () => Promise.resolve(null) }
         },
-        { provide: UsageRating, useValue: { summarizeForPeriod: jest.fn() } },
-        {
-          provide: RenewalService,
-          useValue: { billClosingUsagePeriod: jest.fn() }
-        },
         {
           provide: ConfigService,
           useValue: { get: () => 'http://localhost:4200' }
@@ -315,7 +308,6 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         refundedMinor: Money.fromMinor(0),
         currency: 'RUB',
         status: 'paid',
-        creditUnitsApplied: 0,
         billingMode: 'fixed',
         kind: 'subscription',
         productId: null,

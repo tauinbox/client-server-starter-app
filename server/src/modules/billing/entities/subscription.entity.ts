@@ -59,27 +59,6 @@ export class Subscription {
   @Exclude()
   billingAnchorAt: Date | null;
 
-  /**
-   * Where the metered window of the current period starts, when a switch of
-   * billing mode moved it past `current_period_start`: units before this moment
-   * were billed at the switch, or were consumed on a fixed plan. Null when the
-   * window is the whole period.
-   */
-  @Column({ name: 'metered_from', type: 'timestamptz', nullable: true })
-  @Exclude()
-  meteredFrom: Date | null;
-
-  /**
-   * The end of the last metered window that a self-managed close started to
-   * rate. It is written before the rating, and usage ingest refuses an
-   * `occurredAt` before it, so a record cannot land in a window after that
-   * window was rated. Rating never reads it: a dunning retry re-rates the same
-   * window. Null until the first close.
-   */
-  @Column({ name: 'usage_sealed_until', type: 'timestamptz', nullable: true })
-  @Exclude()
-  usageSealedUntil: Date | null;
-
   @Column({ name: 'cancel_at_period_end', default: false })
   cancelAtPeriodEnd: boolean;
 

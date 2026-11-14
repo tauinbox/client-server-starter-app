@@ -821,8 +821,7 @@ the same permission both apply.
   subscription plan; Free and pay as you go are not targets. Then it shows a live proration mini-ledger from
   `/change/preview`. For YooKassa the ledger shows a credit line, a charge line and a bold "Due now"
   line. For Paddle it shows the net amount, because the provider settles the two parts. A negative net
-  amount reads "Refund due". A switch from a usage plan to a fixed plan shows a note that the metered
-  usage of the current period is charged at the switch.
+  amount reads "Refund due".
 
   The Confirm button calls `POST /api/v1/billing/subscription/change`, which switches the plan
   immediately. Paddle computes the proration itself, through `subscriptions.update` with immediate
@@ -868,9 +867,8 @@ the same permission both apply.
   500, 1000 and 5000 units. They render as the same ticket cards.
 
   A paid pack adds units to the prepaid credit balance of the customer, which
-  `GET /api/v1/billing/credits` reports. Metered usage spends the credits before the system charges
-  money. A usage period that the credits fully cover settles as a paid invoice of zero, with no charge
-  at the provider.
+  `GET /api/v1/billing/credits` reports. Each metered use takes its units from that balance at the
+  moment of use, and a use that the balance does not cover is refused.
 
   A refund of a credit-pack invoice up to its full amount takes the units back. The refund can be one
   leg or several partial legs, because the refunds accumulate. If the customer already spent the
@@ -1937,11 +1935,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3350 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 958 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 936 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1696 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3238 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 932 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 910 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1690 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 344 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1462 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1450 tests pass |
 
 ## CI/CD
 

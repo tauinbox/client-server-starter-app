@@ -24,7 +24,6 @@ import { Subscription } from '../src/modules/billing/entities/subscription.entit
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { BillingAdminController } from '../src/modules/billing/controllers/billing-admin.controller';
-import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { MeteringService } from '../src/modules/billing/services/metering.service';
@@ -64,14 +63,7 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
           provide: BillingService,
           useValue: { getProviderById: () => ({ cancel: providerCancel }) }
         },
-        {
-          provide: RenewalService,
-          useValue: { billClosingUsagePeriod: jest.fn() }
-        },
-        {
-          provide: CreditService,
-          useValue: { releaseHolds: () => Promise.resolve() }
-        },
+        { provide: CreditService, useValue: {} },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: MeteringService, useValue: { consume: jest.fn() } },
         { provide: AuditService, useValue: audit },

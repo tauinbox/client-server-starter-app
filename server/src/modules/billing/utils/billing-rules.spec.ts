@@ -1,13 +1,10 @@
 import {
   geoDefault,
   geoFromLocale,
-  meteredWindowStart,
   overrideForRegion,
   prorationAmounts,
-  rateUsage,
   regionForOverride,
-  renewalAnchor,
-  usageIngestStart
+  renewalAnchor
 } from '@app/shared/utils/billing-rules';
 
 function utc(year: number, monthIndex: number, day: number): Date {
@@ -34,83 +31,6 @@ describe('overrideForRegion and regionForOverride', () => {
   ] as const)('maps region %s to override %s and back', (region, override) => {
     expect(overrideForRegion(region)).toBe(override);
     expect(regionForOverride(override)).toBe(region);
-  });
-});
-
-describe('meteredWindowStart', () => {
-  const periodStart = utc(2026, 8, 1);
-
-  it('is the period start when no switch moved the window', () => {
-    expect(
-      meteredWindowStart({ currentPeriodStart: periodStart, meteredFrom: null })
-    ).toBe(periodStart);
-  });
-
-  it('is the switch moment when a switch moved the window inside the period', () => {
-    const switchedAt = utc(2026, 8, 11);
-
-    expect(
-      meteredWindowStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: switchedAt
-      })
-    ).toBe(switchedAt);
-  });
-
-  it('ignores a switch moment left over from an earlier period', () => {
-    expect(
-      meteredWindowStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: utc(2026, 7, 20)
-      })
-    ).toBe(periodStart);
-  });
-
-  it('compares ISO text by instant, not by text', () => {
-    expect(
-      meteredWindowStart({
-        currentPeriodStart: '2026-09-01T00:00:00.000Z',
-        meteredFrom: '2026-09-01T03:00:00+05:00'
-      })
-    ).toBe('2026-09-01T00:00:00.000Z');
-  });
-});
-
-describe('usageIngestStart', () => {
-  const periodStart = utc(2026, 8, 1);
-
-  it('is the metered window start when no close sealed the window', () => {
-    expect(
-      usageIngestStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: null,
-        usageSealedUntil: null
-      })
-    ).toBe(periodStart);
-  });
-
-  it('is the seal when a close sealed the window past its start', () => {
-    const sealed = utc(2026, 9, 1);
-
-    expect(
-      usageIngestStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: null,
-        usageSealedUntil: sealed
-      })
-    ).toBe(sealed);
-  });
-
-  it('ignores a seal that an earlier period left behind', () => {
-    const switchedAt = utc(2026, 8, 11);
-
-    expect(
-      usageIngestStart({
-        currentPeriodStart: periodStart,
-        meteredFrom: switchedAt,
-        usageSealedUntil: periodStart
-      })
-    ).toBe(switchedAt);
   });
 });
 
@@ -165,72 +85,5 @@ describe('prorationAmounts', () => {
       chargeMinor: 193_333
     });
     expect(fromText).toEqual(fromDates);
-  });
-});
-
-describe('rateUsage', () => {
-  const price = { includedUnits: 100, unitPriceMinor: 200 };
-
-  it.each([
-    [99, 0],
-    [100, 0],
-    [142, 42]
-  ])('bills %i units past the included units as %i', (totalUnits, billable) => {
-    expect(rateUsage({ totalUnits, price })).toEqual({
-      includedUnits: 100,
-      unitPriceMinor: 200,
-      billableUnits: billable,
-      creditUnitsApplied: 0,
-      chargedUnits: billable,
-      amountMinor: billable * 200
-    });
-  });
-
-  it('treats a price without includedUnits and unitPriceMinor as zero values', () => {
-    expect(rateUsage({ totalUnits: 10, price: {} })).toMatchObject({
-      includedUnits: 0,
-      unitPriceMinor: 0,
-      billableUnits: 10,
-      amountMinor: 0
-    });
-  });
-
-  it('prices an amount beyond int32 without precision loss', () => {
-    // 50_000 units at 50_000 minor each exceed the int32 ceiling 2_147_483_647.
-    const rated = rateUsage({
-      totalUnits: 50_000,
-      price: { includedUnits: 0, unitPriceMinor: 50_000 }
-    });
-
-    expect(rated.amountMinor).toBe(2_500_000_000);
-  });
-
-  it.each([
-    ['partial credits', 10, 10, 32],
-    ['credits beyond the billable units', 1000, 42, 0],
-    ['zero credits', 0, 0, 42],
-    ['a negative balance', -100, 0, 42]
-  ])(
-    'offsets the billable units with %s',
-    (_label, availableCreditUnits, applied, charged) => {
-      expect(
-        rateUsage({ totalUnits: 142, price, availableCreditUnits })
-      ).toMatchObject({
-        billableUnits: 42,
-        creditUnitsApplied: applied,
-        chargedUnits: charged,
-        amountMinor: charged * 200
-      });
-    }
-  );
-
-  it('spends no credits on a period with no overage', () => {
-    expect(
-      rateUsage({ totalUnits: 99, price, availableCreditUnits: 50 })
-    ).toMatchObject({
-      billableUnits: 0,
-      creditUnitsApplied: 0,
-      amountMinor: 0
-    });
   });
 });

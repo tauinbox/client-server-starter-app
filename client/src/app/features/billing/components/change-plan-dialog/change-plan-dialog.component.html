@@ -41,7 +41,7 @@
           </span>
           <span class="option-price">
             {{ option.price
-            }}<span class="per">{{ t(option.priceSuffixKey) }}</span>
+            }}<span class="per">{{ t('billing.pricing.perMonth') }}</span>
           </span>
         </button>
       } @empty {
@@ -103,11 +103,6 @@
         } @else if (!ledger.split) {
           <p class="proration-note">
             {{ t('billing.changePlan.providerSettles') }}
-          </p>
-        }
-        @if (closesUsage) {
-          <p class="proration-note">
-            {{ t('billing.changePlan.usageClosingNote') }}
           </p>
         }
       } @else {

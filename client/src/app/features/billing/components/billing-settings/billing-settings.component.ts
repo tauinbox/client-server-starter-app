@@ -118,15 +118,6 @@ export class BillingSettingsComponent implements OnInit {
 
     if (!price) return '';
 
-    // A usage plan has no flat fee: its price is the price of one unit.
-    if (plan.billingMode === 'usage') {
-      return formatMoney(
-        price.unitPriceMinor ?? 0,
-        price.currency,
-        this.#lang()
-      );
-    }
-
     return formatMoney(price.amountMinor, price.currency, this.#lang());
   });
 

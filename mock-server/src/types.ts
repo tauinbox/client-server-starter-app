@@ -197,18 +197,6 @@ export interface MockSubscription {
    * on provider-managed rows, whose boundaries come from the provider.
    */
   billingAnchorAt?: string;
-  /**
-   * Where the metered window of the current period starts after a switch of
-   * billing mode - mirrors the server's @Exclude'd `metered_from` and is never
-   * serialized on the wire. Absent when the window is the whole period.
-   */
-  meteredFrom?: string;
-  /**
-   * The end of the last metered window a renewal started to rate - mirrors
-   * the server's @Exclude'd `usage_sealed_until`. Usage ingest refuses an
-   * `occurredAt` before it; rating never reads it.
-   */
-  usageSealedUntil?: string;
   createdAt: string;
   updatedAt: string;
 }

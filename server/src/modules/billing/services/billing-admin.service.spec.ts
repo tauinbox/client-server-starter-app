@@ -26,7 +26,6 @@ import {
   InvoiceRefundedEvent,
   SubscriptionCanceledEvent
 } from '../events/billing.events';
-import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 
 import { BillingAdminService } from './billing-admin.service';
@@ -126,7 +125,7 @@ function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides
-  } as Invoice;
+  };
 }
 
 function providerStub(id: BillingProviderId) {
@@ -139,15 +138,6 @@ function providerStub(id: BillingProviderId) {
 
 async function build() {
   const subscriptions = repo();
-  // The cancel write runs in a transaction on the manager of the repository.
-  const cancelManager = { withRepository: () => subscriptions };
-
-  Object.assign(subscriptions, {
-    manager: {
-      transaction: (cb: (m: typeof cancelManager) => unknown) =>
-        cb(cancelManager)
-    }
-  });
   const invoices = repo();
   const customers = repo();
   const webhookEvents = repo();
@@ -158,10 +148,8 @@ async function build() {
   const billing = {
     getProviderById: jest.fn()
   };
-  const renewals = { billClosingUsagePeriod: jest.fn() };
   const credits = {
-    clawbackPurchase: jest.fn().mockResolvedValue(undefined),
-    releaseHolds: jest.fn().mockResolvedValue(undefined)
+    clawbackPurchase: jest.fn().mockResolvedValue(undefined)
   };
 
   // Transactional manager that routes the refund's entity-typed calls to the
@@ -208,7 +196,6 @@ async function build() {
       { provide: getRepositoryToken(CustomerGrant), useValue: grants },
       { provide: getRepositoryToken(Product), useValue: products },
       { provide: BillingService, useValue: billing },
-      { provide: RenewalService, useValue: renewals },
       { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } },
       { provide: getDataSourceToken(), useValue: dataSource }
@@ -224,7 +211,6 @@ async function build() {
     grants,
     products,
     billing,
-    renewals,
     credits,
     emit,
     manager,
@@ -369,35 +355,6 @@ describe('BillingAdminService', () => {
         SubscriptionCanceledEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
       );
-    });
-
-    it('bills the closing metered period before an immediate cancel', async () => {
-      const ctx = await build();
-      const sub = makeSubscription({ providerSubscriptionId: null });
-
-      ctx.subscriptions.findOne.mockResolvedValue(sub);
-      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
-
-      await ctx.service.cancelSubscription('sub-1', 'immediate');
-
-      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(
-        sub,
-        expect.any(Date),
-        true
-      );
-    });
-
-    it('leaves a period-end cancel to the renewal scan at the boundary', async () => {
-      const ctx = await build();
-
-      ctx.subscriptions.findOne.mockResolvedValue(
-        makeSubscription({ providerSubscriptionId: null })
-      );
-      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
-
-      await ctx.service.cancelSubscription('sub-1', 'period_end');
-
-      expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
     });
 
     it('does not call the provider for a self-managed sub without a provider ref', async () => {

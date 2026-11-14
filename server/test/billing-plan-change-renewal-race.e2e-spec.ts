@@ -8,17 +8,14 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
-import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
-import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import {
   BILLING_PROVIDERS,
@@ -28,11 +25,9 @@ import {
 } from '../src/modules/billing/providers/payment-provider.interface';
 import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy';
 import { ProrationCalculator } from '../src/modules/billing/rating/proration-calculator';
-import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { PLAN_CHANGE_LEASE_MS } from '../src/modules/billing/renewals/renewal-queue.constants';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { PlanChangeService } from '../src/modules/billing/services/plan-change.service';
-import { CreditService } from '../src/modules/billing/services/credit.service';
 import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
@@ -42,8 +37,10 @@ import {
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 const DAY_MS = 86_400_000;
+const FROM_KEY = 'renewal-race-basic';
 const FIXED_KEY = 'renewal-race-fixed';
-const USAGE_KEY = 'renewal-race-usage';
+const FROM_PRICE = 49000;
+const FIXED_PRICE = 99000;
 // Long enough for the change to read the row and pass its guards first.
 const ANCHOR_DELAY_MS = 1500;
 
@@ -58,7 +55,6 @@ function fakeProvider(): FakeProvider {
     findOffSessionCharge: jest.fn().mockResolvedValue(null),
     getOffSessionCharge: jest.fn().mockResolvedValue(null),
     createOneTimePayment: jest.fn(),
-    chargeUsage: jest.fn(),
     changePlan: jest.fn(),
     previewChangePlan: jest.fn(),
     updatePaymentMethod: jest.fn(),
@@ -107,27 +103,20 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
         limits: null,
         trialDays: 0,
         active: true,
-        prices: { yookassa: { currency: 'RUB', amountMinor: 99000 } }
+        prices: { yookassa: { currency: 'RUB', amountMinor: FIXED_PRICE } }
       }),
       plans.create({
-        key: USAGE_KEY,
-        name: 'Usage',
+        key: FROM_KEY,
+        name: 'Basic',
         description: null,
-        billingMode: 'usage',
+        billingMode: 'fixed',
         interval: 'month',
-        meterKey: 'api_calls',
+        meterKey: null,
         entitlements: [],
         limits: null,
         trialDays: 0,
         active: true,
-        prices: {
-          yookassa: {
-            currency: 'RUB',
-            amountMinor: 0,
-            unitPriceMinor: 200,
-            includedUnits: 0
-          }
-        }
+        prices: { yookassa: { currency: 'RUB', amountMinor: FROM_PRICE } }
       })
     ]);
   }, BILLING_DB_LOCK_TIMEOUT_MS);
@@ -137,7 +126,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
 
     if (customerId) {
       // Invoices hold the customer under RESTRICT, so they go first; the
-      // customer, its subscription and its usage then cascade from the user.
+      // customer and its subscription then cascade from the user.
       await ds.getRepository(Invoice).delete({ customerId });
       customerId = undefined;
     }
@@ -150,7 +139,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
 
   afterAll(async () => {
     await ds?.getRepository(Plan).delete({ key: FIXED_KEY });
-    await ds?.getRepository(Plan).delete({ key: USAGE_KEY });
+    await ds?.getRepository(Plan).delete({ key: FROM_KEY });
     await releaseDbLock?.();
     await ds?.destroy();
   });
@@ -166,9 +155,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
       providers: [
         PlanChangeService,
         RenewalService,
-        CreditService,
         FixedRating,
-        UsageRating,
         ProrationCalculator,
         repository(Customer),
         repository(Subscription),
@@ -177,8 +164,6 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
         repository(Plan),
         repository(Product),
         repository(User),
-        repository(UsageRecord),
-        repository(CreditBalance),
         { provide: getDataSourceToken(), useValue: ds },
         { provide: BILLING_PROVIDERS, useValue: [provider] },
         {
@@ -197,7 +182,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     renewals = module.get(RenewalService);
   }
 
-  /** A usage subscription with 100 units at 200 whose period ends shortly. */
+  /** A subscription on the cheaper plan whose period ends shortly. */
   async function seed(): Promise<void> {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const user = await ds.getRepository(User).save(
@@ -230,15 +215,14 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     const subscription = await ds.getRepository(Subscription).save(
       ds.getRepository(Subscription).create({
         customerId: customer.id,
-        planKey: USAGE_KEY,
+        planKey: FROM_KEY,
         provider: 'yookassa',
-        billingMode: 'usage',
+        billingMode: 'fixed',
         status: 'active',
         lifecycleOwner: 'self',
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
         billingAnchorAt: periodStart,
-        meteredFrom: null,
         cancelAtPeriodEnd: false,
         trialEnd: null,
         providerSubscriptionId: null,
@@ -250,17 +234,6 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     );
 
     subscriptionId = subscription.id;
-
-    await ds.getRepository(UsageRecord).save(
-      ds.getRepository(UsageRecord).create({
-        customerId: customer.id,
-        subscriptionId,
-        meterKey: 'api_calls',
-        quantity: Money.fromMinor(100),
-        occurredAt: new Date(Date.now() - 5 * DAY_MS),
-        idempotencyKey: `seed-${stamp}`
-      })
-    );
   }
 
   /** Records every charge and captures it once `onCharge` settles. */
@@ -317,23 +290,18 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   }
 
   /**
-   * One charge per unit, and the fixed plan prepays the period the scan
-   * opens after the change: no usage renewal, a fixed one at the full price.
+   * The new plan prepays the period the scan opens after the change: one
+   * renewal, at the full price of the new plan.
    */
-  async function expectSwitchThenFixedRenewal(): Promise<void> {
-    expect(chargedPrefixes()).toEqual(['change-charge', 'cancel', 'renewal']);
-    const usage = (await invoices()).filter((i) => i.billingMode === 'usage');
-
-    expect(usage).toHaveLength(1);
-    expect(usage[0].providerEventId).toMatch(/^cancel:/);
-    expect(usage[0].amountMinor.toNumber()).toBe(20000);
+  async function expectSwitchThenRenewal(): Promise<void> {
+    expect(chargedPrefixes()).toEqual(['change-charge', 'renewal']);
 
     const renewal = await ds.getRepository(Invoice).findOneByOrFail({
       providerEventId: `renewal:${subscriptionId}:${periodEnd.getTime()}`
     });
 
     expect(renewal).toMatchObject({ billingMode: 'fixed', status: 'paid' });
-    expect(renewal.amountMinor.toNumber()).toBe(99000);
+    expect(renewal.amountMinor.toNumber()).toBe(FIXED_PRICE);
     expect(renewal.periodStart).toEqual(periodEnd);
 
     const current = await row();
@@ -351,18 +319,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     await planChange.changePlan(userId as string, FIXED_KEY);
     await renewals.runDueRenewals();
 
-    await expectSwitchThenFixedRenewal();
-  }, 30000);
-
-  it('a scan during the closing usage charge does not charge the units again', async () => {
-    await build();
-    await seed();
-    gateOn('cancel:', scanPastAnchor);
-
-    await planChange.changePlan(userId as string, FIXED_KEY);
-    await renewals.runDueRenewals();
-
-    await expectSwitchThenFixedRenewal();
+    await expectSwitchThenRenewal();
   }, 30000);
 
   it('a change that reaches its claim after the anchor is refused before any money moves', async () => {
@@ -387,7 +344,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     expect(charges).toHaveLength(0);
     expect(await invoices()).toHaveLength(0);
     expect(await row()).toMatchObject({
-      planKey: USAGE_KEY,
+      planKey: FROM_KEY,
       version: 1,
       planChangeStartedAt: null
     });
@@ -413,8 +370,10 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
       planChange.changePlan(userId as string, FIXED_KEY)
     ).rejects.toMatchObject({ status: 409 });
 
-    // The units are charged once, by the renewal; the proration charge stays
-    // recorded and refundable, as for every guard miss.
+    // The renewal charges the plan the row still carries. Both legs of the
+    // refused change stay recorded, as for every guard miss: the proration
+    // charge, and the refund leg, whose source is the renewal invoice that the
+    // scan paid while the change waited.
     expect(chargedPrefixes()).toEqual(['change-charge', 'renewal']);
     const all = await invoices();
 
@@ -422,11 +381,17 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
       all.map((i) => [i.providerEventId?.split(':')[0], i.status])
     ).toEqual([
       ['change-charge', 'paid'],
-      ['renewal', 'paid']
+      ['renewal', 'paid'],
+      ['change-refund', 'refunded']
     ]);
+    const [, renewal, refund] = all;
+
+    expect(renewal.refundedMinor.toNumber()).toBe(
+      refund.amountMinor.toNumber()
+    );
     const current = await row();
 
-    expect(current).toMatchObject({ planKey: USAGE_KEY, billingMode: 'usage' });
+    expect(current.planKey).toBe(FROM_KEY);
     expect(current.currentPeriodStart).toEqual(periodEnd);
   }, 30000);
 
@@ -451,7 +416,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
       providerEventId: `renewal:${subscriptionId}:${periodEnd.getTime()}`
     });
 
-    expect(renewal.amountMinor.toNumber()).toBe(20000);
+    expect(renewal.amountMinor.toNumber()).toBe(FROM_PRICE);
   }, 30000);
 
   it('a change claims a row whose lease a dead change left behind', async () => {
@@ -484,7 +449,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
 
     await planChange.changePlan(userId as string, FIXED_KEY);
 
-    expect(chargedPrefixes()).toEqual(['change-charge', 'cancel']);
+    expect(chargedPrefixes()).toEqual(['change-charge']);
     expect(await row()).toMatchObject({
       planKey: FIXED_KEY,
       planChangeStartedAt: null

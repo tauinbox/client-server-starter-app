@@ -161,8 +161,7 @@ export function unitsSpentThisMonth(customerId: string): {
   const periodEnd = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
   );
-  // The server sums the ledger; each record with no subscription is one debit
-  // of its quantity.
+  // The server sums the ledger; each record is one debit of its quantity.
   const unitsSpent = getState()
     .billingUsageRecords.values()
     .filter((r) => {
@@ -170,7 +169,6 @@ export function unitsSpentThisMonth(customerId: string): {
 
       return (
         r.customerId === customerId &&
-        r.subscriptionId === null &&
         recordedAt >= periodStart.getTime() &&
         recordedAt < periodEnd.getTime()
       );

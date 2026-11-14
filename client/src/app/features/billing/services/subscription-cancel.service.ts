@@ -18,17 +18,10 @@ export class SubscriptionCancelService {
 
   /** Resolves `true` when the user confirmed and the cancel was scheduled. */
   async confirmAndCancel(): Promise<boolean> {
-    // A metered plan is postpaid: the units of the period being closed are
-    // charged at the boundary, which the generic copy does not say.
-    const messageKey =
-      this.#store.subscription()?.billingMode === 'usage'
-        ? 'billing.settings.cancelMessageUsage'
-        : 'billing.settings.cancelMessage';
-
     const confirmed = await firstValueFrom(
       this.#dialog.openConfirm({
         title: this.#transloco.translate('billing.settings.cancelTitle'),
-        message: this.#transloco.translate(messageKey),
+        message: this.#transloco.translate('billing.settings.cancelMessage'),
         confirmButton: this.#transloco.translate(
           'billing.settings.cancelConfirm'
         ),

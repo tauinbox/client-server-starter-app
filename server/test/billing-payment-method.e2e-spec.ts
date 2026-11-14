@@ -21,13 +21,11 @@ import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
-import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
 import { YooKassaProvider } from '../src/modules/billing/providers/yookassa.provider';
 import { YOOKASSA_CLIENT } from '../src/modules/billing/providers/yookassa.client';
 import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy';
-import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
@@ -384,17 +382,11 @@ describe('Billing payment-method update flow (e2e)', () => {
         },
         RenewalService,
         FixedRating,
-        UsageRating,
         // No prepaid credits in this scenario set — the credits flow has its
         // own coverage in billing-webhook.e2e-spec and the unit specs.
         {
           provide: CreditService,
-          useValue: {
-            availableUnitsForUpdate: jest.fn().mockResolvedValue(0),
-            releaseHolds: jest.fn(),
-            spendOnUsage: jest.fn(),
-            addPurchase: jest.fn()
-          }
+          useValue: { addPurchase: jest.fn() }
         },
         YooKassaProvider,
         { provide: YOOKASSA_CLIENT, useValue: { getPayment, createPayment } },
@@ -417,10 +409,6 @@ describe('Billing payment-method update flow (e2e)', () => {
                   null
               )
           }
-        },
-        {
-          provide: getRepositoryToken(UsageRecord),
-          useValue: { sum: jest.fn().mockResolvedValue(null) }
         },
         {
           provide: getRepositoryToken(WebhookEvent),

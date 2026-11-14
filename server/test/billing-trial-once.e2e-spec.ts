@@ -18,8 +18,6 @@ import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
-import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
-import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
@@ -100,15 +98,7 @@ runWithInfra('One trial for each customer (e2e)', () => {
         },
         {
           provide: CreditService,
-          useValue: {
-            getBalance: () => Promise.resolve(null),
-            releaseHolds: () => Promise.resolve()
-          }
-        },
-        { provide: UsageRating, useValue: { summarizeForPeriod: jest.fn() } },
-        {
-          provide: RenewalService,
-          useValue: { billClosingUsagePeriod: jest.fn() }
+          useValue: { getBalance: () => Promise.resolve(null) }
         },
         {
           provide: MetricsService,

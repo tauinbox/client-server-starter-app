@@ -232,28 +232,6 @@ describe('BillingSettingsComponent', () => {
     expect(text).toContain('$12.00');
   });
 
-  it('prices a usage plan per unit and names the next bill instead of a renewal', async () => {
-    await setup(true, { subscription: { ...activeSub, billingMode: 'usage' } });
-    storeMock.currentPlan.set({
-      ...proPlan,
-      key: 'usage',
-      name: 'Pay as you go',
-      billingMode: 'usage',
-      prices: {
-        paddle: { currency: 'USD', amountMinor: 0, unitPriceMinor: 2 }
-      }
-    });
-    fixture.detectChanges();
-    const meta =
-      (fixture.nativeElement as HTMLElement).querySelector('.plan-meta')
-        ?.textContent ?? '';
-
-    expect(meta).toContain('$0.02');
-    expect(meta).toContain('/ unit');
-    expect(meta).toContain('Next bill');
-    expect(meta).not.toContain('Renews');
-  });
-
   it('shows the region control in the page header', async () => {
     await setup(true);
     storeMock.region.set({
@@ -373,17 +351,6 @@ describe('BillingSettingsComponent', () => {
     await fixture.whenStable();
     expect(dialogMock.openConfirm).toHaveBeenCalled();
     expect(storeMock.cancel).toHaveBeenCalledWith('period_end');
-    expect(dialogMock.openConfirm.mock.calls[0][0].message).not.toContain(
-      'Metered usage'
-    );
-  });
-
-  it('warns that the closing metered period will be charged', async () => {
-    await setup(true, { subscription: { ...activeSub, billingMode: 'usage' } });
-    fixture.componentInstance.onCancel();
-    expect(dialogMock.openConfirm.mock.calls[0][0].message).toContain(
-      'Metered usage recorded so far is charged when the period closes'
-    );
   });
 
   it('opens the change-plan dialog and applies the chosen plan', async () => {

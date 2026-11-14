@@ -1,11 +1,9 @@
 import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { In, IsNull } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
-import { Invoice } from '../entities/invoice.entity';
 import { CreditService, crossesZero } from './credit.service';
 
 type ManagerMock = {
@@ -44,87 +42,9 @@ async function build(balance: Partial<CreditBalance> | null = null) {
 
 describe('CreditService', () => {
   describe('reads', () => {
-    function readManager(balance: Partial<CreditBalance> | null, held = '0') {
-      const qb: Record<
-        'select' | 'where' | 'andWhere' | 'getRawOne',
-        jest.Mock
-      > = {
-        select: jest.fn(() => qb),
-        where: jest.fn(() => qb),
-        andWhere: jest.fn(() => qb),
-        getRawOne: jest.fn().mockResolvedValue({ held })
-      };
-
-      return {
-        findOne: jest.fn().mockResolvedValue(balance),
-        createQueryBuilder: jest.fn(() => qb),
-        qb
-      };
+    function readManager(balance: Partial<CreditBalance> | null) {
+      return { findOne: jest.fn().mockResolvedValue(balance) };
     }
-
-    it('availableUnitsForUpdate locks the balance row and subtracts the units unpaid invoices hold', async () => {
-      const { service } = await build();
-      const manager = readManager({ balanceUnits: Money.fromMinor(120) }, '30');
-
-      await expect(
-        // @ts-expect-error - partial EntityManager mock: uses findOne/createQueryBuilder
-        service.availableUnitsForUpdate(manager, 'cust-1')
-      ).resolves.toBe(90);
-      expect(manager.findOne).toHaveBeenCalledWith(CreditBalance, {
-        where: { customerId: 'cust-1' },
-        lock: { mode: 'pessimistic_write' }
-      });
-      expect(manager.qb.andWhere).toHaveBeenCalledWith(
-        'i.status IN (:...statuses)',
-        { statuses: ['pending', 'failed'] }
-      );
-      expect(manager.qb.andWhere).toHaveBeenCalledWith(
-        'i.creditsReleasedAt IS NULL'
-      );
-    });
-
-    it('availableUnitsForUpdate leaves the re-rated invoice out of its own hold', async () => {
-      const { service } = await build();
-      const manager = readManager({ balanceUnits: Money.fromMinor(120) });
-
-      // @ts-expect-error - partial EntityManager mock: uses findOne/createQueryBuilder
-      await service.availableUnitsForUpdate(manager, 'cust-1', 'inv-1');
-
-      expect(manager.qb.andWhere).toHaveBeenCalledWith(
-        'i.id <> :excludeInvoiceId',
-        { excludeInvoiceId: 'inv-1' }
-      );
-    });
-
-    it('availableUnitsForUpdate offers nothing when the holds take the whole balance', async () => {
-      const { service } = await build();
-      const manager = readManager({ balanceUnits: Money.fromMinor(20) }, '30');
-
-      await expect(
-        // @ts-expect-error - partial EntityManager mock: uses findOne/createQueryBuilder
-        service.availableUnitsForUpdate(manager, 'cust-1')
-      ).resolves.toBe(0);
-    });
-
-    it.each([
-      [
-        'a negative (clawed-back) balance',
-        { balanceUnits: Money.fromMinor(-50) }
-      ],
-      ['a missing balance row', null]
-    ])(
-      'availableUnitsForUpdate offers nothing for %s',
-      async (_name, balance) => {
-        const { service } = await build();
-        const manager = readManager(balance);
-
-        await expect(
-          // @ts-expect-error - partial EntityManager mock: uses findOne/createQueryBuilder
-          service.availableUnitsForUpdate(manager, 'cust-1')
-        ).resolves.toBe(0);
-        expect(manager.createQueryBuilder).not.toHaveBeenCalled();
-      }
-    );
 
     it.each([
       ['a positive balance', { balanceUnits: Money.fromMinor(7) }, 7],
@@ -218,29 +138,6 @@ describe('CreditService', () => {
       });
     });
 
-    it('spendOnUsage applies a negative delta with a usage ledger entry', async () => {
-      const { service, manager } = await build();
-
-      await service.spendOnUsage(
-        // @ts-expect-error - partial EntityManager mock: uses query/create/save
-        manager,
-        { customerId: 'cust-1', invoiceId: 'inv-2' },
-        42
-      );
-
-      expect(manager.query).toHaveBeenCalledWith(expect.any(String), [
-        'cust-1',
-        -42
-      ]);
-      expect(manager.create).toHaveBeenCalledWith(CreditLedger, {
-        customerId: 'cust-1',
-        delta: Money.fromMinor(-42),
-        reason: 'usage',
-        refInvoiceId: 'inv-2',
-        refUsageRecordId: null
-      });
-    });
-
     it('clawbackPurchase applies a refund delta on the caller transaction manager', async () => {
       const { service, manager } = await build();
 
@@ -262,24 +159,6 @@ describe('CreditService', () => {
         refInvoiceId: 'inv-1',
         refUsageRecordId: null
       });
-    });
-
-    it('releaseHolds ends the hold of the unpaid invoices that match', async () => {
-      const { service } = await build();
-      const manager = { update: jest.fn().mockResolvedValue({ affected: 2 }) };
-
-      // @ts-expect-error - partial EntityManager mock: uses update
-      await service.releaseHolds(manager, { subscriptionId: 'sub-1' });
-
-      expect(manager.update).toHaveBeenCalledWith(
-        Invoice,
-        {
-          subscriptionId: 'sub-1',
-          status: In(['pending', 'failed']),
-          creditsReleasedAt: IsNull()
-        },
-        { creditsReleasedAt: expect.any(Function) }
-      );
     });
   });
 });

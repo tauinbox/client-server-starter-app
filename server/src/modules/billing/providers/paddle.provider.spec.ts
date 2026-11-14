@@ -37,7 +37,6 @@ function paddleMock() {
     transactions: { create: jest.fn(), get: jest.fn() },
     subscriptions: {
       cancel: jest.fn(),
-      createOneTimeCharge: jest.fn(),
       update: jest.fn(),
       previewUpdate: jest.fn(),
       getPaymentMethodChangeTransaction: jest.fn()
@@ -269,47 +268,6 @@ describe('PaddleProvider', () => {
         currency: 'USD',
         paidAt: '2026-06-01T00:05:00Z'
       });
-    });
-
-    it('extracts the usage charge key echoed through the price custom data', async () => {
-      const { provider, client } = await build({});
-
-      client!.webhooks.unmarshal.mockResolvedValue({
-        eventId: 'evt_u1',
-        eventType: EventName.TransactionCompleted,
-        data: {
-          ...transactionData,
-          items: [
-            { price: { customData: { usageChargeKey: 'usage:sub-1:123' } } }
-          ]
-        }
-      });
-
-      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
-        'paddle-signature': 'sig'
-      });
-
-      expect(
-        (reducible(result).payload as NormalizedInvoicePayload).usageChargeKey
-      ).toBe('usage:sub-1:123');
-    });
-
-    it('leaves the usage charge key null on ordinary subscription transactions', async () => {
-      const { provider, client } = await build({});
-
-      client!.webhooks.unmarshal.mockResolvedValue({
-        eventId: 'evt_u2',
-        eventType: EventName.TransactionCompleted,
-        data: { ...transactionData, items: [{ price: { customData: null } }] }
-      });
-
-      const result = await provider.verifyAndParseWebhook(Buffer.from('{}'), {
-        'paddle-signature': 'sig'
-      });
-
-      expect(
-        (reducible(result).payload as NormalizedInvoicePayload).usageChargeKey
-      ).toBeNull();
     });
 
     it('ignores a completed payment-method-change transaction (no invoice to reduce)', async () => {
@@ -858,51 +816,6 @@ describe('PaddleProvider', () => {
       const preview = await provider.previewChangePlan('sub_ext', plan);
 
       expect(preview).toEqual({ amountMinor: 0, currency: 'USD' });
-    });
-  });
-
-  describe('chargeUsage', () => {
-    it('posts an immediate one-time charge with the key in the price custom data', async () => {
-      const { provider, client } = await build({});
-
-      await provider.chargeUsage('sub_123', {
-        amountMinor: 8400,
-        currency: 'USD',
-        description: 'Pay as you go: api_calls × 42',
-        chargeKey: 'usage:sub-1:123'
-      });
-
-      expect(client!.subscriptions.createOneTimeCharge).toHaveBeenCalledWith(
-        'sub_123',
-        {
-          effectiveFrom: 'immediately',
-          items: [
-            {
-              quantity: 1,
-              price: {
-                description: 'Pay as you go: api_calls × 42',
-                unitPrice: { amount: '8400', currencyCode: 'USD' },
-                product: { name: 'Metered usage', taxCategory: 'standard' },
-                customData: { usageChargeKey: 'usage:sub-1:123' }
-              }
-            }
-          ]
-        }
-      );
-    });
-
-    it('rejects when Paddle is not configured', async () => {
-      const { provider } = await build({ client: null });
-
-      await expectApiRejection(
-        provider.chargeUsage('sub_123', {
-          amountMinor: 1,
-          currency: 'USD',
-          description: 'usage',
-          chargeKey: 'k'
-        }),
-        ErrorKeys.BILLING.PROVIDER_NOT_CONFIGURED
-      );
     });
   });
 

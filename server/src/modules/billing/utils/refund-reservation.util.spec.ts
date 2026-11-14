@@ -29,7 +29,7 @@ function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides
-  } as Invoice;
+  };
 }
 
 /** Partial EntityManager: the util only reads through findOne and writes through save. */

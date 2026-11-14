@@ -10,8 +10,6 @@ import type { CancelMode } from '@app/shared/types';
 import type { BillingService } from '../billing.service';
 import type { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
-import type { RenewalService } from '../renewals/renewal.service';
-import type { CreditService } from '../services/credit.service';
 import { cancelFields } from './cancel-fields.util';
 import { ApiError } from '../../../common/errors/api-error';
 
@@ -61,8 +59,6 @@ function cancelRefusal(
 export interface CancelSubscriptionDeps {
   subscriptions: Repository<Subscription>;
   billing: BillingService;
-  renewals: RenewalService;
-  credits: CreditService;
   events: EventEmitter2;
 }
 
@@ -79,9 +75,6 @@ export interface CancelSubscriptionDeps {
  * cancel re-runs the whole flow — a second provider call, a second event, and a
  * second audit row — and a `period_end` repeat leaves `canceled` together with
  * `cancelAtPeriodEnd`, a pair no other writer can produce.
- *
- * An immediate cancel ends the credit hold of every unpaid invoice of the
- * subscription, in the transaction of its write.
  */
 export async function cancelOpenSubscription(
   deps: CancelSubscriptionDeps,
@@ -109,13 +102,6 @@ export async function cancelOpenSubscription(
       .cancel(subscription.providerSubscriptionId, mode);
   }
 
-  // Ending a metered period now means its postpaid units are owed now: they are
-  // rated and charged before the row closes. A period-end cancel leaves that to
-  // the renewal scan, which reaches the boundary with the period still open.
-  if (mode === 'immediate') {
-    await deps.renewals.billClosingUsagePeriod(subscription, new Date(), true);
-  }
-
   const fields = cancelFields(mode);
   const predicate =
     mode === 'immediate'
@@ -125,21 +111,7 @@ export async function cancelOpenSubscription(
           status: In([...ENTITLED_SUBSCRIPTION_STATUSES]),
           cancelAtPeriodEnd: false
         };
-  const applied = await deps.subscriptions.manager.transaction(
-    async (manager) => {
-      const update = await manager
-        .withRepository(deps.subscriptions)
-        .update(predicate, fields);
-
-      if (update.affected === 1 && mode === 'immediate') {
-        await deps.credits.releaseHolds(manager, {
-          subscriptionId: subscription.id
-        });
-      }
-
-      return update;
-    }
-  );
+  const applied = await deps.subscriptions.update(predicate, fields);
 
   if (applied.affected !== 1) {
     // A concurrent writer won: name what it did, not what this call wanted.

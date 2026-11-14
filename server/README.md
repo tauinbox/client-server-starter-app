@@ -619,8 +619,8 @@ returns the active plans with the price of each provider.
 are:
 
 - `GET subscription`, `GET invoices` (cursor-paginated) and `GET payment-method`.
-- `GET usage` returns the metered-usage summary of the metered window of the current period for a
-  usage-mode subscription of the caller whose status is in `ENTITLED_SUBSCRIPTION_STATUSES`. `periodStart` is the window start. It returns null for each other condition.
+- `GET usage` returns the credit units that metered uses took in the current calendar month (UTC),
+  from the credit ledger. It returns null for a caller with no billing customer.
 - `POST checkout` makes the local incomplete subscription for the self-managed provider, and then it
   redirects. It reuses an unpaid row that stays from an earlier attempt, through a conditional write
   that matches only while the row is `incomplete`. Thus a first-payment webhook that activates the
@@ -679,9 +679,8 @@ and the usage record checks `create`. No check reads the record, so `Billing` de
   negative, which blocks usage until the customer adds credits. A refund that leaves a remaining
   balance keeps the grant and the credits.
 - `POST usage` is the internal metering ingest. It is idempotent on
-  `(customer_id, idempotency_key)`. The server validates the meter against the plan catalog, and
-  `occurredAt` against the open metered window and the server clock. There is no public meter
-  endpoint.
+  `(customer_id, idempotency_key)`. The server validates the meter against the meter catalog
+  (`METERS`), and `occurredAt` against the server clock. There is no public meter endpoint.
 
 **Services.** `PlanService` supplies `findActive()`.
 
@@ -738,8 +737,7 @@ runs the identical flip, thus exactly one of the two emits `InvoicePaidEvent`. T
 inserts the refund leg and applies the plan. Thus there is no window in which the customer is charged
 and the plan is not applied. Each leg has its own unique `change-charge` or `change-refund` event id.
 
-A switch during a trial moves no plan money; a switch from a usage plan still bills the closing
-window. The route is guarded to the `active` and `trialing` statuses.
+A switch during a trial moves no plan money. The route is guarded to the `active` and `trialing` statuses.
 It refuses a subscription with a scheduled cancel. It requires a price for the same provider.
 
 **`BillingAdminService`** does the cross-customer read, the cancel and the refund.
@@ -808,19 +806,6 @@ when the pay-as-you-go entitlements start or stop. `spentOnMetering` sums the me
 period for `GET /billing/usage`. Thus the exactly-once property rides on the winning `provider_event_id`
 insert.
 
-**`UsageInvoicingService`** invoices a closed usage period of a provider-managed (Paddle)
-subscription. The billing is postpaid.
-
-The service reads and rates the prepaid credit balance under a `FOR UPDATE` row lock. Thus two
-concurrent closes for the same customer serialize, and they never apply the credits two times.
-
-It plants a pending Invoice, keyed by the unique value `usage:{subscriptionId}:{periodEnd}`, BEFORE
-it posts the charge to the provider. It spends the applied credits in the same transaction. Thus a
-close that races or replays loses the insert, and it never charges twice or spends twice.
-
-A net charge of zero settles as a paid zero invoice with no call to the provider. That occurs when
-there is no usage, or when the credits cover all of it.
-
 **Entities.** The module has 11 entities: `Plan`, `Customer`, `CustomerGrant`, `CreditBalance`,
 `CreditLedger`, `PaymentMethod`, `Product`, `Subscription`, `Invoice`, `UsageRecord` and
 `WebhookEvent`. Each one has an entity-contract file and serialization specs.
@@ -857,8 +842,7 @@ verify, and the answer is a 400.
 `PaddleProvider` is the true Paddle client:
 
 - `verifyAndParseWebhook` uses `webhooks.unmarshal` for the HMAC verification, and it makes a
-  `NormalizedEvent` object. The event includes the usage charge key, which travels through the price
-  custom data. A subscription event and a one-time transaction carry the paid `items[].price.id`
+  `NormalizedEvent` object. A subscription event and a one-time transaction carry the paid `items[].price.id`
   values as `providerPriceIds`. The reducer finds the plan or the product from them, never from the
   transaction custom data, which a Paddle.js checkout in the browser can set.
 - `startCheckout` creates a transaction whose `checkout.url` is `/billing/success`. Paddle adds
@@ -866,7 +850,6 @@ verify, and the answer is a 400.
 - `clientConfig` gives the public values of Paddle.js to `GET /api/v1/billing/paddle-config`: the
   `PADDLE_CLIENT_TOKEN` and the `PADDLE_ENVIRONMENT`. The token is null while the server has no
   Paddle client.
-- `chargeUsage` calls `createOneTimeCharge` at the cycle boundary.
 - `createOneTimePayment` calls `transactions.create`. It uses the catalog `paddlePriceId`, or an
   inline non-catalog price for a custom amount. The one-time marker goes into the custom data of the
   transaction. For a custom amount, the `productId` goes into the custom data of the inline price.
@@ -887,9 +870,10 @@ one Paddle account, thus `billing-plans.seeder.ts` and `billing-products.seeder.
 Before you turn Paddle on, create the prices in the Paddle dashboard and write their ids into the
 database:
 
-- each active paid plan, the usage plan included: `plans.prices -> paddle -> providerPriceId`.
-  The checkout and the change-plan dialog offer every active paid plan, and the server asks Paddle
-  for the price of the target plan. For the base of the usage plan, create a recurring price of 0.
+- each active fixed plan: `plans.prices -> paddle -> providerPriceId`.
+  The checkout and the change-plan dialog offer every active fixed plan, and the server asks Paddle
+  for the price of the target plan. The `usage` plan needs no price id: pay as you go is a credit
+  pack, and checkout and plan change refuse the plan (`errors.billing.payAsYouGoIsPrepaid`).
   Free needs no price id: it is the absence of a subscription, so checkout and plan change refuse
   it (`errors.billing.freePlanNotPurchasable`), and a subscriber returns to it through a cancel;
 - each `sku` and `credits` product: `billing_products.prices -> paddle -> paddlePriceId`.
@@ -957,20 +941,11 @@ images from `cdn.paddle.com` and `sandbox-cdn.paddle.com`, and the checkout fram
 `paddle.client.ts` and `yookassa.client.ts` build each SDK from the environment. Each one returns
 null when the provider is not configured.
 
-**Rating.** The directory holds the `RatedAmount` and `BillingPeriod` types, `FixedRating`,
-`UsageRating` and `ProrationCalculator`.
+**Rating.** The directory holds the `RatedAmount` and `BillingPeriod` types, `FixedRating` and
+`ProrationCalculator`.
 
-`FixedRating` uses the plan price.
-
-`UsageRating` sums the `UsageRecord` rows that carry the `meter_key` of the plan, with `occurred_at`
-inside the period. A foreign meter belongs to another product, thus the rating never prices it at the
-rate of this plan. A plan with no `meter_key` rates to zero. The strategy charges the overage above
-`includedUnits` at `unitPriceMinor`.
-
-`summarizeForPeriodWithCredits()` supports the
-usage invoicing of the two providers. The prepaid credits offset the billable units one for one
-before the pricing step, and the caller deducts the applied units. The arithmetic is `rateUsage` in
-`shared/src/utils/billing-rules.ts`, which the mock server also calls.
+`FixedRating` uses the plan price. No class rates usage: a metered use is a prepaid debit
+(`MeteringService.consume`).
 
 `ProrationCalculator` computes the split of a self-managed plan change. It uses a whole-day
 remainder. It refunds the old plan and charges the new plan, as in section 17.4 of the billing
@@ -980,11 +955,10 @@ mock server also calls.
 **Renewals.** `RenewalService` is the renewal loop of the self-managed (YooKassa) provider. Section 8
 of the billing design describes it.
 
-The scan covers the subscriptions of the two rating modes. It skips a subscription whose owning user
-is soft-deleted, and it joins `billing_customers` to `users` for that check.
+The scan skips a subscription whose owning user is soft-deleted, and it joins `billing_customers`
+to `users` for that check.
 
-A fixed plan prepays the next period. A usage plan postpays the period that closes. The rating covers
-`[currentPeriodStart, anchor)` and applies the prepaid credits first. The invoice covers that period.
+A renewal prepays the next period, and the invoice covers that period.
 
 A net charge of zero advances the period with a zero invoice and no call to the provider. The service
 decides this only after two steps: it inspects the invoice that the period already recorded, and it
@@ -1018,31 +992,14 @@ invoice stays recorded and refundable, and the service logs the blocked advance 
 `cancel_at_period_end` is intentionally outside the predicate, thus the period that the customer paid
 for still opens.
 
-A **usage** subscription with `cancel_at_period_end` that reaches its boundary rates and charges the
-metered period that it closes. It uses the same renewal key. The invoice and the cancel CAS commit in
-one transaction, and the period does NOT advance.
+A subscription with `cancel_at_period_end` that reaches its boundary is canceled with no charge: the
+period that closes was prepaid. The period does NOT advance.
 
-`billClosingUsagePeriod()` does the same for an immediate cancel and for a switch from a usage plan
-to a fixed plan, over `[windowStart, now)`, under the key `cancel:{subId}:{windowStartMs}`. Neither
-path walks dunning. Thus a decline books the window as `failed` and the cancellation or the switch
-still completes.
+A self-managed plan change after the renewal anchor (`trial_end` for a trial, else
+`current_period_end`) gets `409` until the scan renews the period.
 
-An immediate cancel after the renewal anchor (`trial_end` for a trial, else `current_period_end`)
-races the renewal scan for the same units. Thus it splits the window at the anchor: it charges
-`[windowStart, anchor)` under the renewal key `renewal:{subId}:{anchorMs}`, and `[anchor, now)` under
-`cancel:{subId}:{anchorMs}`. The invoice insert and the provider `Idempotence-Key` then collapse the
-two charges of the due part into one. A switch does not split, because the next fixed renewal needs
-the renewal key. Instead, a self-managed plan change after the anchor gets `409` until the scan
-renews the period.
-
-Every usage rating reads the metered window `[max(current_period_start, metered_from), end)`
-(`meteredWindowStart` in `shared/src/utils/billing-rules.ts`). A switch of billing mode sets `metered_from` to the
-moment of the switch, and a new period resets it to NULL. Thus a usage plan never rates the units
-that a fixed plan already covered, and a switch away from usage bills its units at the switch. On
-Paddle that switch emits `UsagePeriodClosedEvent` with the outgoing `planKey`. When Paddle applies a
-switch that the local write did not record, the webhook snapshot writes the new `billing_mode` and
-`metered_from`, and closes the usage window. The local write also compares `billing_mode`, thus a
-webhook that applied the switch first makes it answer 409 and the units bill once.
+When Paddle applies a switch that the local write did not record, the webhook snapshot writes the
+new `plan_key` and its `billing_mode`.
 
 The service advances the period and converts a trial. The new boundary is
 `nextPeriodEnd(billing_anchor_at, boundary, interval)`. That helper steps one interval and restores
@@ -1109,16 +1066,6 @@ second tab, a plan that a later checkout replaced, a cancelled row) emits
 A `payment_method.updated` event comes from a method-update re-bind. It changes the default card. The
 old method is demoted and kept for the history. The autopay pointer of the customer and the open
 subscription move to the new row. There is no invoice and no status change.
-
-For a provider-managed usage subscription, the reducer detects the period rollover. The incoming
-snapshot starts at or after the stored boundary. It emits `UsagePeriodClosed` after the commit.
-
-A `subscription.canceled` event closes the open metered period in the same way. The boundary comes
-from the STORED row, and not from the notification or from the wall clock. Thus a replayed delivery
-keys the same invoice instead of a second charge, and a true rollover for that boundary does nothing.
-
-A paid or failed webhook that carries the usage charge key settles or fails the matching pending
-usage invoice. It does not insert a new row.
 
 A webhook that carries an off-session charge key never inserts a row, because the core already
 recorded that invoice:
@@ -2093,7 +2040,7 @@ a currency with zero decimals and a currency with three decimals correctly.
 | `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `meter_key` (for usage), `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, unitPriceMinor?, includedUnits?, providerPriceId? }` for each provider. Paddle needs `providerPriceId`, and the seeder does not write it (refer to the Paddle price ids note under Billing) |
 | `billing_customers` | UUID PK, `user_id` (unique FK to `users`, CASCADE), `provider`, `provider_override` (the manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to `billing_payment_methods`, SET NULL), `trial_used_at` (nullable, the first move of a subscription to `trialing`; one trial for each customer) |
 | `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default`. A partial unique index on `customer_id WHERE is_default` permits a maximum of one default for each customer |
-| `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`. Also `lifecycle_owner` (`provider` or `self`), the bounds of the current period, `billing_anchor_at`, `metered_from`, `cancel_at_period_end`, `trial_end`, `provider_subscription_id` and `payment_method_id` (FK, SET NULL). `billing_anchor_at` is nullable. It is the billing day that each self-managed boundary returns to, thus a February clamp cannot move a month-end customer backwards. A provider-managed row keeps it NULL. `metered_from` is nullable. It is the start of the metered window after a switch of billing mode, and a new period resets it |
+| `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`. Also `lifecycle_owner` (`provider` or `self`), the bounds of the current period, `billing_anchor_at`, `cancel_at_period_end`, `trial_end`, `provider_subscription_id` and `payment_method_id` (FK, SET NULL). `billing_anchor_at` is nullable. It is the billing day that each self-managed boundary returns to, thus a February clamp cannot move a month-end customer backwards. A provider-managed row keeps it NULL |
 | `billing_invoices` | UUID PK, `customer_id` (FK, RESTRICT), `subscription_id` (FK, SET NULL), `provider`. The FK to the customer uses RESTRICT, because a financial record must survive the deletion of a customer. Also `provider_event_id` (unique, for the webhook idempotency), `provider_invoice_ref`, `amount_minor`, `refunded_minor`, `currency`, `status` and `billing_mode`. Also `kind` (`subscription` or `one_time`) and `product_id` (FK to `billing_products`, SET NULL), which a one-time purchase uses. Also the period bounds, `paid_at` and `receipt_ref` (54-FZ). `refunded_minor` holds the cumulative refunded units. A refund is full when `refunded_minor` is equal to `amount_minor`, and partial when it is less. `@Exclude` keeps it off the wire |
 | `billing_products` | UUID PK, unique `key`, `name`, description, `type` (`sku`, `credits` or `custom`), `prices jsonb`, `grant jsonb`, `active`. A fixed price holds `{ currency, amountMinor?, paddlePriceId? }` for each provider. A custom price holds `{ currency, minAmountMinor, maxAmountMinor }`. The grant holds `{ credits }` or `{ entitlement, durationDays? }`, and it is null for a custom product |
 | `billing_customer_grants` | UUID PK, `customer_id` (FK, CASCADE, indexed), `entitlement`, `source_invoice_id` (FK to `billing_invoices`, CASCADE, for the idempotency and the refund revocation), `expires_at`, `revoked_at` |

@@ -42,7 +42,6 @@ import type {
   OneTimePaymentSession,
   PaymentProvider,
   WebhookIgnored,
-  UsageCharge,
   WebhookVerificationResult
 } from './payment-provider.interface';
 
@@ -81,22 +80,6 @@ function mapSubscriptionStatus(status: string): SubscriptionStatus {
     default:
       return 'incomplete';
   }
-}
-
-/**
- * Reads the postpaid usage-charge key our `chargeUsage` planted in the
- * non-catalog price's custom data, echoed back on the charge's transaction.
- */
-function usageChargeKeyFrom(txn: TransactionNotification): string | null {
-  for (const item of txn.items ?? []) {
-    const key: unknown = item.price?.customData?.['usageChargeKey'];
-
-    if (typeof key === 'string') {
-      return key;
-    }
-  }
-
-  return null;
 }
 
 /** Reads the one-time purchase marker echoed via custom data. */
@@ -260,7 +243,7 @@ export class PaddleProvider implements PaymentProvider {
 
   chargeOffSession(): Promise<ChargeResult> {
     // Paddle owns renewals; off-session charging is the self-managed (YooKassa)
-    // path. Paddle usage is charged via chargeUsage (createOneTimeCharge).
+    // path.
     // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
     throw new NotImplementedException(
       'PaddleProvider.chargeOffSession is not applicable (provider-managed lifecycle)'
@@ -281,38 +264,6 @@ export class PaddleProvider implements PaymentProvider {
     throw new NotImplementedException(
       'PaddleProvider.getOffSessionCharge is not applicable (provider-managed lifecycle)'
     );
-  }
-
-  /**
-   * Posts the period's usage total as a one-time charge on the subscription
-   * (postpaid at the billing-cycle boundary, no Paddle
-   * metering). The price is non-catalog with the charge key in its custom
-   * data; the resulting `transaction.completed` webhook carries it back so the
-   * reducer reconciles the pending usage invoice.
-   */
-  async chargeUsage(
-    providerSubscriptionId: string,
-    { amountMinor, currency, description, chargeKey }: UsageCharge
-  ): Promise<void> {
-    const paddle = this.requireClient();
-
-    await paddle.subscriptions.createOneTimeCharge(providerSubscriptionId, {
-      effectiveFrom: 'immediately',
-      items: [
-        {
-          quantity: 1,
-          price: {
-            description,
-            unitPrice: {
-              amount: String(amountMinor),
-              currencyCode: currency as CurrencyCode
-            },
-            product: { name: 'Metered usage', taxCategory: 'standard' },
-            customData: { usageChargeKey: chargeKey }
-          }
-        }
-      ]
-    });
   }
 
   /** The new plan's Paddle catalog price id — required for update/preview. */
@@ -620,8 +571,7 @@ export class PaddleProvider implements PaymentProvider {
 
         const payload: NormalizedPaymentFailedPayload = {
           ref: refFromCustomData(txn.customData),
-          providerSubscriptionId: txn.subscriptionId,
-          usageChargeKey: usageChargeKeyFrom(txn)
+          providerSubscriptionId: txn.subscriptionId
         };
 
         return { ...base, type: 'payment.failed', payload };
@@ -660,7 +610,6 @@ export class PaddleProvider implements PaymentProvider {
       periodStart: txn.billingPeriod?.startsAt ?? null,
       periodEnd: txn.billingPeriod?.endsAt ?? null,
       paidAt: txn.billedAt,
-      usageChargeKey: usageChargeKeyFrom(txn),
       ...(isOneTime(txn.customData)
         ? {
             kind: 'one_time',

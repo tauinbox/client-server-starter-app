@@ -16,10 +16,7 @@ import {
   Repository
 } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
-import {
-  meteredWindowStart,
-  renewalAnchor
-} from '@app/shared/utils/billing-rules';
+import { renewalAnchor } from '@app/shared/utils/billing-rules';
 import {
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ErrorKeys,
@@ -32,11 +29,7 @@ import { Customer } from '../entities/customer.entity';
 import { Invoice, UNPAID_INVOICE_STATUSES } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
-import {
-  InvoicePaidEvent,
-  PlanChangedEvent,
-  UsagePeriodClosedEvent
-} from '../events/billing.events';
+import { InvoicePaidEvent, PlanChangedEvent } from '../events/billing.events';
 import { ChargeDeclinedError } from '../providers/payment-provider.interface';
 import type {
   ChargeResult,
@@ -67,7 +60,6 @@ import {
   reserveRefund
 } from '../utils/refund-reservation.util';
 import { PLAN_CHANGE_LEASE_MS } from '../renewals/renewal-queue.constants';
-import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 
 /** Everything a plan change / proration preview operates on. */
@@ -79,14 +71,6 @@ interface ChangeContext {
   /** The price of `toPlan` for the provider of the subscription. */
   toPrice: PlanPrice;
   provider: PaymentProvider;
-}
-
-/** A switch from a usage plan to a fixed one ends the metered window. */
-function closesMeteredWindow(
-  subscription: Subscription,
-  toPlan: Plan
-): boolean {
-  return subscription.billingMode === 'usage' && toPlan.billingMode !== 'usage';
 }
 
 /**
@@ -112,7 +96,6 @@ export class PlanChangeService {
     private readonly plans: Repository<Plan>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly billing: BillingService,
-    private readonly renewals: RenewalService,
     private readonly proration: ProrationCalculator,
     private readonly events: EventEmitter2
   ) {}
@@ -129,16 +112,10 @@ export class PlanChangeService {
    * fiscal document and its own local invoice row. A refund failure after a
    * successful charge is logged and the switch proceeds - the admin console can
    * re-issue the refund, while reverting would double-tangle the money.
-   *
-   * A switch of billing mode starts a new metered window at the switch, on both
-   * providers. A switch from a usage plan bills the units of the closing window
-   * under the outgoing plan; a switch to one never rates the units consumed on
-   * the fixed plan before it.
    */
   async changePlan(userId: string, planKey: string): Promise<Subscription> {
     const ctx = await this.resolveChangeContext(userId, planKey);
     const { customer, subscription, fromPlan, toPlan, provider } = ctx;
-    const now = new Date();
 
     if (provider.managesLifecycle) {
       const { providerSubscriptionId } = subscription;
@@ -151,7 +128,7 @@ export class PlanChangeService {
       return this.whileClaimed(subscription, async () => {
         await provider.changePlan(providerSubscriptionId, customer, toPlan);
 
-        return this.applyPlanChange(ctx, now);
+        return this.applyPlanChange(ctx);
       });
     }
 
@@ -165,14 +142,14 @@ export class PlanChangeService {
             provider: provider.id,
             periodStart: subscription.currentPeriodStart,
             periodEnd: subscription.currentPeriodEnd,
-            now
+            now: new Date()
           });
 
     // Claim the change before any money moves: a concurrent change or a
     // renewal scan is kept off the row until it is released, so the provider
     // is never asked for a second, conflicting charge.
     return this.whileClaimed(subscription, () =>
-      this.applySelfManagedChange(ctx, quote, now)
+      this.applySelfManagedChange(ctx, quote)
     );
   }
 
@@ -182,8 +159,7 @@ export class PlanChangeService {
    */
   private async applySelfManagedChange(
     ctx: ChangeContext,
-    quote: ProrationQuote | null,
-    now: Date
+    quote: ProrationQuote | null
   ): Promise<Subscription> {
     const { customer, subscription, fromPlan, toPlan, provider } = ctx;
     const seq = subscription.planChangeSeq;
@@ -233,18 +209,6 @@ export class PlanChangeService {
         chargeCaptured = charge.status === 'captured';
         await this.recordChargeRef(chargeKey, chargeRef);
       }
-    }
-
-    // The fixed plan must not absorb units metered before the switch: they are
-    // billed now under the outgoing plan. The window moves in its own write, so
-    // a guard miss below cannot leave the billed units for the renewal to bill
-    // again.
-    if (closesMeteredWindow(subscription, toPlan)) {
-      await this.renewals.billClosingUsagePeriod(subscription, now);
-      await this.subscriptions.update(
-        { id: subscription.id },
-        { meteredFrom: now }
-      );
     }
 
     // Reserved after the charge, since a charge failure aborts the switch and
@@ -313,10 +277,11 @@ export class PlanChangeService {
           }
         }
 
-        const saved = await this.commitPlanChange(manager, subscription, {
-          toPlan,
-          now
-        });
+        const saved = await this.commitPlanChange(
+          manager,
+          subscription,
+          toPlan
+        );
 
         return { saved, chargeSettled };
       }
@@ -407,19 +372,17 @@ export class PlanChangeService {
    * like the one the change was claimed against. The entity was loaded before
    * the provider round-trip, so committing it whole would write back every
    * column as it looked then - reverting whatever landed during that window (a
-   * cancellation, a dunning write, a period advance, or a mode switch that the
-   * provider's webhook already applied and closed the window for). A switch of
-   * billing mode also starts a new metered window at `now`. A self-managed
-   * period that a renewal advanced past an expired lease is not the one the
-   * switch priced. Returns the re-read row, or `null` when the guard missed
-   * and the caller must refuse the switch.
+   * cancellation, a dunning write, a period advance, or a switch that the
+   * provider's webhook already applied). A self-managed period that a renewal
+   * advanced past an expired lease is not the one the switch priced. Returns
+   * the re-read row, or `null` when the guard missed and the caller must
+   * refuse the switch.
    */
   private async commitPlanChange(
     manager: EntityManager,
     subscription: Subscription,
-    { toPlan, now }: { toPlan: Plan; now: Date }
+    toPlan: Plan
   ): Promise<Subscription | null> {
-    const modeChanges = toPlan.billingMode !== subscription.billingMode;
     const applied = await manager.update(
       Subscription,
       {
@@ -435,8 +398,7 @@ export class PlanChangeService {
       {
         planKey: toPlan.key,
         billingMode: toPlan.billingMode,
-        planChangeSeq: () => 'plan_change_seq + 1',
-        ...(modeChanges ? { meteredFrom: now } : {})
+        planChangeSeq: () => 'plan_change_seq + 1'
       }
     );
 
@@ -444,10 +406,6 @@ export class PlanChangeService {
 
     subscription.planKey = toPlan.key;
     subscription.billingMode = toPlan.billingMode;
-
-    if (modeChanges) {
-      subscription.meteredFrom = now;
-    }
 
     const fresh = await manager.findOne(Subscription, {
       where: { id: subscription.id }
@@ -512,8 +470,7 @@ export class PlanChangeService {
 
   /**
    * A self-managed period past its due moment belongs to the renewal scan: a
-   * switch now races that charge, or bills usage for time the next fixed
-   * period also prepays.
+   * switch now races that charge.
    */
   private assertBeforeRenewal(subscription: Subscription, at: Date): void {
     if (
@@ -744,8 +701,7 @@ export class PlanChangeService {
   /**
    * Reserves the refund leg of a self-managed switch against the invoice that
    * paid for the outgoing plan's current coverage, capped by what is still
-   * unrefunded on it (no source, or nothing left -> no refund, e.g. a period
-   * opened by a zero usage invoice).
+   * unrefunded on it (no source, or nothing left -> no refund).
    *
    * The cap is applied and committed under the row lock, before the provider
    * call, so an admin refund of the same invoice either loses the race and
@@ -844,21 +800,13 @@ export class PlanChangeService {
    * Persists the new plan on the local row and publishes the change. A row that
    * moved while the provider was applying the change is left alone: the
    * provider's own webhook reconciles the local row from its snapshot.
-   *
-   * A switch from a usage plan closes its metered window here. The listener
-   * runs after this commit, so the event names the outgoing plan to rate under.
    */
-  private async applyPlanChange(
-    ctx: ChangeContext,
-    now: Date
-  ): Promise<Subscription> {
+  private async applyPlanChange(ctx: ChangeContext): Promise<Subscription> {
     const { customer, subscription, fromPlan, toPlan } = ctx;
-    const closesWindow = closesMeteredWindow(subscription, toPlan);
-    const windowStart = meteredWindowStart(subscription);
     const saved = await this.commitPlanChange(
       this.dataSource.manager,
       subscription,
-      { toPlan, now }
+      toPlan
     );
 
     if (!saved) {
@@ -873,19 +821,6 @@ export class PlanChangeService {
       new PlanChangedEvent(customer.userId, saved.id, fromPlan.key, toPlan.key)
     );
 
-    if (closesWindow) {
-      this.events.emit(
-        UsagePeriodClosedEvent.name,
-        new UsagePeriodClosedEvent(
-          customer.userId,
-          saved.id,
-          windowStart,
-          now,
-          fromPlan.key
-        )
-      );
-    }
-
     return saved;
   }
 
@@ -898,7 +833,7 @@ export class PlanChangeService {
    * unrecorded charge is not even refundable through the admin console (that
    * route is addressed by invoice id).
    *
-   * Same construction as the usage close (`UsageInvoicingService`): the row
+   * The row
    * carries no provider ref yet - `recordChargeRef` writes the real one the
    * moment the provider answers - and a replayed change loses the `orIgnore`
    * insert and reuses the row already under the key. `paidRef` is the provider
