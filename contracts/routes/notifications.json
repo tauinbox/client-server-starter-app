@@ -2,6 +2,45 @@
   "routes": [
     {
       "method": "GET",
+      "path": "/api/v1/notifications",
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications/unread-count",
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/notifications/1/read",
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/notifications/stream",
       "expectedStatus": 401,
       "policy": {

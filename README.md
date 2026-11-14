@@ -1035,7 +1035,8 @@ fullstack-starter-app/
 │   │   │   ├── auth/           # JWT + refresh token auth, lockout, verification, reset, permissions endpoint
 │   │   ├── mail/           # Email delivery (nodemailer, console/SMTP transports)
 │   │   ├── users/          # User CRUD
-│   │   ├── notifications/  # SSE push: NotificationsService, NotificationsListener, NotificationsController
+│   │   ├── notifications/  # SSE push: NotificationsService, NotificationsListener, NotificationsController;
+│   │   │                   # stored notices: UserNotificationsService, UserNotification entity
 │   │   └── roles/          # RBAC: Role/Permission/RolePermission entities, RolesController, PermissionsGuard
 │   ├── src/common/
 │   │   ├── dtos/           # CursorPaginationQueryDto, CursorPaginatedResponseDto<T>, EntityCursorQueryDto
@@ -1665,7 +1666,10 @@ The base URL of the API is `/api/v1`.
 | DELETE | `/roles/:id/permissions/:permId` | `roles:update` | Remove a permission from a role. Answers 404 when the role does not hold the permission |
 | POST | `/roles/assign/:userId` | `roles:assign` | Assign a role to a user. Answers 404 when the user is unknown or soft-deleted |
 | DELETE | `/roles/assign/:userId/:roleId` | `roles:assign` | Remove a role from a user. Answers 404 when the user is unknown or soft-deleted, or does not hold the role |
-| GET | `/notifications/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events` and `user_list_stale`. `user_crud_events` goes only to a client whose `users:search` covers the changed user; `user_list_stale` goes to each client that may search users. One user can hold at most 10 open streams; the next one gets 429 |
+| GET | `/notifications/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events`, `user_list_stale` and `notification_created`. `user_crud_events` goes only to a client whose `users:search` covers the changed user; `user_list_stale` goes to each client that may search users. One user can hold at most 10 open streams; the next one gets 429 |
+| GET | `/notifications` | Bearer | The caller's stored billing notices, newest first, cursor paginated |
+| GET | `/notifications/unread-count` | Bearer | `{ unread }`, the number of the caller's unread notices |
+| POST | `/notifications/:id/read` | Bearer | Mark one notice of the caller as read (204). A notice of another user answers 404 `errors.notifications.notFound` |
 | GET | `/rbac/resources` | `permissions:read` | List each resource, ordered by name. The user permissions page reads the display names from it |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 422 for an action that the code does not check |
 | POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. Answers 409 when no controller registers it |
@@ -1950,11 +1954,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3253 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 955 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 933 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1760 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 348 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1465 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3283 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 967 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 945 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1774 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 350 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1471 tests pass |
 
 ## CI/CD
 

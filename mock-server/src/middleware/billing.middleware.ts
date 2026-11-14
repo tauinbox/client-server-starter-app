@@ -52,6 +52,13 @@ import {
   notifyEntitlementsChanged
 } from '../helpers/billing-settle.helpers';
 import {
+  noticeCancelScheduled,
+  noticeCanceled,
+  noticeCreditBalanceCrossed,
+  noticeInvoicePaid,
+  noticeRefundIssued
+} from '../helpers/billing-notices.helpers';
+import {
   consumeCredits,
   subscriptionPlan,
   unitsSpentThisMonth
@@ -674,6 +681,7 @@ billingRouter.delete(
         sub.cancelAtPeriodEnd = true;
         sub.updatedAt = nowIso;
         cancelScheduled = true;
+        noticeCancelScheduled(sub);
       }
     }
 
@@ -1247,8 +1255,10 @@ billingRouter.post(
       // excludes its charge row by id instead).
       const { source, refundMinor } = prorationRefund(sub, quote.refundMinor);
 
+      let charge: MockInvoice | null = null;
+
       if (quote.chargeMinor > 0) {
-        const charge: MockInvoice = {
+        charge = {
           id: randomUUID(),
           customerId: customer.id,
           subscriptionId: sub.id,
@@ -1301,7 +1311,12 @@ billingRouter.post(
           source.status = 'refunded';
           source.updatedAt = nowIso;
         }
+
+        noticeRefundIssued(source, refundMinor);
       }
+
+      // The server announces the charge after the refund leg.
+      if (charge) noticeInvoicePaid(charge);
     }
 
     sub.planKey = toPlan.key;
@@ -1403,6 +1418,9 @@ function cancelOpenSubscription(
     return false;
   }
 
+  // An unpaid `incomplete` row ends no access, so it gets no notice of an end.
+  const endedAccess = ENTITLED_SUBSCRIPTION_STATUSES.includes(sub.status);
+
   if (mode === 'immediate') {
     sub.status = 'canceled';
     sub.cancelAtPeriodEnd = false;
@@ -1413,8 +1431,14 @@ function cancelOpenSubscription(
   sub.updatedAt = new Date().toISOString();
 
   // Only an immediate cancel revokes access now; a period-end cancel leaves
-  // entitlements untouched until the boundary, so it pushes nothing.
-  if (mode === 'immediate') notifyEntitlementsChanged(sub.customerId);
+  // entitlements untouched until the boundary and only tells the last day.
+  if (mode === 'immediate') {
+    notifyEntitlementsChanged(sub.customerId);
+
+    if (endedAccess) noticeCanceled(sub);
+  } else {
+    noticeCancelScheduled(sub);
+  }
 
   return true;
 }
@@ -1685,7 +1709,10 @@ function revokeOneTimeEffects(invoice: MockInvoice): void {
   const change = applyCreditDelta(invoice.customerId, -product.grant.credits);
 
   // The server emits CreditBalanceCrossedEvent here.
-  if (crossesZero(change)) notifyEntitlementsChanged(invoice.customerId);
+  if (crossesZero(change)) {
+    notifyEntitlementsChanged(invoice.customerId);
+    noticeCreditBalanceCrossed(invoice.customerId, change.after);
+  }
 }
 
 billingAdminRouter.post(
@@ -1750,6 +1777,9 @@ billingAdminRouter.post(
     const cumulativeRefunded = alreadyRefunded + refundAmount;
 
     invoice.refundedMinor = cumulativeRefunded;
+    // The server tells the user once the provider accepted the refund, before
+    // the status flip below.
+    noticeRefundIssued(invoice, refundAmount);
 
     if (cumulativeRefunded >= invoice.amountMinor) {
       invoice.status = 'refunded';

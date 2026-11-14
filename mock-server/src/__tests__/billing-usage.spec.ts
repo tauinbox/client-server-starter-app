@@ -269,10 +269,15 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     expect(push).not.toHaveBeenCalled();
 
     await postUsage(token, use(customerId, { idempotencyKey: 'evt-2' }));
-    expect(push).toHaveBeenCalledTimes(1);
-    expect(push).toHaveBeenCalledWith(userId, {
-      type: 'entitlements_updated'
-    });
+    // The crossing drops the entitlements and stores the empty-balance notice.
+    expect(push.mock.calls).toEqual([
+      [userId, { type: 'entitlements_updated' }],
+      [userId, { type: 'notification_created' }]
+    ]);
+    // The fixture paid for a subscription first, which stored its own notice.
+    expect(
+      [...getState().userNotifications.values()].map(({ kind }) => kind).at(-1)
+    ).toBe('credit_balance_depleted');
     push.mockRestore();
   });
 

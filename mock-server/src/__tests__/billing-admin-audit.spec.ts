@@ -207,13 +207,33 @@ describe('admin billing mutations write audit entries', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(push).toHaveBeenCalledTimes(1);
-      expect(push).toHaveBeenCalledWith(userId, {
-        type: 'entitlements_updated'
-      });
+      // One entitlement drop, then the stored notice of the end.
+      expect(push.mock.calls).toEqual([
+        [userId, { type: 'entitlements_updated' }],
+        [userId, { type: 'notification_created' }]
+      ]);
     } finally {
       push.mockRestore();
     }
+  });
+
+  it('stores no end notice for the immediate cancel of an unpaid checkout', async () => {
+    const { token, userId } = await loginAdmin();
+    const { subscriptionId } = await activateSubscription(userId, 'incomplete');
+    const before = getState().userNotifications.size;
+
+    const res = await post(
+      token,
+      `/admin/billing/subscriptions/${subscriptionId}/cancel`,
+      { mode: 'immediate' }
+    );
+
+    expect(res.status).toBe(200);
+    expect(
+      [...getState().userNotifications.values()]
+        .slice(before)
+        .map(({ kind }) => kind)
+    ).toEqual([]);
   });
 
   it('audits a refund with the requested amount', async () => {

@@ -1,0 +1,65 @@
+<mat-card *transloco="let t; scope: 'billing'" class="notifications-card">
+  <mat-card-header>
+    <mat-card-title>{{ t('billing.notifications.title') }}</mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    @let list = rows();
+
+    @if (loading() && list.length === 0) {
+      <nxs-list-skeleton [cells]="skeletonCells" />
+    } @else if (list.length === 0) {
+      <nxs-list-empty
+        icon="notifications_none"
+        [message]="t('billing.notifications.empty')"
+      />
+    } @else {
+      <ul class="notice-list">
+        @for (row of list; track row.notice.id) {
+          @let unread = row.notice.readAt === null;
+          <li class="notice" [class.unread]="unread">
+            <mat-icon class="notice-icon" aria-hidden="true">{{
+              row.icon
+            }}</mat-icon>
+            <div class="notice-body">
+              <p class="notice-text">
+                {{ t('billing.notifications.kind.' + row.textKey, row.params) }}
+              </p>
+              <time class="notice-time" [attr.datetime]="row.notice.createdAt">
+                {{ row.notice.createdAt | localizedDate: 'short' }}
+              </time>
+            </div>
+            @if (unread) {
+              <button
+                matIconButton
+                class="notice-action"
+                [matTooltip]="t('billing.notifications.markRead')"
+                [attr.aria-label]="t('billing.notifications.markRead')"
+                (click)="markRead(row.notice.id)"
+              >
+                <mat-icon>done</mat-icon>
+              </button>
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    <div
+      class="scroll-sentinel"
+      nxsInfiniteScroll
+      [hasMore]="hasMore()"
+      [busy]="busy()"
+      (loadMore)="loadMore()"
+    ></div>
+
+    @if (isLoadingMore()) {
+      <div class="load-more-container">
+        <mat-spinner
+          [attr.aria-label]="t('common.loading')"
+          [diameter]="36"
+        ></mat-spinner>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

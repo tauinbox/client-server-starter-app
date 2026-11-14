@@ -157,6 +157,9 @@ export const ErrorKeys = {
     PAYMENT_METHOD_MISSING: 'errors.billing.paymentMethodMissing',
     TERMS_NOT_ACCEPTED: 'errors.billing.termsNotAccepted'
   },
+  NOTIFICATIONS: {
+    NOT_FOUND: 'errors.notifications.notFound'
+  },
   DB: {
     UNIQUE_VIOLATION: 'errors.db.uniqueViolation',
     FOREIGN_KEY_VIOLATION: 'errors.db.foreignKeyViolation',

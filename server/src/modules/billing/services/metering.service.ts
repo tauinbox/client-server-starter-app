@@ -123,7 +123,7 @@ export class MeteringService {
     }
 
     if (change && crossesZero(change)) {
-      await this.emitCrossing(customerId);
+      await this.emitCrossing(customerId, change.after);
     }
 
     return response;
@@ -199,7 +199,10 @@ export class MeteringService {
     };
   }
 
-  private async emitCrossing(customerId: string): Promise<void> {
+  private async emitCrossing(
+    customerId: string,
+    balanceAfter: number
+  ): Promise<void> {
     const customer = await this.customers.findOne({
       where: { id: customerId },
       select: { id: true, userId: true }
@@ -208,7 +211,7 @@ export class MeteringService {
     if (customer) {
       this.events.emit(
         CreditBalanceCrossedEvent.name,
-        new CreditBalanceCrossedEvent(customer.userId)
+        new CreditBalanceCrossedEvent(customer.userId, balanceAfter)
       );
     }
   }

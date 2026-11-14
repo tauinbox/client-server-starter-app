@@ -728,7 +728,8 @@ export class RenewalService {
     if (exhausted) {
       this.events.emit(
         SubscriptionCanceledEvent.name,
-        new SubscriptionCanceledEvent(userId, subscription.id)
+        // The write is guarded on an entitled status.
+        new SubscriptionCanceledEvent(userId, subscription.id, true)
       );
     } else {
       this.events.emit(
@@ -762,7 +763,8 @@ export class RenewalService {
 
     this.events.emit(
       SubscriptionCanceledEvent.name,
-      new SubscriptionCanceledEvent(userId, subscription.id)
+      // The write is guarded on an entitled status.
+      new SubscriptionCanceledEvent(userId, subscription.id, true)
     );
   }
 }

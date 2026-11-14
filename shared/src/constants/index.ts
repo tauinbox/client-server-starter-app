@@ -61,6 +61,7 @@ export {
   RESOURCE_LIST_QUERY,
   SUBSCRIPTION_LIST_QUERY,
   INVOICE_LIST_QUERY,
+  USER_NOTIFICATION_LIST_QUERY,
   type UserListQuery,
   type UserListFilters,
   type FeatureFlagListQuery,
@@ -177,11 +178,13 @@ export {
 
 export {
   ALLOWED_INVOICE_SORT_COLUMNS,
+  ALLOWED_USER_NOTIFICATION_SORT_COLUMNS,
   ALLOWED_SUBSCRIPTION_SORT_COLUMNS,
   ALLOWED_ROLE_SORT_COLUMNS,
   ALLOWED_RESOURCE_SORT_COLUMNS,
   ALLOWED_FEATURE_FLAG_SORT_COLUMNS,
   type InvoiceSortColumn,
+  type UserNotificationSortColumn,
   type SubscriptionSortColumn,
   type RoleSortColumn,
   type ResourceSortColumn,

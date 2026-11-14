@@ -16,6 +16,7 @@ import {
   InvoicePaidEvent,
   PaymentFailedEvent,
   SubscriptionActivatedEvent,
+  SubscriptionCancelScheduledEvent,
   SubscriptionCanceledEvent,
   SubscriptionRenewedEvent
 } from '../events/billing.events';
@@ -352,23 +353,34 @@ describe('BillingEventReducer', () => {
       );
     });
 
-    it('emits SubscriptionCanceled on cancellation', async () => {
-      const existing = {
-        id: 'sub-1',
-        providerSubscriptionId: 'sub_123',
-        currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
-      } as Subscription;
-      const { reducer, emit } = await build({ subscription: existing });
+    it.each([
+      ['an active row: access ends', 'active', true],
+      [
+        'the echo of a cancel already written: nothing ends again',
+        'canceled',
+        false
+      ]
+    ] as const)(
+      'emits SubscriptionCanceled on cancellation of %s',
+      async (_name, status, endedAccess) => {
+        const existing = {
+          id: 'sub-1',
+          status,
+          providerSubscriptionId: 'sub_123',
+          currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
+        } as Subscription;
+        const { reducer, emit } = await build({ subscription: existing });
 
-      await reducer.reduce(
-        event('subscription.canceled', subPayload({ status: 'canceled' }))
-      );
+        await reducer.reduce(
+          event('subscription.canceled', subPayload({ status: 'canceled' }))
+        );
 
-      expect(emit).toHaveBeenCalledWith(
-        SubscriptionCanceledEvent.name,
-        expect.objectContaining({ subscriptionId: 'sub-1' })
-      );
-    });
+        expect(emit).toHaveBeenCalledWith(
+          SubscriptionCanceledEvent.name,
+          new SubscriptionCanceledEvent('user-1', 'sub-1', endedAccess)
+        );
+      }
+    );
 
     it('skips when the event carries no customer reference', async () => {
       const { reducer, manager, emit } = await build();
@@ -504,6 +516,81 @@ describe('BillingEventReducer', () => {
     });
   });
 
+  describe('cancel scheduled at the provider (provider-managed)', () => {
+    const stored = {
+      id: 'sub-1',
+      planKey: 'pro',
+      billingMode: 'fixed',
+      lifecycleOwner: 'provider',
+      providerSubscriptionId: 'sub_123'
+    } as Subscription;
+
+    it('announces a cancel that the snapshot is the first to set', async () => {
+      const { reducer, manager, emit } = await build({
+        subscription: stored,
+        plan: planRow('pro'),
+        updateAffected: 1
+      });
+
+      await reducer.reduce(
+        event('subscription.renewed', subPayload({ cancelAtPeriodEnd: true }))
+      );
+
+      expect(manager.update).toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1', cancelAtPeriodEnd: false },
+        { cancelAtPeriodEnd: true }
+      );
+      expect(emit).toHaveBeenCalledWith(
+        SubscriptionCancelScheduledEvent.name,
+        new SubscriptionCancelScheduledEvent('user-1', 'sub-1')
+      );
+    });
+
+    it('stays silent when the row already holds the cancel', async () => {
+      // A cancel that this server asked for set the column before the echo.
+      const { reducer, emit } = await build({
+        subscription: stored,
+        plan: planRow('pro'),
+        updateAffected: 0
+      });
+
+      await reducer.reduce(
+        event('subscription.renewed', subPayload({ cancelAtPeriodEnd: true }))
+      );
+
+      expect(emit).not.toHaveBeenCalledWith(
+        SubscriptionCancelScheduledEvent.name,
+        expect.anything()
+      );
+    });
+
+    it('does not announce a schedule on a row that the snapshot ends', async () => {
+      const { reducer, manager, emit } = await build({
+        subscription: stored,
+        plan: planRow('pro'),
+        updateAffected: 1
+      });
+
+      await reducer.reduce(
+        event(
+          'subscription.canceled',
+          subPayload({ status: 'canceled', cancelAtPeriodEnd: true })
+        )
+      );
+
+      expect(manager.update).not.toHaveBeenCalledWith(
+        Subscription,
+        { id: 'sub-1', cancelAtPeriodEnd: false },
+        expect.anything()
+      );
+      expect(emit).not.toHaveBeenCalledWith(
+        SubscriptionCancelScheduledEvent.name,
+        expect.anything()
+      );
+    });
+  });
+
   describe('invoice.paid', () => {
     const invoicePayload: NormalizedInvoicePayload = {
       ref: { customerId: 'cust-1', userId: 'user-1' },
@@ -608,6 +695,10 @@ describe('BillingEventReducer', () => {
         SubscriptionActivatedEvent.name,
         expect.anything()
       );
+      expect(emit).toHaveBeenCalledWith(
+        SubscriptionCancelScheduledEvent.name,
+        new SubscriptionCancelScheduledEvent('user-1', 'sub-1')
+      );
     });
 
     it('persists the saved card, activates the incomplete subscription, and emits both events', async () => {
@@ -666,6 +757,10 @@ describe('BillingEventReducer', () => {
       );
       expect(emit).not.toHaveBeenCalledWith(
         FirstPaymentUnclaimedEvent.name,
+        expect.anything()
+      );
+      expect(emit).not.toHaveBeenCalledWith(
+        SubscriptionCancelScheduledEvent.name,
         expect.anything()
       );
       expect(manager.update).not.toHaveBeenCalledWith(

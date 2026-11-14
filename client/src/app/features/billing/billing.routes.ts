@@ -20,6 +20,14 @@ export const billingRoutes: Routes = [
           )
       },
       {
+        path: AppRouteSegmentEnum.BillingNotifications,
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./components/notifications-page/notifications-page.component').then(
+            (c) => c.NotificationsPageComponent
+          )
+      },
+      {
         path: AppRouteSegmentEnum.BillingSettings,
         canActivate: [authGuard],
         loadComponent: () =>

@@ -185,7 +185,7 @@ src/
     ├── audit/              # Audit log service, decorator, interceptor, entity
     ├── mail/               # Email delivery
     ├── roles/              # Roles, permissions, CASL ability factory, guards
-    ├── notifications/      # SSE push hub
+    ├── notifications/      # SSE push hub and the stored notices of each user
     ├── feature-flags/      # Flag entities, resolver, admin API, guard, middleware
     ├── billing/            # Subscriptions, invoices, providers, rating, renewals,
     │                       #   webhooks, credits, one-time purchases
@@ -491,7 +491,14 @@ the bus does nothing.
 `permissions_updated` to every connected user, because a holder of a grant on the resource can
 be in any role.
 
-`notifications.controller.ts` holds `GET /stream`. The `@Sse()` decorator returns
+`user-notifications.service.ts` owns the table `user_notifications`: `notify(userId, content)`
+stores a notice, pushes `notification_created` and sends the mail through
+`MailService.sendUserNotice`; `list`, `unreadCount` and `markRead` filter on the user of the
+token. `BillingNoticesListener` in the billing module is its caller (`doc/billing-design.md`
+section 25).
+
+`notifications.controller.ts` holds `GET /`, `GET /unread-count`, `POST /:id/read` and
+`GET /stream`. For the stream, the `@Sse()` decorator returns
 `NotificationsService.openStream()`: the events of the connection, merged with a heartbeat each
 30 s. The stream opens with one heartbeat frame, thus the client knows at once that it is live
 and can reload the state that it missed while it was not connected. Each heartbeat also checks the session of the stream (`RefreshTokenService.hasLiveSession`).
@@ -2594,7 +2601,10 @@ The base URL is `/api/v1`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events`, `user_list_stale` and `feature_flags_updated`. `user_crud_events` goes only to a client whose `users:search` covers the changed user; `user_list_stale` (a role rename or delete) goes to each client that may search users. One user can hold at most 10 open streams; the next one gets 429 |
+| GET | `/` | Bearer | The caller's stored notices, newest first (`USER_NOTIFICATION_LIST_QUERY`, cursor paginated) |
+| GET | `/unread-count` | Bearer | `{ unread }`, the number of the caller's unread notices |
+| POST | `/:id/read` | Bearer | Mark one notice of the caller as read (204); a notice of another user answers 404 `errors.notifications.notFound` |
+| GET | `/stream` | Bearer | The SSE stream. It pushes `session_invalidated`, `permissions_updated`, `user_crud_events`, `user_list_stale`, `feature_flags_updated` and `notification_created`. `user_crud_events` goes only to a client whose `users:search` covers the changed user; `user_list_stale` (a role rename or delete) goes to each client that may search users. One user can hold at most 10 open streams; the next one gets 429 |
 
 ### Feature Flags (`/api/v1`)
 

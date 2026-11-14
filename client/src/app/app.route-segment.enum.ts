@@ -11,6 +11,7 @@ export enum AppRouteSegmentEnum {
   BillingSettings = 'settings',
   BillingSuccess = 'success',
   BillingCancel = 'cancel',
+  BillingNotifications = 'notifications',
   OAuthCallback = 'oauth/callback',
   Forbidden = 'forbidden',
   ForgotPassword = 'forgot-password',

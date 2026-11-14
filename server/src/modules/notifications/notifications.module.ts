@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { UserNotification } from './entities/user-notification.entity';
+import { UserNotificationsService } from './user-notifications.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { NotificationsListener } from './notifications.listener';
@@ -14,10 +17,16 @@ import {
 } from './notifications.constants';
 
 @Module({
-  imports: [CaslModule, AuthModule, UsersModule],
+  imports: [
+    CaslModule,
+    AuthModule,
+    UsersModule,
+    TypeOrmModule.forFeature([UserNotification])
+  ],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,
+    UserNotificationsService,
     NotificationsListener,
     {
       provide: SSE_HEARTBEAT_INTERVAL_MS,
@@ -37,6 +46,6 @@ import {
       }
     }
   ],
-  exports: [NotificationsService]
+  exports: [NotificationsService, UserNotificationsService]
 })
 export class NotificationsModule {}

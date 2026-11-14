@@ -286,6 +286,13 @@ src/app/
 │       │   │                      # against the catalog bounds. An optional note goes to the
 │       │   │                      # receipt. The pay button shows the live amount. The component
 │       │   │                      # emits donate.
+│       │   ├── notifications-page/ # NotificationsPageComponent (/billing/notifications): the
+│       │   │                      # stored notices of the user, newest first, through
+│       │   │                      # UserNotificationsStore (withList, URL key `notices`), with
+│       │   │                      # "Mark as read" on an unread notice. It reloads on
+│       │   │                      # notification_created and reconnected$. UnreadNoticesService
+│       │   │                      # (services/) holds the count of the header bell, which shows
+│       │   │                      # only for a signed-in user while the billing flag is on.
 │       │   ├── billing-settings/  # BillingSettingsComponent shows the region control in the
 │       │   │                      # header, and the current plan and a status chip. It opens the change-plan dialog, which stays hidden for
 │       │   │                      # the past_due status and for a pending cancellation. The
@@ -758,7 +765,8 @@ The server keeps no event history, thus an event sent while the tab was not conn
 `reconnected$` emits when a reopened stream sends its first frame (not for the first stream after
 `connect()`). On it, `AuthService` waits a random 0 to 5 s and then reloads the feature flags, the
 permissions and, when they are loaded, the entitlements. The user list marks itself stale and
-shows its banner.
+shows its banner. `UnreadNoticesService` and the notices page read the stored notices again, on
+`reconnected$` and on `notificationCreated$`.
 
 The service recycles the connection each 4 h to 8 h. The interval has jitter for each client, thus
 the clients do not reconnect at the same time. The recycle closes the stream and opens a new one,

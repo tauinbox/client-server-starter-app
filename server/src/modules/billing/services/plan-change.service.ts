@@ -29,7 +29,11 @@ import { Customer } from '../entities/customer.entity';
 import { Invoice, UNPAID_INVOICE_STATUSES } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
-import { InvoicePaidEvent, PlanChangedEvent } from '../events/billing.events';
+import {
+  InvoicePaidEvent,
+  PlanChangedEvent,
+  RefundIssuedEvent
+} from '../events/billing.events';
 import { ChargeDeclinedError } from '../providers/payment-provider.interface';
 import type {
   ChargeResult,
@@ -232,6 +236,13 @@ export class PlanChangeService {
           refundKey
         );
         refundIssued = true;
+        this.events.emit(
+          RefundIssuedEvent.name,
+          new RefundIssuedEvent(customer.userId, refund.source.id, {
+            amountMinor: refund.minor,
+            currency: refund.source.currency
+          })
+        );
       } catch (error) {
         await this.releaseProrationRefund(
           refund.source.id,

@@ -150,7 +150,7 @@ describe('MeteringService', () => {
     expect(ctx.emit).toHaveBeenCalledTimes(1);
     expect(ctx.emit).toHaveBeenCalledWith(
       CreditBalanceCrossedEvent.name,
-      new CreditBalanceCrossedEvent('user-1')
+      new CreditBalanceCrossedEvent('user-1', 0)
     );
   });
 

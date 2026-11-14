@@ -10,7 +10,10 @@ import {
 } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
-import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
+import {
+  ENTITLED_SUBSCRIPTION_STATUSES,
+  OPEN_SUBSCRIPTION_STATUSES
+} from '@app/shared/constants';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
 import { CustomerGrant } from '../entities/customer-grant.entity';
@@ -32,6 +35,7 @@ import {
   InvoicePaidEvent,
   PaymentFailedEvent,
   SubscriptionActivatedEvent,
+  SubscriptionCancelScheduledEvent,
   SubscriptionCanceledEvent,
   SubscriptionPastDueEvent,
   SubscriptionRenewedEvent
@@ -277,7 +281,12 @@ export class BillingEventReducer {
           await this.markTrialUsed(manager, created.customerId, now);
         }
 
-        return { subscriptionId: created.id, userId };
+        return {
+          subscriptionId: created.id,
+          userId,
+          cancelScheduled: false,
+          endedAccess: false
+        };
       }
 
       // A plan change whose local write missed its guard reaches the row only
@@ -306,20 +315,54 @@ export class BillingEventReducer {
         snapshot.currentPeriodEnd = new Date(payload.currentPeriodEnd);
       }
 
+      // A cancel scheduled at the provider (its customer portal) reaches the
+      // row only through this snapshot. A cancel that this server asked for
+      // already set the column, so the guarded flip finds nothing to change.
+      const cancelScheduled =
+        payload.cancelAtPeriodEnd &&
+        ENTITLED_SUBSCRIPTION_STATUSES.includes(payload.status) &&
+        Boolean(
+          (
+            await manager.update(
+              Subscription,
+              { id: subscription.id, cancelAtPeriodEnd: false },
+              { cancelAtPeriodEnd: true }
+            )
+          ).affected
+        );
+
       await manager.update(Subscription, { id: subscription.id }, snapshot);
 
       if (payload.status === 'trialing') {
         await this.markTrialUsed(manager, subscription.customerId, now);
       }
 
-      return { subscriptionId: subscription.id, userId };
+      return {
+        subscriptionId: subscription.id,
+        userId,
+        cancelScheduled,
+        // The status before this snapshot: the echo of a cancel that this
+        // server already wrote ends nothing a second time.
+        endedAccess: ENTITLED_SUBSCRIPTION_STATUSES.includes(
+          subscription.status
+        )
+      };
     });
 
     if (!result?.userId) {
       return;
     }
 
-    this.emitSubscriptionEvent(type, result.userId, result.subscriptionId);
+    const { userId, subscriptionId, endedAccess } = result;
+
+    this.emitSubscriptionEvent(type, { userId, subscriptionId, endedAccess });
+
+    if (result.cancelScheduled) {
+      this.events.emit(
+        SubscriptionCancelScheduledEvent.name,
+        new SubscriptionCancelScheduledEvent(userId, subscriptionId)
+      );
+    }
   }
 
   private emitSubscriptionEvent(
@@ -328,8 +371,11 @@ export class BillingEventReducer {
       | 'subscription.renewed'
       | 'subscription.past_due'
       | 'subscription.canceled',
-    userId: string,
-    subscriptionId: string
+    {
+      userId,
+      subscriptionId,
+      endedAccess
+    }: { userId: string; subscriptionId: string; endedAccess: boolean }
   ): void {
     switch (type) {
       case 'subscription.activated':
@@ -353,7 +399,7 @@ export class BillingEventReducer {
       case 'subscription.canceled':
         this.events.emit(
           SubscriptionCanceledEvent.name,
-          new SubscriptionCanceledEvent(userId, subscriptionId)
+          new SubscriptionCanceledEvent(userId, subscriptionId, endedAccess)
         );
         break;
     }
@@ -565,15 +611,10 @@ export class BillingEventReducer {
           { product, now }
         );
 
-        return {
-          invoiceId,
-          userId,
-          activatedSubscriptionId: null,
-          unclaimed: false
-        };
+        return { invoiceId, userId, activated: null, unclaimed: false };
       }
 
-      const activatedSubscriptionId =
+      const activated =
         selfManaged && subscription
           ? await this.activateSelfManaged(manager, subscription, {
               payload,
@@ -581,10 +622,9 @@ export class BillingEventReducer {
             })
           : null;
       // A trial binding moves no money, so there is nothing to give back.
-      const unclaimed =
-        selfManaged && !activatedSubscriptionId && payload.amountMinor > 0;
+      const unclaimed = selfManaged && !activated && payload.amountMinor > 0;
 
-      return { invoiceId, userId, activatedSubscriptionId, unclaimed };
+      return { invoiceId, userId, activated, unclaimed };
     });
 
     if (!result?.userId) {
@@ -596,12 +636,21 @@ export class BillingEventReducer {
       new InvoicePaidEvent(result.userId, result.invoiceId)
     );
 
-    if (result.activatedSubscriptionId) {
+    const { activated } = result;
+
+    if (activated) {
       this.events.emit(
         SubscriptionActivatedEvent.name,
-        new SubscriptionActivatedEvent(
+        new SubscriptionActivatedEvent(result.userId, activated.subscriptionId)
+      );
+    }
+
+    if (activated?.cancelScheduled) {
+      this.events.emit(
+        SubscriptionCancelScheduledEvent.name,
+        new SubscriptionCancelScheduledEvent(
           result.userId,
-          result.activatedSubscriptionId
+          activated.subscriptionId
         )
       );
     }
@@ -681,7 +730,7 @@ export class BillingEventReducer {
     manager: EntityManager,
     subscription: Subscription,
     { payload, now }: { payload: NormalizedInvoicePayload; now: Date }
-  ): Promise<string | null> {
+  ): Promise<{ subscriptionId: string; cancelScheduled: boolean } | null> {
     const { savedPaymentMethod: saved } = payload;
     // Locked before the subscription row, in the order of the card removal.
     const customer = saved
@@ -730,7 +779,7 @@ export class BillingEventReducer {
       );
     }
 
-    return subscription.id;
+    return { subscriptionId: subscription.id, cancelScheduled: refused };
   }
 
   /** Keeps the first moment: a replayed or later trial does not move it. */

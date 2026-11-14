@@ -98,7 +98,7 @@ describe('EntitlementChangedListener', () => {
 
     emitter.emit(
       SubscriptionCanceledEvent.name,
-      new SubscriptionCanceledEvent('user-3', 'sub-3')
+      new SubscriptionCanceledEvent('user-3', 'sub-3', true)
     );
     // The handler runs synchronously up to its first await, so the invalidation
     // call is registered by the time emit returns.

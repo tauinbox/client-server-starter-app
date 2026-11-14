@@ -9,7 +9,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { Server } from 'http';
 import request from 'supertest';
 import { DataSource, In } from 'typeorm';
@@ -69,6 +69,7 @@ import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { BillingConsent } from '../src/modules/billing/entities/billing-consent.entity';
+import { UserNotification } from '../src/modules/notifications/entities/user-notification.entity';
 import {
   LEGAL_DOCUMENT_VERSIONS,
   type LegalDocumentVersions
@@ -829,6 +830,19 @@ runWithInfra('Request scenarios (e2e)', () => {
       });
 
       ctx.values.$webhookEventId = event.id;
+    },
+    notification: async (ctx) => {
+      const notice = await dataSource.getRepository(UserNotification).save({
+        userId: ctx.actor!.user.id,
+        kind: 'invoice_paid',
+        payload: {
+          invoiceId: randomUUID(),
+          amountMinor: 1000,
+          currency: 'RUB'
+        }
+      });
+
+      ctx.values.$notificationId = notice.id;
     }
   };
 

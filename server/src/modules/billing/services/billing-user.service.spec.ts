@@ -24,7 +24,10 @@ import { PaymentMethod } from '../entities/payment-method.entity';
 import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
-import { SubscriptionCanceledEvent } from '../events/billing.events';
+import {
+  SubscriptionCancelScheduledEvent,
+  SubscriptionCanceledEvent
+} from '../events/billing.events';
 import { BillingService } from '../billing.service';
 import {
   expectRefusal,
@@ -1135,6 +1138,12 @@ describe('BillingUserService', () => {
         ctx.manager
       );
       expect(ctx.billing.getProviderById).not.toHaveBeenCalled();
+      expect(ctx.emit.mock.calls).toEqual([
+        [
+          SubscriptionCancelScheduledEvent.name,
+          new SubscriptionCancelScheduledEvent('user-1', 'sub-1')
+        ]
+      ]);
     });
 
     it('writes nothing when a self-managed customer has no card', async () => {
@@ -1152,6 +1161,7 @@ describe('BillingUserService', () => {
 
       expect(ctx.manager.update).not.toHaveBeenCalled();
       expect(ctx.audit.log).not.toHaveBeenCalled();
+      expect(ctx.emit).not.toHaveBeenCalled();
     });
 
     it('cancels a provider-managed subscription at the period end through the provider', async () => {
@@ -1179,6 +1189,13 @@ describe('BillingUserService', () => {
         }),
         ctx.manager
       );
+      // One notice, from the provider cancel; the transaction scheduled nothing.
+      expect(ctx.emit.mock.calls).toEqual([
+        [
+          SubscriptionCancelScheduledEvent.name,
+          new SubscriptionCancelScheduledEvent('user-1', 'sub-1')
+        ]
+      ]);
     });
 
     it('also deletes a local card left beside a provider-managed subscription', async () => {
@@ -1257,7 +1274,14 @@ describe('BillingUserService', () => {
       expect(paddle.cancel).toHaveBeenCalledWith('sub_ext', 'period_end');
       expect(result.cancelAtPeriodEnd).toBe(true);
       expect(result.status).toBe('active');
-      expect(ctx.emit).not.toHaveBeenCalled();
+      // Access stays until the period end, so no entitlement event; only the
+      // notice of the last day.
+      expect(ctx.emit.mock.calls).toEqual([
+        [
+          SubscriptionCancelScheduledEvent.name,
+          new SubscriptionCancelScheduledEvent('user-1', 'sub-1')
+        ]
+      ]);
       // Only the cancel column is written — the row moved on while the provider
       // was cancelling, and the whole entity would carry it back.
       expect(ctx.subscriptions.save).not.toHaveBeenCalled();

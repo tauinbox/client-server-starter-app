@@ -11,13 +11,24 @@ describe('NotificationsController', () => {
     closeStream: jest.Mock;
   };
 
+  let notices: {
+    list: jest.Mock;
+    unreadCount: jest.Mock;
+    markRead: jest.Mock;
+  };
+
   beforeEach(() => {
     service = {
       openStream: jest.fn().mockReturnValue(of({ data: 'hello' })),
       closeStream: jest.fn()
     };
-    // @ts-expect-error partial mock
-    controller = new NotificationsController(service);
+    notices = {
+      list: jest.fn().mockResolvedValue({ data: [] }),
+      unreadCount: jest.fn().mockResolvedValue({ unread: 2 }),
+      markRead: jest.fn().mockResolvedValue(undefined)
+    };
+    // @ts-expect-error partial mocks
+    controller = new NotificationsController(service, notices);
   });
 
   const buildReq = (userId: string, destroyed = false): JwtAuthRequest => {
@@ -52,6 +63,20 @@ describe('NotificationsController', () => {
 
     return res;
   };
+
+  it('scopes every notice route to the caller', async () => {
+    const req = buildReq('user-1');
+    const query = { limit: 10 };
+
+    // @ts-expect-error partial query DTO
+    await controller.list(req, query);
+    await expect(controller.unreadCount(req)).resolves.toEqual({ unread: 2 });
+    await controller.markRead(req, 'notice-1');
+
+    expect(notices.list).toHaveBeenCalledWith('user-1', query);
+    expect(notices.unreadCount).toHaveBeenCalledWith('user-1');
+    expect(notices.markRead).toHaveBeenCalledWith('user-1', 'notice-1');
+  });
 
   it('opens the stream for the user and the session of the caller', () => {
     const req = buildReq('user-1');

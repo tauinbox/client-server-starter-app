@@ -24,6 +24,7 @@ import { WebhookEvent } from '../entities/webhook-event.entity';
 import {
   CreditBalanceCrossedEvent,
   InvoiceRefundedEvent,
+  RefundIssuedEvent,
   SubscriptionCanceledEvent
 } from '../events/billing.events';
 import { BillingService } from '../billing.service';
@@ -353,7 +354,27 @@ describe('BillingAdminService', () => {
       );
       expect(ctx.emit).toHaveBeenCalledWith(
         SubscriptionCanceledEvent.name,
-        expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
+        new SubscriptionCanceledEvent('user-1', 'sub-1', true)
+      );
+    });
+
+    it('marks the immediate cancel of an unpaid checkout as ending no access', async () => {
+      const ctx = await build();
+
+      ctx.subscriptions.findOne.mockResolvedValue(
+        makeSubscription({ status: 'incomplete', providerSubscriptionId: null })
+      );
+      ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
+      ctx.customers.findOne.mockResolvedValue({
+        id: 'cust-1',
+        userId: 'user-1'
+      });
+
+      await ctx.service.cancelSubscription('sub-1', 'immediate');
+
+      expect(ctx.emit).toHaveBeenCalledWith(
+        SubscriptionCanceledEvent.name,
+        new SubscriptionCanceledEvent('user-1', 'sub-1', false)
       );
     });
 
@@ -641,7 +662,7 @@ describe('BillingAdminService', () => {
         expect(emitted).toEqual(
           Array.from({ length: crossings }, () => [
             CreditBalanceCrossedEvent.name,
-            new CreditBalanceCrossedEvent('user-1')
+            new CreditBalanceCrossedEvent('user-1', change.after)
           ])
         );
       }
@@ -1030,7 +1051,27 @@ describe('BillingAdminService', () => {
 
         expect(second.status).toBe('refunded');
         expect(ctx.grants.update).toHaveBeenCalledTimes(1);
-        expect(ctx.emit).toHaveBeenCalledTimes(1);
+        // A notice for each leg, and one grant revoke for the full refund.
+        expect(ctx.emit.mock.calls).toEqual([
+          [
+            RefundIssuedEvent.name,
+            new RefundIssuedEvent('user-1', 'inv-1', {
+              amountMinor: 24500,
+              currency: invoice.currency
+            })
+          ],
+          [
+            RefundIssuedEvent.name,
+            new RefundIssuedEvent('user-1', 'inv-1', {
+              amountMinor: 24500,
+              currency: invoice.currency
+            })
+          ],
+          [
+            InvoiceRefundedEvent.name,
+            new InvoiceRefundedEvent('user-1', 'inv-1')
+          ]
+        ]);
 
         // Each leg keys on the cumulative-after total, so the provider sees two
         // distinct refunds (the original bug let identical-amount legs collide).

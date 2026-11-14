@@ -9,7 +9,8 @@ import {
   ALLOWED_INVOICE_SORT_COLUMNS,
   ALLOWED_RESOURCE_SORT_COLUMNS,
   ALLOWED_ROLE_SORT_COLUMNS,
-  ALLOWED_SUBSCRIPTION_SORT_COLUMNS
+  ALLOWED_SUBSCRIPTION_SORT_COLUMNS,
+  ALLOWED_USER_NOTIFICATION_SORT_COLUMNS
 } from './sort-columns.constants';
 import { ALLOWED_USER_SORT_COLUMNS } from './user.constants';
 
@@ -82,6 +83,12 @@ export const INVOICE_LIST_QUERY = {
   search: [],
   filters: {},
   sort: ALLOWED_INVOICE_SORT_COLUMNS
+} as const satisfies ListQuerySpec;
+
+export const USER_NOTIFICATION_LIST_QUERY = {
+  search: [],
+  filters: {},
+  sort: ALLOWED_USER_NOTIFICATION_SORT_COLUMNS
 } as const satisfies ListQuerySpec;
 
 export type UserListQuery = ListQuery<typeof USER_LIST_QUERY>;

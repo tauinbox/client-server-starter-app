@@ -22,7 +22,9 @@
   "header": {
     "login": "Login",
     "register": "Register",
-    "logout": "Logout"
+    "logout": "Logout",
+    "notifications": "Notifications",
+    "notificationsUnread": "Notifications, {{count}} unread"
   },
   "sidenav": {
     "adminPanel": "Admin panel",
@@ -200,6 +202,9 @@
       "ifMatchRequired": "The If-Match header is required for optimistic locking",
       "ifMatchInvalid": "The If-Match header must be \"*\" or a list of entity tags",
       "invalidRule": "One of the rules is not valid. Check the rules and try again."
+    },
+    "notifications": {
+      "notFound": "Notification not found"
     },
     "billing": {
       "regionUnavailable": "Payments are not available in this billing region.",

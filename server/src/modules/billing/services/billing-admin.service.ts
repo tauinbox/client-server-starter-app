@@ -21,7 +21,8 @@ import { Subscription } from '../entities/subscription.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import {
   CreditBalanceCrossedEvent,
-  InvoiceRefundedEvent
+  InvoiceRefundedEvent,
+  RefundIssuedEvent
 } from '../events/billing.events';
 import { cancelOpenSubscription } from '../utils/cancel-subscription.util';
 import {
@@ -175,7 +176,7 @@ export class BillingAdminService {
    * pair of values is the signature to reconcile on.
    */
   async refundInvoice(id: string, amountMinor?: number): Promise<Invoice> {
-    const { refundAmount, cumulativeRefunded, providerRef } =
+    const { refundAmount, cumulativeRefunded, providerRef, owner } =
       await withTransaction(this.dataSource, async (manager) => {
         const invoice = await lockInvoice(manager, { where: { id } });
 
@@ -213,7 +214,8 @@ export class BillingAdminService {
           providerRef: {
             provider: invoice.provider,
             invoiceRef: invoice.providerInvoiceRef
-          }
+          },
+          owner: { customerId: invoice.customerId, currency: invoice.currency }
         };
       });
 
@@ -232,8 +234,22 @@ export class BillingAdminService {
       throw error;
     }
 
+    // The money moved at the provider, so the notice does not wait for the
+    // status flip below, which can fail on its own.
+    const refundedUserId = await this.resolveUserId(owner.customerId);
+
+    if (refundedUserId) {
+      this.events.emit(
+        RefundIssuedEvent.name,
+        new RefundIssuedEvent(refundedUserId, id, {
+          amountMinor: refundAmount.toNumber(),
+          currency: owner.currency
+        })
+      );
+    }
+
     // The money side is already recorded, so settling is only the status flip.
-    const { saved, revokedUserId, crossedUserId } = await withTransaction(
+    const { saved, revokedUserId, crossed } = await withTransaction(
       this.dataSource,
       async (manager) => {
         const invoice = await lockInvoice(manager, { where: { id } });
@@ -250,19 +266,22 @@ export class BillingAdminService {
           cumulativeRefunded.compare(invoice.amountMinor) < 0 ||
           invoice.status !== 'paid'
         ) {
-          return { saved: invoice, revokedUserId: null, crossedUserId: null };
+          return { saved: invoice, revokedUserId: null, crossed: null };
         }
 
         invoice.status = 'refunded';
         const revokedUserId = await this.revokeOneTimeGrants(manager, invoice);
         const clawback = await this.clawbackCreditPurchase(manager, invoice);
-        const crossedUserId =
+        const crossed =
           clawback && crossesZero(clawback)
-            ? await this.resolveUserId(invoice.customerId)
+            ? {
+                userId: await this.resolveUserId(invoice.customerId),
+                balanceAfter: clawback.after
+              }
             : null;
         const saved = await manager.save(Invoice, invoice);
 
-        return { saved, revokedUserId, crossedUserId };
+        return { saved, revokedUserId, crossed };
       }
     );
 
@@ -275,10 +294,10 @@ export class BillingAdminService {
       );
     }
 
-    if (crossedUserId) {
+    if (crossed?.userId) {
       this.events.emit(
         CreditBalanceCrossedEvent.name,
-        new CreditBalanceCrossedEvent(crossedUserId)
+        new CreditBalanceCrossedEvent(crossed.userId, crossed.balanceAfter)
       );
     }
 

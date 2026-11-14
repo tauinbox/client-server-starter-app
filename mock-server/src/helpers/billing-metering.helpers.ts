@@ -9,6 +9,7 @@ import {
 import type { MeteringResponse } from '@app/shared/types';
 import { getState } from '../state';
 import type { MockPlan, MockUsageRecord } from '../types';
+import { noticeCreditBalanceCrossed } from './billing-notices.helpers';
 import {
   applyCreditDelta,
   crossesZero,
@@ -135,7 +136,10 @@ export function consumeCredits(
   const change = applyCreditDelta(customerId, -units);
 
   // The server emits CreditBalanceCrossedEvent here.
-  if (crossesZero(change)) notifyEntitlementsChanged(customerId);
+  if (crossesZero(change)) {
+    notifyEntitlementsChanged(customerId);
+    noticeCreditBalanceCrossed(customerId, change.after);
+  }
 
   return {
     response: {
