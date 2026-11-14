@@ -204,5 +204,25 @@
     "errorPaymentMethodFailed": "Could not start the payment-method update. Please try again.",
     "errorRemoveCardFailed": "Could not remove the card. Please try again.",
     "errorPurchaseFailed": "Could not start the purchase. Please try again."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications yet.",
+    "markRead": "Mark as read",
+    "kind": {
+      "invoice_paid": "We received your payment of {{amount}}.",
+      "payment_failed": "A payment failed. Check your card and try again.",
+      "payment_failed_retry": "The payment for the {{plan}} plan failed. We will try again on {{date}}.",
+      "payment_failed_provider": "The payment for the {{plan}} plan failed. The payment provider will try again.",
+      "payment_failed_ended": "The payment for the {{plan}} plan failed. There are no more attempts, and the subscription is canceled.",
+      "subscription_cancel_scheduled": "Your {{plan}} subscription will not renew. You keep access until {{date}}.",
+      "subscription_canceled": "Your {{plan}} subscription has ended.",
+      "refund_issued": "We refunded {{amount}} to your payment method.",
+      "credit_balance_depleted": "Your credit balance reached zero. Features that use credits stop until you buy more."
+    },
+    "store": {
+      "errorLoadFailed": "Could not load the notifications.",
+      "errorMarkReadFailed": "Could not mark the notification as read. Please try again."
+    }
   }
 }

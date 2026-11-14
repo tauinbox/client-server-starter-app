@@ -22,7 +22,9 @@
   "header": {
     "login": "Войти",
     "register": "Регистрация",
-    "logout": "Выйти"
+    "logout": "Выйти",
+    "notifications": "Уведомления",
+    "notificationsUnread": "Уведомления, непрочитанных: {{count}}"
   },
   "sidenav": {
     "adminPanel": "Панель администратора",
@@ -200,6 +202,9 @@
       "ifMatchRequired": "Для оптимистичной блокировки требуется заголовок If-Match",
       "ifMatchInvalid": "Заголовок If-Match должен быть \"*\" или списком тегов сущности",
       "invalidRule": "Одно из правил некорректно. Проверьте правила и повторите попытку."
+    },
+    "notifications": {
+      "notFound": "Уведомление не найдено"
     },
     "billing": {
       "regionUnavailable": "В этом регионе оплата недоступна.",

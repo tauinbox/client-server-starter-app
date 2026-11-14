@@ -20,7 +20,8 @@ export const LIST_URL_KEYS = [
   'resources',
   'flags',
   'subs',
-  'invoices'
+  'invoices',
+  'notices'
 ] as const;
 
 export type ListUrlKey = (typeof LIST_URL_KEYS)[number];

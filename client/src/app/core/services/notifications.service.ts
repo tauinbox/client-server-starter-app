@@ -54,6 +54,10 @@ export class NotificationsService {
     this.#ofType('entitlements_updated')
   );
 
+  readonly notificationCreated$ = this.#events$.pipe(
+    this.#ofType('notification_created')
+  );
+
   connect(): void {
     if (this.#subscription) return;
 

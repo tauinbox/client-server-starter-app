@@ -14,6 +14,29 @@
   <nxs-language-switcher></nxs-language-switcher>
   <nxs-theme-toggle></nxs-theme-toggle>
 
+  @if (notices.available()) {
+    @let unread = notices.unread();
+    <a
+      matIconButton
+      class="notices-link"
+      [routerLink]="noticesLink"
+      routerLinkActive="active"
+      [matTooltip]="t('header.notifications')"
+      [attr.aria-label]="
+        unread > 0
+          ? t('header.notificationsUnread', { count: unread })
+          : t('header.notifications')
+      "
+    >
+      <mat-icon
+        [matBadge]="unread"
+        [matBadgeHidden]="unread === 0"
+        aria-hidden="true"
+        >notifications</mat-icon
+      >
+    </a>
+  }
+
   @if (authStore.isAuthenticated()) {
     <button matButton="text" [matMenuTriggerFor]="menu">
       {{ authStore.user()?.name }}

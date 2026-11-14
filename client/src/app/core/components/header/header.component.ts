@@ -9,6 +9,8 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatBadgeModule } from '@angular/material/badge';
+import { UnreadNoticesService } from '@features/billing/services/unread-notices.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AuthService } from '@features/auth/services/auth.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
@@ -29,6 +31,7 @@ import { LanguageService } from '@core/services/language.service';
     MatIconModule,
     MatMenuModule,
     MatTooltipModule,
+    MatBadgeModule,
     RouterLink,
     RouterLinkActive,
     ThemeToggleComponent,
@@ -43,6 +46,8 @@ export class HeaderComponent {
   protected readonly authStore = inject(AuthStore);
   protected readonly sidenavState = inject(SidenavStateService);
   protected readonly routes = AppRouteSegmentEnum;
+  protected readonly notices = inject(UnreadNoticesService);
+  protected readonly noticesLink = `/${AppRouteSegmentEnum.Billing}/${AppRouteSegmentEnum.BillingNotifications}`;
   readonly #language = inject(LanguageService).language;
   protected readonly appName = environment.appName;
 
