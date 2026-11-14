@@ -6,7 +6,8 @@ import type {
 } from '@app/shared/constants';
 import type {
   MfaRequiredResponse,
-  PaddleClientConfigResponse
+  PaddleClientConfigResponse,
+  UserNotificationResponse
 } from '@app/shared/types';
 
 export type {
@@ -479,6 +480,8 @@ export interface State {
   billingWebhookEvents: Map<string, MockWebhookEvent>;
   // Accepted versions of the terms, mirroring the append-only table.
   billingConsents: MockBillingConsent[];
+  // Stored notices, keyed by id, mirroring `user_notifications`.
+  userNotifications: Map<string, MockUserNotification>;
   // The terms versions that replace LEGAL_DOCUMENTS. Default: none. Tests set
   // one through /__control/billing/terms to reach a published version.
   legalTermsOverrides: Partial<Record<LegalJurisdiction, LegalDocumentVersion>>;
@@ -509,6 +512,11 @@ export interface State {
   // `POST /__control/breached-passwords`.
   breachedPasswords: Set<string>;
 }
+
+/** A stored notice: the wire shape plus its owner, which the wire omits. */
+export type MockUserNotification = UserNotificationResponse & {
+  userId: string;
+};
 
 export interface AuthenticatedRequest extends Request {
   user: MockUser;

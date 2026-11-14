@@ -128,7 +128,8 @@ export function resetState(): void {
     billingCreditBalances: new Map(),
     billingWebhookEvents: new Map(),
     billingConsents: [],
-    legalTermsOverrides: {}
+    legalTermsOverrides: {},
+    userNotifications: new Map()
   };
 }
 

@@ -27,6 +27,7 @@ import {
 import { createApp } from '../app';
 import { MOCK_TOTP_CODE, MOCK_TOTP_SECRET } from '../constants';
 import { recordFailure } from '../helpers/reauth.helpers';
+import { storeUserNotification } from '../helpers/billing-notices.helpers';
 import {
   addOAuthAccounts,
   getState,
@@ -631,6 +632,20 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
       receivedAt: new Date().toISOString()
     });
     ctx.values.$webhookEventId = id;
+
+    return Promise.resolve();
+  },
+  notification: (ctx) => {
+    const notice = storeUserNotification(ctx.actor!.id, {
+      kind: 'invoice_paid',
+      payload: {
+        invoiceId: randomUUID(),
+        amountMinor: 1000,
+        currency: 'RUB'
+      }
+    });
+
+    ctx.values.$notificationId = notice.id;
 
     return Promise.resolve();
   }

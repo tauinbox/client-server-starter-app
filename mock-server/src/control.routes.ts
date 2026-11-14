@@ -96,7 +96,8 @@ function buildStateSnapshot(state: State): StateSnapshot {
     billingCreditBalances: Array.from(state.billingCreditBalances.values()),
     billingWebhookEvents: Array.from(state.billingWebhookEvents.values()),
     billingConsents: state.billingConsents,
-    legalTermsOverrides: state.legalTermsOverrides
+    legalTermsOverrides: state.legalTermsOverrides,
+    userNotifications: Array.from(state.userNotifications.values())
   };
 }
 

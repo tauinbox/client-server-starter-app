@@ -8,6 +8,11 @@ import { getState } from '../state';
 import type { MockInvoice, MockSubscription } from '../types';
 import { nextPeriodEnd } from '../utils/period';
 import { notifyEntitlementsChanged } from './billing-settle.helpers';
+import {
+  noticeCanceled,
+  noticeInvoicePaid,
+  noticePaymentFailed
+} from './billing-notices.helpers';
 
 // The test and manual-check clock of the mock billing. The control routes
 // (E2E) and the billing lab page (manual checks) share these steps, so the
@@ -15,6 +20,7 @@ import { notifyEntitlementsChanged } from './billing-settle.helpers';
 
 // Mirrors the server's dunning policy (renewal-queue.constants).
 const DUNNING_MAX_ATTEMPTS = 3;
+const DUNNING_RETRY_DELAY_MS = 3 * 24 * 60 * 60 * 1000;
 
 export type RenewalOutcome = 'success' | 'failure';
 
@@ -85,6 +91,18 @@ export function advanceRenewal(
 
     subscription.updatedAt = nowIso;
     notifyEntitlementsChanged(subscription.customerId);
+    // The server emits `PaymentFailedEvent`, then the event of the new status.
+    // Only a row that the server charges has a retry date; a provider runs
+    // its own retries.
+    noticePaymentFailed(
+      subscription,
+      subscription.status === 'past_due' &&
+        subscription.lifecycleOwner === 'self'
+        ? new Date(now.getTime() + DUNNING_RETRY_DELAY_MS).toISOString()
+        : null
+    );
+
+    if (subscription.status === 'canceled') noticeCanceled(subscription);
 
     return subscription;
   }
@@ -100,6 +118,7 @@ export function advanceRenewal(
     subscription.status = 'canceled';
     subscription.updatedAt = nowIso;
     notifyEntitlementsChanged(subscription.customerId);
+    noticeCanceled(subscription);
 
     return subscription;
   }
@@ -147,6 +166,7 @@ export function advanceRenewal(
   subscription.billingAnchorAt = billingAnchor.toISOString();
   subscription.updatedAt = nowIso;
   notifyEntitlementsChanged(subscription.customerId);
+  noticeInvoicePaid(invoice);
 
   return subscription;
 }

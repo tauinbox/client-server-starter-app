@@ -553,7 +553,7 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
     expect(after.status).toBe(403);
   });
 
-  it('a partial refund of an sku purchase tells the client nothing', async () => {
+  it('a partial refund of an sku purchase changes no entitlement; it only adds the refund notice', async () => {
     const token = await login();
     const adminToken = await login('admin@example.com');
     const purchase = await postPurchase(token, { productKey: 'report-pack' });
@@ -565,7 +565,9 @@ describe('POST /admin/billing/invoices/:id/refund — one-time clawback', () => 
 
     try {
       await refund(adminToken, invoice.id, { amountMinor: 100 });
-      expect(push).not.toHaveBeenCalled();
+      expect(push.mock.calls).toEqual([
+        [expect.any(String), { type: 'notification_created' }]
+      ]);
     } finally {
       push.mockRestore();
     }

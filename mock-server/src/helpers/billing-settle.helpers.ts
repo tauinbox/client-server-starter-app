@@ -2,6 +2,10 @@ import { randomUUID } from 'crypto';
 import type { BillingProviderId } from '@app/shared/types';
 import { getState } from '../state';
 import { pushToUser } from '../sse-hub';
+import {
+  noticeInvoicePaid,
+  noticeRefundIssued
+} from './billing-notices.helpers';
 import { addInterval } from '../utils/period';
 import type {
   MockCustomer,
@@ -206,6 +210,7 @@ export function activateSubscription(
   state.billingInvoices.set(invoice.id, invoice);
 
   notifyEntitlementsChanged(customerId);
+  noticeInvoicePaid(invoice);
 
   return subscription;
 }
@@ -264,6 +269,10 @@ export function settleSelfManagedCheckout(
   };
 
   state.billingInvoices.set(invoice.id, invoice);
+  // The server announces the payment, then its unclaimed listener refunds it.
+  noticeInvoicePaid(invoice);
+
+  if (amountMinor > 0) noticeRefundIssued(invoice, amountMinor);
 }
 
 /**
@@ -324,6 +333,7 @@ export function settlePurchase(session: MockPurchaseSession): MockInvoice {
 
   state.billingPurchaseSessions.delete(session.sessionRef);
   notifyEntitlementsChanged(session.customerId);
+  noticeInvoicePaid(invoice);
 
   return invoice;
 }

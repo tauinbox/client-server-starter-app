@@ -1,9 +1,27 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
-import type { NotificationEvent } from '@app/shared/types';
-import { MAX_SSE_STREAMS_PER_USER } from '@app/shared/constants';
+import type {
+  NotificationEvent,
+  UserNotificationUnreadCountResponse
+} from '@app/shared/types';
+import {
+  ErrorKeys,
+  MAX_SSE_STREAMS_PER_USER,
+  USER_NOTIFICATION_LIST_QUERY
+} from '@app/shared/constants';
 import { authGuard } from '../helpers/auth.helpers';
-import { isSessionLive } from '../state';
+import { toUserNotificationResponse } from '../helpers/billing-notices.helpers';
+import { sendError } from '../helpers/error-envelope.helpers';
+import {
+  listPage,
+  listQueryErrors,
+  rejectInvalidCursor
+} from '../helpers/list-query.helpers';
+import {
+  requireUuid,
+  sendValidationError
+} from '../helpers/validation-error.helpers';
+import { getState, isSessionLive } from '../state';
 import {
   countSseConnections,
   registerSseConnection,
@@ -23,6 +41,59 @@ function heartbeatIntervalMs(): number {
 }
 
 const router = Router();
+
+// GET /api/v1/notifications - mirrors UserNotificationsService.list.
+router.get('/', authGuard, (req, res) => {
+  const query = req.query as Record<string, unknown>;
+  const errors = listQueryErrors(query, USER_NOTIFICATION_LIST_QUERY);
+
+  if (errors.length > 0) {
+    sendValidationError(res, 'query', errors);
+
+    return;
+  }
+
+  if (rejectInvalidCursor(res, query)) return;
+
+  const { user } = req as AuthenticatedRequest;
+  const notices = getState()
+    .userNotifications.values()
+    .filter((notice) => notice.userId === user.id)
+    .toArray();
+  const page = listPage(notices, USER_NOTIFICATION_LIST_QUERY, query);
+
+  res.json({
+    data: page.data.map(toUserNotificationResponse),
+    meta: page.meta
+  });
+});
+
+// GET /api/v1/notifications/unread-count
+router.get('/unread-count', authGuard, (req, res) => {
+  const { user } = req as AuthenticatedRequest;
+  const unread = getState()
+    .userNotifications.values()
+    .filter((notice) => notice.userId === user.id && notice.readAt === null)
+    .toArray().length;
+
+  res.json({ unread } satisfies UserNotificationUnreadCountResponse);
+});
+
+// POST /api/v1/notifications/:id/read - a notice of another user answers as
+// a missing one, as the server does.
+router.post('/:id/read', authGuard, requireUuid('id'), (req, res) => {
+  const { user } = req as AuthenticatedRequest;
+  const notice = getState().userNotifications.get(String(req.params['id']));
+
+  if (notice?.userId !== user.id) {
+    sendError(res, ErrorKeys.NOTIFICATIONS.NOT_FOUND, 'Notification not found');
+
+    return;
+  }
+
+  notice.readAt ??= new Date().toISOString();
+  res.status(204).end();
+});
 
 // GET /api/v1/notifications/stream
 router.get('/stream', authGuard, (req, res) => {

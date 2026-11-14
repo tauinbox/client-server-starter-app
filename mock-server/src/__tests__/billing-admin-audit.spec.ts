@@ -207,10 +207,11 @@ describe('admin billing mutations write audit entries', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(push).toHaveBeenCalledTimes(1);
-      expect(push).toHaveBeenCalledWith(userId, {
-        type: 'entitlements_updated'
-      });
+      // One entitlement drop, then the stored notice of the end.
+      expect(push.mock.calls).toEqual([
+        [userId, { type: 'entitlements_updated' }],
+        [userId, { type: 'notification_created' }]
+      ]);
     } finally {
       push.mockRestore();
     }
