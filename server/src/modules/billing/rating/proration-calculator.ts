@@ -24,8 +24,7 @@ export interface ProrationQuote extends ProrationAmounts {
  * Self-managed (YooKassa) plan-change proration. The amounts and the rounding
  * policy are `prorationAmounts`, which the mock server runs too; this adds the
  * receipt items of the charge leg. The provider builds the refund receipt from
- * the paid payment. Metered overage is settled by the usage-invoicing path,
- * not here.
+ * the paid payment.
  */
 @Injectable()
 export class ProrationCalculator {

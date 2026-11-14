@@ -13,14 +13,12 @@ import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
-import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import {
   InvoicePaidEvent,
   SubscriptionActivatedEvent
 } from '../src/modules/billing/events/billing.events';
 import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy';
-import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { DUNNING_RETRY_DELAY_MS } from '../src/modules/billing/renewals/renewal-queue.constants';
@@ -248,21 +246,12 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
         },
         YooKassaProvider,
         FixedRating,
-        UsageRating,
         { provide: YOOKASSA_CLIENT, useValue: yoo },
         { provide: ConfigService, useValue: { get: () => '1' } },
         { provide: EventEmitter2, useValue: { emit } },
         {
           provide: CreditService,
-          useValue: {
-            availableUnitsForUpdate: () => Promise.resolve(0),
-            releaseHolds: jest.fn(),
-            spendOnUsage: jest.fn()
-          }
-        },
-        {
-          provide: getRepositoryToken(UsageRecord),
-          useValue: { sum: () => Promise.resolve(0) }
+          useValue: { addPurchase: jest.fn() }
         },
         {
           provide: getRepositoryToken(User),

@@ -25,7 +25,7 @@ import {
 
 /**
  * The statuses of an invoice whose outcome is still open: a settle may flip it
- * to `paid`, and until then it holds its `creditUnitsApplied`.
+ * to `paid`.
  */
 export const UNPAID_INVOICE_STATUSES: readonly InvoiceStatus[] = [
   'pending',
@@ -91,19 +91,6 @@ export class Invoice {
 
   @Column({ type: 'varchar', length: 16 })
   status: InvoiceStatus;
-
-  // Prepaid credit units this invoice's amount was rated against. Persisted on
-  // a pending (uncaptured) charge so the later settle spends exactly the units
-  // the charged amount assumed, even if the live balance drifted meanwhile.
-  @Column({ name: 'credit_units_applied', type: 'int', default: 0 })
-  @Exclude()
-  creditUnitsApplied: number;
-
-  // Set when an unpaid invoice stops holding its `creditUnitsApplied`: its
-  // charge was declined, its dunning ran out, or its subscription closed.
-  @Column({ name: 'credits_released_at', type: 'timestamptz', nullable: true })
-  @Exclude()
-  creditsReleasedAt: Date | null;
 
   @Column({ name: 'billing_mode', type: 'varchar', length: 16 })
   billingMode: BillingMode;

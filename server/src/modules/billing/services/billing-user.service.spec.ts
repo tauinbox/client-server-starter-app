@@ -23,7 +23,6 @@ import { Plan } from '../entities/plan.entity';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
-import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 import {
   expectRefusal,
@@ -41,15 +40,6 @@ function cursorQuery(overrides: Partial<InvoiceCursorQueryDto> = {}) {
 async function build() {
   const customers = repo();
   const subscriptions = repo();
-  // The cancel write runs in a transaction on the manager of the repository.
-  const cancelManager = { withRepository: () => subscriptions };
-
-  Object.assign(subscriptions, {
-    manager: {
-      transaction: (cb: (m: typeof cancelManager) => unknown) =>
-        cb(cancelManager)
-    }
-  });
   const invoices = repo();
   const paymentMethods = repo();
   const plans = repo();
@@ -59,10 +49,8 @@ async function build() {
 
   const credits = {
     getBalance: jest.fn().mockResolvedValue(null),
-    spentOnMetering: jest.fn().mockResolvedValue(0),
-    releaseHolds: jest.fn().mockResolvedValue(undefined)
+    spentOnMetering: jest.fn().mockResolvedValue(0)
   };
-  const renewals = { billClosingUsagePeriod: jest.fn() };
 
   const billing = {
     resolveProvider: jest.fn(),
@@ -86,7 +74,6 @@ async function build() {
       { provide: getRepositoryToken(Product), useValue: products },
       { provide: getRepositoryToken(User), useValue: users },
       { provide: BillingService, useValue: billing },
-      { provide: RenewalService, useValue: renewals },
       { provide: CreditService, useValue: credits },
       {
         provide: ConfigService,
@@ -106,7 +93,6 @@ async function build() {
     products,
     users,
     billing,
-    renewals,
     credits,
     emit
   };
@@ -951,72 +937,6 @@ describe('BillingUserService', () => {
         SubscriptionCanceledEvent.name,
         expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1' })
       );
-    });
-
-    it.each([
-      ['immediate', true],
-      ['period_end', false]
-    ] as const)(
-      'ends the credit holds of the subscription on a %s cancel: %s',
-      async (mode, released) => {
-        const ctx = await build();
-
-        ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
-        ctx.subscriptions.findOne.mockResolvedValue({
-          id: 'sub-1',
-          provider: 'yookassa' as const,
-          providerSubscriptionId: null,
-          status: 'active',
-          cancelAtPeriodEnd: false
-        });
-        ctx.subscriptions.update.mockResolvedValue({ affected: 1 });
-
-        await ctx.service.cancelSubscription('user-1', mode);
-
-        expect(ctx.credits.releaseHolds.mock.calls).toEqual(
-          released ? [[expect.anything(), { subscriptionId: 'sub-1' }]] : []
-        );
-      }
-    );
-
-    it('bills the closing metered period before an immediate cancel', async () => {
-      const ctx = await build();
-
-      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
-      const sub = {
-        id: 'sub-1',
-        provider: 'yookassa' as const,
-        providerSubscriptionId: null,
-        status: 'active',
-        cancelAtPeriodEnd: false
-      };
-
-      ctx.subscriptions.findOne.mockResolvedValue(sub);
-
-      await ctx.service.cancelSubscription('user-1', 'immediate');
-
-      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(
-        sub,
-        expect.any(Date),
-        true
-      );
-    });
-
-    it('leaves a period-end cancel to the renewal scan at the boundary', async () => {
-      const ctx = await build();
-
-      ctx.customers.findOne.mockResolvedValue({ id: 'cust-1' });
-      ctx.subscriptions.findOne.mockResolvedValue({
-        id: 'sub-1',
-        provider: 'yookassa' as const,
-        providerSubscriptionId: null,
-        status: 'active',
-        cancelAtPeriodEnd: false
-      });
-
-      await ctx.service.cancelSubscription('user-1');
-
-      expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
     });
 
     it('answers 409 and emits nothing when a concurrent writer cancelled first', async () => {

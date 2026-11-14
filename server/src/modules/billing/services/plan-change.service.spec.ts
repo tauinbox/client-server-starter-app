@@ -11,12 +11,7 @@ import { Customer } from '../entities/customer.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
-import {
-  InvoicePaidEvent,
-  PlanChangedEvent,
-  UsagePeriodClosedEvent
-} from '../events/billing.events';
-import { RenewalService } from '../renewals/renewal.service';
+import { InvoicePaidEvent, PlanChangedEvent } from '../events/billing.events';
 import { BillingService } from '../billing.service';
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { ChargeDeclinedError } from '../providers/payment-provider.interface';
@@ -189,7 +184,6 @@ async function build() {
   const plans = repo();
   const emit = jest.fn();
 
-  const renewals = { billClosingUsagePeriod: jest.fn() };
   const billing = { getProviderById: jest.fn() };
 
   const insertStore = makeInsertStore(invoices);
@@ -217,7 +211,6 @@ async function build() {
       { provide: getRepositoryToken(Plan), useValue: plans },
       { provide: getDataSourceToken(), useValue: dataSource },
       { provide: BillingService, useValue: billing },
-      { provide: RenewalService, useValue: renewals },
       { provide: EventEmitter2, useValue: { emit } }
     ]
   }).compile();
@@ -229,7 +222,6 @@ async function build() {
     invoices,
     plans,
     billing,
-    renewals,
     emit,
     dataSource,
     insertedInvoices: insertStore.inserted
@@ -346,28 +338,25 @@ describe('PlanChangeService', () => {
 
         plansByKey(ctx);
         ctx.customers.findOne.mockResolvedValue(customer);
-        ctx.subscriptions.findOne.mockResolvedValue(
-          makeSub({ planKey: 'usage', billingMode: 'usage', ...overrides })
-        );
+        ctx.subscriptions.findOne.mockResolvedValue(makeSub(overrides));
         const yoo = provider('yookassa', false);
 
         ctx.billing.getProviderById.mockReturnValue(yoo);
         const message =
           'The billing period has ended and its renewal is in progress. Try again shortly.';
 
-        await expect(ctx.service.changePlan('user-1', 'pro')).rejects.toThrow(
-          message
-        );
         await expect(
-          ctx.service.previewChange('user-1', 'pro')
+          ctx.service.changePlan('user-1', 'business')
+        ).rejects.toThrow(message);
+        await expect(
+          ctx.service.previewChange('user-1', 'business')
         ).rejects.toThrow(message);
         await expectRefusal(
-          ctx.service.changePlan('user-1', 'pro'),
+          ctx.service.changePlan('user-1', 'business'),
           ErrorKeys.BILLING.RENEWAL_IN_PROGRESS
         );
 
         expect(ctx.subscriptions.update).not.toHaveBeenCalled();
-        expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
         expect(yoo.chargeOffSession).not.toHaveBeenCalled();
       }
     );
@@ -658,124 +647,7 @@ describe('PlanChangeService', () => {
       expect(ctx.subscriptions.update).not.toHaveBeenCalled();
     });
 
-    it('usage → fixed bills the closing window under the outgoing plan, then moves it', async () => {
-      const ctx = await build();
-
-      plansByKey(ctx);
-      ctx.customers.findOne.mockResolvedValue(customer);
-      ctx.subscriptions.findOne.mockResolvedValue(
-        makeSub({ planKey: 'usage', billingMode: 'usage' })
-      );
-      const planAtClose: string[] = [];
-
-      ctx.renewals.billClosingUsagePeriod.mockImplementation(
-        (sub: Subscription) => {
-          planAtClose.push(sub.planKey);
-
-          return Promise.resolve();
-        }
-      );
-      const yoo = provider('yookassa', false);
-
-      ctx.billing.getProviderById.mockReturnValue(yoo);
-
-      const result = await ctx.service.changePlan('user-1', 'pro');
-
-      expect(ctx.renewals.billClosingUsagePeriod).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'sub-1' }),
-        frozenNow
-      );
-      expect(planAtClose).toEqual(['usage']);
-      expect(ctx.subscriptions.update).toHaveBeenCalledWith(
-        { id: 'sub-1' },
-        { meteredFrom: frozenNow }
-      );
-      expect(result).toMatchObject({ planKey: 'pro', billingMode: 'fixed' });
-    });
-
-    it('usage → fixed bills nothing when the prorated charge is declined', async () => {
-      const ctx = await build();
-
-      plansByKey(ctx);
-      ctx.customers.findOne.mockResolvedValue(customer);
-      ctx.subscriptions.findOne.mockResolvedValue(
-        makeSub({ planKey: 'usage', billingMode: 'usage' })
-      );
-      const yoo = provider('yookassa', false);
-
-      yoo.chargeOffSession.mockRejectedValue(new Error('declined'));
-      ctx.billing.getProviderById.mockReturnValue(yoo);
-
-      await expect(ctx.service.changePlan('user-1', 'pro')).rejects.toThrow(
-        'declined'
-      );
-
-      expect(ctx.renewals.billClosingUsagePeriod).not.toHaveBeenCalled();
-    });
-
-    it('usage → fixed on a provider-managed row closes the window with the outgoing plan', async () => {
-      const ctx = await build();
-      const paddleUsage = makePlan({
-        ...usagePlan,
-        prices: {
-          paddle: {
-            currency: 'USD',
-            amountMinor: 0,
-            unitPriceMinor: 2,
-            providerPriceId: 'pri_usage'
-          }
-        }
-      });
-
-      ctx.plans.findOne.mockImplementation((opts: { where: { key: string } }) =>
-        Promise.resolve(
-          opts.where.key === 'usage'
-            ? paddleUsage
-            : opts.where.key === 'business'
-              ? businessPlan
-              : null
-        )
-      );
-      ctx.customers.findOne.mockResolvedValue({ ...customer, country: 'US' });
-      const switchedIn = new Date('2026-06-05T00:00:00Z');
-
-      ctx.subscriptions.findOne.mockResolvedValue(
-        makeSub({
-          planKey: 'usage',
-          billingMode: 'usage',
-          provider: 'paddle',
-          lifecycleOwner: 'provider',
-          providerSubscriptionId: 'sub_ext',
-          meteredFrom: switchedIn
-        })
-      );
-      ctx.billing.getProviderById.mockReturnValue(provider('paddle', true));
-
-      await ctx.service.changePlan('user-1', 'business');
-
-      expect(ctx.emit).toHaveBeenCalledWith(
-        UsagePeriodClosedEvent.name,
-        expect.objectContaining({
-          userId: 'user-1',
-          subscriptionId: 'sub-1',
-          periodStart: switchedIn,
-          periodEnd: frozenNow,
-          planKey: 'usage'
-        })
-      );
-      expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
-        Subscription,
-        expect.objectContaining({ id: 'sub-1' }),
-        {
-          planKey: 'business',
-          billingMode: 'fixed',
-          planChangeSeq: expect.any(Function),
-          meteredFrom: frozenNow
-        }
-      );
-    });
-
-    it('a switch that keeps the billing mode leaves the metered window alone', async () => {
+    it('a provider-managed switch writes the plan, its mode and the sequence', async () => {
       const ctx = await build();
 
       plansByKey(ctx);
@@ -799,10 +671,6 @@ describe('PlanChangeService', () => {
           billingMode: 'fixed',
           planChangeSeq: expect.any(Function)
         }
-      );
-      expect(ctx.emit).not.toHaveBeenCalledWith(
-        UsagePeriodClosedEvent.name,
-        expect.anything()
       );
     });
 

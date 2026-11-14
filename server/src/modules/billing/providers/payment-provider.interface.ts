@@ -108,18 +108,11 @@ export interface NormalizedInvoicePayload {
    */
   planKey?: string | null;
   /**
-   * The `usage:{subscriptionId}:{periodEnd}` key a postpaid usage charge was
-   * posted under (echoed back through the provider's price custom data). When
-   * present, the reducer reconciles the payment onto the matching pending
-   * usage invoice instead of inserting a new row.
-   */
-  usageChargeKey?: string | null;
-  /**
    * The `providerEventId` of the invoice a self-managed (YooKassa) scheduler
    * charge already recorded — its idempotency key, echoed back through the
    * payment's metadata. Set on the provider's confirming `payment.succeeded`
-   * for any core-initiated off-session charge (renewal, trial conversion, usage
-   * close, plan-change proration). The core inserted the invoice itself (`paid`
+   * for any core-initiated off-session charge (renewal, trial conversion,
+   * plan-change proration). The core inserted the invoice itself (`paid`
    * when captured synchronously, `pending` while fiscalization settles), so the
    * reducer settles/reconciles onto that row and never inserts a duplicate,
    * saves a second default card, or re-activates.
@@ -158,8 +151,6 @@ export interface NormalizedPaymentMethodPayload {
 export interface NormalizedPaymentFailedPayload {
   ref: NormalizedCustomerRef;
   providerSubscriptionId: string | null;
-  /** See `NormalizedInvoicePayload.usageChargeKey` — marks the pending usage invoice failed. */
-  usageChargeKey?: string | null;
   /**
    * See `NormalizedInvoicePayload.offSessionChargeKey`: a core-initiated
    * off-session charge that was accepted as `pending` and then canceled at
@@ -283,14 +274,6 @@ export interface OffSessionCharge {
   idempotencyKey?: string;
 }
 
-/** A postpaid usage charge on a provider-managed subscription. */
-export interface UsageCharge {
-  amountMinor: number;
-  currency: string;
-  description: string;
-  chargeKey: string;
-}
-
 export interface PaymentProvider {
   readonly id: BillingProviderId;
   readonly managesLifecycle: boolean;
@@ -351,17 +334,6 @@ export interface PaymentProvider {
     customer: Customer,
     params: OneTimePaymentParams
   ): Promise<OneTimePaymentSession>;
-  /**
-   * Posts a postpaid usage charge against a provider-managed subscription at
-   * its billing-cycle boundary (Paddle `createOneTimeCharge`). `chargeKey` is
-   * echoed back through the provider's price custom data so the resulting paid
-   * webhook reconciles onto the pending usage invoice. Self-managed providers
-   * charge usage through the renewal scheduler and reject this call.
-   */
-  chargeUsage(
-    providerSubscriptionId: string,
-    charge: UsageCharge
-  ): Promise<void>;
   /**
    * Switches a provider-managed subscription to `plan` with immediate
    * proration (Paddle `subscriptions.update`, `prorated_immediately`). The

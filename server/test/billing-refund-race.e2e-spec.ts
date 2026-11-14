@@ -18,7 +18,6 @@ import { Subscription } from '../src/modules/billing/entities/subscription.entit
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
-import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
@@ -108,7 +107,6 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
         refundedMinor: Money.fromMinor(0),
         currency: 'RUB',
         status: 'paid',
-        creditUnitsApplied: 0,
         billingMode: 'fixed',
         kind: 'subscription',
         productId: null,
@@ -165,10 +163,6 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
           useValue: { getProviderById: () => provider }
         },
         { provide: CreditService, useValue: { clawbackPurchase: jest.fn() } },
-        {
-          provide: RenewalService,
-          useValue: { billClosingUsagePeriod: jest.fn() }
-        },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } }
       ]
     }).compile();

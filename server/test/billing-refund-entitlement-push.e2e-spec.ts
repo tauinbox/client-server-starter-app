@@ -158,7 +158,6 @@ runWithInfra(
           refundedMinor: Money.fromMinor(0),
           currency: 'RUB',
           status: 'paid',
-          creditUnitsApplied: 0,
           billingMode: 'fixed',
           kind: 'one_time',
           productId: null,

@@ -18,14 +18,10 @@ import {
 } from '../events/billing.events';
 import {
   BILLING_PROVIDERS,
-  ChargeDeclinedError,
   type PaymentProvider
 } from '../providers/payment-provider.interface';
 import { withProviderDeadline } from '../providers/provider-deadline';
 import { FixedRating } from '../rating/fixed-rating.strategy';
-import { UsageRating } from '../rating/usage-rating.strategy';
-import { UsageRecord } from '../entities/usage-record.entity';
-import { CreditService } from '../services/credit.service';
 import { RenewalService } from './renewal.service';
 import {
   DUNNING_MAX_ATTEMPTS,
@@ -323,14 +319,10 @@ async function build(
   store: Store,
   chargeOffSession: jest.Mock,
   {
-    usageSum = jest.fn().mockResolvedValue(null),
-    availableCredits = 0,
     findOffSessionCharge = jest.fn().mockResolvedValue(null),
     deadlineMs = 0,
     getOffSessionCharge = jest.fn().mockResolvedValue(null)
   }: {
-    usageSum?: jest.Mock;
-    availableCredits?: number;
     findOffSessionCharge?: jest.Mock;
     deadlineMs?: number;
     getOffSessionCharge?: jest.Mock;
@@ -341,18 +333,8 @@ async function build(
   charge: jest.Mock;
   findCharge: jest.Mock;
   getCharge: jest.Mock;
-  credits: {
-    availableUnitsForUpdate: jest.Mock;
-    spendOnUsage: jest.Mock;
-    releaseHolds: jest.Mock;
-  };
 }> {
   const emit = jest.fn();
-  const credits = {
-    availableUnitsForUpdate: jest.fn().mockResolvedValue(availableCredits),
-    spendOnUsage: jest.fn().mockResolvedValue(undefined),
-    releaseHolds: jest.fn().mockResolvedValue(undefined)
-  };
   const manager = makeManager(store);
   const dataSource = {
     transaction: (cb: (m: typeof manager) => unknown) => cb(manager),
@@ -366,7 +348,6 @@ async function build(
     findOffSessionCharge,
     getOffSessionCharge,
     createOneTimePayment: jest.fn(),
-    chargeUsage: jest.fn(),
     changePlan: jest.fn(),
     previewChangePlan: jest.fn(),
     updatePaymentMethod: jest.fn(),
@@ -379,26 +360,6 @@ async function build(
     providers: [
       RenewalService,
       FixedRating,
-      UsageRating,
-      {
-        // UsageRating now aggregates via a raw bigint SUM query; drive the same
-        // `usageSum` control knob through the query-builder's getRawOne wire shape.
-        provide: getRepositoryToken(UsageRecord),
-        useValue: {
-          createQueryBuilder: () => {
-            const qb = {
-              select: () => qb,
-              where: () => qb,
-              andWhere: () => qb,
-              getRawOne: async () => ({
-                total: String((await usageSum()) ?? 0)
-              })
-            };
-
-            return qb;
-          }
-        }
-      },
       {
         provide: getRepositoryToken(Subscription),
         useValue: subscriptionsRepo(store)
@@ -426,7 +387,6 @@ async function build(
         provide: BILLING_PROVIDERS,
         useValue: [withProviderDeadline(provider, deadlineMs)]
       },
-      { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } }
     ]
   }).compile();
@@ -436,8 +396,7 @@ async function build(
     emit,
     charge: chargeOffSession,
     findCharge: findOffSessionCharge,
-    getCharge: getOffSessionCharge,
-    credits
+    getCharge: getOffSessionCharge
   };
 }
 
@@ -449,8 +408,6 @@ function priorInvoice(overrides: Partial<Invoice> = {}): Invoice {
     status: 'failed',
     providerInvoiceRef: '',
     amountMinor: Money.fromMinor(99000),
-    creditUnitsApplied: 0,
-    creditsReleasedAt: null,
     ...overrides
   });
 }
@@ -556,50 +513,6 @@ describe('RenewalService', () => {
     }
   );
 
-  it('books the closing charge of an immediate usage cancel in the currency of the price', async () => {
-    const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
-    const store = baseStore(sub);
-
-    store.customers[0].currency = 'USD';
-    store.plans.push(
-      Object.assign(makePlan(), {
-        key: 'usage',
-        billingMode: 'usage',
-        meterKey: 'api_calls',
-        prices: {
-          yookassa: {
-            currency: 'RUB',
-            amountMinor: 0,
-            unitPriceMinor: 200,
-            includedUnits: 0
-          }
-        }
-      })
-    );
-    const charge = jest
-      .fn()
-      .mockResolvedValue({ providerInvoiceRef: 'pay_c', status: 'captured' });
-    const { service } = await build(store, charge, {
-      usageSum: jest.fn().mockResolvedValue(3)
-    });
-
-    await service.billClosingUsagePeriod(sub, NOW);
-
-    expect(charge).toHaveBeenCalledWith(
-      expect.objectContaining({ currency: 'USD' }),
-      {
-        amountMinor: 600,
-        currency: 'RUB',
-        receiptItems: expect.any(Array),
-        idempotencyKey: expect.any(String)
-      }
-    );
-    expect(store.invoices[0]).toMatchObject({
-      status: 'paid',
-      currency: 'RUB'
-    });
-  });
-
   it('bounds a stalled provider call and still renews the next due subscription', async () => {
     const stalled = makeSub();
     const next = makeSub({ id: 'sub-2', customerId: 'cust-2' });
@@ -617,7 +530,6 @@ describe('RenewalService', () => {
         : Promise.resolve({ providerInvoiceRef: 'pay_2', status: 'captured' })
     );
     const { service } = await build(store, charge, {
-      availableCredits: 0,
       deadlineMs: 20
     });
 
@@ -871,7 +783,6 @@ describe('RenewalService', () => {
         status: 'captured'
       });
       const { service, emit } = await build(store, charge, {
-        availableCredits: 0,
         findOffSessionCharge: findCharge
       });
 
@@ -907,7 +818,6 @@ describe('RenewalService', () => {
       const charge = jest.fn();
       const findCharge = jest.fn().mockRejectedValue(new Error('api down'));
       const { service, emit } = await build(store, charge, {
-        availableCredits: 0,
         findOffSessionCharge: findCharge
       });
 
@@ -933,7 +843,6 @@ describe('RenewalService', () => {
         .mockResolvedValue({ providerInvoiceRef: 'pay_1', status: 'captured' });
       const findCharge = jest.fn();
       const { service } = await build(store, charge, {
-        availableCredits: 0,
         findOffSessionCharge: findCharge
       });
 
@@ -1148,712 +1057,6 @@ describe('RenewalService', () => {
     ).toHaveLength(1);
   });
 
-  describe('usage-mode subscriptions (postpaid period close)', () => {
-    function makeUsagePlan(): Plan {
-      return Object.assign(new Plan(), {
-        id: 'plan-usage',
-        key: 'usage',
-        name: 'Pay as you go',
-        description: null,
-        billingMode: 'usage',
-        interval: 'month',
-        meterKey: 'api_calls',
-        entitlements: [],
-        limits: null,
-        trialDays: 0,
-        active: true,
-        prices: {
-          yookassa: {
-            currency: 'RUB',
-            amountMinor: 0,
-            unitPriceMinor: 200,
-            includedUnits: 100
-          }
-        },
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-    }
-
-    function usageStore(sub: Subscription): Store {
-      const store = baseStore(sub);
-
-      store.plans.push(makeUsagePlan());
-
-      return store;
-    }
-
-    const usageSub = () =>
-      makeSub({ planKey: 'usage', billingMode: 'usage' as const });
-
-    it('seals usage ingest at the anchor before it rates the window', async () => {
-      const sub = usageSub();
-      const store = usageStore(sub);
-      let sealAtRating: Date | null | undefined;
-      const sum = jest.fn(() => {
-        sealAtRating = sub.usageSealedUntil;
-
-        return Promise.resolve(142);
-      });
-      const { service } = await build(
-        store,
-        jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_usage',
-          status: 'captured'
-        }),
-        { usageSum: sum }
-      );
-
-      await service.runDueRenewals(NOW);
-
-      expect(sealAtRating).toEqual(new Date('2026-06-01T00:00:00Z'));
-    });
-
-    it('re-rates the whole window on a dunning retry the seal already covers', async () => {
-      const anchor = new Date('2026-06-01T00:00:00Z');
-      const sub = makeSub({
-        planKey: 'usage',
-        billingMode: 'usage' as const,
-        status: 'past_due',
-        dunningAttempts: 1,
-        nextRenewalAttemptAt: new Date(NOW.getTime() - 1000),
-        usageSealedUntil: anchor
-      });
-      const store = usageStore(sub);
-      const { service } = await build(
-        store,
-        jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_retry',
-          status: 'captured'
-        }),
-        { usageSum: jest.fn().mockResolvedValue(142) }
-      );
-
-      await service.runDueRenewals(NOW);
-
-      expect(store.invoices[0]).toMatchObject({
-        amountMinor: Money.fromMinor(8400),
-        periodStart: new Date('2026-05-01T00:00:00Z'),
-        periodEnd: anchor
-      });
-    });
-
-    it('charges the overage of the closed period and invoices that period', async () => {
-      const sub = usageSub();
-      const store = usageStore(sub);
-      const charge = jest.fn().mockResolvedValue({
-        providerInvoiceRef: 'pay_usage',
-        status: 'captured'
-      });
-      const sum = jest.fn().mockResolvedValue(142);
-      const { service, emit } = await build(store, charge, { usageSum: sum });
-
-      await service.runDueRenewals(NOW);
-
-      expect(charge).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'cust-1' }),
-        {
-          amountMinor: 8400,
-          currency: 'RUB',
-          receiptItems: [
-            {
-              description: 'Pay as you go: api_calls × 42',
-              amountMinor: 8400,
-              quantity: 1,
-              paymentMode: 'full_payment'
-            }
-          ],
-          idempotencyKey:
-            'renewal:sub-1:' + new Date('2026-06-01T00:00:00Z').getTime()
-        }
-      );
-      // The invoice covers the metered period that just closed, not the new one.
-      expect(store.invoices[0]).toMatchObject({
-        amountMinor: Money.fromMinor(8400),
-        billingMode: 'usage',
-        periodStart: new Date('2026-05-01T00:00:00Z'),
-        periodEnd: new Date('2026-06-01T00:00:00Z')
-      });
-      // The subscription itself advances to the next period.
-      expect(sub.currentPeriodStart).toEqual(new Date('2026-06-01T00:00:00Z'));
-      expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
-      expect(emit).toHaveBeenCalledWith(
-        SubscriptionRenewedEvent.name,
-        expect.objectContaining({ subscriptionId: 'sub-1' })
-      );
-    });
-
-    it('rates the closed period [currentPeriodStart, anchor)', async () => {
-      const sub = usageSub();
-      const store = usageStore(sub);
-      const sum = jest.fn().mockResolvedValue(150);
-      const { service } = await build(
-        store,
-        jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_u',
-          status: 'captured'
-        }),
-        { usageSum: sum }
-      );
-
-      await service.runDueRenewals(NOW);
-
-      // The exact [start, end) window is asserted in usage-rating.strategy.spec;
-      // here it is enough that the closed period was rated at all.
-      expect(sum).toHaveBeenCalled();
-    });
-
-    it('invoices only the metered window a mode switch opened, then resets it', async () => {
-      const switchedAt = new Date('2026-05-11T00:00:00Z');
-      const sub = makeSub({
-        planKey: 'usage',
-        billingMode: 'usage' as const,
-        meteredFrom: switchedAt
-      });
-      const store = usageStore(sub);
-      const { service } = await build(
-        store,
-        jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_u',
-          status: 'captured'
-        }),
-        { usageSum: jest.fn().mockResolvedValue(142) }
-      );
-
-      await service.runDueRenewals(NOW);
-
-      expect(store.invoices[0]).toMatchObject({
-        billingMode: 'usage',
-        periodStart: switchedAt,
-        periodEnd: new Date('2026-06-01T00:00:00Z')
-      });
-      expect(sub.meteredFrom).toBeNull();
-      expect(sub.currentPeriodStart).toEqual(new Date('2026-06-01T00:00:00Z'));
-    });
-
-    it('closes a zero-usage period without a provider charge via a zero invoice', async () => {
-      const sub = usageSub();
-      const store = usageStore(sub);
-      const charge = jest.fn();
-      const sum = jest.fn().mockResolvedValue(null);
-      const { service, emit } = await build(store, charge, { usageSum: sum });
-
-      await service.runDueRenewals(NOW);
-
-      expect(charge).not.toHaveBeenCalled();
-      expect(store.invoices).toHaveLength(1);
-      expect(store.invoices[0]).toMatchObject({
-        amountMinor: Money.fromMinor(0),
-        status: 'paid',
-        billingMode: 'usage'
-      });
-      expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
-      expect(emit).toHaveBeenCalledWith(
-        InvoicePaidEvent.name,
-        expect.objectContaining({ userId: 'user-1' })
-      );
-    });
-
-    it('spends partial credits with the renewal and charges only the remainder', async () => {
-      const sub = usageSub();
-      const store = usageStore(sub);
-      const charge = jest.fn().mockResolvedValue({
-        providerInvoiceRef: 'pay_usage',
-        status: 'captured'
-      });
-      const sum = jest.fn().mockResolvedValue(142);
-      const { service, credits } = await build(store, charge, {
-        usageSum: sum,
-        availableCredits: 10
-      });
-
-      await service.runDueRenewals(NOW);
-
-      // 42 billable − 10 credits = 32 charged at 200 minor.
-      expect(charge).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'cust-1' }),
-        {
-          amountMinor: 6400,
-          currency: 'RUB',
-          receiptItems: [
-            {
-              description: 'Pay as you go: api_calls × 32',
-              amountMinor: 6400,
-              quantity: 1,
-              paymentMode: 'full_payment'
-            }
-          ],
-          idempotencyKey: expect.any(String)
-        }
-      );
-      expect(credits.spendOnUsage).toHaveBeenCalledWith(
-        expect.anything(),
-        { customerId: 'cust-1', invoiceId: 'inv-1' },
-        10
-      );
-      expect(store.invoices[0]).toMatchObject({
-        amountMinor: Money.fromMinor(6400)
-      });
-    });
-
-    it('skips the provider entirely when credits cover the whole period', async () => {
-      const sub = usageSub();
-      const store = usageStore(sub);
-      const charge = jest.fn();
-      const sum = jest.fn().mockResolvedValue(142);
-      const { service, credits, emit } = await build(store, charge, {
-        usageSum: sum,
-        availableCredits: 1000
-      });
-
-      await service.runDueRenewals(NOW);
-
-      expect(charge).not.toHaveBeenCalled();
-      expect(credits.spendOnUsage).toHaveBeenCalledWith(
-        expect.anything(),
-        { customerId: 'cust-1', invoiceId: 'inv-1' },
-        42
-      );
-      expect(store.invoices[0]).toMatchObject({
-        amountMinor: Money.fromMinor(0),
-        status: 'paid'
-      });
-      expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
-      expect(emit).toHaveBeenCalledWith(
-        SubscriptionRenewedEvent.name,
-        expect.objectContaining({ subscriptionId: 'sub-1' })
-      );
-    });
-
-    it('books the failed period unpaid and spends no credits', async () => {
-      const sub = usageSub();
-      const store = usageStore(sub);
-      const charge = jest.fn().mockRejectedValue(new Error('declined'));
-      const sum = jest.fn().mockResolvedValue(142);
-      const { service, credits } = await build(store, charge, {
-        usageSum: sum,
-        availableCredits: 10
-      });
-
-      await service.runDueRenewals(NOW);
-
-      // The row carries the units this attempt rated against, but they settle
-      // with a paid invoice only - an unpaid period deducts nothing.
-      expect(credits.spendOnUsage).not.toHaveBeenCalled();
-      expect(store.invoices).toHaveLength(1);
-      expect(store.invoices[0]).toMatchObject({
-        status: 'failed',
-        providerInvoiceRef: '',
-        creditUnitsApplied: 10
-      });
-    });
-
-    it('walks the dunning ladder when the usage charge fails', async () => {
-      const sub = usageSub();
-      const store = usageStore(sub);
-      const charge = jest.fn().mockRejectedValue(new Error('declined'));
-      const sum = jest.fn().mockResolvedValue(142);
-      const { service, emit } = await build(store, charge, { usageSum: sum });
-
-      await service.runDueRenewals(NOW);
-
-      expect(sub.status).toBe('past_due');
-      expect(sub.dunningAttempts).toBe(1);
-      expect(store.invoices).toHaveLength(1);
-      expect(store.invoices[0]).toMatchObject({
-        status: 'failed',
-        providerInvoiceRef: ''
-      });
-      expect(emit).toHaveBeenCalledWith(
-        PaymentFailedEvent.name,
-        expect.objectContaining({ userId: 'user-1' })
-      );
-    });
-
-    describe('cancel_at_period_end reaching the boundary', () => {
-      const closingSub = () =>
-        makeSub({
-          planKey: 'usage',
-          billingMode: 'usage' as const,
-          cancelAtPeriodEnd: true
-        });
-
-      it('charges the closing period, then cancels without advancing', async () => {
-        const sub = closingSub();
-        const store = usageStore(sub);
-        const charge = jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_close',
-          status: 'captured'
-        });
-        const sum = jest.fn().mockResolvedValue(142);
-        const { service, emit } = await build(store, charge, { usageSum: sum });
-
-        await service.runDueRenewals(NOW);
-
-        expect(charge).toHaveBeenCalledWith(
-          expect.objectContaining({ id: 'cust-1' }),
-          {
-            amountMinor: 8400,
-            currency: 'RUB',
-            receiptItems: expect.anything(),
-            idempotencyKey:
-              'renewal:sub-1:' + new Date('2026-06-01T00:00:00Z').getTime()
-          }
-        );
-        expect(store.invoices[0]).toMatchObject({
-          amountMinor: Money.fromMinor(8400),
-          status: 'paid',
-          billingMode: 'usage',
-          periodStart: new Date('2026-05-01T00:00:00Z'),
-          periodEnd: new Date('2026-06-01T00:00:00Z')
-        });
-        expect(sub.status).toBe('canceled');
-        expect(sub.currentPeriodStart).toEqual(
-          new Date('2026-05-01T00:00:00Z')
-        );
-        expect(sub.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
-        expect(emit).toHaveBeenCalledWith(
-          SubscriptionCanceledEvent.name,
-          expect.objectContaining({ subscriptionId: 'sub-1' })
-        );
-        expect(
-          emit.mock.calls.filter(
-            (call: unknown[]) => call[0] === SubscriptionRenewedEvent.name
-          )
-        ).toHaveLength(0);
-      });
-
-      it('cancels anyway when the closing charge is declined, booking it unpaid', async () => {
-        const sub = closingSub();
-        const store = usageStore(sub);
-        const charge = jest.fn().mockRejectedValue(new Error('declined'));
-        const sum = jest.fn().mockResolvedValue(142);
-        const { service, emit } = await build(store, charge, { usageSum: sum });
-
-        await service.runDueRenewals(NOW);
-
-        expect(store.invoices).toHaveLength(1);
-        expect(store.invoices[0]).toMatchObject({
-          amountMinor: Money.fromMinor(8400),
-          status: 'failed',
-          periodStart: new Date('2026-05-01T00:00:00Z'),
-          periodEnd: new Date('2026-06-01T00:00:00Z')
-        });
-        // Dunning protects the next period; a cancellation has none.
-        expect(sub.status).toBe('canceled');
-        expect(sub.dunningAttempts).toBe(0);
-        expect(
-          emit.mock.calls.filter(
-            (call: unknown[]) => call[0] === PaymentFailedEvent.name
-          )
-        ).toHaveLength(0);
-      });
-
-      it('closes a zero-usage period with a zero invoice and cancels', async () => {
-        const sub = closingSub();
-        const store = usageStore(sub);
-        const charge = jest.fn();
-        const { service } = await build(store, charge);
-
-        await service.runDueRenewals(NOW);
-
-        expect(charge).not.toHaveBeenCalled();
-        expect(store.invoices[0]).toMatchObject({
-          amountMinor: Money.fromMinor(0),
-          status: 'paid'
-        });
-        expect(sub.status).toBe('canceled');
-      });
-
-      it('leaves a fixed subscription cancelling at the boundary uninvoiced', async () => {
-        const sub = makeSub({ cancelAtPeriodEnd: true });
-        const store = baseStore(sub);
-        const charge = jest.fn();
-        const { service } = await build(store, charge);
-
-        await service.runDueRenewals(NOW);
-
-        expect(charge).not.toHaveBeenCalled();
-        expect(store.invoices).toHaveLength(0);
-        expect(sub.status).toBe('canceled');
-      });
-    });
-
-    describe('billClosingUsagePeriod', () => {
-      it('charges [currentPeriodStart, now) under one window key when the subscription stays open', async () => {
-        const sub = usageSub();
-        const store = usageStore(sub);
-        const charge = jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_now',
-          status: 'captured'
-        });
-        const sum = jest.fn().mockResolvedValue(142);
-        const { service, emit } = await build(store, charge, { usageSum: sum });
-
-        await service.billClosingUsagePeriod(sub, NOW);
-
-        expect(charge).toHaveBeenCalledWith(
-          expect.objectContaining({ id: 'cust-1' }),
-          {
-            amountMinor: 8400,
-            currency: 'RUB',
-            receiptItems: expect.anything(),
-            idempotencyKey:
-              'cancel:sub-1:' + new Date('2026-05-01T00:00:00Z').getTime()
-          }
-        );
-        expect(store.invoices[0]).toMatchObject({
-          status: 'paid',
-          billingMode: 'usage',
-          periodStart: new Date('2026-05-01T00:00:00Z'),
-          periodEnd: NOW
-        });
-        // The cancel columns belong to the caller; this only moves money.
-        expect(sub.status).toBe('active');
-        expect(emit).toHaveBeenCalledWith(
-          InvoicePaidEvent.name,
-          expect.objectContaining({ userId: 'user-1' })
-        );
-      });
-
-      it('rates nothing for an incomplete row, which accrues no usage', async () => {
-        const sub = usageSub();
-
-        sub.status = 'incomplete';
-        const store = usageStore(sub);
-        const charge = jest.fn();
-        const sum = jest.fn().mockResolvedValue(142);
-        const { service } = await build(store, charge, { usageSum: sum });
-
-        await service.billClosingUsagePeriod(sub, NOW, true);
-
-        expect(charge).not.toHaveBeenCalled();
-        expect(store.invoices).toEqual([]);
-        expect(store.subscriptions[0].usageSealedUntil ?? null).toBeNull();
-      });
-
-      it('seals usage ingest at now before it rates the closing window', async () => {
-        const sub = usageSub();
-        const store = usageStore(sub);
-        let sealAtRating: Date | null | undefined;
-        const sum = jest.fn(() => {
-          sealAtRating = store.subscriptions[0].usageSealedUntil;
-
-          return Promise.resolve(142);
-        });
-        const { service } = await build(
-          store,
-          jest.fn().mockResolvedValue({
-            providerInvoiceRef: 'pay_now',
-            status: 'captured'
-          }),
-          { usageSum: sum }
-        );
-
-        await service.billClosingUsagePeriod(sub, NOW);
-
-        expect(sealAtRating).toEqual(NOW);
-      });
-
-      it('charges a window a mode switch moved under a key of its own', async () => {
-        const switchedAt = new Date('2026-05-11T00:00:00Z');
-        const sub = makeSub({
-          planKey: 'usage',
-          billingMode: 'usage' as const,
-          meteredFrom: switchedAt
-        });
-        const store = usageStore(sub);
-        const charge = jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_now',
-          status: 'captured'
-        });
-        const { service } = await build(store, charge, {
-          usageSum: jest.fn().mockResolvedValue(142)
-        });
-
-        await service.billClosingUsagePeriod(sub, NOW);
-
-        expect(charge).toHaveBeenCalledWith(expect.anything(), {
-          amountMinor: 8400,
-          currency: 'RUB',
-          receiptItems: expect.anything(),
-          idempotencyKey: `cancel:sub-1:${switchedAt.getTime()}`
-        });
-        expect(store.invoices[0]).toMatchObject({
-          periodStart: switchedAt,
-          periodEnd: NOW
-        });
-      });
-
-      it('books the period unpaid when the charge is declined, without throwing', async () => {
-        const sub = usageSub();
-        const store = usageStore(sub);
-        const charge = jest.fn().mockRejectedValue(new Error('declined'));
-        const sum = jest.fn().mockResolvedValue(142);
-        const { service } = await build(store, charge, { usageSum: sum });
-
-        await expect(
-          service.billClosingUsagePeriod(sub, NOW)
-        ).resolves.toBeUndefined();
-
-        expect(store.invoices[0]).toMatchObject({ status: 'failed' });
-        expect(sub.dunningAttempts).toBe(0);
-      });
-
-      it('skips a period a renewal invoice already covers when the subscription stays open', async () => {
-        const sub = usageSub();
-        const store = usageStore(sub);
-        const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
-        // @ts-expect-error - partial Invoice fake for this scenario
-        const booked: Invoice & { providerEventId: string | null } = {
-          id: 'inv-renewal',
-          providerEventId: `renewal:sub-1:${anchorMs}`,
-          status: 'failed',
-          providerInvoiceRef: '',
-          creditUnitsApplied: 0
-        };
-
-        store.invoices.push(booked);
-        const charge = jest.fn();
-        const { service } = await build(store, charge);
-
-        await service.billClosingUsagePeriod(sub, NOW);
-
-        expect(charge).not.toHaveBeenCalled();
-        expect(store.invoices).toHaveLength(1);
-      });
-
-      it('charges the due part of an immediate cancel under the renewal key and the rest under a cancel key', async () => {
-        const sub = usageSub();
-        const store = usageStore(sub);
-        const anchor = new Date('2026-06-01T00:00:00Z');
-        const charge = jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_now',
-          status: 'captured'
-        });
-        const { service } = await build(store, charge, {
-          usageSum: jest.fn().mockResolvedValue(142)
-        });
-
-        await service.billClosingUsagePeriod(sub, NOW, true);
-
-        expect(
-          charge.mock.calls.map(
-            (call: [unknown, { idempotencyKey?: string }]) =>
-              call[1].idempotencyKey
-          )
-        ).toEqual([
-          `renewal:sub-1:${anchor.getTime()}`,
-          `cancel:sub-1:${anchor.getTime()}`
-        ]);
-        expect(store.invoices).toEqual([
-          expect.objectContaining({
-            providerEventId: `renewal:sub-1:${anchor.getTime()}`,
-            status: 'paid',
-            periodStart: new Date('2026-05-01T00:00:00Z'),
-            periodEnd: anchor
-          }),
-          expect.objectContaining({
-            providerEventId: `cancel:sub-1:${anchor.getTime()}`,
-            status: 'paid',
-            periodStart: anchor,
-            periodEnd: NOW
-          })
-        ]);
-      });
-
-      it('bills only the time after the due period when a renewal invoice already covers it', async () => {
-        const sub = usageSub();
-        const store = usageStore(sub);
-        const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
-        // @ts-expect-error - partial Invoice fake for this scenario
-        const booked: Invoice & { providerEventId: string | null } = {
-          id: 'inv-renewal',
-          providerEventId: `renewal:sub-1:${anchorMs}`,
-          status: 'failed',
-          providerInvoiceRef: '',
-          creditUnitsApplied: 0
-        };
-
-        store.invoices.push(booked);
-        const charge = jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_now',
-          status: 'captured'
-        });
-        const { service } = await build(store, charge, {
-          usageSum: jest.fn().mockResolvedValue(142)
-        });
-
-        await service.billClosingUsagePeriod(sub, NOW, true);
-
-        expect(charge).toHaveBeenCalledTimes(1);
-        expect(charge).toHaveBeenCalledWith(expect.anything(), {
-          amountMinor: 8400,
-          currency: 'RUB',
-          receiptItems: expect.anything(),
-          idempotencyKey: `cancel:sub-1:${anchorMs}`
-        });
-        expect(booked.status).toBe('failed');
-        expect(store.invoices[1]).toMatchObject({
-          periodStart: new Date(anchorMs),
-          periodEnd: NOW
-        });
-      });
-
-      it('keeps the window key for an immediate cancel before the due moment', async () => {
-        const sub = usageSub();
-        const store = usageStore(sub);
-        const midPeriod = new Date('2026-05-20T00:00:00Z');
-        const charge = jest.fn().mockResolvedValue({
-          providerInvoiceRef: 'pay_now',
-          status: 'captured'
-        });
-        const { service } = await build(store, charge, {
-          usageSum: jest.fn().mockResolvedValue(142)
-        });
-
-        await service.billClosingUsagePeriod(sub, midPeriod, true);
-
-        expect(charge).toHaveBeenCalledTimes(1);
-        expect(charge).toHaveBeenCalledWith(expect.anything(), {
-          amountMinor: 8400,
-          currency: 'RUB',
-          receiptItems: expect.anything(),
-          idempotencyKey:
-            'cancel:sub-1:' + new Date('2026-05-01T00:00:00Z').getTime()
-        });
-      });
-
-      it('skips provider-managed rows, whose cancel webhook closes the period', async () => {
-        const sub = makeSub({
-          planKey: 'usage',
-          billingMode: 'usage' as const,
-          lifecycleOwner: 'provider'
-        });
-        const store = usageStore(sub);
-        const charge = jest.fn();
-        const { service } = await build(store, charge);
-
-        await service.billClosingUsagePeriod(sub, NOW);
-
-        expect(charge).not.toHaveBeenCalled();
-        expect(store.invoices).toHaveLength(0);
-      });
-
-      it('skips a fixed subscription entirely', async () => {
-        const sub = makeSub();
-        const store = baseStore(sub);
-        const charge = jest.fn();
-        const { service } = await build(store, charge);
-
-        await service.billClosingUsagePeriod(sub, NOW);
-
-        expect(charge).not.toHaveBeenCalled();
-        expect(store.invoices).toHaveLength(0);
-      });
-    });
-  });
-
   it('renews a fixed $0 plan without a provider charge via a zero invoice', async () => {
     const sub = makeSub({ planKey: 'free' });
     const store = baseStore(sub);
@@ -1970,20 +1173,18 @@ describe('RenewalService', () => {
       id: 'inv-pre',
       providerEventId: `renewal:sub-1:${anchorMs}`,
       status: 'paid',
-      providerInvoiceRef: 'pay_wh',
-      creditUnitsApplied: 0
+      providerInvoiceRef: 'pay_wh'
     };
 
     store.invoices.push(preInvoice);
     const charge = jest.fn();
-    const { service, emit, credits } = await build(store, charge);
+    const { service, emit } = await build(store, charge);
 
     await service.runDueRenewals(NOW);
 
     expect(charge).not.toHaveBeenCalled();
     expect(store.invoices).toHaveLength(1);
     expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
-    expect(credits.spendOnUsage).not.toHaveBeenCalled();
     expect(
       emit.mock.calls.filter(
         (call: unknown[]) => call[0] === InvoicePaidEvent.name
@@ -2005,7 +1206,7 @@ describe('RenewalService', () => {
     it('records a pending invoice without advancing or emitting when the charge is uncaptured', async () => {
       const sub = makeSub();
       const store = baseStore(sub);
-      const { service, emit, credits } = await build(store, pendingCharge());
+      const { service, emit } = await build(store, pendingCharge());
 
       await service.runDueRenewals(NOW);
 
@@ -2018,7 +1219,6 @@ describe('RenewalService', () => {
       });
       expect(sub.status).toBe('active');
       expect(sub.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
-      expect(credits.spendOnUsage).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
     });
 
@@ -2031,7 +1231,6 @@ describe('RenewalService', () => {
       });
       const findCharge = jest.fn();
       const { service, emit, charge } = await build(store, pendingCharge(), {
-        availableCredits: 0,
         findOffSessionCharge: findCharge,
         deadlineMs: 0,
         getOffSessionCharge: getCharge
@@ -2071,7 +1270,6 @@ describe('RenewalService', () => {
         status: 'pending'
       });
       const { service, emit, charge } = await build(store, pendingCharge(), {
-        availableCredits: 0,
         deadlineMs: 0,
         getOffSessionCharge: getCharge
       });
@@ -2097,7 +1295,6 @@ describe('RenewalService', () => {
       });
       const getCharge = jest.fn();
       const { service, charge } = await build(store, jest.fn(), {
-        availableCredits: 0,
         findOffSessionCharge: findCharge,
         deadlineMs: 0,
         getOffSessionCharge: getCharge
@@ -2120,7 +1317,6 @@ describe('RenewalService', () => {
         .fn()
         .mockRejectedValue(new Error('payment lookup down'));
       const { service, emit } = await build(store, pendingCharge(), {
-        availableCredits: 0,
         deadlineMs: 0,
         getOffSessionCharge: getCharge
       });
@@ -2140,8 +1336,7 @@ describe('RenewalService', () => {
       const sub = makeSub();
       const store = baseStore(sub);
       const getCharge = jest.fn().mockResolvedValue(null);
-      const { service, emit, credits } = await build(store, pendingCharge(), {
-        availableCredits: 0,
+      const { service, emit } = await build(store, pendingCharge(), {
         deadlineMs: 0,
         getOffSessionCharge: getCharge
       });
@@ -2157,7 +1352,6 @@ describe('RenewalService', () => {
       expect(sub.nextRenewalAttemptAt).toEqual(
         new Date(NOW.getTime() + DUNNING_RETRY_DELAY_MS)
       );
-      expect(credits.spendOnUsage).not.toHaveBeenCalled();
       expect(emit).toHaveBeenCalledWith(
         PaymentFailedEvent.name,
         expect.objectContaining({ userId: 'user-1' })
@@ -2173,8 +1367,7 @@ describe('RenewalService', () => {
         id: 'inv-pre',
         providerEventId: `renewal:sub-1:${anchorMs}`,
         status: 'failed',
-        providerInvoiceRef: 'pay_pend',
-        creditUnitsApplied: 0
+        providerInvoiceRef: 'pay_pend'
       };
 
       store.invoices.push(preInvoice);
@@ -2192,60 +1385,6 @@ describe('RenewalService', () => {
       );
     });
 
-    it('spends the stored credit units on settle, not re-rated ones', async () => {
-      const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
-      const store = baseStore(sub);
-
-      store.plans.push(
-        Object.assign(new Plan(), {
-          ...makePlan(),
-          id: 'plan-usage',
-          key: 'usage',
-          billingMode: 'usage',
-          meterKey: 'api_calls',
-          prices: {
-            yookassa: {
-              currency: 'RUB',
-              amountMinor: 0,
-              unitPriceMinor: 200,
-              includedUnits: 100
-            }
-          }
-        })
-      );
-      const sum = jest.fn().mockResolvedValue(142);
-      const getCharge = jest.fn().mockResolvedValue({
-        providerInvoiceRef: 'pay_pend',
-        status: 'captured'
-      });
-      const { service, credits } = await build(store, pendingCharge(), {
-        usageSum: sum,
-        availableCredits: 10,
-        deadlineMs: 0,
-        getOffSessionCharge: getCharge
-      });
-
-      await service.runDueRenewals(NOW);
-      expect(store.invoices[0]).toMatchObject({
-        status: 'pending',
-        creditUnitsApplied: 10
-      });
-      expect(credits.spendOnUsage).not.toHaveBeenCalled();
-
-      // The balance drifts before the settle; the recorded charge was rated
-      // against 10 units and must spend exactly those.
-      credits.availableUnitsForUpdate.mockResolvedValue(25);
-      await service.runDueRenewals(NOW);
-
-      expect(credits.spendOnUsage).toHaveBeenCalledTimes(1);
-      expect(credits.spendOnUsage).toHaveBeenCalledWith(
-        expect.anything(),
-        { customerId: 'cust-1', invoiceId: 'inv-1' },
-        10
-      );
-      expect(store.invoices[0]).toMatchObject({ status: 'paid' });
-    });
-
     it('records a pending prior attempt found by the dunning reconcile and waits', async () => {
       const sub = makeSub({
         status: 'past_due',
@@ -2261,7 +1400,6 @@ describe('RenewalService', () => {
         status: 'pending'
       });
       const { service, emit } = await build(store, charge, {
-        availableCredits: 0,
         findOffSessionCharge: findCharge
       });
 
@@ -2279,182 +1417,6 @@ describe('RenewalService', () => {
   });
 
   describe('a period that re-rates to zero while a charge is open', () => {
-    function pushUsagePlan(store: Store): void {
-      store.plans.push(
-        Object.assign(new Plan(), {
-          ...makePlan(),
-          id: 'plan-usage',
-          key: 'usage',
-          billingMode: 'usage',
-          meterKey: 'api_calls',
-          prices: {
-            yookassa: {
-              currency: 'RUB',
-              amountMinor: 0,
-              unitPriceMinor: 200,
-              includedUnits: 100
-            }
-          }
-        })
-      );
-    }
-
-    // 132 recorded − 100 included = 32 billable; 10 prepaid credits leave 22
-    // units at 200 minor = 4400 charged.
-    const usageSum = () => jest.fn().mockResolvedValue(132);
-
-    it('polls the open charge instead of settling it from re-rated values', async () => {
-      const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
-      const store = baseStore(sub);
-
-      pushUsagePlan(store);
-      const charge = jest.fn().mockResolvedValue({
-        providerInvoiceRef: 'pay_real',
-        status: 'pending'
-      });
-      const getCharge = jest.fn().mockResolvedValue({
-        providerInvoiceRef: 'pay_real',
-        status: 'pending'
-      });
-      const { service, emit, credits } = await build(store, charge, {
-        usageSum: usageSum(),
-        availableCredits: 10,
-        deadlineMs: 0,
-        getOffSessionCharge: getCharge
-      });
-
-      await service.runDueRenewals(NOW);
-      expect(store.invoices[0]).toMatchObject({
-        status: 'pending',
-        amountMinor: Money.fromMinor(4400),
-        creditUnitsApplied: 10,
-        providerInvoiceRef: 'pay_real'
-      });
-
-      // The buyer tops the balance up while the charge is still settling, so
-      // the same period now rates to zero.
-      credits.availableUnitsForUpdate.mockResolvedValue(40);
-      await service.runDueRenewals(NOW);
-
-      expect(getCharge).toHaveBeenCalledTimes(1);
-      expect(charge).toHaveBeenCalledTimes(1);
-      expect(store.invoices).toHaveLength(1);
-      expect(store.invoices[0]).toMatchObject({
-        status: 'pending',
-        amountMinor: Money.fromMinor(4400),
-        creditUnitsApplied: 10,
-        providerInvoiceRef: 'pay_real'
-      });
-      expect(credits.spendOnUsage).not.toHaveBeenCalled();
-      expect(sub.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
-      expect(emit).not.toHaveBeenCalled();
-    });
-
-    it('settles the open charge at its stored amount and credit units', async () => {
-      const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
-      const store = baseStore(sub);
-
-      pushUsagePlan(store);
-      const charge = jest.fn().mockResolvedValue({
-        providerInvoiceRef: 'pay_real',
-        status: 'pending'
-      });
-      const getCharge = jest.fn().mockResolvedValue({
-        providerInvoiceRef: 'pay_real',
-        status: 'captured'
-      });
-      const { service, credits } = await build(store, charge, {
-        usageSum: usageSum(),
-        availableCredits: 10,
-        deadlineMs: 0,
-        getOffSessionCharge: getCharge
-      });
-
-      await service.runDueRenewals(NOW);
-      credits.availableUnitsForUpdate.mockResolvedValue(40);
-      await service.runDueRenewals(NOW);
-
-      expect(store.invoices).toHaveLength(1);
-      // The money the provider actually captured, under its own payment id -
-      // never the re-rated zero, never the idempotency key as a payment ref.
-      expect(store.invoices[0]).toMatchObject({
-        status: 'paid',
-        amountMinor: Money.fromMinor(4400),
-        creditUnitsApplied: 10,
-        providerInvoiceRef: 'pay_real'
-      });
-      expect(credits.spendOnUsage).toHaveBeenCalledTimes(1);
-      expect(credits.spendOnUsage).toHaveBeenCalledWith(
-        expect.anything(),
-        { customerId: 'cust-1', invoiceId: 'inv-1' },
-        10
-      );
-      expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
-    });
-
-    it('reconciles a captured prior attempt at its stored amount', async () => {
-      const sub = makeSub({
-        planKey: 'usage',
-        billingMode: 'usage',
-        status: 'past_due',
-        dunningAttempts: 1,
-        nextRenewalAttemptAt: new Date('2026-06-07T00:00:00Z')
-      });
-      const store = baseStore(sub);
-
-      pushUsagePlan(store);
-      const anchorMs = new Date('2026-06-01T00:00:00Z').getTime();
-      // @ts-expect-error - partial Invoice fake for this scenario
-      const failedInvoice: Invoice & { providerEventId: string | null } = {
-        id: 'inv-pre',
-        providerEventId: `renewal:sub-1:${anchorMs}`,
-        status: 'failed',
-        providerInvoiceRef: 'pay_prior',
-        amountMinor: Money.fromMinor(4400),
-        creditUnitsApplied: 10
-      };
-
-      store.invoices.push(failedInvoice);
-      const charge = jest.fn();
-      const findCharge = jest.fn().mockResolvedValue(null);
-      const getCharge = jest.fn().mockResolvedValue({
-        providerInvoiceRef: 'pay_prior',
-        status: 'captured'
-      });
-      // The balance grew since the failed attempt, so this scan rates to zero.
-      const { service, credits } = await build(store, charge, {
-        usageSum: usageSum(),
-        availableCredits: 40,
-        findOffSessionCharge: findCharge,
-        deadlineMs: 0,
-        getOffSessionCharge: getCharge
-      });
-
-      await service.runDueRenewals(NOW);
-
-      // The recorded row carries the prior attempt's payment reference, so the
-      // reconcile reads that one payment instead of walking the shop's list.
-      expect(getCharge).toHaveBeenCalledWith(
-        'pay_prior',
-        `renewal:sub-1:${anchorMs}`
-      );
-      expect(findCharge).not.toHaveBeenCalled();
-      expect(charge).not.toHaveBeenCalled();
-      expect(store.invoices).toHaveLength(1);
-      expect(store.invoices[0]).toMatchObject({
-        status: 'paid',
-        amountMinor: Money.fromMinor(4400),
-        creditUnitsApplied: 10,
-        providerInvoiceRef: 'pay_prior'
-      });
-      expect(credits.spendOnUsage).toHaveBeenCalledWith(
-        expect.anything(),
-        { customerId: 'cust-1', invoiceId: 'inv-pre' },
-        10
-      );
-      expect(sub.currentPeriodEnd).toEqual(new Date('2026-07-01T00:00:00Z'));
-    });
-
     it('keeps a pending fixed charge when the plan is re-priced to zero', async () => {
       const sub = makeSub();
       const store = baseStore(sub);
@@ -2466,8 +1428,7 @@ describe('RenewalService', () => {
         providerInvoiceRef: 'pay_fix',
         status: 'pending'
       });
-      const { service, credits } = await build(store, charge, {
-        availableCredits: 0,
+      const { service } = await build(store, charge, {
         deadlineMs: 0,
         getOffSessionCharge: getCharge
       });
@@ -2488,161 +1449,7 @@ describe('RenewalService', () => {
         amountMinor: Money.fromMinor(99000),
         providerInvoiceRef: 'pay_fix'
       });
-      expect(credits.spendOnUsage).not.toHaveBeenCalled();
       expect(sub.currentPeriodEnd).toEqual(new Date('2026-06-01T00:00:00Z'));
-    });
-  });
-  describe('credit holds', () => {
-    const renewalKey = `renewal:sub-1:${new Date('2026-06-01T00:00:00Z').getTime()}`;
-    // 142 units, 100 included, 10 credits: 32 units charged at 200.
-    const usageSum = () => jest.fn().mockResolvedValue(142);
-
-    function usageStore(): { sub: Subscription; store: Store } {
-      const sub = makeSub({ planKey: 'usage', billingMode: 'usage' });
-      const store = baseStore(sub);
-
-      store.plans.push(
-        Object.assign(new Plan(), {
-          ...makePlan(),
-          id: 'plan-usage',
-          key: 'usage',
-          billingMode: 'usage',
-          meterKey: 'api_calls',
-          prices: {
-            yookassa: {
-              currency: 'RUB',
-              amountMinor: 0,
-              unitPriceMinor: 200,
-              includedUnits: 100
-            }
-          }
-        })
-      );
-
-      return { sub, store };
-    }
-
-    it('records the period with its credit units before the provider is asked', async () => {
-      const { store } = usageStore();
-      const recorded: Invoice[] = [];
-      const charge = jest.fn(() => {
-        recorded.push({ ...store.invoices[0] });
-
-        return Promise.resolve({
-          providerInvoiceRef: 'pay_1',
-          status: 'captured'
-        });
-      });
-      const { service, credits } = await build(store, charge, {
-        usageSum: usageSum(),
-        availableCredits: 10
-      });
-
-      await service.runDueRenewals(NOW);
-
-      expect(recorded).toEqual([
-        expect.objectContaining({
-          providerEventId: renewalKey,
-          status: 'pending',
-          amountMinor: Money.fromMinor(6400),
-          creditUnitsApplied: 10
-        })
-      ]);
-      expect(credits.spendOnUsage).toHaveBeenCalledTimes(1);
-      expect(credits.spendOnUsage).toHaveBeenCalledWith(
-        expect.anything(),
-        { customerId: 'cust-1', invoiceId: 'inv-1' },
-        10
-      );
-    });
-
-    it('re-rates a dunning retry without the hold of its own row', async () => {
-      const { sub, store } = usageStore();
-
-      Object.assign(sub, {
-        status: 'past_due',
-        dunningAttempts: 1,
-        nextRenewalAttemptAt: new Date('2026-06-07T00:00:00Z')
-      });
-      store.invoices.push(priorInvoice({ creditUnitsApplied: 10 }));
-      const charge = jest
-        .fn()
-        .mockResolvedValue({ providerInvoiceRef: 'pay_2', status: 'captured' });
-      const { service, credits } = await build(store, charge, {
-        usageSum: usageSum(),
-        availableCredits: 10
-      });
-
-      await service.runDueRenewals(NOW);
-
-      expect(credits.availableUnitsForUpdate).toHaveBeenCalledWith(
-        expect.anything(),
-        'cust-1',
-        'inv-pre'
-      );
-      expect(store.invoices).toEqual([
-        expect.objectContaining({
-          id: 'inv-pre',
-          status: 'paid',
-          creditUnitsApplied: 10
-        })
-      ]);
-    });
-
-    it.each([
-      ['a decline', new ChargeDeclinedError(), true],
-      ['a timeout', new Error('deadline'), false]
-    ])(
-      'keeps the units held after %s unless the outcome is known',
-      async (_name, error, released) => {
-        const { store } = usageStore();
-        const charge = jest.fn().mockRejectedValue(error);
-        const { service, credits } = await build(store, charge, {
-          usageSum: usageSum(),
-          availableCredits: 10
-        });
-
-        await service.runDueRenewals(NOW);
-
-        expect(store.invoices).toEqual([
-          expect.objectContaining({ status: 'failed', creditUnitsApplied: 10 })
-        ]);
-        expect(credits.releaseHolds.mock.calls).toEqual(
-          released ? [[expect.anything(), { providerEventId: renewalKey }]] : []
-        );
-        expect(credits.spendOnUsage).not.toHaveBeenCalled();
-      }
-    );
-
-    it('ends every hold of the subscription when dunning runs out', async () => {
-      const sub = makeSub({
-        status: 'past_due',
-        dunningAttempts: DUNNING_MAX_ATTEMPTS - 1,
-        nextRenewalAttemptAt: new Date('2026-06-07T00:00:00Z')
-      });
-      const store = baseStore(sub);
-      const charge = jest.fn().mockRejectedValue(new Error('declined'));
-      const { service, credits } = await build(store, charge);
-
-      await service.runDueRenewals(NOW);
-
-      expect(sub.status).toBe('canceled');
-      expect(credits.releaseHolds).toHaveBeenCalledWith(expect.anything(), {
-        subscriptionId: 'sub-1'
-      });
-    });
-
-    it('ends every hold of the subscription when it closes at the boundary', async () => {
-      const sub = makeSub({ cancelAtPeriodEnd: true });
-      const store = baseStore(sub);
-      const { service, credits } = await build(store, jest.fn());
-
-      await service.runDueRenewals(NOW);
-
-      expect(sub.status).toBe('canceled');
-      expect(credits.releaseHolds).toHaveBeenCalledWith(expect.anything(), {
-        subscriptionId: 'sub-1'
-      });
     });
   });
 });

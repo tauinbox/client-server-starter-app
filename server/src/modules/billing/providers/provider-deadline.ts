@@ -14,7 +14,6 @@ import type {
   OffSessionCharge,
   OneTimePaymentSession,
   PaymentProvider,
-  UsageCharge,
   WebhookVerificationResult
 } from './payment-provider.interface';
 
@@ -146,15 +145,6 @@ export class DeadlineBoundProvider implements PaymentProvider {
   ): Promise<OneTimePaymentSession> {
     return this.bound('createOneTimePayment', () =>
       this.inner.createOneTimePayment(customer, params)
-    );
-  }
-
-  chargeUsage(
-    providerSubscriptionId: string,
-    charge: UsageCharge
-  ): Promise<void> {
-    return this.bound('chargeUsage', () =>
-      this.inner.chargeUsage(providerSubscriptionId, charge)
     );
   }
 

@@ -92,8 +92,8 @@ const METHOD_UPDATE_PURPOSE = 'method_update';
 const ONE_TIME_PURPOSE = 'one_time';
 
 /**
- * Marks a core-initiated off-session charge (renewal, trial conversion, usage
- * close, plan-change proration), carrying the `chargeKey` of the invoice the
+ * Marks a core-initiated off-session charge (renewal, trial conversion,
+ * plan-change proration), carrying the `chargeKey` of the invoice the
  * core already recorded. Routes the confirming webhook to a reconcile/no-op so
  * it neither double-records nor re-activates — the scheduler owns the lifecycle.
  */
@@ -258,15 +258,6 @@ export class YooKassaProvider implements PaymentProvider {
     return this.yoo;
   }
 
-  chargeUsage(): Promise<void> {
-    // Self-managed lifecycle: usage periods are closed and charged by the
-    // renewal scheduler through chargeOffSession (with the 54-FZ receipt).
-    // eslint-disable-next-line no-restricted-syntax -- a programmer error (501): no request reaches this method
-    throw new NotImplementedException(
-      'YooKassaProvider.chargeUsage is not applicable (usage is charged by the renewal scheduler)'
-    );
-  }
-
   changePlan(): Promise<void> {
     // Self-managed lifecycle: there is no provider-side subscription to update.
     // The core computes the proration (ProrationCalculator) and settles it via
@@ -305,7 +296,7 @@ export class YooKassaProvider implements PaymentProvider {
       planKey: plan.key
     };
 
-    // A zero first charge (a trial, or a postpaid usage plan) is a card binding:
+    // A zero first charge (a trial) is a card binding:
     // the method is saved now and the scheduler charges later. No money moves,
     // so no fiscal receipt. A paid first period has a 54-FZ receipt.
     const amountMinor = isTrial ? 0 : price.amountMinor;

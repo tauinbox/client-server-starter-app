@@ -17,8 +17,7 @@ import {
   PaymentFailedEvent,
   SubscriptionActivatedEvent,
   SubscriptionCanceledEvent,
-  SubscriptionRenewedEvent,
-  UsagePeriodClosedEvent
+  SubscriptionRenewedEvent
 } from '../events/billing.events';
 import type {
   NormalizedEvent,
@@ -142,11 +141,7 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager)),
     manager: bareManager
   };
-  const credits = {
-    addPurchase: jest.fn().mockResolvedValue(undefined),
-    spendOnUsage: jest.fn().mockResolvedValue(undefined),
-    releaseHolds: jest.fn().mockResolvedValue(undefined)
-  };
+  const credits = { addPurchase: jest.fn().mockResolvedValue(undefined) };
 
   const metrics = { recordUnmatchedOffSessionCharge: jest.fn() };
 
@@ -375,26 +370,6 @@ describe('BillingEventReducer', () => {
       );
     });
 
-    it('ends the credit hold of every unpaid invoice when the subscription is canceled', async () => {
-      const existing = {
-        id: 'sub-1',
-        providerSubscriptionId: 'sub_123',
-        currentPeriodEnd: new Date('2026-07-01T00:00:00Z')
-      } as Subscription;
-      const { reducer, manager, credits } = await build({
-        subscription: existing
-      });
-
-      await reducer.reduce(
-        event('subscription.canceled', subPayload({ status: 'canceled' }))
-      );
-      await reducer.reduce(event('subscription.renewed', subPayload()));
-
-      expect(credits.releaseHolds.mock.calls).toEqual([
-        [manager, { subscriptionId: 'sub-1' }]
-      ]);
-    });
-
     it('skips when the event carries no customer reference', async () => {
       const { reducer, manager, emit } = await build();
 
@@ -480,420 +455,52 @@ describe('BillingEventReducer', () => {
     });
   });
 
-  describe('usage period rollover (provider-managed)', () => {
-    const usageSub = () =>
+  describe('plan change from the snapshot (provider-managed)', () => {
+    const stored = (planKey: string) =>
       ({
         id: 'sub-1',
-        billingMode: 'usage',
+        planKey,
+        billingMode: 'fixed',
         lifecycleOwner: 'provider',
         providerSubscriptionId: 'sub_123',
         currentPeriodStart: new Date('2026-05-01T00:00:00Z'),
-        currentPeriodEnd: new Date('2026-06-01T00:00:00Z'),
-        meteredFrom: null
+        currentPeriodEnd: new Date('2026-06-01T00:00:00Z')
       }) as Subscription;
-    const rollover = () =>
+    const inPeriod = () =>
       event(
         'subscription.renewed',
         subPayload({
-          currentPeriodStart: '2026-06-01T00:00:00Z',
-          currentPeriodEnd: '2026-07-01T00:00:00Z'
+          currentPeriodStart: '2026-05-01T00:00:00Z',
+          currentPeriodEnd: '2026-06-01T00:00:00Z'
         })
       );
 
-    it('closes only the window after a switch to the usage plan, and resets it', async () => {
-      const switchedAt = new Date('2026-05-11T00:00:00Z');
-      const { reducer, manager, emit } = await build({
-        subscription: { ...usageSub(), meteredFrom: switchedAt }
-      });
-
-      await reducer.reduce(rollover());
-
-      expect(emit).toHaveBeenCalledWith(
-        UsagePeriodClosedEvent.name,
-        expect.objectContaining({
-          periodStart: switchedAt,
-          periodEnd: new Date('2026-06-01T00:00:00Z')
-        })
-      );
-      expect(manager.update).toHaveBeenCalledWith(
-        Subscription,
-        { id: 'sub-1' },
-        expect.objectContaining({ meteredFrom: null })
-      );
-    });
-
-    it('resets the window of a fixed-mode row at rollover', async () => {
+    it('writes the plan and its mode when the snapshot carries another plan', async () => {
       const { reducer, manager } = await build({
-        subscription: {
-          ...usageSub(),
-          billingMode: 'fixed',
-          meteredFrom: new Date('2026-05-11T00:00:00Z')
-        }
+        subscription: stored('basic'),
+        plan: planRow('pro', 'fixed')
       });
 
-      await reducer.reduce(rollover());
+      await reducer.reduce(inPeriod());
 
-      expect(manager.update).toHaveBeenCalledWith(
-        Subscription,
-        { id: 'sub-1' },
-        expect.objectContaining({ meteredFrom: null })
-      );
+      const [[, where, fields]] = manager.update.mock.calls;
+
+      expect(where).toEqual({ id: 'sub-1' });
+      expect(fields).toMatchObject({ planKey: 'pro', billingMode: 'fixed' });
     });
 
-    it('keeps the window when the snapshot stays inside the stored period', async () => {
+    it('writes neither the plan nor the mode when the snapshot keeps the stored plan', async () => {
       const { reducer, manager } = await build({
-        subscription: {
-          ...usageSub(),
-          meteredFrom: new Date('2026-05-11T00:00:00Z')
-        }
+        subscription: stored('pro'),
+        plan: planRow('pro', 'fixed')
       });
 
-      await reducer.reduce(
-        event(
-          'subscription.renewed',
-          subPayload({
-            currentPeriodStart: '2026-05-01T00:00:00Z',
-            currentPeriodEnd: '2026-06-01T00:00:00Z'
-          })
-        )
-      );
+      await reducer.reduce(inPeriod());
 
-      expect(manager.update).toHaveBeenCalledWith(
-        Subscription,
-        { id: 'sub-1' },
-        expect.not.objectContaining({ meteredFrom: null })
-      );
-    });
+      const [[, , fields]] = manager.update.mock.calls;
 
-    it('emits UsagePeriodClosed with the closed period when the snapshot starts a new one', async () => {
-      const { reducer, emit } = await build({ subscription: usageSub() });
-
-      await reducer.reduce(
-        event(
-          'subscription.renewed',
-          subPayload({
-            currentPeriodStart: '2026-06-01T00:00:00Z',
-            currentPeriodEnd: '2026-07-01T00:00:00Z'
-          })
-        )
-      );
-
-      expect(emit).toHaveBeenCalledWith(
-        UsagePeriodClosedEvent.name,
-        expect.objectContaining({
-          userId: 'user-1',
-          subscriptionId: 'sub-1',
-          periodStart: new Date('2026-05-01T00:00:00Z'),
-          periodEnd: new Date('2026-06-01T00:00:00Z')
-        })
-      );
-    });
-
-    it('does not emit when the snapshot stays inside the stored period', async () => {
-      const { reducer, emit } = await build({ subscription: usageSub() });
-
-      await reducer.reduce(
-        event(
-          'subscription.renewed',
-          subPayload({
-            currentPeriodStart: '2026-05-01T00:00:00Z',
-            currentPeriodEnd: '2026-06-01T00:00:00Z'
-          })
-        )
-      );
-
-      expect(emit).not.toHaveBeenCalledWith(
-        UsagePeriodClosedEvent.name,
-        expect.anything()
-      );
-    });
-
-    it('does not emit for fixed-mode subscriptions on rollover', async () => {
-      const { reducer, emit } = await build({
-        subscription: {
-          ...usageSub(),
-          billingMode: 'fixed'
-        }
-      });
-
-      await reducer.reduce(
-        event(
-          'subscription.renewed',
-          subPayload({
-            currentPeriodStart: '2026-06-01T00:00:00Z',
-            currentPeriodEnd: '2026-07-01T00:00:00Z'
-          })
-        )
-      );
-
-      expect(emit).not.toHaveBeenCalledWith(
-        UsagePeriodClosedEvent.name,
-        expect.anything()
-      );
-    });
-
-    it('emits UsagePeriodClosed for the stored period when the subscription is canceled', async () => {
-      const { reducer, emit } = await build({ subscription: usageSub() });
-
-      await reducer.reduce(
-        event(
-          'subscription.canceled',
-          subPayload({
-            status: 'canceled',
-            currentPeriodStart: null,
-            currentPeriodEnd: null
-          })
-        )
-      );
-
-      // The stored boundary, not the notification and not wall-clock now: a
-      // replayed delivery must key the same invoice instead of charging twice.
-      expect(emit).toHaveBeenCalledWith(
-        UsagePeriodClosedEvent.name,
-        expect.objectContaining({
-          subscriptionId: 'sub-1',
-          periodStart: new Date('2026-05-01T00:00:00Z'),
-          periodEnd: new Date('2026-06-01T00:00:00Z')
-        })
-      );
-    });
-
-    it('does not emit on cancel for a fixed-mode subscription', async () => {
-      const { reducer, emit } = await build({
-        subscription: { ...usageSub(), billingMode: 'fixed' }
-      });
-
-      await reducer.reduce(
-        event('subscription.canceled', subPayload({ status: 'canceled' }))
-      );
-
-      expect(emit).not.toHaveBeenCalledWith(
-        UsagePeriodClosedEvent.name,
-        expect.anything()
-      );
-    });
-
-    describe('plan change from the snapshot', () => {
-      const withPlan = (billingMode: Plan['billingMode']) =>
-        planRow('pro', billingMode);
-      const inPeriod = () =>
-        event(
-          'subscription.renewed',
-          subPayload({
-            currentPeriodStart: '2026-05-01T00:00:00Z',
-            currentPeriodEnd: '2026-06-01T00:00:00Z'
-          })
-        );
-
-      it('switches usage -> fixed: writes the mode and a new window, and closes the old one under the stored plan', async () => {
-        const { reducer, manager, emit } = await build({
-          subscription: { ...usageSub(), planKey: 'metered' },
-          plan: withPlan('fixed')
-        });
-
-        await reducer.reduce(inPeriod());
-
-        const [[, where, fields]] = manager.update.mock.calls;
-
-        expect(where).toEqual({ id: 'sub-1' });
-        expect(fields).toMatchObject({ planKey: 'pro', billingMode: 'fixed' });
-        const switchedAt = fields['meteredFrom'];
-
-        expect(switchedAt).toBeInstanceOf(Date);
-        expect(emit).toHaveBeenCalledWith(
-          UsagePeriodClosedEvent.name,
-          new UsagePeriodClosedEvent(
-            'user-1',
-            'sub-1',
-            new Date('2026-05-01T00:00:00Z'),
-            switchedAt as Date,
-            'metered'
-          )
-        );
-      });
-
-      it('switches fixed -> usage: writes the mode and a new window, and closes nothing', async () => {
-        const { reducer, manager, emit } = await build({
-          subscription: {
-            ...usageSub(),
-            planKey: 'basic',
-            billingMode: 'fixed'
-          },
-          plan: withPlan('usage')
-        });
-
-        await reducer.reduce(inPeriod());
-
-        const [[, where, fields]] = manager.update.mock.calls;
-
-        expect(where).toEqual({ id: 'sub-1' });
-        expect(fields).toMatchObject({ billingMode: 'usage' });
-        expect(fields['meteredFrom']).toBeInstanceOf(Date);
-        expect(emit).not.toHaveBeenCalledWith(
-          UsagePeriodClosedEvent.name,
-          expect.anything()
-        );
-      });
-
-      it('writes neither the mode nor the window for a plan change in the same mode', async () => {
-        const { reducer, manager, emit } = await build({
-          subscription: { ...usageSub(), planKey: 'metered' },
-          plan: withPlan('usage')
-        });
-
-        await reducer.reduce(inPeriod());
-
-        const [[, , fields]] = manager.update.mock.calls;
-
-        expect(fields).not.toHaveProperty('billingMode');
-        expect(fields).not.toHaveProperty('meteredFrom');
-        expect(emit).not.toHaveBeenCalledWith(
-          UsagePeriodClosedEvent.name,
-          expect.anything()
-        );
-      });
-
-      it('writes neither the plan nor the mode when the snapshot keeps the stored plan', async () => {
-        const { reducer, manager } = await build({
-          subscription: { ...usageSub(), planKey: 'pro' },
-          plan: withPlan('fixed')
-        });
-
-        await reducer.reduce(inPeriod());
-
-        const [[, , fields]] = manager.update.mock.calls;
-
-        expect(fields).not.toHaveProperty('planKey');
-        expect(fields).not.toHaveProperty('billingMode');
-      });
-
-      it('keeps the rollover rule when the switch arrives with a new period', async () => {
-        const { reducer, manager, emit } = await build({
-          subscription: { ...usageSub(), planKey: 'metered' },
-          plan: withPlan('fixed')
-        });
-
-        await reducer.reduce(rollover());
-
-        expect(manager.update).toHaveBeenCalledWith(
-          Subscription,
-          { id: 'sub-1' },
-          expect.objectContaining({ billingMode: 'fixed', meteredFrom: null })
-        );
-        expect(emit).toHaveBeenCalledWith(
-          UsagePeriodClosedEvent.name,
-          new UsagePeriodClosedEvent(
-            'user-1',
-            'sub-1',
-            new Date('2026-05-01T00:00:00Z'),
-            new Date('2026-06-01T00:00:00Z'),
-            'metered'
-          )
-        );
-      });
-    });
-
-    it('does not emit on cancel for a self-managed subscription', async () => {
-      const { reducer, emit } = await build({
-        subscription: { ...usageSub(), lifecycleOwner: 'self' }
-      });
-
-      await reducer.reduce(
-        event('subscription.canceled', subPayload({ status: 'canceled' }))
-      );
-
-      expect(emit).not.toHaveBeenCalledWith(
-        UsagePeriodClosedEvent.name,
-        expect.anything()
-      );
-    });
-  });
-
-  describe('invoice.paid — usage charge reconciliation', () => {
-    const usagePaidPayload: NormalizedInvoicePayload = {
-      ref: { customerId: 'cust-1', userId: 'user-1' },
-      providerInvoiceRef: 'txn_usage',
-      providerSubscriptionId: 'sub_123',
-      amountMinor: 8400,
-      currency: 'USD',
-      periodStart: null,
-      periodEnd: null,
-      paidAt: '2026-06-01T00:05:00Z',
-      usageChargeKey: 'usage:sub-1:1780272000000'
-    };
-
-    it('settles the pending usage invoice instead of inserting a new row', async () => {
-      const { reducer, manager, emit } = await build({
-        invoice: { id: 'inv-usage' } as Invoice,
-        updateAffected: 1
-      });
-
-      await reducer.reduce(event('invoice.paid', usagePaidPayload));
-
-      expect(manager.update).toHaveBeenCalledWith(
-        Invoice,
-        {
-          providerEventId: 'usage:sub-1:1780272000000',
-          status: In(['pending', 'failed'])
-        },
-        expect.objectContaining({
-          status: 'paid',
-          providerInvoiceRef: 'txn_usage'
-        })
-      );
-      expect(manager.execute).not.toHaveBeenCalled();
-      expect(emit).toHaveBeenCalledWith(
-        InvoicePaidEvent.name,
-        expect.objectContaining({ userId: 'user-1', invoiceId: 'inv-usage' })
-      );
-    });
-
-    it('spends the credit units the planted invoice holds on the winning flip only', async () => {
-      const invoice = {
-        id: 'inv-usage',
-        customerId: 'cust-1',
-        creditUnitsApplied: 10
-      } as Invoice;
-      const won = await build({ invoice, updateAffected: 1 });
-      const replay = await build({ invoice, updateAffected: 0 });
-
-      await won.reducer.reduce(event('invoice.paid', usagePaidPayload));
-      await replay.reducer.reduce(event('invoice.paid', usagePaidPayload));
-
-      expect(won.credits.spendOnUsage).toHaveBeenCalledWith(
-        won.manager,
-        { customerId: 'cust-1', invoiceId: 'inv-usage' },
-        10
-      );
-      expect(replay.credits.spendOnUsage).not.toHaveBeenCalled();
-    });
-
-    it('is a no-op when the keyed invoice is already settled (replay)', async () => {
-      const { reducer, manager, emit } = await build({
-        invoice: { id: 'inv-usage' } as Invoice,
-        updateAffected: 0
-      });
-
-      await reducer.reduce(event('invoice.paid', usagePaidPayload));
-
-      expect(manager.execute).not.toHaveBeenCalled();
-      expect(emit).not.toHaveBeenCalled();
-    });
-
-    it('falls back to a plain insert when the keyed invoice is missing', async () => {
-      const { reducer, manager, emit } = await build({
-        subscription: { id: 'sub-1', billingMode: 'usage' } as Subscription,
-        invoice: null,
-        invoiceInsertRows: [{ id: 'inv-2' }]
-      });
-
-      await reducer.reduce(event('invoice.paid', usagePaidPayload));
-
-      expect(manager.execute).toHaveBeenCalledTimes(1);
-      expect(emit).toHaveBeenCalledWith(
-        InvoicePaidEvent.name,
-        expect.objectContaining({ invoiceId: 'inv-2' })
-      );
+      expect(fields).not.toHaveProperty('planKey');
+      expect(fields).not.toHaveProperty('billingMode');
     });
   });
 
@@ -1165,8 +772,7 @@ describe('BillingEventReducer', () => {
           customerId: 'cust-1',
           status: 'pending',
           amountMinor: Money.fromMinor(99000),
-          currency: 'RUB',
-          creditUnitsApplied: 0
+          currency: 'RUB'
         } as Invoice
       });
 
@@ -1196,38 +802,13 @@ describe('BillingEventReducer', () => {
       );
     });
 
-    it('spends the credit units the pending charge was rated against on settle', async () => {
-      const { reducer, credits } = await build({
-        updateAffected: 1,
-        invoice: {
-          id: 'inv-1',
-          customerId: 'cust-1',
-          status: 'pending',
-          amountMinor: Money.fromMinor(99000),
-          currency: 'RUB',
-          creditUnitsApplied: 10
-        } as Invoice
-      });
-
-      await reducer.reduce(
-        event('invoice.paid', offSessionPayload, 'yookassa')
-      );
-
-      expect(credits.spendOnUsage).toHaveBeenCalledWith(
-        expect.anything(),
-        { customerId: 'cust-1', invoiceId: 'inv-1' },
-        10
-      );
-    });
-
     it('only reconciles the payment ref when the invoice was already settled', async () => {
-      const { reducer, manager, emit, credits } = await build({
+      const { reducer, manager, emit } = await build({
         updateAffected: 0,
         invoice: {
           id: 'inv-1',
           customerId: 'cust-1',
-          status: 'paid',
-          creditUnitsApplied: 10
+          status: 'paid'
         } as Invoice
       });
 
@@ -1240,7 +821,6 @@ describe('BillingEventReducer', () => {
         { providerEventId: 'renewal:sub-1:123:0' },
         { providerInvoiceRef: 'pay-1' }
       );
-      expect(credits.spendOnUsage).not.toHaveBeenCalled();
       expect(emit).not.toHaveBeenCalled();
     });
 
@@ -1327,8 +907,7 @@ describe('BillingEventReducer', () => {
           status: 'pending',
           // The core rated and receipted 99000; the provider reports 88000.
           amountMinor: Money.fromMinor(88000),
-          currency: 'RUB',
-          creditUnitsApplied: 0
+          currency: 'RUB'
         } as Invoice
       });
       const logged = jest
@@ -1359,8 +938,7 @@ describe('BillingEventReducer', () => {
           customerId: 'cust-1',
           status: 'pending',
           amountMinor: Money.fromMinor(99000),
-          currency: 'USD',
-          creditUnitsApplied: 0
+          currency: 'USD'
         } as Invoice
       });
       const logged = jest
@@ -1740,54 +1318,6 @@ describe('BillingEventReducer', () => {
   });
 
   describe('payment.failed', () => {
-    it('marks the pending usage invoice failed when the charge key is present', async () => {
-      const payload: NormalizedPaymentFailedPayload = {
-        ref: { customerId: 'cust-1', userId: 'user-1' },
-        providerSubscriptionId: 'sub_123',
-        usageChargeKey: 'usage:sub-1:1780272000000'
-      };
-      const { reducer, manager } = await build({
-        subscription: { id: 'sub-1' } as Subscription
-      });
-
-      await reducer.reduce(event('payment.failed', payload));
-
-      expect(manager.update).toHaveBeenCalledWith(
-        Invoice,
-        {
-          providerEventId: 'usage:sub-1:1780272000000',
-          status: 'pending'
-        },
-        { status: 'failed' }
-      );
-    });
-
-    it.each([
-      ['canceled', true],
-      ['active', false]
-    ] as const)(
-      'ends the credit hold of a failed usage invoice only when the subscription is %s',
-      async (status, released) => {
-        const payload: NormalizedPaymentFailedPayload = {
-          ref: { customerId: 'cust-1', userId: 'user-1' },
-          providerSubscriptionId: 'sub_123',
-          usageChargeKey: 'usage:sub-1:1780272000000'
-        };
-        const { reducer, manager, credits } = await build({
-          subscription: { id: 'sub-1', status } as Subscription,
-          updateAffected: 1
-        });
-
-        await reducer.reduce(event('payment.failed', payload));
-
-        expect(credits.releaseHolds.mock.calls).toEqual(
-          released
-            ? [[manager, { providerEventId: 'usage:sub-1:1780272000000' }]]
-            : []
-        );
-      }
-    );
-
     it('emits PaymentFailed with the linked subscription id', async () => {
       const payload: NormalizedPaymentFailedPayload = {
         ref: { customerId: 'cust-1', userId: 'user-1' },
@@ -1836,13 +1366,12 @@ describe('BillingEventReducer', () => {
         providerSubscriptionId: null,
         offSessionChargeKey: 'renewal:sub-1:123:0'
       };
-      const usage: NormalizedPaymentFailedPayload = {
+      const providerManaged: NormalizedPaymentFailedPayload = {
         ref: { customerId: 'cust-1', userId: 'user-1' },
-        providerSubscriptionId: 'sub_123',
-        usageChargeKey: 'usage:sub-1:1780272000000'
+        providerSubscriptionId: 'sub_123'
       };
 
-      for (const payload of [offSession, usage]) {
+      for (const payload of [offSession, providerManaged]) {
         const { reducer, bareManager, dataSource } = await build({
           subscription: { id: 'sub-1' } as Subscription,
           updateAffected: 1

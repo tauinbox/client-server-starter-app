@@ -41,7 +41,6 @@ import {
   withProviderDeadline
 } from './providers/provider-deadline';
 import { FixedRating } from './rating/fixed-rating.strategy';
-import { UsageRating } from './rating/usage-rating.strategy';
 import { ProrationCalculator } from './rating/proration-calculator';
 import { PlanService } from './services/plan.service';
 import { CreditService } from './services/credit.service';
@@ -49,7 +48,6 @@ import { BillingUserService } from './services/billing-user.service';
 import { PlanChangeService } from './services/plan-change.service';
 import { BillingAdminService } from './services/billing-admin.service';
 import { MeteringService } from './services/metering.service';
-import { UsageInvoicingService } from './services/usage-invoicing.service';
 import { BillingPlansController } from './controllers/billing-plans.controller';
 import { BillingUserController } from './controllers/billing-user.controller';
 import { BillingAdminController } from './controllers/billing-admin.controller';
@@ -137,7 +135,6 @@ export class BillingModule {
         PlanChangeService,
         BillingAdminService,
         MeteringService,
-        UsageInvoicingService,
         BillingConfiguredAttributesRegistrar,
         EntitlementChangedListener,
         BillingUserDeletedListener,
@@ -145,7 +142,6 @@ export class BillingModule {
         PaddleProvider,
         YooKassaProvider,
         FixedRating,
-        UsageRating,
         ProrationCalculator,
         WebhookIngestionService,
         WebhookIpAllowlistGuard,

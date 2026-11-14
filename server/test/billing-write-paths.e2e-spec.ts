@@ -21,24 +21,20 @@ import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
-import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
 import { FixedRating } from '../src/modules/billing/rating/fixed-rating.strategy';
-import { UsageRating } from '../src/modules/billing/rating/usage-rating.strategy';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { EntitlementService } from '../src/modules/entitlements/entitlement.service';
 import { CreditService } from '../src/modules/billing/services/credit.service';
-import { UsageInvoicingService } from '../src/modules/billing/services/usage-invoicing.service';
 import { BillingAdminService } from '../src/modules/billing/services/billing-admin.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook-ingestion.service';
 import { RenewalService } from '../src/modules/billing/renewals/renewal.service';
 import {
   PaymentFailedEvent,
-  SubscriptionCanceledEvent,
-  UsagePeriodClosedEvent
+  SubscriptionCanceledEvent
 } from '../src/modules/billing/events/billing.events';
 import {
   BILLING_DB_LOCK_TIMEOUT_MS,
@@ -50,16 +46,6 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 const DAY = 86_400_000;
 const FIXED_PLAN = 'wp-fixed';
-const USAGE_PLAN = 'wp-usage';
-// A second metered plan, so the suite has a meter that is in the catalog but is
-// not the meter of the subscription under test.
-const ALT_USAGE_PLAN = 'wp-usage-alt';
-const ALT_METER = 'wp-alt-meter';
-
-interface SeedRecordKeys {
-  idempotencyKey: string;
-  meterKey?: string;
-}
 
 runWithInfra('billing write paths (e2e)', () => {
   let ds: DataSource;
@@ -77,7 +63,6 @@ runWithInfra('billing write paths (e2e)', () => {
         Promise.resolve({ providerInvoiceRef: 'pay_wp', status: 'captured' })
       ),
       findOffSessionCharge: jest.fn(() => Promise.resolve(null)),
-      chargeUsage: jest.fn(() => Promise.resolve(undefined)),
       refund: jest.fn(() => Promise.resolve(undefined)),
       cancel: jest.fn(() => Promise.resolve(undefined)),
       verifyAndParseWebhook: jest.fn(() => Promise.resolve(null))
@@ -107,7 +92,6 @@ runWithInfra('billing write paths (e2e)', () => {
       await ds.getRepository(CustomerGrant).delete({ customerId });
       await ds.getRepository(CreditLedger).delete({ customerId });
       await ds.getRepository(CreditBalance).delete({ customerId });
-      await ds.getRepository(UsageRecord).delete({ customerId });
       await ds.getRepository(Invoice).delete({ customerId });
     }
 
@@ -116,13 +100,7 @@ runWithInfra('billing write paths (e2e)', () => {
     await ds
       .getRepository(WebhookEvent)
       .delete({ providerEventId: 'wp-webhook-1' });
-    await ds
-      .getRepository(Plan)
-      .delete([
-        { key: FIXED_PLAN },
-        { key: USAGE_PLAN },
-        { key: ALT_USAGE_PLAN }
-      ]);
+    await ds.getRepository(Plan).delete({ key: FIXED_PLAN });
     await ds
       .getRepository(Product)
       .delete([{ key: 'wp-sku' }, { key: 'wp-credits' }]);
@@ -154,7 +132,7 @@ runWithInfra('billing write paths (e2e)', () => {
 
     customerId = customer.id;
 
-    await ds.getRepository(Plan).save([
+    await ds.getRepository(Plan).save(
       ds.getRepository(Plan).create({
         key: FIXED_PLAN,
         name: FIXED_PLAN,
@@ -167,48 +145,8 @@ runWithInfra('billing write paths (e2e)', () => {
         trialDays: 0,
         active: true,
         prices: { yookassa: { currency: 'RUB', amountMinor: 99000 } }
-      }),
-      ds.getRepository(Plan).create({
-        key: USAGE_PLAN,
-        name: USAGE_PLAN,
-        description: null,
-        billingMode: 'usage',
-        interval: 'month',
-        meterKey: 'api_calls',
-        entitlements: ['reports'],
-        limits: null,
-        trialDays: 0,
-        active: true,
-        prices: {
-          yookassa: {
-            currency: 'RUB',
-            amountMinor: 0,
-            unitPriceMinor: 200,
-            includedUnits: 0
-          }
-        }
-      }),
-      ds.getRepository(Plan).create({
-        key: ALT_USAGE_PLAN,
-        name: ALT_USAGE_PLAN,
-        description: null,
-        billingMode: 'usage',
-        interval: 'month',
-        meterKey: ALT_METER,
-        entitlements: [],
-        limits: null,
-        trialDays: 0,
-        active: true,
-        prices: {
-          yookassa: {
-            currency: 'RUB',
-            amountMinor: 0,
-            unitPriceMinor: 900,
-            includedUnits: 0
-          }
-        }
       })
-    ]);
+    );
 
     const method = await ds.getRepository(PaymentMethod).save(
       ds.getRepository(PaymentMethod).create({
@@ -228,9 +166,9 @@ runWithInfra('billing write paths (e2e)', () => {
     const subscription = await ds.getRepository(Subscription).save(
       ds.getRepository(Subscription).create({
         customerId: customer.id,
-        planKey: USAGE_PLAN,
+        planKey: FIXED_PLAN,
         provider: 'yookassa',
-        billingMode: 'usage',
+        billingMode: 'fixed',
         status: 'active',
         lifecycleOwner: 'self',
         currentPeriodStart: new Date(Date.now() - 40 * DAY),
@@ -248,58 +186,16 @@ runWithInfra('billing write paths (e2e)', () => {
     subscriptionId = subscription.id;
   }
 
-  /** The stable per-period key a due renewal charges the closing period under. */
-  function renewalKey(subscription: Subscription): string {
-    return `renewal:${subscription.id}:${subscription.currentPeriodEnd.getTime()}`;
-  }
-
-  /**
-   * Stores a postpaid record of `quantity` units of `meterKey` against the
-   * shared subscription. No writer creates such a record any more; the cases of
-   * the postpaid close that remain read it.
-   */
-  async function seedRecord(
-    { occurredAt, quantity }: { occurredAt: Date; quantity: number },
-    { idempotencyKey, meterKey = 'api_calls' }: SeedRecordKeys
-  ): Promise<void> {
-    await ds.getRepository(UsageRecord).insert({
-      customerId,
-      subscriptionId,
-      meterKey,
-      quantity: Money.fromMinor(quantity),
-      occurredAt,
-      idempotencyKey
-    });
-  }
-
-  /** Meters `quantity` units inside the subscription's open period. */
-  function seedUnits(
-    periodStart: Date,
-    quantity: number,
-    idempotencyKey: string
-  ): Promise<void> {
-    return seedRecord(
-      { occurredAt: new Date(periodStart.getTime() + 60_000), quantity },
-      { idempotencyKey }
-    );
-  }
-
-  /** Puts the shared subscription back on a known plan and lifecycle state. */
+  /** Puts the shared subscription back on a known lifecycle state. */
   function resetSubscription(
-    planKey: string,
     overrides: Partial<Subscription> = {}
   ): Promise<unknown> {
     return ds.getRepository(Subscription).update(
       { id: subscriptionId },
       {
-        planKey,
-        billingMode: planKey === USAGE_PLAN ? 'usage' : 'fixed',
         status: 'active',
         dunningAttempts: 0,
         nextRenewalAttemptAt: null,
-        // The period moves back in time here, which no real writer does, so
-        // the seal an earlier case left would close the new window.
-        usageSealedUntil: null,
         currentPeriodStart: new Date(Date.now() - 40 * DAY),
         currentPeriodEnd: new Date(Date.now() - DAY),
         ...overrides
@@ -316,7 +212,6 @@ runWithInfra('billing write paths (e2e)', () => {
         type,
         CreditService,
         FixedRating,
-        UsageRating,
         RenewalService,
         { provide: getDataSourceToken(), useValue: ds },
         {
@@ -335,10 +230,6 @@ runWithInfra('billing write paths (e2e)', () => {
         {
           provide: getRepositoryToken(Product),
           useValue: ds.getRepository(Product)
-        },
-        {
-          provide: getRepositoryToken(UsageRecord),
-          useValue: ds.getRepository(UsageRecord)
         },
         {
           provide: getRepositoryToken(WebhookEvent),
@@ -446,59 +337,7 @@ runWithInfra('billing write paths (e2e)', () => {
       .then((b) => b?.balanceUnits.toNumber() ?? 0);
   }
 
-  /** Units of the subscription's own meter recorded inside a window. */
-  async function ratableUnits(start: Date, end: Date): Promise<number> {
-    const rows = await ds
-      .getRepository(UsageRecord)
-      .find({ where: { customerId, meterKey: 'api_calls' } });
-
-    return rows
-      .filter(
-        (r) =>
-          r.occurredAt.getTime() >= start.getTime() &&
-          r.occurredAt.getTime() < end.getTime()
-      )
-      .reduce((sum, r) => sum + r.quantity.toNumber(), 0);
-  }
-
-  describe('metering and credits', () => {
-    it('rates only the plan meter when a foreign-meter row shares the period', async () => {
-      // An isolated window, so only these two rows are in scope whatever else
-      // the suite has recorded: the foreign one is another plan's meter, which
-      // is stored and simply not priced here.
-      const occurredAt = new Date(Date.now() - 30 * DAY);
-      const period = {
-        start: new Date(occurredAt.getTime() - DAY),
-        end: new Date(occurredAt.getTime() + DAY)
-      };
-
-      await seedRecord(
-        { occurredAt, quantity: 7 },
-        { idempotencyKey: 'wp-rate-own' }
-      );
-      await seedRecord(
-        { occurredAt, quantity: 1000 },
-        { idempotencyKey: 'wp-rate-foreign', meterKey: ALT_METER }
-      );
-
-      const rating = await build(UsageRating);
-      const subscription = await ds
-        .getRepository(Subscription)
-        .findOneByOrFail({ id: subscriptionId });
-      const plan = await ds
-        .getRepository(Plan)
-        .findOneByOrFail({ key: USAGE_PLAN });
-
-      const summary = await rating.summarizeForPeriod(
-        subscription,
-        plan,
-        period
-      );
-
-      expect(summary.totalUnits).toBe(7);
-      expect(summary.amountMinor).toBe(1400);
-    }, 30000);
-
+  describe('credits', () => {
     it('upserts the balance and appends a ledger row per delta', async () => {
       const invoice = await ds.getRepository(Invoice).save(
         ds.getRepository(Invoice).create({
@@ -526,7 +365,7 @@ runWithInfra('billing write paths (e2e)', () => {
           { customerId, invoiceId: invoice.id },
           100
         );
-        await credits.spendOnUsage(
+        await credits.clawbackPurchase(
           m,
           { customerId, invoiceId: invoice.id },
           30
@@ -695,32 +534,8 @@ runWithInfra('billing write paths (e2e)', () => {
   });
 
   describe('renewals', () => {
-    it('invoices a closed usage period', async () => {
-      await resetSubscription(USAGE_PLAN);
-      const invoicing = await build(UsageInvoicingService);
-      const sub = await ds
-        .getRepository(Subscription)
-        .findOneOrFail({ where: { id: subscriptionId } });
-
-      await invoicing.invoiceClosedPeriod(
-        new UsagePeriodClosedEvent(
-          userId,
-          subscriptionId,
-          sub.currentPeriodStart,
-          sub.currentPeriodEnd
-        )
-      );
-
-      const rows = await ds
-        .getRepository(Invoice)
-        .find({ where: { subscriptionId, billingMode: 'usage' } });
-
-      expect(rows).toHaveLength(1);
-      expect(rows[0].refundedMinor.toNumber()).toBe(0);
-    }, 30000);
-
     it('charges a due fixed subscription and advances the period', async () => {
-      await resetSubscription(FIXED_PLAN);
+      await resetSubscription();
       const renewals = await build(RenewalService);
 
       await renewals.runDueRenewals(new Date());
@@ -739,7 +554,7 @@ runWithInfra('billing write paths (e2e)', () => {
     }, 60000);
 
     it('walks dunning when the card declines', async () => {
-      await resetSubscription(FIXED_PLAN);
+      await resetSubscription();
       provider.chargeOffSession.mockRejectedValueOnce(
         new Error('card declined')
       );
@@ -757,7 +572,7 @@ runWithInfra('billing write paths (e2e)', () => {
     }, 60000);
 
     it('walks one dunning rung when two scans race the same decline', async () => {
-      await resetSubscription(FIXED_PLAN);
+      await resetSubscription();
       // The second scan fails the row the first one recorded while that charge
       // waits, then the first declines too: both read rung 0, so the loser's
       // guarded UPDATE must match nothing in Postgres.
@@ -798,7 +613,7 @@ runWithInfra('billing write paths (e2e)', () => {
     }, 60000);
 
     it('cancels at the period boundary through a guarded update', async () => {
-      await resetSubscription(FIXED_PLAN, { cancelAtPeriodEnd: true });
+      await resetSubscription({ cancelAtPeriodEnd: true });
       const charges = provider.chargeOffSession.mock.calls.length;
       const emit = jest.fn();
       const renewals = await buildWithEmitter(emit);
@@ -817,80 +632,6 @@ runWithInfra('billing write paths (e2e)', () => {
           (call: unknown[]) => call[0] === SubscriptionCanceledEvent.name
         )
       ).toHaveLength(1);
-    }, 60000);
-
-    it('invoices the metered period a boundary cancellation closes', async () => {
-      await resetSubscription(USAGE_PLAN, { cancelAtPeriodEnd: true });
-      const sub = await ds
-        .getRepository(Subscription)
-        .findOneOrFail({ where: { id: subscriptionId } });
-      // Seeded past the standing credit balance so the closing period leaves a
-      // real charge rather than being fully absorbed.
-      const credits = await creditUnits();
-
-      await seedUnits(sub.currentPeriodStart, credits + 7, 'wp-close-boundary');
-      const units = await ratableUnits(
-        sub.currentPeriodStart,
-        sub.currentPeriodEnd
-      );
-      const emit = jest.fn();
-      const renewals = await buildWithEmitter(emit);
-
-      await renewals.runDueRenewals(new Date());
-
-      const invoice = await ds.getRepository(Invoice).findOneOrFail({
-        where: { providerEventId: renewalKey(sub) }
-      });
-
-      expect(invoice.amountMinor.toNumber()).toBe(
-        (units - Math.max(0, credits)) * 200
-      );
-      expect(invoice.status).toBe('paid');
-      expect(invoice.periodStart.getTime()).toBe(
-        sub.currentPeriodStart.getTime()
-      );
-      expect(invoice.periodEnd.getTime()).toBe(sub.currentPeriodEnd.getTime());
-
-      const after = await ds
-        .getRepository(Subscription)
-        .findOneOrFail({ where: { id: subscriptionId } });
-
-      expect(after.status).toBe('canceled');
-      // The period the invoice covers must stay put, not roll forward.
-      expect(after.currentPeriodEnd.getTime()).toBe(
-        sub.currentPeriodEnd.getTime()
-      );
-    }, 60000);
-
-    it('invoices the open metered window that a mode switch closes', async () => {
-      await resetSubscription(USAGE_PLAN);
-      const sub = await ds
-        .getRepository(Subscription)
-        .findOneOrFail({ where: { id: subscriptionId } });
-
-      await seedUnits(sub.currentPeriodStart, 3, 'wp-close-immediate');
-      const now = new Date();
-      const units = await ratableUnits(sub.currentPeriodStart, now);
-      const credits = await creditUnits();
-      const renewals = await build(RenewalService);
-
-      await renewals.billClosingUsagePeriod(sub, now);
-
-      const invoice = await ds.getRepository(Invoice).findOneOrFail({
-        where: {
-          providerEventId: `cancel:${subscriptionId}:${sub.currentPeriodStart.getTime()}`
-        }
-      });
-
-      expect(invoice.status).toBe('paid');
-      expect(invoice.amountMinor.toNumber()).toBe(
-        Math.max(0, units - Math.max(0, credits)) * 200
-      );
-      expect(invoice.periodStart.getTime()).toBe(
-        sub.currentPeriodStart.getTime()
-      );
-      expect(invoice.periodEnd.getTime()).toBe(now.getTime());
-      expect(invoice.refundedMinor.toNumber()).toBe(0);
     }, 60000);
   });
 });

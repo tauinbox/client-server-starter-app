@@ -52,42 +52,6 @@ export function regionForOverride(
 }
 
 /**
- * The start of the metered window of the current period: the later of the
- * period start and `meteredFrom`. A switch of billing mode moves `meteredFrom`
- * forward so that units consumed before the switch are never rated under the
- * plan that follows it. A stale `meteredFrom` from an earlier period loses to
- * the period start.
- */
-export function meteredWindowStart<T extends Instant>(subscription: {
-  currentPeriodStart: T;
-  meteredFrom?: T | null;
-}): T {
-  const { currentPeriodStart, meteredFrom } = subscription;
-
-  return meteredFrom && epochMs(meteredFrom) > epochMs(currentPeriodStart)
-    ? meteredFrom
-    : currentPeriodStart;
-}
-
-/**
- * The earliest `occurredAt` that usage ingest accepts: the metered window
- * start, or the end of a window that a close already started to rate when
- * that is later. Rating uses `meteredWindowStart`, never this.
- */
-export function usageIngestStart<T extends Instant>(subscription: {
-  currentPeriodStart: T;
-  meteredFrom?: T | null;
-  usageSealedUntil?: T | null;
-}): T {
-  const windowStart = meteredWindowStart(subscription);
-  const { usageSealedUntil } = subscription;
-
-  return usageSealedUntil && epochMs(usageSealedUntil) > epochMs(windowStart)
-    ? usageSealedUntil
-    : windowStart;
-}
-
-/**
  * The boundary a self-managed renewal charges at: `trialEnd` for a trial,
  * else the end of the current period.
  */
@@ -99,51 +63,6 @@ export function renewalAnchor<T extends Instant>(subscription: {
   return subscription.status === 'trialing' && subscription.trialEnd
     ? subscription.trialEnd
     : subscription.currentPeriodEnd;
-}
-
-export interface UsageRatingInput {
-  totalUnits: number;
-  price: Pick<PlanPrice, 'includedUnits' | 'unitPriceMinor'>;
-  /** Prepaid credit units the period may spend; a negative balance offers none. */
-  availableCreditUnits?: number;
-}
-
-export interface RatedUsage {
-  includedUnits: number;
-  unitPriceMinor: number;
-  /** Units beyond the included units. */
-  billableUnits: number;
-  creditUnitsApplied: number;
-  /** Billable units that credits did not cover: the only units that cost money. */
-  chargedUnits: number;
-  amountMinor: number;
-}
-
-/**
- * Rates a metered period: the included units are free, prepaid credits offset
- * the billable units one-for-one, and the remainder is charged at the unit
- * price. Pure: the caller reads the available units and deducts
- * `creditUnitsApplied` itself.
- */
-export function rateUsage(input: UsageRatingInput): RatedUsage {
-  const { totalUnits, price, availableCreditUnits = 0 } = input;
-  const includedUnits = price.includedUnits ?? 0;
-  const unitPriceMinor = price.unitPriceMinor ?? 0;
-  const billableUnits = Math.max(0, totalUnits - includedUnits);
-  const creditUnitsApplied = Math.min(
-    Math.max(0, availableCreditUnits),
-    billableUnits
-  );
-  const chargedUnits = billableUnits - creditUnitsApplied;
-
-  return {
-    includedUnits,
-    unitPriceMinor,
-    billableUnits,
-    creditUnitsApplied,
-    chargedUnits,
-    amountMinor: Money.fromMinor(unitPriceMinor).mulInt(chargedUnits).toNumber()
-  };
 }
 
 /** The part of a plan that proration reads. */
@@ -176,8 +95,7 @@ export interface ProrationAmounts {
 /**
  * Self-managed plan-change proration: immediate switch, refund-and-recharge,
  * whole-day granularity, no credit carry-forward. Both legs use the same
- * remainder. Usage plans have a zero fixed price, so a leg on a usage plan
- * contributes nothing.
+ * remainder.
  *
  * Rounding policy (applies to both legs): each leg is floored to whole minor
  * units, so the sub-minor-unit remainder of each leg stays with the merchant.

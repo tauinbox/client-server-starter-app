@@ -10,7 +10,6 @@ import {
 } from 'typeorm';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
-import { meteredWindowStart } from '@app/shared/utils/billing-rules';
 import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import { Customer } from '../entities/customer.entity';
@@ -31,8 +30,7 @@ import {
   SubscriptionActivatedEvent,
   SubscriptionCanceledEvent,
   SubscriptionPastDueEvent,
-  SubscriptionRenewedEvent,
-  UsagePeriodClosedEvent
+  SubscriptionRenewedEvent
 } from '../events/billing.events';
 import { MANAGES_LIFECYCLE } from '../providers/payment-provider.interface';
 import type {
@@ -275,43 +273,12 @@ export class BillingEventReducer {
           await this.markTrialUsed(manager, created.customerId, now);
         }
 
-        return { subscriptionId: created.id, userId, closedPeriod: null };
+        return { subscriptionId: created.id, userId };
       }
 
-      const incomingStart = payload.currentPeriodStart
-        ? new Date(payload.currentPeriodStart)
-        : null;
-      const rollsOver =
-        incomingStart !== null &&
-        !Number.isNaN(incomingStart.getTime()) &&
-        incomingStart.getTime() >= subscription.currentPeriodEnd.getTime();
-      // A provider-managed metered period closes either way: the snapshot
-      // starts a new one at/after the stored boundary, or it cancels the
-      // subscription - a case the rollover predicate never matches. Keyed on
-      // the stored boundary, so a replay neither re-detects nor charges twice.
-      const meteredClose =
-        subscription.billingMode === 'usage' &&
-        subscription.lifecycleOwner === 'provider';
-      const closesPeriod =
-        meteredClose && (type === 'subscription.canceled' || rollsOver);
       // A plan change whose local write missed its guard reaches the row only
-      // through this snapshot, so a switch of billing mode is applied here.
+      // through this snapshot.
       const toPlan = plan && plan.key !== subscription.planKey ? plan : null;
-      const switchesMode =
-        toPlan !== null && toPlan.billingMode !== subscription.billingMode;
-      const closeEnd = closesPeriod
-        ? subscription.currentPeriodEnd
-        : switchesMode && meteredClose && !rollsOver
-          ? now
-          : null;
-      // Rated under the stored plan: the snapshot may already carry the next.
-      const closedPeriod = closeEnd
-        ? {
-            start: meteredWindowStart(subscription),
-            end: closeEnd,
-            planKey: subscription.planKey
-          }
-        : null;
 
       // By name, not by saving the entity: a whole-row diff would push the
       // values read before the awaits above back over anything a concurrent
@@ -324,6 +291,7 @@ export class BillingEventReducer {
 
       if (toPlan) {
         snapshot.planKey = toPlan.key;
+        snapshot.billingMode = toPlan.billingMode;
       }
 
       if (payload.currentPeriodStart) {
@@ -334,28 +302,13 @@ export class BillingEventReducer {
         snapshot.currentPeriodEnd = new Date(payload.currentPeriodEnd);
       }
 
-      if (switchesMode) {
-        snapshot.billingMode = toPlan.billingMode;
-        snapshot.meteredFrom = now;
-      }
-
-      if (rollsOver) {
-        snapshot.meteredFrom = null;
-      }
-
       await manager.update(Subscription, { id: subscription.id }, snapshot);
-
-      if (payload.status === 'canceled') {
-        await this.credits.releaseHolds(manager, {
-          subscriptionId: subscription.id
-        });
-      }
 
       if (payload.status === 'trialing') {
         await this.markTrialUsed(manager, subscription.customerId, now);
       }
 
-      return { subscriptionId: subscription.id, userId, closedPeriod };
+      return { subscriptionId: subscription.id, userId };
     });
 
     if (!result?.userId) {
@@ -363,19 +316,6 @@ export class BillingEventReducer {
     }
 
     this.emitSubscriptionEvent(type, result.userId, result.subscriptionId);
-
-    if (result.closedPeriod) {
-      this.events.emit(
-        UsagePeriodClosedEvent.name,
-        new UsagePeriodClosedEvent(
-          result.userId,
-          result.subscriptionId,
-          result.closedPeriod.start,
-          result.closedPeriod.end,
-          result.closedPeriod.planKey
-        )
-      );
-    }
   }
 
   private emitSubscriptionEvent(
@@ -544,16 +484,6 @@ export class BillingEventReducer {
 
           this.reconcileChargeAmount(invoice, payload);
 
-          // The winning flip to paid spends the credits the charged amount
-          // was rated against - exactly once, whichever side settles.
-          if (invoice.creditUnitsApplied > 0) {
-            await this.credits.spendOnUsage(
-              manager,
-              { customerId: invoice.customerId, invoiceId: invoice.id },
-              invoice.creditUnitsApplied
-            );
-          }
-
           const userId = await this.resolveUserId(manager, payload.ref);
 
           return { invoiceId: invoice.id, userId };
@@ -573,50 +503,6 @@ export class BillingEventReducer {
     const result = await withTransaction(this.dataSource, async (manager) => {
       const userId = await this.resolveUserId(manager, payload.ref);
       const now = new Date();
-
-      // A postpaid usage charge round-trips its `usage:{sub}:{periodEnd}` key
-      // through the provider's price custom data; the payment settles the
-      // planted invoice, `failed` included because Paddle retries a charge.
-      if (payload.usageChargeKey) {
-        const reconciled = await manager.update(
-          Invoice,
-          {
-            providerEventId: payload.usageChargeKey,
-            status: In([...UNPAID_INVOICE_STATUSES])
-          },
-          {
-            status: 'paid',
-            providerInvoiceRef: payload.providerInvoiceRef,
-            paidAt: parseDate(payload.paidAt, now)
-          }
-        );
-        const invoice = await manager.findOne(Invoice, {
-          where: { providerEventId: payload.usageChargeKey }
-        });
-
-        if (invoice) {
-          if (reconciled.affected && invoice.creditUnitsApplied > 0) {
-            await this.credits.spendOnUsage(
-              manager,
-              { customerId: invoice.customerId, invoiceId: invoice.id },
-              invoice.creditUnitsApplied
-            );
-          }
-
-          // No pending row matched but the invoice exists — an already-settled
-          // replay; never insert a duplicate alongside it.
-          return reconciled.affected
-            ? {
-                invoiceId: invoice.id,
-                userId,
-                activatedSubscriptionId: null,
-                unclaimed: false
-              }
-            : null;
-        }
-        // The keyed invoice vanished — fall through to the plain insert so the
-        // payment is still recorded.
-      }
 
       // A one-time purchase belongs to no subscription — it must never match
       // the self-managed open-subscription fallback below (which would
@@ -949,22 +835,6 @@ export class BillingEventReducer {
             where: { providerSubscriptionId: payload.providerSubscriptionId }
           })
         : null;
-
-      // The failed row keeps its credit hold while Paddle retries. A canceled
-      // subscription has no later release point, so its hold ends here.
-      if (payload.usageChargeKey) {
-        const flip = await manager.update(
-          Invoice,
-          { providerEventId: payload.usageChargeKey, status: 'pending' },
-          { status: 'failed' }
-        );
-
-        if (flip.affected && subscription?.status === 'canceled') {
-          await this.credits.releaseHolds(manager, {
-            providerEventId: payload.usageChargeKey
-          });
-        }
-      }
 
       const userId = await this.resolveUserId(manager, payload.ref);
 

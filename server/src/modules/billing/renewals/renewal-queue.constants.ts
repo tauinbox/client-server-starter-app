@@ -33,9 +33,9 @@ export const DUNNING_RETRY_DELAY_MS = 3 * 24 * 60 * 60 * 1000;
 
 /**
  * How long the claim of a self-service plan change keeps the renewal scan off
- * its subscription. A change makes at most three provider calls in sequence
- * (the proration charge, the closing usage charge and the refund), each bounded
- * by the provider deadline, so a live change always ends inside the lease. An
+ * its subscription. A change makes two provider calls in sequence (the
+ * proration charge and the refund), each bounded by the provider deadline. The
+ * lease covers three deadlines, so a live change always ends inside it. An
  * older lease belongs to a change whose process died, and the scan ignores it.
  */
 export const PLAN_CHANGE_LEASE_MS =

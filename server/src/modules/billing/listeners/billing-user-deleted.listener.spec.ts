@@ -9,7 +9,6 @@ import { Customer } from '../entities/customer.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { SubscriptionCanceledEvent } from '../events/billing.events';
 import { BILLING_PROVIDERS } from '../providers/payment-provider.interface';
-import { CreditService } from '../services/credit.service';
 import { BillingUserDeletedListener } from './billing-user-deleted.listener';
 
 describe('BillingUserDeletedListener', () => {
@@ -19,9 +18,7 @@ describe('BillingUserDeletedListener', () => {
     find: jest.Mock;
     save: jest.Mock;
     update: jest.Mock;
-    manager: { transaction: jest.Mock };
   };
-  let credits: { releaseHolds: jest.Mock };
   let paddleCancel: jest.Mock;
   let yookassaCancel: jest.Mock;
   let emit: jest.Mock;
@@ -33,16 +30,8 @@ describe('BillingUserDeletedListener', () => {
       save: jest
         .fn()
         .mockImplementation((s: Subscription) => Promise.resolve(s)),
-      update: jest.fn().mockResolvedValue({ affected: 1 }),
-      // The cancel write runs in a transaction on the manager of the repository.
-      manager: {
-        transaction: jest.fn(
-          (cb: (m: { withRepository: () => unknown }) => unknown) =>
-            cb({ withRepository: () => subscriptions })
-        )
-      }
+      update: jest.fn().mockResolvedValue({ affected: 1 })
     };
-    credits = { releaseHolds: jest.fn().mockResolvedValue(undefined) };
     paddleCancel = jest.fn().mockResolvedValue(undefined);
     yookassaCancel = jest.fn().mockResolvedValue(undefined);
     emit = jest.fn();
@@ -59,7 +48,6 @@ describe('BillingUserDeletedListener', () => {
             { id: 'yookassa', cancel: yookassaCancel }
           ]
         },
-        { provide: CreditService, useValue: credits },
         { provide: EventEmitter2, useValue: { emit } }
       ]
     }).compile();
@@ -141,9 +129,6 @@ describe('BillingUserDeletedListener', () => {
       SubscriptionCanceledEvent.name,
       new SubscriptionCanceledEvent('user-1', 'sub-2')
     );
-    expect(credits.releaseHolds).toHaveBeenCalledWith(expect.anything(), {
-      subscriptionId: 'sub-2'
-    });
     expect(yookassaCancel).not.toHaveBeenCalled();
   });
 
@@ -162,7 +147,6 @@ describe('BillingUserDeletedListener', () => {
     await listener.handleUserDeleted(new UserDeletedEvent('user-1'));
 
     expect(emit).not.toHaveBeenCalled();
-    expect(credits.releaseHolds).not.toHaveBeenCalled();
   });
 
   it('swallows a local-cancel write failure so account deletion is not blocked', async () => {

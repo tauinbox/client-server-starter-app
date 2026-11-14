@@ -54,7 +54,6 @@ import {
 } from '../utils/open-subscription.util';
 import { INVOICE_LIST_COLUMNS } from '../utils/list-order.util';
 import type { InvoiceCursorQueryDto } from '../dtos/billing-cursor-query.dto';
-import { RenewalService } from '../renewals/renewal.service';
 import { BillingService } from '../billing.service';
 import { CreditService } from './credit.service';
 import { ApiError } from '../../../common/errors/api-error';
@@ -119,7 +118,6 @@ export class BillingUserService {
     @InjectRepository(User)
     private readonly users: Repository<User>,
     private readonly billing: BillingService,
-    private readonly renewals: RenewalService,
     private readonly credits: CreditService,
     private readonly config: ConfigService,
     private readonly events: EventEmitter2
@@ -577,8 +575,6 @@ export class BillingUserService {
       {
         subscriptions: this.subscriptions,
         billing: this.billing,
-        renewals: this.renewals,
-        credits: this.credits,
         events: this.events
       },
       subscription,
