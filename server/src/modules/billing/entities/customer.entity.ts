@@ -65,6 +65,18 @@ export class Customer {
   @Exclude()
   trialUsedAt: Date | null;
 
+  /**
+   * When the customer last refused the saved card. A card from a payment that
+   * was created before this moment is not saved again.
+   */
+  @Column({
+    name: 'payment_method_removed_at',
+    type: 'timestamptz',
+    nullable: true
+  })
+  @Exclude()
+  paymentMethodRemovedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

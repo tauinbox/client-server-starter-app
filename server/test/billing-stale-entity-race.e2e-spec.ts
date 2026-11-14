@@ -24,6 +24,7 @@ import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { AuditService } from '../src/modules/audit/audit.service';
 import { DRAFT_TERMS_CONSENTS } from '../src/modules/billing/testing/billing-service.fixtures';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
@@ -312,7 +313,8 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
           provide: ConfigService,
           useValue: { get: () => 'http://localhost:4200' }
         },
-        { provide: EventEmitter2, useValue: { emit } }
+        { provide: EventEmitter2, useValue: { emit } },
+        { provide: AuditService, useValue: { log: jest.fn() } }
       ]
     }).compile();
 
@@ -398,7 +400,8 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
       savedPaymentMethod: {
         providerMethodRef: 'tok-new',
         brand: 'MasterCard',
-        last4: '4444'
+        last4: '4444',
+        consentedAt: new Date().toISOString()
       }
     };
 
@@ -444,7 +447,8 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
       savedPaymentMethod: {
         providerMethodRef: 'pm_tok',
         brand: 'Visa',
-        last4: '4242'
+        last4: '4242',
+        consentedAt: new Date().toISOString()
       }
     };
 

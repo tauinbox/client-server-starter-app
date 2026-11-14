@@ -105,6 +105,19 @@
       }
     },
     {
+      "method": "DELETE",
+      "path": "/api/v1/billing/payment-method",
+      "expectedStatus": 401,
+      "policy": {
+        "access": "signed-in",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
+    },
+    {
       "method": "GET",
       "path": "/api/v1/billing/products",
       "expectedStatus": 401,

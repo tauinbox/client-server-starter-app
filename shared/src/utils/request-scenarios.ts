@@ -77,6 +77,8 @@ export const STATE_FIXTURES = [
    * `customer` when the scenario has one.
    */
   'subscription',
+  /** A default saved `yookassa` card of the `customer`. */
+  'saved-card',
   /** A fixed monthly plan `$meterKey` with a `yookassa` price of 10.00 RUB. */
   'fixed-plan',
   /** A fixed monthly plan `$planKey` with a `yookassa` price of 10.00 RUB. */

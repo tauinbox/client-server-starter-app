@@ -25,6 +25,7 @@ import {
   type OffSessionCharge
 } from '../src/modules/billing/providers/payment-provider.interface';
 import { BillingUserService } from '../src/modules/billing/services/billing-user.service';
+import { AuditService } from '../src/modules/audit/audit.service';
 import {
   DRAFT_TERMS_CONSENTS,
   TERMS_NOT_SENT
@@ -264,7 +265,8 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
           provide: ConfigService,
           useValue: { get: () => 'http://localhost:4200' }
         },
-        { provide: EventEmitter2, useValue: { emit: jest.fn() } }
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: AuditService, useValue: { log: jest.fn() } }
       ]
     }).compile();
 

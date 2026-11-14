@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Post,
@@ -130,6 +131,20 @@ export class BillingUserController {
   @ApiOkResponse({ type: CheckoutSessionResponseDto })
   updatePaymentMethod(@Req() req: JwtAuthRequest) {
     return this.billingUser.startPaymentMethodUpdate(req.user.userId);
+  }
+
+  @Delete('payment-method')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Refuse the saved card: delete it and end the subscription at the close of the period. A charge that read the card before the commit completes; every later charge is refused.'
+  })
+  @ApiOkResponse({ type: SubscriptionResponseDto })
+  removePaymentMethod(@Req() req: JwtAuthRequest) {
+    return this.billingUser.removePaymentMethod(req.user.userId, {
+      actorEmail: req.user.email,
+      context: extractAuditContext(req)
+    });
   }
 
   @Get('products')

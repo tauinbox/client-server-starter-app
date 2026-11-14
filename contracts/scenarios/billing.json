@@ -16,6 +16,37 @@
       }
     },
     {
+      "name": "a subscriber removes the saved card",
+      "route": "DELETE /api/v1/billing/payment-method",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription",
+        "saved-card"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": [
+          "BILLING_PAYMENT_METHOD_REMOVE"
+        ]
+      }
+    },
+    {
+      "name": "a removal with no saved card changes nothing",
+      "route": "DELETE /api/v1/billing/payment-method",
+      "actor": "user",
+      "auth": "bearer",
+      "state": [
+        "subscription"
+      ],
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
       "name": "a user with no subscription cannot update the payment method",
       "route": "POST /api/v1/billing/payment-method",
       "actor": "user",

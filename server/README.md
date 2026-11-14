@@ -640,6 +640,10 @@ are:
 - `POST payment-method` starts the card replacement at the provider. Paddle gives its
   payment-method-change checkout. YooKassa does a zero-amount re-bind, and its webhook changes the
   default method. A `past_due` subscription can use this route, because it is how dunning recovers.
+- `DELETE payment-method` is the refusal of the saved card (consumer law, Article 16.1 p. 4.2). It
+  deletes the local cards and ends the subscription at the close of its period: a self-managed row
+  gets `cancelAtPeriodEnd`, a Paddle subscription is canceled at the provider. A first payment or
+  a re-bind that was created before the removal saves no card (section 24 of the billing design).
 - `GET region` and `PUT region` read and write the `auto`, `ru` or `world` override. The write has an
   active-subscription guard, as in section 19 of the billing design. Both responses carry
   `availableProviders`: the providers that `BillingService.isProviderAvailable` accepts now, and

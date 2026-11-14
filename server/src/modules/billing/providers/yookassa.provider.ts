@@ -702,7 +702,8 @@ export class YooKassaProvider implements PaymentProvider {
           ? {
               providerMethodRef: method.id,
               brand: method.card?.card_type ?? 'card',
-              last4: method.card?.last4 ?? '0000'
+              last4: method.card?.last4 ?? '0000',
+              consentedAt: payment.created_at ?? null
             }
           : null;
 
