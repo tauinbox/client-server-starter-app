@@ -227,7 +227,9 @@ cannot both proceed. The raw Redis client is used for the same reason the versio
 Keyv gives no conditional write. Without Redis one process owns the ledger, and the claims in flight
 are also reserved synchronously, because the read and the write are two awaits. A ledger that cannot
 be reached fails open, because it hardens a credential that is already signed and short-lived.
-There are two consumers. `POST /auth/oauth/exchange` claims the `jti` of the `oauth_data` cookie.
+There are three consumers. `POST /auth/oauth/exchange` claims the `jti` of the `oauth_data` cookie,
+and `POST /auth/oauth/signup` the `jti` of the `oauth_signup` cookie under `oauth-signup:spent:`,
+after the region check of the country, so a refused country leaves the cookie unspent.
 `AuthService.isValidReauthProof` claims the `jti` of a `reauth_proof` under the prefix
 `reauth-proof:spent:`, so one provider round trip authorises one sensitive change. That claim runs
 after every other check on the proof, thus a proof offered for the wrong operation is refused and
@@ -368,7 +370,8 @@ exception filter use it. It calls `common/utils/host-cookie.ts`. In the auth mod
 without dependency injection.
 
 `SignInCompletionService.complete` is the last step of each sign-in: the password sign-in, the
-second-factor sign-in and `POST /auth/oauth/exchange`. It ends the session that the browser presents,
+second-factor sign-in, `POST /auth/oauth/exchange` and `POST /auth/oauth/signup` (the provider
+sign-up, after the country of residence). It ends the session that the browser presents,
 issues the new session, writes the `USER_LOGIN_SUCCESS` audit entry and the `login_success` metric,
 sets the refresh cookie and removes the refresh token from the body. The OAuth callback creates no
 session. It signs only `{ userId, provider }` (or the second-factor challenge) into the `oauth_data`
@@ -2217,6 +2220,7 @@ These routes currently replace the default limit:
 | `POST /auth/forgot-password` | 5 min | 2 | The cost of an email, and enumeration mitigation. The CAPTCHA soft trigger starts near the limit |
 | `POST /auth/reset-password` | 1 min | 10 | Defense in depth against a token brute force |
 | `POST /auth/oauth/exchange` | 1 min | 10 | It is bound to a state token, and the payload id it carries is spendable once. The limit bounds the attempts around both |
+| `POST /auth/oauth/signup` | 1 min | 10 | The same handoff family: the `oauth_signup` cookie is spendable once. The limit bounds the country attempts of one cookie |
 | `POST /auth/mfa/verify` | 1 min | 5 plus `login-long-window` | Six digits is a million guesses, and an unthrottled route walks that in minutes. Both keys are per address, so this route also carries a per-account counter of refused codes |
 | `POST /auth/mfa/recovery` | 1 min | 5 plus `login-long-window` | The same, against the recovery codes |
 | `POST /auth/mfa/setup` | 1 min | 5 plus `login-long-window`, on a body that carries `currentPassword` | It verifies the step-up secret of an authenticated caller. A stolen access token must not buy unlimited guesses |

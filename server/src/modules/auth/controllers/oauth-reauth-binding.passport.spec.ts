@@ -21,6 +21,7 @@ import { PurposeTokenService } from '../services/purpose-token.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuthService } from '../services/auth.service';
 import { SignInCompletionService } from '../services/sign-in-completion.service';
+import { RegionService } from '../../core/region/region.service';
 import { UsersService } from '../../users/services/users.service';
 import { MailService } from '../../mail/mail.service';
 import { CLIENT_URL } from '../providers/client-url.provider';
@@ -190,6 +191,7 @@ describe('OAuth step-up re-authentication (real Passport pipeline)', () => {
         },
         { provide: UsersService, useValue: { findById: jest.fn() } },
         { provide: SignInCompletionService, useValue: { complete: jest.fn() } },
+        { provide: RegionService, useValue: {} },
         {
           provide: MailService,
           useValue: { sendOAuthUnlinkedNotification: jest.fn() }

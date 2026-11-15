@@ -19,9 +19,10 @@ import { Router } from '@angular/router';
 import type { User } from '@shared/models/user.types';
 import type {
   ActiveSessionResponse,
+  OAuthExchangeResponse,
   UserPermissionsResponse
 } from '@app/shared/types';
-import type { StepUpOperation } from '@app/shared/constants';
+import type { CountryCode, StepUpOperation } from '@app/shared/constants';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -442,34 +443,51 @@ export class AuthService {
   /**
    * A provider round trip does not always end the sign-in either: an account
    * carrying a second factor answers with a challenge, exactly as the password
-   * route does, and no session exists until a code is presented.
+   * route does, and no session exists until a code is presented. An identity
+   * that no account holds answers that the residence is required, and
+   * `completeOAuthSignup` creates the account.
    */
-  exchangeOAuthData(): Observable<LoginResponse> {
+  exchangeOAuthData(): Observable<OAuthExchangeResponse> {
     return this.#http
-      .post<LoginResponse>(
+      .post<OAuthExchangeResponse>(
         AuthApiEnum.OAuthExchange,
         {},
         { context: silentContext() }
       )
       .pipe(
         switchMap((response) => {
-          if ('mfaRequired' in response) {
+          if ('mfaRequired' in response || 'residenceRequired' in response) {
             return [response];
           }
 
-          // Checked before anything is saved: a partial response must not
-          // leave a half-written session behind the redirect to /login.
-          if (
-            !response.tokens?.access_token ||
-            !response.user?.id ||
-            !response.user?.email
-          ) {
-            return throwError(() => new Error('Incomplete OAuth response'));
-          }
-
-          return this.startSession(response);
+          return this.startOAuthSession(response);
         })
       );
+  }
+
+  /** Creates the account of the provider identity, then signs it in. */
+  completeOAuthSignup(residenceCountry: CountryCode): Observable<AuthResponse> {
+    return this.#http
+      .post<AuthResponse>(
+        AuthApiEnum.OAuthSignup,
+        { residenceCountry },
+        { context: silentContext() }
+      )
+      .pipe(switchMap((response) => this.startOAuthSession(response)));
+  }
+
+  private startOAuthSession(response: AuthResponse): Observable<AuthResponse> {
+    // Checked before anything is saved: a partial response must not leave a
+    // half-written session behind the redirect to /login.
+    if (
+      !response.tokens?.access_token ||
+      !response.user?.id ||
+      !response.user?.email
+    ) {
+      return throwError(() => new Error('Incomplete OAuth response'));
+    }
+
+    return this.startSession(response);
   }
 
   /**

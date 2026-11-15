@@ -1,0 +1,21 @@
+<ng-container *transloco="let t; scope: 'auth'">
+  @let country = field()();
+  <mat-form-field
+    appearance="outline"
+    class="full-width"
+    subscriptSizing="dynamic"
+  >
+    <mat-label>{{ t('auth.register.residenceCountry') }}</mat-label>
+    <mat-icon matPrefix aria-hidden="true">public</mat-icon>
+    <mat-select [formField]="field()">
+      @for (option of countries(); track option.code) {
+        <mat-option [value]="option.code">{{ option.name }}</mat-option>
+      }
+    </mat-select>
+    @if (country.touched() && country.invalid()) {
+      <mat-error>{{ t('auth.register.residenceCountryRequired') }}</mat-error>
+    } @else {
+      <mat-hint>{{ t('auth.register.residenceCountryHint') }}</mat-hint>
+    }
+  </mat-form-field>
+</ng-container>

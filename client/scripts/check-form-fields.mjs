@@ -9,7 +9,7 @@
  *  - condition-builder      — mat-select/input in admin condition builder
  *  - feature-flag-rule-row  — admin rule editor; all fields set subscriptSizing="dynamic", no nxs-form-field siblings
  *  - feature-flag-preview   — admin dry-run preview; standalone JSON/attribute inputs, no nxs-form-field siblings
- *  - auth/components/register — mat-select for the country of residence; subscriptSizing="dynamic"
+ *  - auth/components/residence-country-field — mat-select for the country of residence; subscriptSizing="dynamic"
  *
  * Exit code 1 if violations found.
  */
@@ -29,7 +29,7 @@ const ALLOWED_PATTERNS = [
   /condition-builder[\\/]/,
   /feature-flag-rule-row[\\/]/,
   /feature-flag-preview[\\/]/,
-  /auth[\\/]components[\\/]register[\\/]/
+  /auth[\\/]components[\\/]residence-country-field[\\/]/
 ];
 
 // Find all .html files under src/app

@@ -1,0 +1,42 @@
+@use 'abstracts/variables' as vars;
+@use 'abstracts/mixins' as mix;
+
+:host {
+  display: block;
+
+  .intro {
+    margin-block: 0 vars.$spacing-md;
+    font-size: vars.$font-size-sm;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .form-actions {
+    @include mix.form-actions;
+  }
+
+  .error-message {
+    @include mix.error-message;
+  }
+
+  .peer-region-link {
+    display: block;
+    margin-top: vars.$spacing-xs;
+  }
+
+  .residence-links {
+    display: flex;
+    justify-content: center;
+    margin-top: vars.$spacing-xs;
+  }
+
+  nxs-legal-links {
+    display: block;
+    margin-top: vars.$spacing-sm;
+  }
+
+  button[type='submit'] {
+    width: 100%;
+
+    @include mix.button-with-spinner;
+  }
+}

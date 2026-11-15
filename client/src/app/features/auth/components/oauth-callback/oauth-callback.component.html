@@ -14,6 +14,20 @@
         />
       </mat-card-content>
     </mat-card>
+  } @else if (residenceRequired()) {
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>{{ t('auth.oauthResidence.title') }}</mat-card-title>
+      </mat-card-header>
+
+      <mat-card-content>
+        <nxs-oauth-residence
+          (completed)="onSignedUp()"
+          (cancelled)="onResidenceCancelled()"
+          (failed)="onResidenceFailed($event)"
+        />
+      </mat-card-content>
+    </mat-card>
   } @else {
     <div class="oauth-callback-progress">
       <mat-spinner [attr.aria-label]="t('common.loading')"></mat-spinner>

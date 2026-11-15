@@ -27,6 +27,7 @@ export const TOKEN_PURPOSE = {
   OAUTH_LINK: 'oauth_link',
   OAUTH_DATA: 'oauth_data',
   OAUTH_REAUTH: 'oauth_reauth',
+  OAUTH_SIGNUP: 'oauth_signup',
   REAUTH_PROOF: 'reauth_proof',
   MFA_PENDING: 'mfa_pending'
 } as const;

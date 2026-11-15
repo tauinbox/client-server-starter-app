@@ -1,0 +1,66 @@
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import {
+  HttpTestingController,
+  provideHttpClientTesting
+} from '@angular/common/http/testing';
+import { firstValueFrom } from 'rxjs';
+import {
+  REGION_CONFIG_API_V1,
+  RegionConfigService
+} from './region-config.service';
+
+describe('RegionConfigService', () => {
+  let service: RegionConfigService;
+  let httpTesting: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()]
+    });
+    service = TestBed.inject(RegionConfigService);
+    httpTesting = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpTesting.verify());
+
+  describe('peerUrl', () => {
+    async function peerUrlWith(
+      peers: Record<string, string>
+    ): Promise<string | null> {
+      const result = firstValueFrom(service.peerUrl('RU'));
+
+      httpTesting
+        .expectOne(REGION_CONFIG_API_V1)
+        .flush({ region: 'intl', peers });
+
+      return result;
+    }
+
+    it('gives the https URL of the cell that serves the country', async () => {
+      await expect(peerUrlWith({ ru: 'https://ru.example.com' })).resolves.toBe(
+        'https://ru.example.com'
+      );
+    });
+
+    it('gives null for a URL that is not https', async () => {
+      await expect(peerUrlWith({ ru: 'javascript:alert(1)' })).resolves.toBe(
+        null
+      );
+    });
+
+    it('gives null when no cell serves the region', async () => {
+      await expect(peerUrlWith({})).resolves.toBe(null);
+    });
+
+    it('gives null when the config does not load', async () => {
+      const result = firstValueFrom(service.peerUrl('RU'));
+
+      httpTesting
+        .expectOne(REGION_CONFIG_API_V1)
+        .flush(null, { status: 503, statusText: 'Unavailable' });
+
+      await expect(result).resolves.toBe(null);
+    });
+  });
+});

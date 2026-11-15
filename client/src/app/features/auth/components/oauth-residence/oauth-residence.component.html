@@ -1,0 +1,51 @@
+<ng-container *transloco="let t; scope: 'auth'">
+  <p class="intro">{{ t('auth.oauthResidence.intro') }}</p>
+
+  <form (submit)="$event.preventDefault(); onSubmit()">
+    <nxs-residence-country-field [field]="residenceForm.residenceCountry" />
+
+    @if (error()) {
+      <div class="error-message" role="alert">
+        {{ error() }}
+        @if (peerUrl(); as url) {
+          <a class="peer-region-link" [href]="url">{{
+            t('auth.register.openPeerRegion')
+          }}</a>
+        }
+      </div>
+    }
+
+    <div class="form-actions">
+      <button matButton="filled" type="submit" [disabled]="!canSubmit()">
+        @if (loading()) {
+          <span class="app-btn-loading">
+            <mat-spinner
+              [attr.aria-label]="t('common.loading')"
+              diameter="24"
+            ></mat-spinner>
+            {{ t('auth.oauthResidence.creating') }}
+          </span>
+        } @else {
+          {{ t('auth.oauthResidence.submit') }}
+        }
+      </button>
+    </div>
+
+    <div class="residence-links">
+      <button
+        matButton="text"
+        type="button"
+        [disabled]="loading()"
+        (click)="cancelled.emit()"
+      >
+        {{ t('common.cancel') }}
+      </button>
+    </div>
+  </form>
+
+  <nxs-legal-links
+    class="full-width"
+    [kinds]="legalKinds"
+    intro="legal.introRegister"
+  />
+</ng-container>

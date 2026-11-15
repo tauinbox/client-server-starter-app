@@ -93,11 +93,11 @@ runWithInfra('The name of a provider sign-up (e2e)', () => {
   async function signUp(profile: OAuthUserProfile): Promise<User> {
     const result = await app.get(OAuthService).loginWithOAuth(profile);
 
-    if ('mfaRequired' in result) throw new Error('unexpected challenge');
+    if (!('signupProfile' in result)) throw new Error('expected a sign-up');
 
-    return dataSource
-      .getRepository(User)
-      .findOneOrFail({ where: { email: profile.email } });
+    return app
+      .get(OAuthService)
+      .createOAuthUser(result.signupProfile, { residenceCountry: 'DE' });
   }
 
   function uniqueEmail(label: string): string {

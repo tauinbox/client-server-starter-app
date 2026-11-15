@@ -30,6 +30,11 @@ export const OAUTH_DATA_COOKIE_OPTIONS: CookieOptions = {
   maxAge: OAUTH_DATA_MAX_AGE_MS
 };
 
+// Mirrors OAuthController.OAUTH_SIGNUP_COOKIE / OAUTH_SIGNUP_MAX_AGE_SECONDS.
+export const OAUTH_SIGNUP_COOKIE = 'oauth_signup';
+
+export const OAUTH_SIGNUP_MAX_AGE_MS = 600 * 1000;
+
 export const REAUTH_PROOF_COOKIE = 'reauth_proof';
 export const REAUTH_PROOF_MAX_AGE_MS = 300 * 1000;
 

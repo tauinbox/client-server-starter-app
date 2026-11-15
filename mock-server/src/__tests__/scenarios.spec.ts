@@ -319,6 +319,15 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     ctx.cookies.push(`oauth_data=${token}`);
   },
+  'oauth-signup': async (ctx) => {
+    const { signupToken } = await json<{ signupToken: string }>(
+      await call('POST', '/__control/oauth-signup', {
+        body: { email: ctx.values.$newEmail, name: 'Scenario Owner' }
+      })
+    );
+
+    ctx.cookies.push(`oauth_signup=${signupToken}`);
+  },
   'step-up-code-failures': (ctx) => {
     for (let i = 1; i < MAX_FAILED_ATTEMPTS; i++) {
       recordFailure(getState().mfaStepUpFailures, ctx.actor!.id);

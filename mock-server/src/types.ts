@@ -393,7 +393,28 @@ export interface MockOAuthChallengeData extends MockOAuthDataBase {
   challenge: MfaRequiredResponse;
 }
 
-export type MockOAuthData = MockOAuthSessionData | MockOAuthChallengeData;
+/**
+ * No account holds the provider identity yet. The profile waits in
+ * `oauthSignupTokens` until the user declares the country of residence.
+ */
+export interface MockOAuthResidenceData {
+  residenceRequired: true;
+  issuedAtMs: number;
+  expiresAt: number;
+}
+
+export type MockOAuthData =
+  MockOAuthSessionData | MockOAuthChallengeData | MockOAuthResidenceData;
+
+/** The provider profile that the real server signs into `oauth_signup`. */
+export interface MockOAuthSignup {
+  provider: string;
+  providerId: string;
+  email: string;
+  name: string;
+  emailVerified: boolean;
+  expiresAt: number;
+}
 
 export interface MockReauthProof {
   userId: string;
@@ -418,6 +439,8 @@ export interface State {
   // signs the payload into the cookie itself; keeping it server-side here is
   // observably identical and needs no signing key.
   oauthDataTokens: Map<string, MockOAuthData>;
+  // Keyed by the opaque value of the `oauth_signup` cookie, as above.
+  oauthSignupTokens: Map<string, MockOAuthSignup>;
   // Keyed by the opaque value of the `reauth_proof` cookie. The real server
   // signs a JWT; the mock has no provider round trip to mint one, so a control
   // route seeds this instead.

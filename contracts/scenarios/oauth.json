@@ -234,6 +234,54 @@
         "errorKey": null,
         "audit": []
       }
+    },
+    {
+      "name": "the declared residence creates the account of a provider identity",
+      "route": "POST /api/v1/auth/oauth/signup",
+      "auth": "none",
+      "state": [
+        "oauth-signup"
+      ],
+      "body": {
+        "residenceCountry": "DE"
+      },
+      "expect": {
+        "status": 201,
+        "errorKey": null,
+        "audit": [
+          "USER_LOGIN_SUCCESS",
+          "USER_REGISTER"
+        ]
+      }
+    },
+    {
+      "name": "a resident of a region with no cell gets no account from a provider",
+      "route": "POST /api/v1/auth/oauth/signup",
+      "auth": "none",
+      "state": [
+        "oauth-signup"
+      ],
+      "body": {
+        "residenceCountry": "RU"
+      },
+      "expect": {
+        "status": 409,
+        "errorKey": "errors.auth.residenceRegionNotServed",
+        "audit": []
+      }
+    },
+    {
+      "name": "a provider signup needs the oauth_signup cookie",
+      "route": "POST /api/v1/auth/oauth/signup",
+      "auth": "none",
+      "body": {
+        "residenceCountry": "DE"
+      },
+      "expect": {
+        "status": 401,
+        "errorKey": "errors.auth.missingOauthData",
+        "audit": []
+      }
     }
   ]
 }

@@ -1,13 +1,31 @@
+import { randomUUID } from 'crypto';
 import { Router, type Response } from 'express';
 import { signedTokenAccount } from '@app/shared/utils/token-revocation';
 import { completeSignIn } from '../helpers/sign-in.helpers';
 import {
   ErrorKeys,
+  isCountryCode,
+  OAUTH_ERROR,
   STEP_UP_OPERATION,
-  STEP_UP_OPERATIONS
+  STEP_UP_OPERATIONS,
+  VERIFICATION_TOKEN_EXPIRY_MS,
+  type CountryCode
 } from '@app/shared/constants';
 import { oneOfErrors, unknownPropertyErrors } from '../utils/validation';
-import { findUserById, getState, logAudit } from '../state';
+import {
+  addOAuthAccounts,
+  findUserByEmail,
+  findUserById,
+  findUserByPendingEmail,
+  getState,
+  logAudit
+} from '../state';
+import { residenceRefusal } from '../helpers/region.helpers';
+import {
+  buildMockUser,
+  RESIDENCE_COUNTRY_ERROR
+} from '../helpers/user-create.helpers';
+import { pushUserCrudEvent } from '../helpers/user-list-events.helpers';
 import { authGuard } from '../helpers/auth.helpers';
 import {
   clearReauthProofCookie,
@@ -22,7 +40,8 @@ import { sendError } from '../helpers/error-envelope.helpers';
 import {
   AUTH_COOKIE_PATH,
   OAUTH_DATA_COOKIE,
-  OAUTH_PROVIDERS
+  OAUTH_PROVIDERS,
+  OAUTH_SIGNUP_COOKIE
 } from '../constants';
 import type { AuthenticatedRequest } from '../types';
 
@@ -195,6 +214,14 @@ router.post('/exchange', (req, res) => {
     return;
   }
 
+  // No account exists yet: POST /auth/oauth/signup creates it once the user
+  // declares the country of residence, as on the server.
+  if ('residenceRequired' in pending) {
+    res.status(201).json({ residenceRequired: true });
+
+    return;
+  }
+
   // A deactivated or recovered account gets the refusal a bad cookie gets, as
   // on the server, so the exchange tells nothing about the account. The
   // pending entry names the account, so the audit row names it too.
@@ -225,6 +252,144 @@ router.post('/exchange', (req, res) => {
   completeSignIn({ req, res }, verdict.user, {
     method: 'oauth',
     provider: pending.provider
+  });
+});
+
+// POST /api/v1/auth/oauth/signup
+// Creates the account of the provider identity that the `oauth_signup` cookie
+// holds, after the region check of the declared country, then signs it in.
+router.post('/signup', (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const { residenceCountry } = body;
+  // The global pipe of the server runs before the handler reads the cookie.
+  const bodyErrors = [
+    ...unknownPropertyErrors(body, ['residenceCountry']),
+    ...(isCountryCode(residenceCountry) ? [] : [RESIDENCE_COUNTRY_ERROR])
+  ];
+
+  if (bodyErrors.length > 0) {
+    sendValidationError(res, 'body', bodyErrors);
+
+    return;
+  }
+
+  const country = residenceCountry as CountryCode;
+  const cookie = (req.cookies as Record<string, string> | undefined)?.[
+    OAUTH_SIGNUP_COOKIE
+  ];
+
+  if (!cookie) {
+    sendError(res, ErrorKeys.AUTH.MISSING_OAUTH_DATA, 'Missing OAuth data');
+
+    return;
+  }
+
+  const state = getState();
+  const profile = state.oauthSignupTokens.get(cookie);
+
+  if (!profile || profile.expiresAt < Date.now()) {
+    res.clearCookie(OAUTH_SIGNUP_COOKIE, { path: AUTH_COOKIE_PATH });
+    sendInvalidOAuthData(res);
+
+    return;
+  }
+
+  // Before the cookie is spent, so a refused country can be corrected, as on
+  // the server. The refusal writes no audit row, as at registration.
+  const refusal = residenceRefusal(country);
+
+  if (refusal) {
+    sendError(res, refusal.errorKey, refusal.message);
+
+    return;
+  }
+
+  state.oauthSignupTokens.delete(cookie);
+  res.clearCookie(OAUTH_SIGNUP_COOKIE, { path: AUTH_COOKIE_PATH });
+
+  const identityTaken = state.oauthAccounts
+    .values()
+    .some((accounts) =>
+      accounts.some(
+        (a) =>
+          a.provider === profile.provider && a.providerId === profile.providerId
+      )
+    );
+
+  if (
+    identityTaken ||
+    findUserByEmail(profile.email) ||
+    findUserByPendingEmail(profile.email)
+  ) {
+    logAudit('USER_LOGIN_FAILURE', {
+      details: {
+        method: 'oauth',
+        provider: profile.provider,
+        reason: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
+      },
+      ip: req.ip
+    });
+    sendError(
+      res,
+      ErrorKeys.USERS.EMAIL_EXISTS,
+      'User with this email already exists'
+    );
+
+    return;
+  }
+
+  // A provider account has no password; the builder takes the fields of the
+  // password routes.
+  const user = {
+    ...buildMockUser(
+      {
+        email: profile.email,
+        name: profile.name || profile.email.split('@')[0],
+        password: '',
+        locale: 'en'
+      },
+      { isEmailVerified: profile.emailVerified, residenceCountry: country }
+    ),
+    password: null
+  };
+
+  state.users.set(user.id, user);
+  addOAuthAccounts(user.id, [
+    {
+      provider: profile.provider,
+      providerId: profile.providerId,
+      createdAt: new Date().toISOString()
+    }
+  ]);
+
+  if (!profile.emailVerified) {
+    const verificationToken = randomUUID();
+
+    state.emailVerificationTokens.set(verificationToken, {
+      userId: user.id,
+      expiresAt: new Date(
+        Date.now() + VERIFICATION_TOKEN_EXPIRY_MS
+      ).toISOString()
+    });
+    console.log(
+      `[EMAIL VERIFICATION] To: ${user.email}\n  Verify URL: http://localhost:4200/verify-email?token=${verificationToken}`
+    );
+  }
+
+  logAudit('USER_REGISTER', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    details: { provider: profile.provider },
+    ip: req.ip
+  });
+  pushUserCrudEvent('created', user.id);
+
+  res.status(201);
+  completeSignIn({ req, res }, user, {
+    method: 'oauth',
+    provider: profile.provider
   });
 });
 

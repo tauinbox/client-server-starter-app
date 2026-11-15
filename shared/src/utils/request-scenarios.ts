@@ -45,6 +45,11 @@ export const STATE_FIXTURES = [
   'mfa-challenge',
   /** The request carries the `oauth_data` cookie of a `google` sign-in. */
   'oauth-data',
+  /**
+   * The request carries the `oauth_signup` cookie of a `google` sign-in of an
+   * identity that no account holds, with the address `$newEmail`.
+   */
+  'oauth-signup',
   /** A linked `vk` account. */
   'vk-linked',
   /** Wrong step-up codes of `user-mfa`, one below the lock. */

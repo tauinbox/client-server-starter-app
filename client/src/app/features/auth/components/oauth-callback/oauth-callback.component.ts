@@ -19,6 +19,7 @@ import { OAuthIntentService } from '../../services/oauth-intent.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { safeReturnUrl } from '../../utils/safe-return-url';
 import { MfaChallengeComponent } from '../mfa-challenge/mfa-challenge.component';
+import { OAuthResidenceComponent } from '../oauth-residence/oauth-residence.component';
 import type { MfaRequiredResponse } from '../../models/auth.types';
 import { TranslocoDirective } from '@jsverse/transloco';
 import { OAUTH_ERROR, type OAuthError } from '@app/shared/constants';
@@ -32,6 +33,7 @@ import { OAUTH_ERROR, type OAuthError } from '@app/shared/constants';
     MatCardTitle,
     MatProgressSpinner,
     MfaChallengeComponent,
+    OAuthResidenceComponent,
     TranslocoDirective
   ],
   templateUrl: './oauth-callback.component.html',
@@ -52,6 +54,9 @@ export class OAuthCallbackComponent implements OnInit {
    */
   protected readonly mfaChallenge = signal<MfaRequiredResponse | null>(null);
 
+  /** No account holds the provider identity until the user declares a country. */
+  protected readonly residenceRequired = signal(false);
+
   ngOnInit(): void {
     this.#returnUrl = this.#oauthIntent.take();
 
@@ -68,6 +73,12 @@ export class OAuthCallbackComponent implements OnInit {
         // code is presented, so nothing is saved and no navigation happens yet.
         if ('mfaRequired' in response) {
           this.mfaChallenge.set(response);
+
+          return;
+        }
+
+        if ('residenceRequired' in response) {
+          this.residenceRequired.set(true);
 
           return;
         }
@@ -97,6 +108,19 @@ export class OAuthCallbackComponent implements OnInit {
 
   onMfaExpired(): void {
     this.#redirectToLogin(OAUTH_ERROR.AUTH_FAILED);
+  }
+
+  /** `completeOAuthSignup` already saved the session. */
+  onSignedUp(): void {
+    this.#navigateToReturnUrl();
+  }
+
+  onResidenceCancelled(): void {
+    this.#redirectToLogin(OAUTH_ERROR.CANCELLED);
+  }
+
+  onResidenceFailed(error: OAuthError): void {
+    this.#redirectToLogin(error);
   }
 
   #navigateToReturnUrl(): void {

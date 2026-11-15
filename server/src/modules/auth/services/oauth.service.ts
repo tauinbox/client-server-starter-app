@@ -4,7 +4,10 @@ import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { User } from '../../users/entities/user.entity';
 import { UserCreatedEvent } from '../../users/events/user-created.event';
-import { addressTakenWhere } from '../../users/utils/email-taken';
+import {
+  addressTakenWhere,
+  emailExistsConflict
+} from '../../users/utils/email-taken';
 import { OAuthAccount } from '../entities/oauth-account.entity';
 import { OAuthAccountService } from './oauth-account.service';
 import { RoleService } from './role.service';
@@ -22,7 +25,8 @@ import {
   SYSTEM_ROLES,
   ErrorKeys,
   OAUTH_ERROR,
-  VERIFICATION_TOKEN_EXPIRY_MS
+  VERIFICATION_TOKEN_EXPIRY_MS,
+  type CountryCode
 } from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
@@ -34,6 +38,14 @@ import { AccountRefusedException } from '../exceptions/account-refused.exception
 import type { MfaRequiredResponse } from '@app/shared/types';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import { ApiError } from '../../../common/errors/api-error';
+
+/**
+ * A provider identity that no account holds. No account exists yet: the
+ * profile waits in a signed cookie until the user declares the country.
+ */
+export interface OAuthSignupRequired {
+  signupProfile: OAuthUserProfile;
+}
 
 @Injectable()
 export class OAuthService {
@@ -64,8 +76,12 @@ export class OAuthService {
   async loginWithOAuth(
     profile: OAuthUserProfile,
     auditContext?: AuditContext
-  ): Promise<User | MfaRequiredResponse> {
-    const user = await this.resolveUserForOAuth(profile, auditContext);
+  ): Promise<User | MfaRequiredResponse | OAuthSignupRequired> {
+    const user = await this.findUserForOAuth(profile, auditContext);
+
+    if (!user) {
+      return { signupProfile: await this.signupProfile(profile) };
+    }
 
     if (user.totpEnabledAt) {
       return {
@@ -79,174 +95,208 @@ export class OAuthService {
     return user;
   }
 
-  /** Finds, or creates, the account the provider profile names. */
-  private async resolveUserForOAuth(
+  /** The account that the provider identity is linked to, else null. */
+  private async findUserForOAuth(
     profile: OAuthUserProfile,
     auditContext?: AuditContext
-  ): Promise<User> {
-    // 1. Check if OAuth account already linked
+  ): Promise<User | null> {
     const existingOAuth =
       await this.oauthAccountService.findByProviderAndProviderId(
         profile.provider,
         profile.providerId
       );
 
-    let user: User;
+    if (!existingOAuth) {
+      return null;
+    }
 
-    if (existingOAuth) {
-      // `lockedUntil` counts password guesses; locking the provider path too
-      // would let an attacker deny the owner every way in.
-      // A soft delete keeps the links, so a deleted owner is refused here.
-      const owner = accountRefusal(
-        await this.usersService.findById(existingOAuth.userId)
+    // `lockedUntil` counts password guesses; locking the provider path too
+    // would let an attacker deny the owner every way in.
+    // A soft delete keeps the links, so a deleted owner is refused here.
+    const owner = accountRefusal(
+      await this.usersService.findById(existingOAuth.userId)
+    );
+
+    if ('refusal' in owner) {
+      throw new AccountRefusedException(existingOAuth.userId, owner.refusal);
+    }
+
+    const { user } = owner;
+
+    // Verifying unconditionally would void the mail sent at creation for
+    // providers that assert nothing (VK), opening password login on an
+    // unproven address.
+    if (
+      !user.isEmailVerified &&
+      profile.emailVerified &&
+      this.assertsSameEmail(profile, user)
+    ) {
+      user.isEmailVerified = await this.usersService.markEmailVerified(
+        user.id,
+        { email: user.email }
       );
 
-      if ('refusal' in owner) {
-        throw new AccountRefusedException(existingOAuth.userId, owner.refusal);
+      if (user.isEmailVerified) {
+        this.auditService.logFireAndForget({
+          action: AuditAction.EMAIL_VERIFIED,
+          actorId: user.id,
+          actorEmail: user.email,
+          targetId: user.id,
+          targetType: 'User',
+          details: { source: 'oauth', provider: profile.provider },
+          context: auditContext
+        });
       }
+    }
 
-      user = owner.user;
+    return user;
+  }
 
-      // Verifying unconditionally would void the mail sent at creation for
-      // providers that assert nothing (VK), opening password login on an
-      // unproven address.
-      if (
-        !user.isEmailVerified &&
-        profile.emailVerified &&
-        this.assertsSameEmail(profile, user)
-      ) {
-        user.isEmailVerified = await this.usersService.markEmailVerified(
-          user.id,
-          { email: user.email }
-        );
+  /**
+   * The profile that a later `createOAuthUser` receives. The refusals that do
+   * not depend on the country come here, so the user does not declare a
+   * country for an account that cannot be created.
+   */
+  private async signupProfile(
+    profile: OAuthUserProfile
+  ): Promise<OAuthUserProfile> {
+    // Canonicalized again here rather than trusted from the strategy: this is
+    // the only writer of OAuth-created users, and a provider-cased address
+    // would create a duplicate the conflict check can never see.
+    const email = normalizeEmail(profile.email);
 
-        if (user.isEmailVerified) {
-          this.auditService.logFireAndForget({
-            action: AuditAction.EMAIL_VERIFIED,
-            actorId: user.id,
-            actorEmail: user.email,
-            targetId: user.id,
-            targetType: 'User',
-            details: { source: 'oauth', provider: profile.provider },
-            context: auditContext
-          });
+    // Only creation needs an address; a linked account signs in without one.
+    if (!email) {
+      throw new OAuthAuthenticationFailedException(OAUTH_ERROR.NO_EMAIL);
+    }
+
+    if (
+      await this.dataSource
+        .getRepository(User)
+        .exists({ where: addressTakenWhere(email) })
+    ) {
+      throw new OAuthAuthenticationFailedException(
+        OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
+      );
+    }
+
+    return { ...profile, email };
+  }
+
+  /**
+   * Creates the account of a provider identity after the user declared the
+   * country of residence. The caller checked the region of the country.
+   * `profile` comes from the signed cookie that `loginWithOAuth` produced, so
+   * its address is canonical; the address check runs again, because the
+   * address can be taken since the callback.
+   */
+  async createOAuthUser(
+    profile: OAuthUserProfile,
+    {
+      residenceCountry,
+      auditContext
+    }: { residenceCountry: CountryCode; auditContext?: AuditContext }
+  ): Promise<User> {
+    const { email } = profile;
+
+    // Email verification: trust the provider's `emailVerified` flag.
+    // If the provider asserts the email is verified, mark verified;
+    // otherwise issue a verification token and send the email.
+    const isEmailVerified = profile.emailVerified;
+    const verification = isEmailVerified
+      ? null
+      : issueMailedToken(VERIFICATION_TOKEN_EXPIRY_MS);
+
+    // One transaction: a failure after the user insert would leave an account
+    // with no provider link, and nobody could sign in to it.
+    const createdUserId = await withTransaction(
+      this.dataSource,
+      async (manager) => {
+        // Do NOT auto-link OAuth to a pre-existing local account: a provider
+        // asserting an address is not consent to take over that account.
+        // An address another account is changing to is reserved as well,
+        // matching register; otherwise that owner's confirmation fails.
+        const existing = await manager.findOne(User, {
+          where: addressTakenWhere(email)
+        });
+
+        if (existing) {
+          throw emailExistsConflict();
         }
-      }
-    } else {
-      // Canonicalized again here rather than trusted from the strategy: this is
-      // the only writer of OAuth-created users, and a provider-cased address
-      // would create a duplicate the conflict check below can never see.
-      const email = normalizeEmail(profile.email);
 
-      // Only creation needs an address; a linked account signs in without one.
-      if (!email) {
-        throw new OAuthAuthenticationFailedException(OAUTH_ERROR.NO_EMAIL);
-      }
+        let newUser: User;
 
-      // 2. Create new user + OAuth account atomically.
-      // Without a transaction, a failure after user creation would leave an
-      // orphaned user with no OAuth account — they would be unable to log in.
-      // Email verification: trust the provider's `emailVerified` flag.
-      // If the provider asserts the email is verified, mark verified;
-      // otherwise issue a verification token and send the email.
-      const isEmailVerified = profile.emailVerified;
-      const verification = isEmailVerified
-        ? null
-        : issueMailedToken(VERIFICATION_TOKEN_EXPIRY_MS);
-
-      const createdUserId = await withTransaction(
-        this.dataSource,
-        async (manager) => {
-          // Do NOT auto-link OAuth to a pre-existing local account: a provider
-          // asserting an address is not consent to take over that account.
-          // An address another account is changing to is reserved as well,
-          // matching register; otherwise that owner's confirmation fails.
-          const existing = await manager.findOne(User, {
-            where: addressTakenWhere(email)
+        try {
+          newUser = await manager.save(User, {
+            email,
+            name: profile.name || email.split('@')[0],
+            password: null,
+            isEmailVerified,
+            emailVerificationToken: verification?.hashedToken ?? null,
+            emailVerificationExpiresAt: verification?.expiresAt ?? null,
+            residenceCountry
           });
 
-          if (existing) {
-            throw new OAuthAuthenticationFailedException(
-              OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
-            );
-          }
-
-          let newUser: User;
-
-          try {
-            newUser = await manager.save(User, {
-              email,
-              name: profile.name || email.split('@')[0],
-              password: null,
-              isEmailVerified,
-              emailVerificationToken: verification?.hashedToken ?? null,
-              emailVerificationExpiresAt: verification?.expiresAt ?? null
-            });
-          } catch (error: unknown) {
-            if (isUniqueViolation(error)) {
-              throw new OAuthAuthenticationFailedException(
-                OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
-              );
-            }
-
-            throw error;
-          }
-
-          await manager.save(OAuthAccount, {
+          await manager.insert(OAuthAccount, {
             userId: newUser.id,
             provider: profile.provider,
             providerId: profile.providerId
           });
+        } catch (error: unknown) {
+          // The address, or the provider identity, was taken by a concurrent
+          // sign-up. Either way this account is not created.
+          if (isUniqueViolation(error)) {
+            throw emailExistsConflict();
+          }
 
-          // Assign default 'user' role
-          const userRole = await this.roleService.findRoleByName(
-            SYSTEM_ROLES.USER
-          );
-
-          await manager
-            .createQueryBuilder()
-            .relation(User, 'roles')
-            .of(newUser.id)
-            .add(userRole.id);
-
-          return newUser.id;
+          throw error;
         }
-      );
 
-      // The account exists once the transaction commits, so an audit outage
-      // must not turn this sign-in into a failure the user sees.
-      this.auditService.logFireAndForget({
-        action: AuditAction.USER_REGISTER,
-        actorId: createdUserId,
-        actorEmail: email,
-        targetId: createdUserId,
-        targetType: 'User',
-        details: { provider: profile.provider },
-        context: auditContext
-      });
-      this.metricsService.recordAuthEvent('register');
-      this.eventEmitter.emit(
-        UserCreatedEvent.name,
-        new UserCreatedEvent(createdUserId)
-      );
+        const userRole = await this.roleService.findRoleByName(
+          SYSTEM_ROLES.USER
+        );
 
-      if (verification) {
-        this.mailService
-          .sendEmailVerification(email, verification.rawToken)
-          .catch((err) =>
-            this.logger.error(
-              `Failed to send OAuth verification email to ${maskEmail(email)}`,
-              err
-            )
-          );
+        await manager
+          .createQueryBuilder()
+          .relation(User, 'roles')
+          .of(newUser.id)
+          .add(userRole.id);
+
+        return newUser.id;
       }
+    );
 
-      // Re-read with `roles` relation so the response includes the full
-      // RoleResponse[] shape expected by UserResponseDto.
-      user = await this.usersService.findOne(createdUserId, SYSTEM_ABILITY);
+    // The account exists once the transaction commits, so an audit outage
+    // must not turn this sign-in into a failure the user sees.
+    this.auditService.logFireAndForget({
+      action: AuditAction.USER_REGISTER,
+      actorId: createdUserId,
+      actorEmail: email,
+      targetId: createdUserId,
+      targetType: 'User',
+      details: { provider: profile.provider },
+      context: auditContext
+    });
+    this.metricsService.recordAuthEvent('register');
+    this.eventEmitter.emit(
+      UserCreatedEvent.name,
+      new UserCreatedEvent(createdUserId)
+    );
+
+    if (verification) {
+      this.mailService
+        .sendEmailVerification(email, verification.rawToken)
+        .catch((err) =>
+          this.logger.error(
+            `Failed to send OAuth verification email to ${maskEmail(email)}`,
+            err
+          )
+        );
     }
 
-    return user;
+    // Re-read with `roles` relation so the response includes the full
+    // RoleResponse[] shape expected by UserResponseDto.
+    return this.usersService.findOne(createdUserId, SYSTEM_ABILITY);
   }
 
   /** A provider vouching for a different mailbox says nothing about this one. */

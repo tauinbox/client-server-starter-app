@@ -179,6 +179,13 @@
   "oauthCallback": {
     "completingSignIn": "Завершаем вход..."
   },
+  "oauthResidence": {
+    "title": "Создание аккаунта",
+    "intro": "Укажите страну проживания, чтобы завершить создание аккаунта.",
+    "submit": "Создать аккаунт",
+    "creating": "Создаём аккаунт...",
+    "errorFailed": "Не удалось создать аккаунт. Попробуйте ещё раз."
+  },
   "providers": {
     "google": "Google",
     "facebook": "Facebook",
