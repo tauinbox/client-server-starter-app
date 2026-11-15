@@ -292,7 +292,9 @@ URL in a log message (`GlobalExceptionFilter`, `RequestLoggingMiddleware` and th
 `audit_logs`. Add a header to the allowlist only after you make sure that it cannot carry a secret.
 
 `region/` holds `RegionModule`, with `RegionService` (the `DATA_REGION` and `PEER_REGIONS` of the
-cell, validated at boot) and `GET /api/v1/config/region`.
+cell, validated at boot) and `GET /api/v1/config/region`. `RegionService.assertServesCountry`
+refuses a registration whose declared country of residence belongs to another region, before any
+other check of `POST /auth/register`.
 
 `health/` holds `HealthModule`, with `GET /api/health/live` and `GET /api/health/ready`. The
 readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value or the
