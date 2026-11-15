@@ -1232,8 +1232,8 @@ Thus a login answers 401 and never 422, and the lookup and the audit row never g
 
 **Email canonicalization.** `normalizeEmail` trims the address and makes it lowercase. The DTO
 `@Transform` decorators apply it. `LocalStrategy` applies it. The three OAuth strategies apply it. It
-also runs once more inside `OAuthService.resolveUserForOAuth`, which is the only writer of a user
-that OAuth makes. The
+also runs once more in `OAuthService` before a provider sign-up (`signupProfile`), whose canonical
+profile `createOAuthUser`, the only writer of a user that OAuth makes, receives. The
 `UQ_users_email_lower` index in the schema is the backstop.
 
 **JwtStrategy** verifies the signature of the Bearer token. It pins the issuer, the audience and the
@@ -1747,11 +1747,18 @@ the provider with `POST /auth/oauth/link-init`, which asks for their password fi
 provider signs the account in and outlives every session. An account recovery (a password reset, or an
 administrator who sets a new password or address) removes every linked provider.
 
-**A linked account signs in without an email.** `resolveUserForOAuth` finds a returning user by the
+**A linked account signs in without an email.** `findUserForOAuth` finds a returning user by the
 provider and the `providerId`, and it does not read the address there. Facebook and VK send no address
 when the person declines the email permission. Only the creation of an account needs the address: without
 one, the service throws `OAuthAuthenticationFailedException(no_email)` before any write, and the callback
 redirects to `/login?oauth_error=no_email`.
+
+**A new identity creates no account at the callback.** The country of residence decides which
+deployment may keep the data, so the callback signs the provider profile into the single-use
+`oauth_signup` cookie (10 minutes), and `POST /auth/oauth/exchange` answers `{ residenceRequired: true }`.
+`POST /auth/oauth/signup` checks the region of the declared country as the registration does, then
+`createOAuthUser` creates the user, the link and the role in one transaction and the route signs the
+account in.
 
 A new user that OAuth makes takes the `email_verified` flag of the provider. Google gives
 `profile.emails[0].verified`. Facebook and VK always give `false`: the account-level `verified` flag of
