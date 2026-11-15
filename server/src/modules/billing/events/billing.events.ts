@@ -119,6 +119,21 @@ export class RefundIssuedEvent {
   ) {}
 }
 
+/**
+ * A self-managed subscription renews at `renewsAt` and its saved card is then
+ * charged `amount`. The notice scan emits it once for each period.
+ */
+export class RenewalUpcomingEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly subscriptionId: string,
+    public readonly renewal: {
+      renewsAt: Date;
+      amount: { amountMinor: number; currency: string };
+    }
+  ) {}
+}
+
 /** Event-name keys an entitlement-affecting billing change is published under. */
 export const ENTITLEMENT_CHANGING_EVENTS = [
   SubscriptionActivatedEvent.name,

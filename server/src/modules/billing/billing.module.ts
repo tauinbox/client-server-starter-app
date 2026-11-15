@@ -67,6 +67,7 @@ import { BillingEventReducer } from './webhooks/billing-event-reducer.service';
 import { BillingWebhookProcessor } from './webhooks/billing-webhook.processor';
 import { BILLING_WEBHOOK_QUEUE } from './webhooks/billing-webhook-queue.constants';
 import { RenewalService } from './renewals/renewal.service';
+import { RenewalNoticeService } from './renewals/renewal-notice.service';
 import { RenewalProcessor } from './renewals/renewal.processor';
 import { BILLING_RENEWAL_QUEUE } from './renewals/renewal-queue.constants';
 
@@ -158,6 +159,7 @@ export class BillingModule {
         WebhookIpAllowlistGuard,
         BillingEventReducer,
         RenewalService,
+        RenewalNoticeService,
         ...(redisUrl
           ? [
               WebhookReconciliationService,

@@ -1038,7 +1038,10 @@ service logs the ceiling at warn level. A deferred row is safe by construction: 
 again, the charge key is per period, and the advance is a CAS.
 
 `RenewalProcessor` is the BullMQ repeatable scan. The module upserts it at bootstrap, thus it is safe
-with more than one instance.
+with more than one instance. Each tick runs `RenewalService.runDueRenewals` and then
+`RenewalNoticeService.sendRenewalNotices`, which tells the user 3 days
+(`RENEWAL_NOTICE_LEAD_MS`) before a self-managed charge, once for each period: a guarded update
+claims the row through `subscriptions.renewal_notice_for` (`doc/billing-design.md` section 25).
 
 **Webhooks.** The `@Public()` routes are `POST webhooks/paddle` and `POST webhooks/yookassa`. They
 take a `RawBodyRequest` object.

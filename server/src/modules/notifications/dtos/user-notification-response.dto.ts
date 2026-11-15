@@ -12,6 +12,7 @@ const KIND_SET: Record<UserNotificationKind, true> = {
   payment_failed: true,
   subscription_cancel_scheduled: true,
   subscription_canceled: true,
+  renewal_upcoming: true,
   refund_issued: true,
   credit_balance_depleted: true
 };

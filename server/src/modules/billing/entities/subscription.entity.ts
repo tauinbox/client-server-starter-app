@@ -126,6 +126,15 @@ export class Subscription {
   @Exclude()
   nextRenewalAttemptAt: Date | null;
 
+  /**
+   * The renewal boundary that the last renewal notice was sent for. The notice
+   * scan claims a row by writing it, so a period gets one notice, also when
+   * two scans run at the same time or a scan runs again after a crash.
+   */
+  @Column({ name: 'renewal_notice_for', type: 'timestamptz', nullable: true })
+  @Exclude()
+  renewalNoticeFor: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
   createdAt: Date;
 

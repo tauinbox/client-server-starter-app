@@ -33,7 +33,17 @@ const ALL_KINDS: UserNotificationContent[] = [
     kind: 'refund_issued',
     payload: { invoiceId: 'inv-1', amountMinor: 1250, currency: 'USD' }
   },
-  { kind: 'credit_balance_depleted', payload: {} }
+  { kind: 'credit_balance_depleted', payload: {} },
+  {
+    kind: 'renewal_upcoming',
+    payload: {
+      subscriptionId: 'sub-1',
+      planName: 'Pro',
+      renewsAt: '2026-12-01T00:00:00.000Z',
+      amountMinor: 99000,
+      currency: 'RUB'
+    }
+  }
 ];
 
 function text(content: UserNotificationContent, locale: 'en' | 'ru') {
@@ -68,6 +78,29 @@ describe('billingNoticeMessage', () => {
 
     expect(text(scheduled, 'en')).toContain('until 1 December 2026');
     expect(text(scheduled, 'ru')).toContain('до 1 декабря 2026');
+  });
+
+  it('puts no second period after a Russian date, which ends in "г."', () => {
+    const texts = ALL_KINDS.map((content) => text(content, 'ru'));
+
+    expect(texts.filter((t) => t.includes('г..'))).toEqual([]);
+    expect(text(ALL_KINDS[1], 'ru')).toContain(
+      'Следующая попытка — 4 декабря 2026 г. Проверьте'
+    );
+    expect(text(ALL_KINDS[2], 'ru')).toContain(
+      'Доступ сохраняется до 1 декабря 2026 г. Списаний'
+    );
+  });
+
+  it('gives the day and the amount of a renewal charge, and how to stop it', () => {
+    const renewal = ALL_KINDS.at(-1)!;
+
+    expect(text(renewal, 'en')).toMatch(
+      /^Your Pro subscription renews on 1 December 2026\. On that day we take RUB\s990\.00 from your saved card\. To stop the renewal, cancel the subscription in the billing section of your account before that day\.$/u
+    );
+    expect(text(renewal, 'ru')).toMatch(
+      /^Подписка на тариф Pro продлится 1 декабря 2026 г\.: в этот день с сохранённой карты будет списано 990,00\s₽\. /u
+    );
   });
 
   it.each([

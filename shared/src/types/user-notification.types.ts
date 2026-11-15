@@ -32,6 +32,15 @@ export interface UserNotificationPayloads {
     accessEndsAt: string;
   };
   subscription_canceled: { subscriptionId: string; planName: string };
+  /**
+   * The saved card is charged at `renewsAt` for the next period, at the
+   * amount of the plan at the time of the notice.
+   */
+  renewal_upcoming: NoticeAmount & {
+    subscriptionId: string;
+    planName: string;
+    renewsAt: string;
+  };
   refund_issued: NoticeAmount & { invoiceId: string };
   credit_balance_depleted: Record<string, never>;
 }
