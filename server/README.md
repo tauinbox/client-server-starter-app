@@ -227,7 +227,9 @@ cannot both proceed. The raw Redis client is used for the same reason the versio
 Keyv gives no conditional write. Without Redis one process owns the ledger, and the claims in flight
 are also reserved synchronously, because the read and the write are two awaits. A ledger that cannot
 be reached fails open, because it hardens a credential that is already signed and short-lived.
-There are two consumers. `POST /auth/oauth/exchange` claims the `jti` of the `oauth_data` cookie.
+There are three consumers. `POST /auth/oauth/exchange` claims the `jti` of the `oauth_data` cookie,
+and `POST /auth/oauth/signup` the `jti` of the `oauth_signup` cookie under `oauth-signup:spent:`,
+after the region check of the country, so a refused country leaves the cookie unspent.
 `AuthService.isValidReauthProof` claims the `jti` of a `reauth_proof` under the prefix
 `reauth-proof:spent:`, so one provider round trip authorises one sensitive change. That claim runs
 after every other check on the proof, thus a proof offered for the wrong operation is refused and
@@ -368,7 +370,8 @@ exception filter use it. It calls `common/utils/host-cookie.ts`. In the auth mod
 without dependency injection.
 
 `SignInCompletionService.complete` is the last step of each sign-in: the password sign-in, the
-second-factor sign-in and `POST /auth/oauth/exchange`. It ends the session that the browser presents,
+second-factor sign-in, `POST /auth/oauth/exchange` and `POST /auth/oauth/signup` (the provider
+sign-up, after the country of residence). It ends the session that the browser presents,
 issues the new session, writes the `USER_LOGIN_SUCCESS` audit entry and the `login_success` metric,
 sets the refresh cookie and removes the refresh token from the body. The OAuth callback creates no
 session. It signs only `{ userId, provider }` (or the second-factor challenge) into the `oauth_data`
@@ -1229,8 +1232,8 @@ Thus a login answers 401 and never 422, and the lookup and the audit row never g
 
 **Email canonicalization.** `normalizeEmail` trims the address and makes it lowercase. The DTO
 `@Transform` decorators apply it. `LocalStrategy` applies it. The three OAuth strategies apply it. It
-also runs once more inside `OAuthService.resolveUserForOAuth`, which is the only writer of a user
-that OAuth makes. The
+also runs once more in `OAuthService` before a provider sign-up (`signupProfile`), whose canonical
+profile `createOAuthUser`, the only writer of a user that OAuth makes, receives. The
 `UQ_users_email_lower` index in the schema is the backstop.
 
 **JwtStrategy** verifies the signature of the Bearer token. It pins the issuer, the audience and the
@@ -1744,11 +1747,18 @@ the provider with `POST /auth/oauth/link-init`, which asks for their password fi
 provider signs the account in and outlives every session. An account recovery (a password reset, or an
 administrator who sets a new password or address) removes every linked provider.
 
-**A linked account signs in without an email.** `resolveUserForOAuth` finds a returning user by the
+**A linked account signs in without an email.** `findUserForOAuth` finds a returning user by the
 provider and the `providerId`, and it does not read the address there. Facebook and VK send no address
 when the person declines the email permission. Only the creation of an account needs the address: without
 one, the service throws `OAuthAuthenticationFailedException(no_email)` before any write, and the callback
 redirects to `/login?oauth_error=no_email`.
+
+**A new identity creates no account at the callback.** The country of residence decides which
+deployment may keep the data, so the callback signs the provider profile into the single-use
+`oauth_signup` cookie (10 minutes), and `POST /auth/oauth/exchange` answers `{ residenceRequired: true }`.
+`POST /auth/oauth/signup` checks the region of the declared country as the registration does, then
+`createOAuthUser` creates the user, the link and the role in one transaction and the route signs the
+account in.
 
 A new user that OAuth makes takes the `email_verified` flag of the provider. Google gives
 `profile.emails[0].verified`. Facebook and VK always give `false`: the account-level `verified` flag of
@@ -2217,6 +2227,7 @@ These routes currently replace the default limit:
 | `POST /auth/forgot-password` | 5 min | 2 | The cost of an email, and enumeration mitigation. The CAPTCHA soft trigger starts near the limit |
 | `POST /auth/reset-password` | 1 min | 10 | Defense in depth against a token brute force |
 | `POST /auth/oauth/exchange` | 1 min | 10 | It is bound to a state token, and the payload id it carries is spendable once. The limit bounds the attempts around both |
+| `POST /auth/oauth/signup` | 1 min | 10 | The same handoff family: the `oauth_signup` cookie is spendable once. The limit bounds the country attempts of one cookie |
 | `POST /auth/mfa/verify` | 1 min | 5 plus `login-long-window` | Six digits is a million guesses, and an unthrottled route walks that in minutes. Both keys are per address, so this route also carries a per-account counter of refused codes |
 | `POST /auth/mfa/recovery` | 1 min | 5 plus `login-long-window` | The same, against the recovery codes |
 | `POST /auth/mfa/setup` | 1 min | 5 plus `login-long-window`, on a body that carries `currentPassword` | It verifies the step-up secret of an authenticated caller. A stolen access token must not buy unlimited guesses |

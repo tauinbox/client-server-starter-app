@@ -142,6 +142,7 @@ runWithInfra('Request scenarios (e2e)', () => {
   let auditWrites: ReturnType<typeof trackAuditWrites>;
   let refreshCookieName: string;
   let oauthDataCookieName: string;
+  let oauthSignupCookieName: string;
   let userRole: Role;
   let superRole: Role;
   let permissionId: string;
@@ -232,6 +233,7 @@ runWithInfra('Request scenarios (e2e)', () => {
 
     refreshCookieName = secure ? '__Host-refresh_token' : 'refresh_token';
     oauthDataCookieName = secure ? '__Host-oauth_data' : 'oauth_data';
+    oauthSignupCookieName = secure ? '__Host-oauth_signup' : 'oauth_signup';
     const roles = dataSource.getRepository(Role);
 
     userRole = await roles.findOneByOrFail({ name: 'user' });
@@ -601,6 +603,21 @@ runWithInfra('Request scenarios (e2e)', () => {
 
       oauthProfile = undefined;
       ctx.cookies.push(cookieOf(res, oauthDataCookieName));
+    },
+    'oauth-signup': async (ctx) => {
+      oauthProfile = {
+        provider: 'google',
+        providerId: `google-${randomBytes(6).toString('hex')}`,
+        email: ctx.values.$newEmail!,
+        name: 'Scenario Owner',
+        emailVerified: true
+      };
+      const res = await request(http())
+        .get('/api/v1/auth/oauth/google/callback')
+        .expect(302);
+
+      oauthProfile = undefined;
+      ctx.cookies.push(cookieOf(res, oauthSignupCookieName));
     },
     'step-up-code-failures': async (ctx) => {
       const user = await dataSource

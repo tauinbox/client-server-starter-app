@@ -254,13 +254,16 @@ runWithInfra(
         name: 'Self Registered',
         residenceCountry: 'DE'
       });
-      await app.get(OAuthService).loginWithOAuth({
-        provider: 'vk',
-        providerId: `vk-${randomBytes(6).toString('hex')}`,
-        email: emails.provider,
-        name: 'Provider Signup',
-        emailVerified: true
-      });
+      await app.get(OAuthService).createOAuthUser(
+        {
+          provider: 'vk',
+          providerId: `vk-${randomBytes(6).toString('hex')}`,
+          email: emails.provider,
+          name: 'Provider Signup',
+          emailVerified: true
+        },
+        { residenceCountry: 'DE' }
+      );
 
       const registered = await usersService.findByEmail(emails.registered);
       const provider = await usersService.findByEmail(emails.provider);

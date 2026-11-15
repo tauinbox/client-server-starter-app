@@ -24,3 +24,10 @@ export const REAUTH_PROOF_COOKIE = 'reauth_proof';
  * the session or the second-factor challenge.
  */
 export const OAUTH_DATA_COOKIE = 'oauth_data';
+
+/**
+ * The provider profile of an identity that no account holds yet. The account
+ * is created only when the user declares the country of residence, so the
+ * profile stays in this signed cookie until then.
+ */
+export const OAUTH_SIGNUP_COOKIE = 'oauth_signup';

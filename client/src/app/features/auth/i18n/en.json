@@ -179,6 +179,13 @@
   "oauthCallback": {
     "completingSignIn": "Completing sign in..."
   },
+  "oauthResidence": {
+    "title": "Create your account",
+    "intro": "Choose your country of residence to finish creating your account.",
+    "submit": "Create account",
+    "creating": "Creating account...",
+    "errorFailed": "The account could not be created. Please try again."
+  },
   "providers": {
     "google": "Google",
     "facebook": "Facebook",

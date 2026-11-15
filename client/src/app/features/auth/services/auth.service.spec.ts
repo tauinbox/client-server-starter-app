@@ -248,6 +248,47 @@ describe('AuthService', () => {
     });
   });
 
+  describe('provider sign-up', () => {
+    it('saves nothing when the exchange asks for the residence', async () => {
+      const exchangePromise = firstValueFrom(service.exchangeOAuthData());
+
+      httpMock
+        .expectOne(AuthApiEnum.OAuthExchange)
+        .flush({ residenceRequired: true });
+
+      await expect(exchangePromise).resolves.toEqual({
+        residenceRequired: true
+      });
+      expect(authStoreMock.saveAuthResponse).not.toHaveBeenCalled();
+      httpMock.expectNone(AuthApiEnum.Permissions);
+    });
+
+    it('sends the declared country and starts the session of the new account', async () => {
+      const mockAuth = createMockAuthResponse();
+      const signupPromise = firstValueFrom(service.completeOAuthSignup('DE'));
+
+      const req = httpMock.expectOne(AuthApiEnum.OAuthSignup);
+
+      expect(req.request.body).toEqual({ residenceCountry: 'DE' });
+      req.flush(mockAuth);
+      httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: [] });
+
+      await expect(signupPromise).resolves.toEqual(mockAuth);
+      expect(authStoreMock.saveAuthResponse).toHaveBeenCalledWith(mockAuth);
+    });
+
+    it('saves nothing from an incomplete sign-up response', async () => {
+      const signupPromise = firstValueFrom(service.completeOAuthSignup('DE'));
+
+      httpMock
+        .expectOne(AuthApiEnum.OAuthSignup)
+        .flush({ tokens: {}, user: {} });
+
+      await expect(signupPromise).rejects.toThrow('Incomplete OAuth response');
+      expect(authStoreMock.saveAuthResponse).not.toHaveBeenCalled();
+    });
+  });
+
   describe('two-factor enrolment', () => {
     it('sends the current password with the setup request', async () => {
       const setupPromise = firstValueFrom(service.startMfaSetup('Password1'));

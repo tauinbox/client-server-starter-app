@@ -1,0 +1,7 @@
+@use 'abstracts/variables' as vars;
+
+// The raw form field keeps the rhythm of the nxs-form-field hosts beside it.
+:host {
+  display: block;
+  margin-bottom: vars.$space-form-row-gap;
+}

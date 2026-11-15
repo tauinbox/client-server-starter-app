@@ -67,6 +67,7 @@ describe('OAuthCallbackComponent', () => {
     exchangeOAuthData: ReturnType<typeof vi.fn>;
     verifyMfa: ReturnType<typeof vi.fn>;
     verifyMfaRecoveryCode: ReturnType<typeof vi.fn>;
+    completeOAuthSignup: ReturnType<typeof vi.fn>;
   };
   let oauthIntentMock: { take: ReturnType<typeof vi.fn> };
   let router: Router;
@@ -75,7 +76,8 @@ describe('OAuthCallbackComponent', () => {
     authServiceMock = {
       exchangeOAuthData: vi.fn().mockReturnValue(of(mockAuthResponse)),
       verifyMfa: vi.fn().mockReturnValue(of(mockAuthResponse)),
-      verifyMfaRecoveryCode: vi.fn().mockReturnValue(of(mockAuthResponse))
+      verifyMfaRecoveryCode: vi.fn().mockReturnValue(of(mockAuthResponse)),
+      completeOAuthSignup: vi.fn().mockReturnValue(of(mockAuthResponse))
     };
 
     oauthIntentMock = { take: vi.fn().mockReturnValue('/profile') };
@@ -84,6 +86,8 @@ describe('OAuthCallbackComponent', () => {
       imports: [OAuthCallbackComponent, TranslocoTestingModuleWithLangs],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         provideNoopMaterialAnimations(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: OAuthIntentService, useValue: oauthIntentMock }
@@ -226,6 +230,74 @@ describe('OAuthCallbackComponent', () => {
 
       expect(router.navigate).toHaveBeenCalledWith(['/login'], {
         queryParams: { oauth_error: OAUTH_ERROR.CANCELLED },
+        replaceUrl: true
+      });
+    });
+  });
+
+  describe('when no account holds the provider identity', () => {
+    async function reachResidence(): Promise<void> {
+      authServiceMock.exchangeOAuthData.mockReturnValue(
+        of({ residenceRequired: true })
+      );
+      fixture = TestBed.createComponent(OAuthCallbackComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it('asks for the country of residence instead of navigating', async () => {
+      await reachResidence();
+
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      expect(
+        fixture.nativeElement.querySelector('nxs-oauth-residence')
+      ).toBeTruthy();
+    });
+
+    it('navigates to the return url once the account is created', async () => {
+      oauthIntentMock.take.mockReturnValue('/dashboard');
+      await reachResidence();
+
+      const residence: HTMLFormElement = fixture.nativeElement.querySelector(
+        'nxs-oauth-residence form'
+      );
+
+      residence.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+
+      expect(authServiceMock.completeOAuthSignup).toHaveBeenCalledTimes(1);
+      expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard', {
+        replaceUrl: true
+      });
+    });
+
+    it('sends the user back to the login page on a cancel', async () => {
+      await reachResidence();
+
+      const cancel: HTMLButtonElement = fixture.nativeElement.querySelector(
+        'nxs-oauth-residence .residence-links button'
+      );
+
+      cancel.click();
+      await fixture.whenStable();
+
+      expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+        queryParams: { oauth_error: OAUTH_ERROR.CANCELLED },
+        replaceUrl: true
+      });
+    });
+
+    it('gives /login the reason when the sign-up cannot go on', async () => {
+      await reachResidence();
+
+      fixture.componentInstance.onResidenceFailed(
+        OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
+      );
+      await fixture.whenStable();
+
+      expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+        queryParams: { oauth_error: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED },
         replaceUrl: true
       });
     });

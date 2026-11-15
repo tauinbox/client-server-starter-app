@@ -147,7 +147,7 @@ export function findCreateUserConflict(
 }
 
 /** The `@IsIn` message of `RegisterDto.residenceCountry`. */
-const RESIDENCE_COUNTRY_ERROR =
+export const RESIDENCE_COUNTRY_ERROR =
   'residenceCountry must be an ISO 3166-1 alpha-2 country code';
 
 /**

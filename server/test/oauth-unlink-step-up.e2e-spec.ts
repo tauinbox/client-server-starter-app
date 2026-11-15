@@ -22,6 +22,7 @@ import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.
 import { PurposeTokenService } from '../src/modules/auth/services/purpose-token.service';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { SignInCompletionService } from '../src/modules/auth/services/sign-in-completion.service';
+import { RegionService } from '../src/modules/core/region/region.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MailService } from '../src/modules/mail/mail.service';
@@ -88,6 +89,7 @@ describe('DELETE /auth/oauth/accounts/:provider step-up (e2e)', () => {
         { provide: OAuthService, useValue: {} },
         { provide: UsersService, useValue: {} },
         { provide: SignInCompletionService, useValue: {} },
+        { provide: RegionService, useValue: {} },
         {
           provide: JwtService,
           useValue: { sign: jest.fn(), verify: jest.fn() }

@@ -13,7 +13,8 @@ export const AUTH_EXCLUDED_URLS = [
   AuthApiEnum.RefreshToken,
   AuthApiEnum.MfaVerify,
   AuthApiEnum.MfaRecovery,
-  AuthApiEnum.OAuthExchange
+  AuthApiEnum.OAuthExchange,
+  AuthApiEnum.OAuthSignup
 ] as const;
 
 /**

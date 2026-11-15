@@ -8,7 +8,7 @@ import { OAuthService } from '../src/modules/auth/services/oauth.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { hashToken } from '../src/common/utils/hash-token';
 import { OAuthAuthenticationFailedException } from '../src/modules/auth/exceptions/oauth-authentication-failed.exception';
-import { OAUTH_ERROR } from '@app/shared/constants';
+import { ErrorKeys, OAUTH_ERROR } from '@app/shared/constants';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 
 // A provider sign-up that took an address in flight would make the owner's
@@ -100,6 +100,13 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
       constructor: OAuthAuthenticationFailedException,
       oauthError: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
     });
+    // The signup checks again, because the reservation can start after the
+    // callback.
+    await expect(
+      oauthService.createOAuthUser(vkProfile(pendingEmail), {
+        residenceCountry: 'DE'
+      })
+    ).rejects.toMatchObject({ errorKey: ErrorKeys.USERS.EMAIL_EXISTS });
     expect(await repository.countBy({ email: pendingEmail })).toBe(0);
 
     // Pre-fix this confirmation threw the email conflict.
@@ -115,12 +122,18 @@ runWithInfra('A provider sign-up and a pending email change (e2e)', () => {
   it('still creates the account for an address that nobody holds', async () => {
     const email = uniqueEmail('free');
 
-    const result = await oauthService.loginWithOAuth({
-      ...vkProfile(email),
-      emailVerified: true
-    });
+    const profile = { ...vkProfile(email), emailVerified: true };
 
-    expect('mfaRequired' in result).toBe(false);
-    expect(await dataSource.getRepository(User).countBy({ email })).toBe(1);
+    expect(await oauthService.loginWithOAuth(profile)).toEqual({
+      signupProfile: profile
+    });
+    await oauthService.createOAuthUser(profile, { residenceCountry: 'DE' });
+
+    expect(
+      await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ email })
+        .then((user) => user.residenceCountry)
+    ).toBe('DE');
   }, 60000);
 });

@@ -1644,6 +1644,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/oauth/reauth-init` | Bearer | Start a step-up re-authentication for an account that holds no password. The body names the operation the proof is for. Sets a short-lived cookie tied to the authorization flow that starts next. The callback mints a `reauth_proof` cookie for that operation, and only when the provider identity already belongs to the caller |
 | POST | `/auth/oauth/link-init` | Bearer + step-up | Start an OAuth account link. The body carries the current password, or the account proves itself with a `reauth_proof` minted for the operation `oauth_link`. A linked provider signs the account in and outlives every session, thus a stolen session must not plant one. Sets a cookie with a short life, thus the OAuth flow that starts next attaches the provider to the current user. The flow that starts next claims it, and no other flow can use it. A logout cancels it |
 | POST | `/auth/oauth/exchange` | None | Exchange the OAuth-data cookie from the callback for the auth response: an access token and a refresh cookie. The session is issued here, not at the callback, after the session of the presented refresh cookie ends. An account that was deactivated or deleted since the callback gets the 401 of a bad cookie, and so does a cookie issued before the last session revocation of the account (a password change or reset, an email change, an administrator action, a role change). An account that carries a second factor gets the same challenge the login route gives, and no refresh cookie. The payload is spendable once, thus a replay inside its 60 seconds is refused |
+| POST | `/auth/oauth/signup` | None | Create the account of a provider identity that no account holds, after the user declares the country of residence; the credential is the `oauth_signup` cookie from the callback. A country of another region is refused as at registration and keeps the cookie. Then signs the new account in |
 | GET | `/auth/oauth/accounts` | Bearer | List the linked OAuth accounts |
 | DELETE | `/auth/oauth/accounts/:provider` | Bearer | Unlink an OAuth provider |
 | GET | `/auth/permissions` | Bearer | Get the resolved permissions of the current user |
@@ -1957,11 +1958,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3311 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 979 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 957 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1785 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 352 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1487 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3321 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 982 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 957 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1808 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 355 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1491 tests pass |
 
 ## CI/CD
 

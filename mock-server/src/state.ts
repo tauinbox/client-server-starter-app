@@ -81,6 +81,7 @@ export function resetState(): void {
       ])
     ),
     oauthDataTokens: new Map(),
+    oauthSignupTokens: new Map(),
     reauthProofs: new Map(),
     refreshTokens: new Map(),
     refreshSessions: new Map(),

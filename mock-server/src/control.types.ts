@@ -110,6 +110,13 @@ export type ControlApi = {
   // that cookie and loads /oauth/callback to drive POST /oauth/exchange - the
   // provider round trip itself needs a real identity provider and stays a stub.
   issueOAuthData(userId: string): Promise<{ token: string }>;
+  // What the provider callback produces for an identity that no account holds:
+  // the `oauth_data` value whose exchange asks for the residence, and the
+  // `oauth_signup` value that POST /oauth/signup reads.
+  issueOAuthSignup(args: {
+    email: string;
+    name?: string;
+  }): Promise<{ token: string; signupToken: string }>;
   /**
    * Stands in for the provider round trip the mock cannot run. The proof binds
    * to one operation, so a test names the change the proof is meant to open.

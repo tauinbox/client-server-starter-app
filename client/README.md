@@ -58,7 +58,11 @@ src/app/
 │   │                       # which also replaces the recovery set;
 │   │                       # components/mfa-challenge holds the code step, and the login
 │   │                       # card and the OAuth callback page both render it, because a
-│   │                       # provider sign-in on an enrolled account asks for a code too)
+│   │                       # provider sign-in on an enrolled account asks for a code too;
+│   │                       # components/oauth-residence asks the country of residence on
+│   │                       # the OAuth callback page before a provider sign-up creates
+│   │                       # the account; components/residence-country-field is the
+│   │                       # country select that it and the register form share)
 │   │   ├── casl/           # app-ability.ts holds AppAbility, Actions and Subjects.
 │   │   │                   # Subjects contains the generated KnownSubjects and AnyObject.
 │   │   │                   # PermissionCheck holds action, subject and an optional instance.
@@ -854,8 +858,9 @@ has exactly one meaning.
    request and not on the session: `POST /auth/logout`, which answers 401 for a session that already
    ended. The route needs the `Authorization` header, thus it cannot move to `AUTH_EXCLUDED_URLS`,
    which also removes that header. A wrong two-factor enrolment code answers 422, not 401, so
-   `POST /auth/mfa/enable` needs no entry. `AUTH_EXCLUDED_URLS` also holds `POST /auth/oauth/exchange`:
-   its credential is the handoff cookie, and a missing or spent cookie answers 401.
+   `POST /auth/mfa/enable` needs no entry. `AUTH_EXCLUDED_URLS` also holds `POST /auth/oauth/exchange`
+   and `POST /auth/oauth/signup`: their credential is a handoff cookie, and a missing or spent cookie
+   answers 401.
 
 ### Path Aliases
 
@@ -1251,8 +1256,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 352 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1785 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 355 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1808 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and

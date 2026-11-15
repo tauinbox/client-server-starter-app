@@ -27,7 +27,12 @@ import {
   isLegalJurisdiction,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS
 } from '@app/shared/constants';
-import { OAUTH_DATA_MAX_AGE_MS, REAUTH_PROOF_MAX_AGE_MS } from './constants';
+import {
+  OAUTH_DATA_MAX_AGE_MS,
+  OAUTH_SIGNUP_MAX_AGE_MS,
+  REAUTH_PROOF_MAX_AGE_MS
+} from './constants';
+import { normalizeEmail } from '@app/shared/utils/email';
 import { isStepUpOperation } from '@app/shared/utils/step-up-operation';
 import { generateMfaPendingToken } from './jwt.utils';
 import { pushToUser } from './sse-hub';
@@ -55,6 +60,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     users: Array.from(state.users.values()).map(toUserResponse),
     oauthAccounts: Object.fromEntries(state.oauthAccounts),
     oauthDataTokens: state.oauthDataTokens.size,
+    oauthSignupTokens: state.oauthSignupTokens.size,
     reauthProofs: state.reauthProofs.size,
     refreshTokens: state.refreshTokens.size,
     refreshSessions: state.refreshSessions.size,
@@ -259,6 +265,51 @@ router.post('/oauth-data', (req, res) => {
   });
 
   res.json({ token });
+});
+
+// POST /__control/oauth-signup — what the real provider callback produces for
+// an identity that no account holds: an `oauth_signup` value with the profile
+// and an `oauth_data` value whose exchange answers `residenceRequired`.
+router.post('/oauth-signup', (req, res) => {
+  const {
+    email,
+    provider = 'google',
+    name = '',
+    emailVerified = true
+  }: {
+    email?: string;
+    provider?: string;
+    name?: string;
+    emailVerified?: boolean;
+  } = req.body;
+  const address = normalizeEmail(email);
+
+  if (!address) {
+    res.status(400).json({ message: 'Body must have an email' });
+
+    return;
+  }
+
+  const state = getState();
+  const now = Date.now();
+  const signupToken = randomUUID();
+  const token = randomUUID();
+
+  state.oauthSignupTokens.set(signupToken, {
+    provider,
+    providerId: `${provider}-${randomUUID()}`,
+    email: address,
+    name,
+    emailVerified,
+    expiresAt: now + OAUTH_SIGNUP_MAX_AGE_MS
+  });
+  state.oauthDataTokens.set(token, {
+    residenceRequired: true,
+    issuedAtMs: now,
+    expiresAt: now + OAUTH_DATA_MAX_AGE_MS
+  });
+
+  res.json({ token, signupToken });
 });
 
 // POST /__control/reauth-proof — mint a step-up proof for a user The real

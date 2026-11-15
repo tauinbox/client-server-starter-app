@@ -57,8 +57,14 @@ import {
   OAUTH_DATA_COOKIE,
   OAUTH_LINK_COOKIE,
   OAUTH_REAUTH_COOKIE,
+  OAUTH_SIGNUP_COOKIE,
   REAUTH_PROOF_COOKIE
 } from '../constants/oauth.constants';
+import type { OAuthResidenceRequiredResponse } from '@app/shared/types';
+import { OAuthSignupDto } from '../dtos/register.dto';
+import { RegionService } from '../../core/region/region.service';
+import { User } from '../../users/entities/user.entity';
+import { isEmailExistsConflict } from '../../users/utils/email-taken';
 import { AuthCookies, claimedFlow } from '../utils/auth-cookies';
 import {
   OAuthFailureAudit,
@@ -81,6 +87,10 @@ interface OAuthSignInData {
   userId: string;
   provider: string;
 }
+
+/** What the callback signs into the `oauth_data` cookie. */
+type OAuthCallbackData =
+  OAuthSignInData | MfaRequiredResponseDto | OAuthResidenceRequiredResponse;
 
 function invalidOAuthData(): ApiError {
   return new ApiError(
@@ -160,8 +170,12 @@ export class OAuthController {
 
   private static readonly OAUTH_LINK_MAX_AGE_SECONDS = 300;
   private static readonly OAUTH_DATA_MAX_AGE_SECONDS = 60;
+  // The user reads the page and picks a country, so this outlives the
+  // exchange.
+  private static readonly OAUTH_SIGNUP_MAX_AGE_SECONDS = 600;
 
   private readonly oauthDataLedger: SingleUseTokenLedger;
+  private readonly oauthSignupLedger: SingleUseTokenLedger;
 
   constructor(
     private readonly oauthService: OAuthService,
@@ -174,12 +188,18 @@ export class OAuthController {
     private readonly failureAudit: OAuthFailureAudit,
     private readonly usersService: UsersService,
     private readonly signIn: SignInCompletionService,
+    private readonly regionService: RegionService,
     @Inject(CLIENT_URL) private readonly clientUrl: string,
     @Inject(CACHE_MANAGER) cache: Cache
   ) {
     this.oauthDataLedger = new SingleUseTokenLedger(
       cache,
       'oauth-data:spent:',
+      this.logger
+    );
+    this.oauthSignupLedger = new SingleUseTokenLedger(
+      cache,
+      'oauth-signup:spent:',
       this.logger
     );
   }
@@ -447,7 +467,7 @@ export class OAuthController {
       );
     }
 
-    let data: OAuthSignInData | MfaRequiredResponseDto;
+    let data: OAuthCallbackData;
     let issuedAtMs: number;
 
     try {
@@ -488,6 +508,12 @@ export class OAuthController {
       return data;
     }
 
+    // No account exists yet: POST /auth/oauth/signup creates it once the user
+    // declares the country of residence.
+    if ('residenceRequired' in data) {
+      return data;
+    }
+
     // The session is issued here and not at the callback: only this request
     // carries the refresh cookie of the session it replaces, which must end
     // before the session limit counts the new one. The account can have been
@@ -518,6 +544,115 @@ export class OAuthController {
         method: 'oauth',
         provider: data.provider
       }
+    );
+  }
+
+  /**
+   * Creates the account of the provider identity that the callback held in
+   * the `oauth_signup` cookie, then signs it in.
+   */
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @Post('signup')
+  @ApiOperation({
+    summary: 'Create the account of a provider identity with its residence'
+  })
+  @ApiOkResponse({ description: 'Auth response of the new account' })
+  async signUpWithOAuth(
+    @Request() req: ExpressRequest,
+    @Body() dto: OAuthSignupDto,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    const cookie = this.cookies.read(req, OAUTH_SIGNUP_COOKIE);
+
+    if (!cookie) {
+      throw new ApiError(
+        ErrorKeys.AUTH.MISSING_OAUTH_DATA,
+        'Missing OAuth data'
+      );
+    }
+
+    let payload: { jti?: string; profile: OAuthUserProfile } | null;
+
+    try {
+      payload = this.purposeTokens.verify<{
+        jti?: string;
+        profile: OAuthUserProfile;
+      }>(cookie, TOKEN_PURPOSE.OAUTH_SIGNUP);
+    } catch {
+      payload = null;
+    }
+
+    if (!payload?.jti) {
+      this.cookies.clear(res, OAUTH_SIGNUP_COOKIE);
+
+      throw invalidOAuthData();
+    }
+
+    const { jti, profile } = payload;
+
+    // Before the cookie is spent, so a refused country can be corrected
+    // without a second provider round trip. The verdict depends on the
+    // country only and writes no audit row, as at registration.
+    this.regionService.assertServesCountry(dto.residenceCountry);
+
+    this.cookies.clear(res, OAUTH_SIGNUP_COOKIE);
+
+    // Clearing the cookie spends it only in this browser; a value captured
+    // before this request is refused by the ledger.
+    if (
+      !(await this.oauthSignupLedger.claim(
+        jti,
+        OAuthController.OAUTH_SIGNUP_MAX_AGE_SECONDS * 1000
+      ))
+    ) {
+      throw invalidOAuthData();
+    }
+
+    const context = extractAuditContext(req);
+    let user: User;
+
+    try {
+      user = await this.oauthService.createOAuthUser(profile, {
+        residenceCountry: dto.residenceCountry,
+        auditContext: context
+      });
+    } catch (error) {
+      // The row the callback writes when the address is taken at that time.
+      if (isEmailExistsConflict(error)) {
+        this.failureAudit.loginFailure(
+          {
+            provider: profile.provider,
+            reason: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED,
+            context
+          },
+          null
+        );
+      }
+
+      throw error;
+    }
+
+    return await this.signIn.complete(
+      user,
+      { req, res },
+      { method: 'oauth', provider: profile.provider }
+    );
+  }
+
+  private setSignupProfile(res: Response, profile: OAuthUserProfile): void {
+    const signed = this.purposeTokens.sign(
+      { profile, jti: randomUUID() },
+      {
+        purpose: TOKEN_PURPOSE.OAUTH_SIGNUP,
+        expiresIn: OAuthController.OAUTH_SIGNUP_MAX_AGE_SECONDS
+      }
+    );
+
+    this.cookies.setShortLived(
+      res,
+      { base: OAUTH_SIGNUP_COOKIE, value: signed },
+      OAuthController.OAUTH_SIGNUP_MAX_AGE_SECONDS
     );
   }
 
@@ -553,10 +688,17 @@ export class OAuthController {
 
       // No session and no success row yet: /exchange writes both when it
       // finishes the sign-in, and POST /auth/mfa/verify does for a challenge.
-      const data =
-        'mfaRequired' in result
-          ? result
-          : { userId: result.id, provider: profile.provider };
+      let data: OAuthCallbackData;
+
+      if ('signupProfile' in result) {
+        this.setSignupProfile(res, result.signupProfile);
+        data = { residenceRequired: true };
+      } else if ('mfaRequired' in result) {
+        data = result;
+      } else {
+        data = { userId: result.id, provider: profile.provider };
+      }
+
       const signedData = this.purposeTokens.sign(
         { data, jti: randomUUID() },
         {

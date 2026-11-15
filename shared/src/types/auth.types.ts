@@ -23,6 +23,18 @@ export type MfaRequiredResponse = {
 
 export type LoginResponse = AuthResponse | MfaRequiredResponse;
 
+/**
+ * What a provider round trip buys for an identity that no account holds yet:
+ * no account and no session. `POST /auth/oauth/signup` creates the account
+ * after the user declares the country of residence.
+ */
+export type OAuthResidenceRequiredResponse = {
+  residenceRequired: true;
+};
+
+export type OAuthExchangeResponse =
+  LoginResponse | OAuthResidenceRequiredResponse;
+
 /** What an enrolment hands the client. The secret is shown once. */
 export type MfaSetupResponse = {
   secret: string;

@@ -34,6 +34,8 @@ import { AccountRefusedException } from '../exceptions/account-refused.exception
 import { AuthCookies } from '../utils/auth-cookies';
 import { OAuthFailureAudit } from '../utils/oauth-failure-audit';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
+import { RegionService } from '../../core/region/region.service';
+import { emailExistsConflict } from '../../users/utils/email-taken';
 
 // Epoch milliseconds, as the `iatMs` of a purpose token is, and the same
 // instant in seconds, as its `iat` is.
@@ -116,6 +118,7 @@ describe('OAuthController', () => {
     loginWithOAuth: jest.Mock;
     linkOAuthToUser: jest.Mock;
     assertReauthenticated: jest.Mock;
+    createOAuthUser: jest.Mock;
   };
   let oauthAccountServiceMock: {
     findByUserId: jest.Mock;
@@ -152,7 +155,8 @@ describe('OAuthController', () => {
     oauthServiceMock = {
       loginWithOAuth: jest.fn(),
       linkOAuthToUser: jest.fn().mockResolvedValue(undefined),
-      assertReauthenticated: jest.fn().mockResolvedValue(undefined)
+      assertReauthenticated: jest.fn().mockResolvedValue(undefined),
+      createOAuthUser: jest.fn().mockResolvedValue(OAUTH_USER)
     };
 
     oauthAccountServiceMock = {
@@ -192,7 +196,8 @@ describe('OAuthController', () => {
     configValues = {
       CLIENT_URL: 'http://localhost:4200',
       JWT_REFRESH_EXPIRATION: '604800',
-      ENVIRONMENT: 'production'
+      ENVIRONMENT: 'production',
+      DATA_REGION: 'intl'
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -212,6 +217,7 @@ describe('OAuthController', () => {
         AccessRefusalService,
         { provide: MailService, useValue: mailServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        RegionService,
         { provide: CACHE_MANAGER, useValue: createMockCache() },
         {
           provide: ConfigService,
@@ -626,6 +632,51 @@ describe('OAuthController', () => {
       expect(res.redirect).toHaveBeenCalledWith(
         'http://localhost:4200/oauth/callback'
       );
+    });
+
+    // No account exists for the identity: the profile waits in its own cookie
+    // until the user declares the country, and the exchange answers so.
+    it('holds the profile of a new identity in the signup cookie and creates nothing', async () => {
+      const profile: OAuthUserProfile = {
+        provider: OAuthProvider.GOOGLE,
+        providerId: '123',
+        email: 'new@example.com',
+        name: 'New User',
+        emailVerified: true
+      };
+
+      oauthServiceMock.loginWithOAuth.mockResolvedValue({
+        signupProfile: profile
+      });
+      const res = mockResponse();
+
+      await controller.googleCallback(mockExpressRequest(profile), res);
+
+      const calls = jwtServiceMock.sign.mock.calls as [
+        { purpose: string; jti: string; profile?: unknown; data?: unknown },
+        { expiresIn: number }
+      ][];
+      const signup = calls.find(
+        ([payload]) => payload.purpose === TOKEN_PURPOSE.OAUTH_SIGNUP
+      );
+      const data = calls.find(
+        ([payload]) => payload.purpose === TOKEN_PURPOSE.OAUTH_DATA
+      );
+
+      expect(signup?.[0].profile).toEqual(profile);
+      expect(signup?.[0].jti).toEqual(expect.any(String));
+      expect(signup?.[1]).toEqual({ expiresIn: 600 });
+      expect(data?.[0].data).toEqual({ residenceRequired: true });
+      expect(res.cookie).toHaveBeenCalledWith(
+        '__Host-oauth_signup',
+        'signed-link-token',
+        expect.objectContaining({ httpOnly: true, sameSite: 'lax', path: '/' })
+      );
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:4200/oauth/callback'
+      );
+      expect(oauthServiceMock.createOAuthUser).not.toHaveBeenCalled();
+      expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
     });
 
     // The provider proved one credential only. An enrolled account gets the
@@ -1329,7 +1380,206 @@ describe('OAuthController', () => {
     });
   });
 
+  describe('signUpWithOAuth', () => {
+    const PROFILE: OAuthUserProfile = {
+      provider: OAuthProvider.GOOGLE,
+      providerId: '123',
+      email: 'new@example.com',
+      name: 'New User',
+      emailVerified: true
+    };
+    const SIGNUP_COOKIE = { '__Host-oauth_signup': 'signed-signup' };
+
+    const signupRequest = (cookies: Record<string, string> = SIGNUP_COOKIE) =>
+      mockExpressRequest({} as OAuthUserProfile, cookies);
+
+    beforeEach(() => {
+      jwtServiceMock.verify.mockReturnValue({
+        profile: PROFILE,
+        purpose: TOKEN_PURPOSE.OAUTH_SIGNUP,
+        iat: LINK_TOKEN_IAT,
+        iatMs: LINK_TOKEN_ISSUED_AT_MS,
+        jti: 'signup-id'
+      });
+    });
+
+    it('creates the account with the declared country and signs it in', async () => {
+      const res = mockResponse();
+
+      const result = await controller.signUpWithOAuth(
+        signupRequest(),
+        { residenceCountry: 'DE' },
+        res
+      );
+
+      expect(jwtServiceMock.verify).toHaveBeenCalledWith('signed-signup');
+      expect(oauthServiceMock.createOAuthUser).toHaveBeenCalledWith(PROFILE, {
+        residenceCountry: 'DE',
+        auditContext: { ip: '127.0.0.1', requestId: undefined }
+      });
+      expect(res.clearCookie).toHaveBeenCalledWith('__Host-oauth_signup', {
+        secure: true,
+        path: '/'
+      });
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuditAction.USER_LOGIN_SUCCESS,
+          details: { method: 'oauth', provider: OAuthProvider.GOOGLE }
+        })
+      );
+      expect(result).toEqual({
+        tokens: { access_token: 'token', expires_in: 3600 },
+        user: OAUTH_USER
+      });
+    });
+
+    it('refuses with missingOauthData when the request has no signup cookie', async () => {
+      await expect(
+        controller.signUpWithOAuth(
+          signupRequest({}),
+          { residenceCountry: 'DE' },
+          mockResponse()
+        )
+      ).rejects.toMatchObject({ errorKey: ErrorKeys.AUTH.MISSING_OAUTH_DATA });
+      expect(oauthServiceMock.createOAuthUser).not.toHaveBeenCalled();
+    });
+
+    const stamp = { iat: LINK_TOKEN_IAT, iatMs: LINK_TOKEN_ISSUED_AT_MS };
+
+    it.each([
+      ['does not verify', null],
+      [
+        'has no token id',
+        { profile: PROFILE, purpose: TOKEN_PURPOSE.OAUTH_SIGNUP, ...stamp }
+      ],
+      // A signed token of another flow, such as the oauth_data handoff, is
+      // not a signup profile.
+      [
+        'carries another purpose',
+        {
+          profile: PROFILE,
+          jti: 'signup-id',
+          purpose: TOKEN_PURPOSE.OAUTH_DATA,
+          ...stamp
+        }
+      ]
+    ])(
+      'refuses with invalidOauthData when the cookie %s',
+      async (_label, payload) => {
+        jwtServiceMock.verify.mockReturnValue(payload);
+        const res = mockResponse();
+
+        await expect(
+          controller.signUpWithOAuth(
+            signupRequest(),
+            { residenceCountry: 'DE' },
+            res
+          )
+        ).rejects.toMatchObject({
+          errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA
+        });
+        expect(res.clearCookie).toHaveBeenCalledWith(
+          '__Host-oauth_signup',
+          expect.anything()
+        );
+        expect(oauthServiceMock.createOAuthUser).not.toHaveBeenCalled();
+      }
+    );
+
+    // The cookie stays, so the user can correct the country without a second
+    // provider round trip; nothing is created and no row is written.
+    it('refuses a country of a region with no cell and keeps the cookie', async () => {
+      const res = mockResponse();
+
+      await expect(
+        controller.signUpWithOAuth(
+          signupRequest(),
+          { residenceCountry: 'RU' },
+          res
+        )
+      ).rejects.toMatchObject({
+        errorKey: ErrorKeys.AUTH.RESIDENCE_REGION_NOT_SERVED
+      });
+      expect(res.clearCookie).not.toHaveBeenCalled();
+      expect(oauthServiceMock.createOAuthUser).not.toHaveBeenCalled();
+      expect(auditServiceMock.logFireAndForget).not.toHaveBeenCalled();
+
+      await controller.signUpWithOAuth(
+        signupRequest(),
+        { residenceCountry: 'DE' },
+        mockResponse()
+      );
+      expect(oauthServiceMock.createOAuthUser).toHaveBeenCalledTimes(1);
+    });
+
+    // Clearing the cookie spends it in one browser only; a captured value is
+    // refused by the server once it was used.
+    it('refuses a second use of the same signup cookie', async () => {
+      await controller.signUpWithOAuth(
+        signupRequest(),
+        { residenceCountry: 'DE' },
+        mockResponse()
+      );
+
+      await expect(
+        controller.signUpWithOAuth(
+          signupRequest(),
+          { residenceCountry: 'DE' },
+          mockResponse()
+        )
+      ).rejects.toMatchObject({ errorKey: ErrorKeys.AUTH.INVALID_OAUTH_DATA });
+      expect(oauthServiceMock.createOAuthUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('writes the row of a taken address when the address was taken after the callback', async () => {
+      oauthServiceMock.createOAuthUser.mockRejectedValueOnce(
+        emailExistsConflict()
+      );
+
+      await expect(
+        controller.signUpWithOAuth(
+          signupRequest(),
+          { residenceCountry: 'DE' },
+          mockResponse()
+        )
+      ).rejects.toMatchObject({ errorKey: ErrorKeys.USERS.EMAIL_EXISTS });
+      expect(auditServiceMock.logFireAndForget).toHaveBeenCalledWith({
+        action: AuditAction.USER_LOGIN_FAILURE,
+        details: {
+          method: 'oauth',
+          provider: OAuthProvider.GOOGLE,
+          reason: OAUTH_ERROR.EMAIL_ALREADY_REGISTERED
+        },
+        context: { ip: '127.0.0.1', requestId: undefined }
+      });
+      expect(authServiceMock.login).not.toHaveBeenCalled();
+    });
+  });
+
   describe('exchangeOAuthData', () => {
+    it('answers that the residence is required, with no session, for a new identity', async () => {
+      jwtServiceMock.verify.mockReturnValue({
+        data: { residenceRequired: true },
+        purpose: TOKEN_PURPOSE.OAUTH_DATA,
+        iat: LINK_TOKEN_IAT,
+        iatMs: LINK_TOKEN_ISSUED_AT_MS,
+        jti: 'token-id'
+      });
+      const res = mockResponse();
+
+      const result = await controller.exchangeOAuthData(
+        mockExpressRequest({} as OAuthUserProfile, {
+          '__Host-oauth_data': 'signed-jwt'
+        }),
+        res
+      );
+
+      expect(result).toEqual({ residenceRequired: true });
+      expect(usersServiceMock.findById).not.toHaveBeenCalled();
+      expect(authServiceMock.login).not.toHaveBeenCalled();
+      expect(res.cookie).not.toHaveBeenCalled();
+    });
+
     it('should set refresh_token cookie and return auth data without refresh_token', async () => {
       jwtServiceMock.verify.mockReturnValue({
         data: SIGN_IN_DATA,

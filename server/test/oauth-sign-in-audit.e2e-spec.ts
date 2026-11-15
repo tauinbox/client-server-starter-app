@@ -26,6 +26,7 @@ import { User } from '../src/modules/users/entities/user.entity';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { withPrivateThrottlerStorage } from './private-throttler';
 import { trackAuditWrites } from './audit-writes';
+import { completeOAuthSignup } from './oauth-signup';
 
 // Only the Passport guard is replaced: every row is written after it or not at
 // all. Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
@@ -177,35 +178,45 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     await app?.close();
   });
 
-  it('records a registration at the callback and a sign-in at the exchange for an account the provider creates', async () => {
+  // The account waits for the declared country, so the callback and the
+  // exchange write nothing; the signup writes the registration and the
+  // sign-in.
+  it('records a registration and a sign-in at the signup for an account the provider creates', async () => {
     currentProfile = newProfile();
     const requestId = `oauth-audit-new-${crypto.randomUUID()}`;
     const exchangeId = `oauth-audit-new-exchange-${crypto.randomUUID()}`;
+    const signupId = `oauth-audit-new-signup-${crypto.randomUUID()}`;
 
     const response = await callback(requestId);
 
     expect(response.headers['location']).toMatch(/\/oauth\/callback$/);
-    await exchange(response, exchangeId);
+    const exchanged = await exchange(response, exchangeId);
+
+    expect(exchanged.body).toEqual({ residenceRequired: true });
+    await completeOAuthSignup(app.getHttpServer() as Server, response, {
+      requestId: signupId
+    }).expect(201);
 
     const user = await dataSource
       .getRepository(User)
       .findOneByOrFail({ email: currentProfile.email });
-    const callbackRows = await settledRows(requestId);
 
-    expect(callbackRows).toHaveLength(1);
-    expect(callbackRows[0].action).toBe(AuditAction.USER_REGISTER);
-    expect(callbackRows[0].details).toEqual({ provider: 'google' });
+    expect(await settledRows(requestId)).toEqual([]);
+    expect(await settledRows(exchangeId)).toEqual([]);
 
-    const exchangeRows = await settledRows(exchangeId);
+    const signupRows = await settledRows(signupId);
 
-    expect(exchangeRows).toHaveLength(1);
-    expect(exchangeRows[0].action).toBe(AuditAction.USER_LOGIN_SUCCESS);
-    expect(exchangeRows[0].details).toEqual({
+    expect(signupRows.map((row) => row.action)).toEqual([
+      AuditAction.USER_REGISTER,
+      AuditAction.USER_LOGIN_SUCCESS
+    ]);
+    expect(signupRows[0].details).toEqual({ provider: 'google' });
+    expect(signupRows[1].details).toEqual({
       method: 'oauth',
       provider: 'google'
     });
 
-    for (const row of [...callbackRows, ...exchangeRows]) {
+    for (const row of signupRows) {
       expect(row.actorId).toBe(user.id);
       expect(row.ipAddress).toBeTruthy();
     }
