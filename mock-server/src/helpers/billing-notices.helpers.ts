@@ -127,6 +127,26 @@ export function noticeCanceled(subscription: MockSubscription): void {
   });
 }
 
+/** `RenewalUpcomingEvent`: the coming charge of a self-managed renewal. */
+export function noticeRenewalUpcoming(
+  subscription: MockSubscription,
+  amount: { amountMinor: number; currency: string }
+): void {
+  const userId = ownerOf(subscription.customerId);
+
+  if (!userId) return;
+
+  storeUserNotification(userId, {
+    kind: 'renewal_upcoming',
+    payload: {
+      subscriptionId: subscription.id,
+      planName: planName(subscription),
+      renewsAt: renewalAnchor(subscription),
+      ...amount
+    }
+  });
+}
+
 /** `RefundIssuedEvent`: one for each refund leg that the provider accepted. */
 export function noticeRefundIssued(
   invoice: MockInvoice,

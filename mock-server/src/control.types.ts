@@ -98,6 +98,7 @@ export type ControlApi = {
     userId: string;
     planKey?: string;
     status?: SubscriptionStatus;
+    provider?: BillingProviderId;
   }): Promise<SubscriptionResponse>;
   // `POST /admin/billing/usage` for `api_calls`, without an admin session.
   consumeBillingCredits(args: {
@@ -125,4 +126,11 @@ export type ControlApi = {
     subscriptionId?: string;
     outcome?: 'success' | 'failure';
   }): Promise<SubscriptionResponse>;
+  // Renewal notice clock: treats the next renewal boundary as inside the
+  // notice lead and runs one pass of the notice scan. `sent` is false for a
+  // row that gets no notice or already got one for that boundary.
+  sendBillingRenewalNotice(args: {
+    userId?: string;
+    subscriptionId?: string;
+  }): Promise<{ sent: boolean }>;
 };

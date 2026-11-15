@@ -4,6 +4,7 @@ import {
   ENTITLED_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
 import type { BillingProviderId } from '@app/shared/types';
+import { renewalAnchor } from '@app/shared/utils/billing-rules';
 import { getState } from '../state';
 import type { MockInvoice, MockSubscription } from '../types';
 import { nextPeriodEnd } from '../utils/period';
@@ -11,7 +12,8 @@ import { notifyEntitlementsChanged } from './billing-settle.helpers';
 import {
   noticeCanceled,
   noticeInvoicePaid,
-  noticePaymentFailed
+  noticePaymentFailed,
+  noticeRenewalUpcoming
 } from './billing-notices.helpers';
 
 // The test and manual-check clock of the mock billing. The control routes
@@ -169,6 +171,46 @@ export function advanceRenewal(
   noticeInvoicePaid(invoice);
 
   return subscription;
+}
+
+/**
+ * Treats the next renewal boundary of the subscription as inside the notice
+ * lead and runs one pass of the renewal notice scan on it, with the rules of
+ * the server's `RenewalNoticeService`: only a self-managed `active` or
+ * `trialing` row that renews, of a live user, gets the notice, once for each
+ * boundary; a free period is claimed with no notice. Returns true when a
+ * notice was stored.
+ */
+export function sendRenewalNotice(subscription: MockSubscription): boolean {
+  const state = getState();
+  const boundary = renewalAnchor(subscription);
+  const customer = state.billingCustomers.get(subscription.customerId);
+  const user = customer ? state.users.get(customer.userId) : undefined;
+
+  if (
+    subscription.lifecycleOwner !== 'self' ||
+    (subscription.status !== 'active' && subscription.status !== 'trialing') ||
+    subscription.cancelAtPeriodEnd ||
+    !user ||
+    user.deletedAt ||
+    subscription.renewalNoticeFor === boundary
+  ) {
+    return false;
+  }
+
+  subscription.renewalNoticeFor = boundary;
+
+  const price = state.plans.values().find((p) => p.key === subscription.planKey)
+    ?.prices[subscription.provider];
+
+  if (!price || price.amountMinor === 0) return false;
+
+  noticeRenewalUpcoming(subscription, {
+    amountMinor: price.amountMinor,
+    currency: price.currency
+  });
+
+  return true;
 }
 
 /**

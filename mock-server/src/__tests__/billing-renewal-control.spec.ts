@@ -173,3 +173,82 @@ describe('POST /__control/billing/advance-renewal', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('POST /__control/billing/renewal-notice', () => {
+  function renewalNotices(userId: string) {
+    return [...getState().userNotifications.values()].filter(
+      (n) => n.userId === userId && n.kind === 'renewal_upcoming'
+    );
+  }
+
+  async function activateSelfManaged(
+    userId: string
+  ): Promise<{ id: string; currentPeriodEnd: string }> {
+    const res = await control('activate-subscription', {
+      userId,
+      planKey: 'pro',
+      provider: 'yookassa'
+    });
+
+    expect(res.status).toBe(200);
+
+    return (await res.json()) as { id: string; currentPeriodEnd: string };
+  }
+
+  it('stores one notice with the date and the amount, and none for the same boundary', async () => {
+    const { id } = await login('user@example.com');
+    const subscription = await activateSelfManaged(id);
+
+    const first = await control('renewal-notice', { userId: id });
+    const second = await control('renewal-notice', { userId: id });
+
+    expect(await first.json()).toEqual({ sent: true });
+    expect(await second.json()).toEqual({ sent: false });
+    expect(renewalNotices(id).map(({ payload }) => payload)).toEqual([
+      {
+        subscriptionId: subscription.id,
+        planName: 'Pro',
+        renewsAt: subscription.currentPeriodEnd,
+        amountMinor: 99000,
+        currency: 'RUB'
+      }
+    ]);
+  });
+
+  it('stores a notice again for the boundary of the next period', async () => {
+    const { id } = await login('user@example.com');
+
+    await activateSelfManaged(id);
+    await control('renewal-notice', { userId: id });
+    await control('advance-renewal', { userId: id });
+    await control('renewal-notice', { userId: id });
+
+    expect(renewalNotices(id)).toHaveLength(2);
+  });
+
+  it.each([
+    ['a provider-managed row', { provider: 'paddle' }],
+    ['a row that does not renew', { cancelAtPeriodEnd: true }],
+    ['a row in dunning', { status: 'past_due' }]
+  ] as const)('stores nothing for %s', async (_name, change) => {
+    const { id } = await login('user@example.com');
+    const { id: subscriptionId } = await activateSelfManaged(id);
+    const subscription = getState().billingSubscriptions.get(subscriptionId)!;
+
+    if ('provider' in change) subscription.lifecycleOwner = 'provider';
+
+    Object.assign(subscription, change);
+
+    const res = await control('renewal-notice', { subscriptionId });
+
+    expect(await res.json()).toEqual({ sent: false });
+    expect(renewalNotices(id)).toHaveLength(0);
+  });
+
+  it('returns 404 when there is no subscription', async () => {
+    const { id } = await login('user@example.com');
+    const res = await control('renewal-notice', { userId: id });
+
+    expect(res.status).toBe(404);
+  });
+});

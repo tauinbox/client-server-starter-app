@@ -38,6 +38,7 @@ import {
 import {
   advanceRenewal,
   findRenewableSubscription,
+  sendRenewalNotice,
   setProviderEnabled,
   type RenewalOutcome
 } from './helpers/billing-clock.helpers';
@@ -645,11 +646,13 @@ router.post('/billing/activate-subscription', (req, res) => {
   const {
     userId,
     planKey = 'pro',
-    status = 'active'
+    status = 'active',
+    provider
   } = req.body as {
     userId?: string;
     planKey?: string;
     status?: MockSubscription['status'];
+    provider?: MockSubscription['provider'];
   };
 
   if (!userId) {
@@ -676,7 +679,9 @@ router.post('/billing/activate-subscription', (req, res) => {
   }
 
   res.json(
-    toSubscriptionResponse(activateSubscription(user, plan, { status }))
+    toSubscriptionResponse(
+      activateSubscription(user, plan, { status, provider })
+    )
   );
 });
 
@@ -788,6 +793,25 @@ router.post('/billing/advance-renewal', (req, res) => {
   }
 
   res.json(toSubscriptionResponse(advanced));
+});
+
+// POST /__control/billing/renewal-notice - renewal notice clock for E2E: one
+// pass of the notice scan on the subscription, as if its next boundary were
+// inside the notice lead. The semantics are on sendRenewalNotice.
+router.post('/billing/renewal-notice', (req, res) => {
+  const { userId, subscriptionId } = req.body as {
+    userId?: string;
+    subscriptionId?: string;
+  };
+  const subscription = findRenewableSubscription({ userId, subscriptionId });
+
+  if (!subscription) {
+    res.status(404).json({ message: 'subscription not found' });
+
+    return;
+  }
+
+  res.json({ sent: sendRenewalNotice(subscription) });
 });
 
 export default router;

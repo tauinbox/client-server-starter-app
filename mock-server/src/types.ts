@@ -202,6 +202,11 @@ export interface MockSubscription {
    * on provider-managed rows, whose boundaries come from the provider.
    */
   billingAnchorAt?: string;
+  /**
+   * The renewal boundary of the last renewal notice - mirrors the server's
+   * @Exclude'd `renewal_notice_for` and is never serialized on the wire.
+   */
+  renewalNoticeFor?: string;
   createdAt: string;
   updatedAt: string;
 }
