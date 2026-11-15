@@ -22,6 +22,13 @@ export const RENEWAL_SCAN_INTERVAL_MS = 60 * 60 * 1000;
 export const RENEWAL_SCAN_MAX_PER_RUN = 200;
 
 /**
+ * How long before the charge of a self-managed renewal the user gets the
+ * renewal notice. The scan runs every `RENEWAL_SCAN_INTERVAL_MS`, so the
+ * notice arrives up to one interval after this lead starts.
+ */
+export const RENEWAL_NOTICE_LEAD_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
  * Dunning policy: a failed self-managed charge moves the
  * subscription to `past_due`; the scheduler retries up to this many times,
  * spaced `DUNNING_RETRY_DELAY_MS` apart (≈ a 7-day grace window), then cancels.

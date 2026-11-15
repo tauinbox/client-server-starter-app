@@ -13,6 +13,7 @@ import {
   InvoicePaidEvent,
   PaymentFailedEvent,
   RefundIssuedEvent,
+  RenewalUpcomingEvent,
   SubscriptionCancelScheduledEvent,
   SubscriptionCanceledEvent
 } from '../events/billing.events';
@@ -124,6 +125,37 @@ export class BillingNoticesListener {
         payload: {
           subscriptionId,
           planName: await this.planName(subscription)
+        }
+      };
+    });
+  }
+
+  @OnEvent(RenewalUpcomingEvent.name)
+  async onRenewalUpcoming({
+    userId,
+    subscriptionId,
+    renewal: { renewsAt, amount }
+  }: RenewalUpcomingEvent): Promise<void> {
+    await this.notify(userId, async () => {
+      const subscription = await this.subscriptions.findOne({
+        where: { id: subscriptionId }
+      });
+
+      // A cancel scheduled after the claim stops the renewal.
+      if (
+        !subscription ||
+        subscription.cancelAtPeriodEnd ||
+        subscription.status === 'canceled'
+      )
+        return null;
+
+      return {
+        kind: 'renewal_upcoming',
+        payload: {
+          subscriptionId,
+          planName: await this.planName(subscription),
+          renewsAt: renewsAt.toISOString(),
+          ...amount
         }
       };
     });

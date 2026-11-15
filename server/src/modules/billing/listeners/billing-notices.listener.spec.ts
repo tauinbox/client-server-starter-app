@@ -6,6 +6,7 @@ import {
   InvoicePaidEvent,
   PaymentFailedEvent,
   RefundIssuedEvent,
+  RenewalUpcomingEvent,
   SubscriptionCancelScheduledEvent,
   SubscriptionCanceledEvent
 } from '../events/billing.events';
@@ -177,6 +178,48 @@ describe('BillingNoticesListener', () => {
 
     await listener.onCanceled(
       new SubscriptionCanceledEvent('user-1', 'sub-1', false)
+    );
+
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('stores the renewal date and the amount of the coming charge', async () => {
+    const { listener, notify } = build({ sub: subscription() });
+
+    await listener.onRenewalUpcoming(
+      new RenewalUpcomingEvent('user-1', 'sub-1', {
+        renewsAt: PERIOD_END,
+        amount: { amountMinor: 99000, currency: 'RUB' }
+      })
+    );
+
+    expect(notify).toHaveBeenCalledWith('user-1', {
+      kind: 'renewal_upcoming',
+      payload: {
+        subscriptionId: 'sub-1',
+        planName: 'Pro',
+        renewsAt: PERIOD_END.toISOString(),
+        amountMinor: 99000,
+        currency: 'RUB'
+      }
+    });
+  });
+
+  it.each([
+    [
+      'a cancel was scheduled after the claim',
+      subscription({ cancelAtPeriodEnd: true })
+    ],
+    ['the row ended', subscription({ status: 'canceled' })],
+    ['the row is gone', null]
+  ])('stores no renewal notice when %s', async (_name, sub) => {
+    const { listener, notify } = build({ sub });
+
+    await listener.onRenewalUpcoming(
+      new RenewalUpcomingEvent('user-1', 'sub-1', {
+        renewsAt: PERIOD_END,
+        amount: { amountMinor: 99000, currency: 'RUB' }
+      })
     );
 
     expect(notify).not.toHaveBeenCalled();

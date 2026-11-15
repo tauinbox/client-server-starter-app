@@ -217,6 +217,7 @@
       "payment_failed_ended": "The payment for the {{plan}} plan failed. There are no more attempts, and the subscription is canceled.",
       "subscription_cancel_scheduled": "Your {{plan}} subscription will not renew. You keep access until {{date}}.",
       "subscription_canceled": "Your {{plan}} subscription has ended.",
+      "renewal_upcoming": "Your {{plan}} subscription renews on {{date}}. On that day we take {{amount}} from your saved card. To stop the renewal, cancel the subscription before that day.",
       "refund_issued": "We refunded {{amount}} to your payment method.",
       "credit_balance_depleted": "Your credit balance reached zero. Features that use credits stop until you buy more."
     },

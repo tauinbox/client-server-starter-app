@@ -46,6 +46,35 @@ test.describe('Billing notices', () => {
     await expect(bell(page)).toHaveAccessibleName('Notifications');
   });
 
+  test('a self-managed renewal shows its date and amount once for each period', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await _mockServer.activateBillingSubscription({
+      userId: USER_ID,
+      planKey: 'pro',
+      provider: 'yookassa'
+    });
+
+    expect(
+      await _mockServer.sendBillingRenewalNotice({ userId: USER_ID })
+    ).toEqual({ sent: true });
+    expect(
+      await _mockServer.sendBillingRenewalNotice({ userId: USER_ID })
+    ).toEqual({ sent: false });
+
+    await page.goto('/billing/notifications');
+
+    const notices = page.locator('.notice');
+
+    // The paid first invoice and one renewal notice.
+    await expect(notices).toHaveCount(2);
+    await expect(notices.first().locator('.notice-text')).toHaveText(
+      /Your Pro subscription renews on \w+ \d{1,2}, \d{4}\. On that day we take RUB\s990\.00 from your saved card\. To stop the renewal, cancel the subscription before that day\./
+    );
+  });
+
   test('notices reach an open tab live: the bell first, then the open notices page', async ({
     page,
     _mockServer

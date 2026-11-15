@@ -7,6 +7,7 @@ import {
 import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { RenewalService } from './renewal.service';
+import { RenewalNoticeService } from './renewal-notice.service';
 import {
   BILLING_RENEWAL_QUEUE,
   BILLING_RENEWAL_SCAN_JOB,
@@ -31,6 +32,7 @@ export class RenewalProcessor
 
   constructor(
     private readonly renewals: RenewalService,
+    private readonly renewalNotices: RenewalNoticeService,
     @InjectQueue(BILLING_RENEWAL_QUEUE) private readonly queue: Queue
   ) {
     super();
@@ -44,8 +46,10 @@ export class RenewalProcessor
     );
   }
 
+  /** The charges first, so that a notice never names a boundary that passed. */
   async process(): Promise<void> {
     await this.renewals.runDueRenewals();
+    await this.renewalNotices.sendRenewalNotices();
   }
 
   @OnWorkerEvent('failed')

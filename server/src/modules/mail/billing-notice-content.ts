@@ -34,7 +34,9 @@ function money(
 
 /**
  * A calendar day in UTC: the server does not know the time zone of the
- * reader, and every billing boundary is stored in UTC.
+ * reader, and every billing boundary is stored in UTC. The Russian form ends
+ * in the abbreviation of "year" with its own period, so a Russian text puts
+ * no period after it.
  */
 function day(locale: SupportedLocale, iso: string): string {
   return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
@@ -84,6 +86,14 @@ const en: NoticeBuilders = {
       'You can choose a plan again in the billing section of your account.'
     ]
   }),
+  renewal_upcoming: ({ planName, renewsAt, ...amount }) => ({
+    subject: 'Your subscription renews soon',
+    heading: 'Subscription renews soon',
+    paragraphs: [
+      `Your ${planName} subscription renews on ${day('en', renewsAt)}. On that day we take ${money('en', amount)} from your saved card.`,
+      'To stop the renewal, cancel the subscription in the billing section of your account before that day.'
+    ]
+  }),
   refund_issued: (payload) => ({
     subject: 'Refund issued',
     heading: 'Refund issued',
@@ -121,7 +131,7 @@ const ru: NoticeBuilders = {
         ? 'Попыток больше не будет, подписка отменена.'
         : subscriptionStatus === 'past_due'
           ? nextAttemptAt
-            ? `Следующая попытка — ${day('ru', nextAttemptAt)}. Проверьте, что с карты можно оплатить, или добавьте другую карту.`
+            ? `Следующая попытка — ${day('ru', nextAttemptAt)} Проверьте, что с карты можно оплатить, или добавьте другую карту.`
             : 'Платёжная система повторит попытку. Проверьте, что с карты можно оплатить.'
           : 'Проверьте карту и повторите попытку.'
     ]
@@ -130,7 +140,7 @@ const ru: NoticeBuilders = {
     subject: 'Подписка будет завершена',
     heading: 'Подписка будет завершена',
     paragraphs: [
-      `Подписка на тариф ${planName} не будет продлена. Доступ сохраняется до ${day('ru', accessEndsAt)}.`,
+      `Подписка на тариф ${planName} не будет продлена. Доступ сохраняется до ${day('ru', accessEndsAt)}`,
       'Списаний по ней больше не будет.'
     ]
   }),
@@ -140,6 +150,14 @@ const ru: NoticeBuilders = {
     paragraphs: [
       `Подписка на тариф ${planName} завершена, его возможности больше недоступны.`,
       'Выбрать тариф снова можно в разделе оплаты вашего аккаунта.'
+    ]
+  }),
+  renewal_upcoming: ({ planName, renewsAt, ...amount }) => ({
+    subject: 'Скоро продление подписки',
+    heading: 'Скоро продление подписки',
+    paragraphs: [
+      `Подписка на тариф ${planName} продлится ${day('ru', renewsAt)}: в этот день с сохранённой карты будет списано ${money('ru', amount)}.`,
+      'Чтобы подписка не продлилась, отмените её в разделе оплаты вашего аккаунта до этого дня.'
     ]
   }),
   refund_issued: (payload) => ({
