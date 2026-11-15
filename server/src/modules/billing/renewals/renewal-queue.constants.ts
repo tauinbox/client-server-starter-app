@@ -55,3 +55,22 @@ export function planChangeLeaseIsLive(
 ): boolean {
   return startedAt.getTime() > now.getTime() - PLAN_CHANGE_LEASE_MS;
 }
+
+/**
+ * How long before the lease expires a plan change stops writing. The scan
+ * compares the lease with its own clock and takes no row lock, so a change
+ * that checked its lease must commit before the scan can see it expired. The
+ * margin covers that commit and a clock difference between two instances.
+ */
+export const PLAN_CHANGE_COMMIT_MARGIN_MS = 60 * 1000;
+
+/** True while a plan change claimed at `startedAt` may still write. */
+export function planChangeMayWrite(
+  startedAt: Date,
+  now: Date = new Date()
+): boolean {
+  return planChangeLeaseIsLive(
+    startedAt,
+    new Date(now.getTime() + PLAN_CHANGE_COMMIT_MARGIN_MS)
+  );
+}

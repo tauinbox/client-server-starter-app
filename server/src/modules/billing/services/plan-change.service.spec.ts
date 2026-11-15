@@ -20,7 +20,10 @@ import { BillingService } from '../billing.service';
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { ChargeDeclinedError } from '../providers/payment-provider.interface';
 import { ProviderTimeoutError } from '../providers/provider-deadline';
-import { PLAN_CHANGE_LEASE_MS } from '../renewals/renewal-queue.constants';
+import {
+  PLAN_CHANGE_COMMIT_MARGIN_MS,
+  PLAN_CHANGE_LEASE_MS
+} from '../renewals/renewal-queue.constants';
 import {
   expectRefusal,
   makePlan,
@@ -1248,7 +1251,7 @@ describe('PlanChangeService', () => {
       );
     });
 
-    it('refuses the switch and takes no refund leg when its lease expires during the charge', async () => {
+    it('refuses the switch and takes no refund leg when its lease nears expiry during the charge', async () => {
       const ctx = await build();
 
       plansByKey(ctx);
@@ -1265,9 +1268,15 @@ describe('PlanChangeService', () => {
       });
       const yoo = provider('yookassa', false);
 
-      // The process stalls in the charge until the renewal scan may own the row.
+      // The process stalls in the charge until the lease leaves less than the
+      // commit margin: the scan still skips the row, but may take it before a
+      // write that starts now commits.
       yoo.chargeOffSession.mockImplementation(() => {
-        jest.setSystemTime(frozenNow.getTime() + PLAN_CHANGE_LEASE_MS);
+        jest.setSystemTime(
+          frozenNow.getTime() +
+            PLAN_CHANGE_LEASE_MS -
+            PLAN_CHANGE_COMMIT_MARGIN_MS
+        );
 
         return Promise.resolve({
           providerInvoiceRef: 'pay_charge',

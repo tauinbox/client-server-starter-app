@@ -65,7 +65,7 @@ import {
 } from '../utils/refund-reservation.util';
 import {
   PLAN_CHANGE_LEASE_MS,
-  planChangeLeaseIsLive
+  planChangeMayWrite
 } from '../renewals/renewal-queue.constants';
 import { BillingService } from '../billing.service';
 
@@ -400,7 +400,7 @@ export class PlanChangeService {
   ): Promise<Subscription | null> {
     const selfManaged = subscription.lifecycleOwner === 'self';
 
-    if (selfManaged && !(lease && planChangeLeaseIsLive(lease))) return null;
+    if (selfManaged && !(lease && planChangeMayWrite(lease))) return null;
 
     const applied = await manager.update(
       Subscription,
@@ -824,7 +824,7 @@ export class PlanChangeService {
 
     return (
       current?.planChangeStartedAt?.getTime() === lease.getTime() &&
-      planChangeLeaseIsLive(lease) &&
+      planChangeMayWrite(lease) &&
       current.currentPeriodEnd.getTime() ===
         subscription.currentPeriodEnd.getTime()
     );
