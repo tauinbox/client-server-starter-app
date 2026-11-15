@@ -1,4 +1,4 @@
-import { ConfigService } from '@nestjs/config';
+import { isolatedConfig } from '../../../common/testing/isolated-config';
 import type { Request } from 'express';
 import { AttributeRegistryService } from '../../feature-flags/services/attribute-registry.service';
 import { BillingConfigService } from '../config/billing-config.service';
@@ -9,7 +9,7 @@ describe('BillingConfiguredAttributesRegistrar', () => {
 
   function setup(env: Record<string, unknown>): AttributeRegistryService {
     const registry = new AttributeRegistryService();
-    const config = new ConfigService(env);
+    const config = isolatedConfig(env);
 
     new BillingConfiguredAttributesRegistrar(
       new BillingConfigService(config),

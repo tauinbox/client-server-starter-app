@@ -109,6 +109,8 @@ Copy `.env.example` to `.env`, and then configure it:
 | `DB_SLOW_QUERY_THRESHOLD` | `200` | Slow query threshold in milliseconds |
 | `DB_LOGGER` | - | TypeORM logger type, for example `advanced-console` or `file`. A value replaces the default logger |
 | `REQUEST_LOG_LEVEL` | `all` | Request logging level. `all` logs each request. `warn` logs a 4xx and a 5xx. `error` logs a 5xx. The logged URL never carries the value of a `code`, `state` or `token` query parameter |
+| `DATA_REGION` | `intl` | Necessary. The data region of this deployment (a cell): `intl` or `ru` (`DATA_REGIONS`). Another value aborts the boot. The JWT issuer is `nexus-api@<region>`, so a cell refuses a token of another cell |
+| `PEER_REGIONS` | `{}` | JSON object of the other cells: region to public `https` URL. An unknown region, a URL that is not `https`, a value that is not JSON and the own region abort the boot |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
 | `JWT_SECRET` | - | Symmetric secret, a minimum of 32 characters, that is the 256-bit key size RFC 7518 makes necessary for HS256. It is necessary when `JWT_ALGORITHM=HS256` |
 | `JWT_PRIVATE_KEY` | - | RSA private key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
@@ -288,6 +290,9 @@ the `code` and `state` values. The `url` goes through `redactSensitiveQuery`, an
 URL in a log message (`GlobalExceptionFilter`, `RequestLoggingMiddleware` and the two IP guards). The log keeps no
 `query`, no `params` and no `x-forwarded-for`. The client IP of a security event stays in
 `audit_logs`. Add a header to the allowlist only after you make sure that it cannot carry a secret.
+
+`region/` holds `RegionModule`, with `RegionService` (the `DATA_REGION` and `PEER_REGIONS` of the
+cell, validated at boot) and `GET /api/v1/config/region`.
 
 `health/` holds `HealthModule`, with `GET /api/health/live` and `GET /api/health/ready`. The
 readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value or the
@@ -2547,6 +2552,12 @@ The Swagger documentation is at http://localhost:3000/swagger. It is on by defau
 
 The base URL is `/api/v1`.
 
+### Config (`/api/v1/config`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/region` | None | `{ region, peers }`: `DATA_REGION` of this cell and `PEER_REGIONS` (`core/region/`, `RegionService`) |
+
 ### Auth (`/api/v1/auth`)
 
 | Method | Path | Auth | Description |
@@ -2796,7 +2807,10 @@ repository.
   that runs outside Nest (`seed-admin.ts`). Runtime code uses the logger.
 
   The reusable fakes for a context, a configuration and an Express object are in
-  `src/common/testing/`. The billing service specs share their repository and provider stubs
+  `src/common/testing/`. A test that needs a real `ConfigService` builds it with
+  `isolatedConfig(values)` from the same folder: the plain constructor falls back to `process.env`
+  for a key that the test did not give, so the result changes with the shell or the CI job env.
+  ESLint refuses `new ConfigService(` in `*.spec.ts` and `test/`. The billing service specs share their repository and provider stubs
   through `src/modules/billing/testing/`. The production build excludes each `testing/` directory.
 
 ```bash

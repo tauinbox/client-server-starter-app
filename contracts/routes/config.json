@@ -1,0 +1,17 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/v1/config/region",
+      "expectedStatus": 200,
+      "policy": {
+        "access": "public",
+        "writes": null,
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 // inside the sub-select they match on - something no mocked repository can
 // prove valid - and the whole point of the job is which rows survive it.
 
-import { ConfigService } from '@nestjs/config';
+import { isolatedConfig } from '../src/common/testing/isolated-config';
 import { DataSource, In, Repository } from 'typeorm';
 import { postgresConfig } from '../src/postgres.config';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
@@ -29,7 +29,7 @@ runWithInfra('billing webhook ledger retention (e2e)', () => {
     events = ds.getRepository(WebhookEvent);
     service = new WebhookRetentionService(
       events,
-      new ConfigService({
+      isolatedConfig({
         BILLING_WEBHOOK_RETENTION_DAYS: String(RETENTION_DAYS),
         BILLING_WEBHOOK_PAYLOAD_RETENTION_DAYS: String(PAYLOAD_RETENTION_DAYS)
       })

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { isolatedConfig } from '../../../common/testing/isolated-config';
 import { BillingConfigService } from './billing-config.service';
 
 describe('BillingConfigService', () => {
@@ -9,7 +9,7 @@ describe('BillingConfigService', () => {
   };
 
   function service(env: Record<string, unknown>): BillingConfigService {
-    return new BillingConfigService(new ConfigService(env));
+    return new BillingConfigService(isolatedConfig(env));
   }
 
   afterEach(() => jest.restoreAllMocks());

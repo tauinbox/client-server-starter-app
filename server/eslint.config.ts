@@ -68,6 +68,16 @@ const uncheckedUserLookupSyntax: RestrictedSyntax[] = [
   }
 ];
 
+// A plain ConfigService falls back to process.env for a key the test did not
+// give, so the result depends on the shell or the CI job env.
+const isolatedConfigSyntax: RestrictedSyntax[] = [
+  {
+    selector: "NewExpression[callee.name='ConfigService']",
+    message:
+      'Use isolatedConfig(values) from src/common/testing/isolated-config. A plain ConfigService reads process.env for a key that the test did not give.'
+  }
+];
+
 export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
@@ -168,7 +178,13 @@ export default defineConfig(
   {
     basePath: __dirname,
     files: ['src/**/*.spec.ts'],
-    rules: { 'no-restricted-syntax': ['error', ...restrictedSyntax] }
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedSyntax,
+        ...isolatedConfigSyntax
+      ]
+    }
   },
   {
     basePath: __dirname,
@@ -177,7 +193,8 @@ export default defineConfig(
       'no-restricted-syntax': [
         'error',
         ...baseRestrictedSyntax,
-        errorKeyLiteralSyntax
+        errorKeyLiteralSyntax,
+        ...isolatedConfigSyntax
       ]
     }
   },

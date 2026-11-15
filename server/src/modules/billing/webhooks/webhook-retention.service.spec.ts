@@ -1,4 +1,4 @@
-import { ConfigService } from '@nestjs/config';
+import { isolatedConfig } from '../../../common/testing/isolated-config';
 import type { Repository } from 'typeorm';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import { WebhookRetentionService } from './webhook-retention.service';
@@ -69,7 +69,7 @@ describe('WebhookRetentionService', () => {
   }
 
   function build(env: Record<string, string> = {}): WebhookRetentionService {
-    return new WebhookRetentionService(makeRepo(), new ConfigService(env));
+    return new WebhookRetentionService(makeRepo(), isolatedConfig(env));
   }
 
   beforeEach(() => {

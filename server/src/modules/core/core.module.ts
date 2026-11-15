@@ -20,6 +20,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GlobalExceptionFilter } from './filters';
 import { MailModule } from '../mail/mail.module';
 import { HealthModule } from './health/health.module';
+import { RegionModule } from './region/region.module';
 import { AuditModule } from '../audit/audit.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { RequestLoggingMiddleware } from './middleware/request-logging.middleware';
@@ -97,6 +98,7 @@ export class CoreModule implements NestModule {
         UsersModule,
         UsersApiModule,
         HealthModule,
+        RegionModule,
         NotificationsModule,
         FeatureFlagsModule,
         BillingModule.forRoot()
