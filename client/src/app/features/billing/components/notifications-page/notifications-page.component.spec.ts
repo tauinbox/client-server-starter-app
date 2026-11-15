@@ -12,6 +12,7 @@ import { NotifyService } from '@core/services/notify.service';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { UserNotificationsService } from '../../services/user-notifications.service';
 import { UnreadNoticesService } from '../../services/unread-notices.service';
+import ruBilling from '../../i18n/ru.json';
 import { NotificationsPageComponent } from './notifications-page.component';
 
 const AT = '2026-11-14T10:00:00.000Z';
@@ -65,6 +66,16 @@ const NOTICES: UserNotificationResponse[] = [
     },
     AT
   ),
+  notice({
+    kind: 'renewal_upcoming',
+    payload: {
+      subscriptionId: 's',
+      planName: 'Pro',
+      renewsAt: '2026-12-01T00:00:00.000Z',
+      amountMinor: 2900,
+      currency: 'USD'
+    }
+  }),
   notice({
     kind: 'refund_issued',
     payload: { invoiceId: 'i', amountMinor: 500, currency: 'USD' }
@@ -120,6 +131,19 @@ describe('NotificationsPageComponent', () => {
     }).compileComponents();
   });
 
+  it('puts no period after a date in Russian, because the date ends in "г."', () => {
+    const date = new Intl.DateTimeFormat('ru', {
+      dateStyle: 'long',
+      timeZone: 'UTC'
+    }).format(new Date(AT));
+    const texts = Object.values(ruBilling.notifications.kind).map((value) =>
+      value.replace('{{date}}', date)
+    );
+
+    expect(date.endsWith('г.')).toBe(true);
+    expect(texts.filter((value) => value.includes('г..'))).toEqual([]);
+  });
+
   it('writes each kind of notice with its own values', async () => {
     const fixture = await render();
     const texts = Array.from(
@@ -133,6 +157,7 @@ describe('NotificationsPageComponent', () => {
       'A payment failed. Check your card and try again.',
       'Your Pro subscription will not renew. You keep access until December 1, 2026.',
       'Your Pro subscription has ended.',
+      'Your Pro subscription renews on December 1, 2026. On that day we take $29.00 from your saved card. To stop the renewal, cancel the subscription before that day.',
       'We refunded $5.00 to your payment method.',
       'Your credit balance reached zero. Features that use credits stop until you buy more.'
     ]);

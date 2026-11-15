@@ -39,6 +39,7 @@ const KIND_ICONS: Record<UserNotificationKind, string> = {
   payment_failed: 'error',
   subscription_cancel_scheduled: 'event_busy',
   subscription_canceled: 'cancel',
+  renewal_upcoming: 'event_repeat',
   refund_issued: 'undo',
   credit_balance_depleted: 'savings'
 };
@@ -178,6 +179,20 @@ function toRow(notice: UserNotificationResponse, lang: string): NoticeRow {
         icon,
         textKey: notice.kind,
         params: { plan: planName, date: day(accessEndsAt, lang) }
+      };
+    }
+    case 'renewal_upcoming': {
+      const { planName, renewsAt, amountMinor, currency } = notice.payload;
+
+      return {
+        notice,
+        icon,
+        textKey: notice.kind,
+        params: {
+          plan: planName,
+          date: day(renewsAt, lang),
+          amount: formatMoney(amountMinor, currency, lang)
+        }
       };
     }
     case 'subscription_canceled':
