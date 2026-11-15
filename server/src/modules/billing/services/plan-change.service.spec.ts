@@ -62,7 +62,13 @@ function statusMatches(
  * observable as the row's final state (the charge leg is now recorded before
  * the provider call and settled afterwards, not inserted once at the end).
  */
-function makeInsertStore(invoices: RepoMock) {
+function makeInsertStore({
+  invoices,
+  subscriptions
+}: {
+  invoices: RepoMock;
+  subscriptions: RepoMock;
+}) {
   const inserted: InsertedInvoice[] = [];
   let seq = 0;
   const applyInvoiceUpdate = (
@@ -110,8 +116,13 @@ function makeInsertStore(invoices: RepoMock) {
     findOne: jest.fn(
       (
         entity: unknown,
-        options: { where?: InvoiceCriteria }
+        options: { where?: InvoiceCriteria; lock?: unknown }
       ): Promise<unknown> => {
+        // The refund reservation reads the subscription row again under a lock.
+        if (entity === Subscription && options.lock) {
+          return subscriptions.findOne(options) as Promise<unknown>;
+        }
+
         if (entity !== Invoice) return Promise.resolve(null);
 
         const eventId = options.where?.providerEventId;
@@ -190,7 +201,7 @@ async function build() {
 
   const billing = { getProviderById: jest.fn() };
 
-  const insertStore = makeInsertStore(invoices);
+  const insertStore = makeInsertStore({ invoices, subscriptions });
   const dataSource = {
     manager: insertStore.manager,
     transaction: jest.fn(async (cb: (m: unknown) => unknown) => {
@@ -1220,6 +1231,62 @@ describe('PlanChangeService', () => {
         InvoicePaidEvent.name,
         expect.objectContaining({ userId: 'user-1' })
       );
+    });
+
+    it('takes no refund leg when a renewal scan took the row during the charge', async () => {
+      const ctx = await build();
+
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: Money.fromMinor(99000),
+        refundedMinor: Money.fromMinor(0),
+        currency: 'RUB',
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      });
+      const yoo = provider('yookassa', false);
+
+      // The scan takes a row with an expired lease by bumping its version, and
+      // the period stays where it is until the renewal is captured.
+      yoo.chargeOffSession.mockImplementation(async () => {
+        const claimed = (await ctx.subscriptions.findOne()) as Subscription;
+
+        ctx.subscriptions.findOne.mockResolvedValue({
+          ...claimed,
+          version: claimed.version + 1
+        });
+
+        return { providerInvoiceRef: 'pay_charge', status: 'captured' };
+      });
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+      // The commit guard carries the claimed version, so it misses too.
+      const applyUpdate =
+        ctx.dataSource.manager.update.getMockImplementation() as (
+          target: unknown,
+          criteria: unknown,
+          patch: unknown
+        ) => Promise<{ affected: number }>;
+
+      ctx.dataSource.manager.update.mockImplementation(
+        (target: unknown, criteria: unknown, patch: unknown) =>
+          target === Subscription
+            ? Promise.resolve({ affected: 0 })
+            : applyUpdate(target, criteria, patch)
+      );
+
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'business'),
+        ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT
+      );
+
+      expect(yoo.refund).not.toHaveBeenCalled();
+      expect(ctx.insertedInvoices).toEqual([
+        expect.objectContaining({ status: 'paid' })
+      ]);
     });
 
     it('rejects a provider-managed change whose local row moved during the provider call', async () => {

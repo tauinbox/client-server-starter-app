@@ -385,9 +385,10 @@ export class PlanChangeService {
    * column as it looked then - reverting whatever landed during that window (a
    * cancellation, a dunning write, a period advance, or a switch that the
    * provider's webhook already applied). A self-managed period that a renewal
-   * advanced past an expired lease is not the one the switch priced. Returns
-   * the re-read row, or `null` when the guard missed and the caller must
-   * refuse the switch.
+   * advanced past an expired lease is not the one the switch priced, and a
+   * renewal scan that took the row from an expired lease bumped its `version`
+   * before it charged the next period at the old price. Returns the re-read
+   * row, or `null` when the guard missed and the caller must refuse the switch.
    */
   private async commitPlanChange(
     manager: EntityManager,
@@ -742,6 +743,10 @@ export class PlanChangeService {
 
       if (leg && leg.status !== 'pending') return null;
 
+      if (!leg && !(await this.ownsPricedPeriod(manager, subscription))) {
+        return null;
+      }
+
       const source = await lockInvoice(
         manager,
         this.refundLegSource(subscription, leg, excludeInvoiceId)
@@ -779,6 +784,31 @@ export class PlanChangeService {
 
       return { source, minor, cumulative };
     });
+  }
+
+  /**
+   * False when the renewal scan took the row from an expired lease (it bumps
+   * `version`) or advanced the period that the quote was priced on. The newest
+   * paid invoice can then be the renewal of the next period, and the commit
+   * guard will refuse the switch. The row lock makes the scan wait for this
+   * transaction: its take, and a renewal that pays its invoice and advances the
+   * period in one transaction, so the source lookup that follows cannot see
+   * that invoice.
+   */
+  private async ownsPricedPeriod(
+    manager: EntityManager,
+    subscription: Subscription
+  ): Promise<boolean> {
+    const current = await manager.findOne(Subscription, {
+      where: { id: subscription.id },
+      lock: { mode: 'pessimistic_write' }
+    });
+
+    return (
+      current?.version === subscription.version &&
+      current.currentPeriodEnd.getTime() ===
+        subscription.currentPeriodEnd.getTime()
+    );
   }
 
   /**
