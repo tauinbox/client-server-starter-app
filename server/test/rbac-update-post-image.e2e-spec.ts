@@ -68,7 +68,8 @@ runWithInfra(
         .send({
           email: actorEmail,
           password,
-          name: 'Post Actor'
+          name: 'Post Actor',
+          residenceCountry: 'DE'
         })
         .expect(201);
       await request(http())
@@ -76,7 +77,8 @@ runWithInfra(
         .send({
           email: targetEmail,
           password,
-          name: 'Alpha'
+          name: 'Alpha',
+          residenceCountry: 'DE'
         })
         .expect(201);
 

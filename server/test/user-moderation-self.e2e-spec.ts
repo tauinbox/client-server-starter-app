@@ -61,7 +61,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     for (const email of [ownerEmail, moderatorEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, name: 'Mod Self' })
+        .send({ email, password, name: 'Mod Self', residenceCountry: 'DE' })
         .expect(201);
     }
 

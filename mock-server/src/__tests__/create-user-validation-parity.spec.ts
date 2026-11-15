@@ -40,7 +40,7 @@ async function errorsOf(res: Response): Promise<string[]> {
   return ((await res.json()) as { errors: string[] }).errors;
 }
 
-async function register(body: unknown): Promise<string[]> {
+async function registerAs(body: Record<string, unknown>): Promise<string[]> {
   return errorsOf(
     await fetch(`${baseUrl}/api/v1/auth/register`, {
       method: 'POST',
@@ -48,6 +48,12 @@ async function register(body: unknown): Promise<string[]> {
       body: JSON.stringify(body)
     })
   );
+}
+
+// The shared cases are about the `CreateUserDto` fields, so the field that
+// only `RegisterDto` carries holds a valid value there.
+async function register(body: Record<string, unknown>): Promise<string[]> {
+  return registerAs({ residenceCountry: 'DE', ...body });
 }
 
 async function adminCreate(body: unknown): Promise<string[]> {
@@ -168,5 +174,43 @@ describe('captchaToken', () => {
       'property captchaToken should not exist',
       ...PASSWORD_MISSING
     ]);
+  });
+});
+
+describe('residenceCountry', () => {
+  const COUNTRY_ERROR =
+    'residenceCountry must be an ISO 3166-1 alpha-2 country code';
+
+  it.each([
+    ['missing', {}],
+    ['null', { residenceCountry: null }],
+    ['lower case', { residenceCountry: 'de' }],
+    ['not assigned', { residenceCountry: 'XX' }]
+  ])('is refused on register when %s', async (_case, country) => {
+    expect(await registerAs({ email: EMAIL, name: 'Ada', ...country })).toEqual(
+      [COUNTRY_ERROR, ...PASSWORD_MISSING]
+    );
+  });
+
+  it('follows captchaToken, in the order of RegisterDto', async () => {
+    expect(
+      await registerAs({ captchaToken: 5, email: EMAIL, name: 'Ada' })
+    ).toEqual([
+      'captchaToken must be shorter than or equal to 2048 characters',
+      'captchaToken must be a string',
+      COUNTRY_ERROR,
+      ...PASSWORD_MISSING
+    ]);
+  });
+
+  it('is an unknown property on an admin create', async () => {
+    expect(
+      await adminCreate({
+        residenceCountry: 'DE',
+        email: EMAIL,
+        name: 'Ada',
+        password: PASSWORD
+      })
+    ).toEqual(['property residenceCountry should not exist']);
   });
 });

@@ -125,6 +125,10 @@ const UNPATTERNED: Readonly<Record<string, string>> = {
   'AUTH.MFA_UNAVAILABLE': 'this server is not configured for the feature (501)',
   'AUTH.MFA_NOT_ENABLED': 'the account state refuses the request (409)',
   'AUTH.MFA_SETUP_REQUIRED': 'the account state refuses the request (409)',
+  'AUTH.RESIDENCE_OTHER_REGION':
+    'the region of this deployment refuses the country (409)',
+  'AUTH.RESIDENCE_REGION_NOT_SERVED':
+    'the region of this deployment refuses the country (409)',
   'AUTH.MFA_INVALID_CODE': 'the second factor of a sign-in is not valid (401)',
   'AUTH.MFA_STEP_UP_INVALID_CODE': 'the step-up proof is not enough (403)',
   'AUTH.MFA_ENROLMENT_INVALID_CODE': 'a code in the body fails a check (422)',

@@ -142,7 +142,8 @@ describe('SSE user list events outside the admin user routes', () => {
         body: {
           email: 'sse-registered@example.com',
           password: 'Sunrise-Kettle-19',
-          name: 'Self Registered'
+          name: 'Self Registered',
+          residenceCountry: 'DE'
         }
       })
     ).toBe(201);

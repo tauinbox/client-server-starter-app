@@ -31,6 +31,7 @@ export function createMockUser(options: MockUserOptions = {}): MockUser {
     roles: options.roles ?? ['user'],
     isEmailVerified: options.isEmailVerified ?? true,
     locale: options.locale ?? 'en',
+    residenceCountry: options.residenceCountry ?? null,
     failedLoginAttempts: options.failedLoginAttempts ?? 0,
     lockedUntil: options.lockedUntil ?? null,
     tokenRevokedAt: options.tokenRevokedAt ?? null,

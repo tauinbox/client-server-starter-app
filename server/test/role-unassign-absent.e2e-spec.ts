@@ -68,7 +68,12 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
     for (const email of [adminEmail, targetEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, name: 'Unassign Absent' })
+        .send({
+          email,
+          password,
+          name: 'Unassign Absent',
+          residenceCountry: 'DE'
+        })
         .expect(201);
     }
 

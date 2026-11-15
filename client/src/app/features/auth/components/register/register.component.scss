@@ -18,8 +18,19 @@
     @include mix.form-actions;
   }
 
+  // The raw form field keeps the rhythm of the nxs-form-field hosts beside it.
+  .residence-country {
+    display: block;
+    margin-bottom: vars.$space-form-row-gap;
+  }
+
   .error-message {
     @include mix.error-message;
+  }
+
+  .peer-region-link {
+    display: block;
+    margin-top: vars.$spacing-xs;
   }
 
   mat-card-actions {

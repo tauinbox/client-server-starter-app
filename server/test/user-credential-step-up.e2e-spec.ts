@@ -72,7 +72,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     for (const email of [adminEmail, ownerEmail, otherEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, name: 'Step Up' })
+        .send({ email, password, name: 'Step Up', residenceCountry: 'DE' })
         .expect(201);
     }
 

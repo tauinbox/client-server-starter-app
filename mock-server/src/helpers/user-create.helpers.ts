@@ -1,5 +1,10 @@
 import { randomUUID } from 'crypto';
-import { ERROR_STATUS, ErrorKeys } from '@app/shared/constants';
+import {
+  ERROR_STATUS,
+  ErrorKeys,
+  isCountryCode,
+  type CountryCode
+} from '@app/shared/constants';
 import { normalizeEmail } from '@app/shared/utils/email';
 import {
   emailErrors,
@@ -13,6 +18,7 @@ import {
 import { findUserByEmail, findUserByPendingEmail } from '../state';
 import { validationError, validationStatus } from './validation-error.helpers';
 import { newPasswordRefusal } from './breached-password.helpers';
+import { residenceRefusal } from './region.helpers';
 import type { MockUser } from '../types';
 
 export interface CreateUserFields {
@@ -34,6 +40,13 @@ type CreateUserResult =
       status: number;
       body: ReturnType<typeof validationError> | ConflictEnvelope;
     };
+
+type RegisterResult =
+  | {
+      ok: true;
+      fields: CreateUserFields & { residenceCountry: CountryCode };
+    }
+  | Extract<CreateUserResult, { ok: false }>;
 
 type CreateUserDtoResult =
   | { ok: true; fields: CreateUserFields }
@@ -133,23 +146,42 @@ export function findCreateUserConflict(
   return null;
 }
 
+/** The `@IsIn` message of `RegisterDto.residenceCountry`. */
+const RESIDENCE_COUNTRY_ERROR =
+  'residenceCountry must be an ISO 3166-1 alpha-2 country code';
+
 /**
  * Both stages in one call, for `POST /auth/register`. That route is public, so
  * it has no ability check to place between them. Its `RegisterDto` adds
- * `captchaToken` to the `CreateUserDto` fields.
+ * `captchaToken` and `residenceCountry` to the `CreateUserDto` fields, and
+ * `AuthService.register` checks the region of the country first.
  */
 export function validateCreateUserBody(
   body: Record<string, unknown>
-): CreateUserResult {
+): RegisterResult {
+  const { residenceCountry } = body;
   const validated = createUserDtoResult(body, [
-    ...unknownPropertyErrors(body, [...CREATE_USER_KEYS, 'captchaToken']),
+    ...unknownPropertyErrors(body, [
+      ...CREATE_USER_KEYS,
+      'captchaToken',
+      'residenceCountry'
+    ]),
     ...stringErrors('captchaToken', body['captchaToken'], {
       max: MAX_CAPTCHA_TOKEN_LENGTH,
       optional: 'nullable'
-    })
+    }),
+    ...(isCountryCode(residenceCountry) ? [] : [RESIDENCE_COUNTRY_ERROR])
   ]);
 
   if (!validated.ok) return validated;
+
+  // The validation above rejects any other value.
+  const country = residenceCountry as CountryCode;
+  const refusal = residenceRefusal(country);
+
+  if (refusal) {
+    return { ok: false, status: ERROR_STATUS[refusal.errorKey], body: refusal };
+  }
 
   const conflict = findCreateUserConflict(validated.fields);
 
@@ -157,16 +189,20 @@ export function validateCreateUserBody(
     return { ok: false, status: conflict.status, body: conflict.body };
   }
 
-  return validated;
+  return {
+    ok: true,
+    fields: { ...validated.fields, residenceCountry: country }
+  };
 }
 
 /**
  * `isEmailVerified` is the one field the two create paths disagree on: a
- * self-registered user has to verify, an admin-created one is trusted.
+ * self-registered user has to verify, an admin-created one is trusted. Only a
+ * self-registration declares a country of residence.
  */
 export function buildMockUser(
   fields: CreateUserFields,
-  options: { isEmailVerified: boolean }
+  options: { isEmailVerified: boolean; residenceCountry: CountryCode | null }
 ): MockUser {
   const now = new Date().toISOString();
 
@@ -179,6 +215,7 @@ export function buildMockUser(
     roles: ['user'],
     isEmailVerified: options.isEmailVerified,
     locale: fields.locale,
+    residenceCountry: options.residenceCountry,
     failedLoginAttempts: 0,
     lockedUntil: null,
     tokenRevokedAt: null,

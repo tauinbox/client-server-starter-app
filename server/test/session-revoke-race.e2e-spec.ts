@@ -61,7 +61,7 @@ runWithInfra('Session revoke race (e2e)', () => {
 
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email, password, name: 'Race Owner' })
+      .send({ email, password, name: 'Race Owner', residenceCountry: 'DE' })
       .expect(201);
   }, 60000);
 

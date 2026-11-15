@@ -56,7 +56,9 @@ export const ErrorKeys = {
     STEP_UP_LOCKED: 'errors.auth.stepUpLocked',
     SESSION_NOT_FOUND: 'errors.auth.sessionNotFound',
     SESSION_IS_CURRENT: 'errors.auth.sessionIsCurrent',
-    REFRESH_TOKEN_REQUIRED: 'errors.auth.refreshTokenRequired'
+    REFRESH_TOKEN_REQUIRED: 'errors.auth.refreshTokenRequired',
+    RESIDENCE_OTHER_REGION: 'errors.auth.residenceOtherRegion',
+    RESIDENCE_REGION_NOT_SERVED: 'errors.auth.residenceRegionNotServed'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',

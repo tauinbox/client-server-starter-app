@@ -1,5 +1,6 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { COUNTRY_CODES, type CountryCode } from '@app/shared/constants';
 import { CreateUserDto } from '../../users/dtos/create-user.dto';
 
 export class RegisterDto extends CreateUserDto {
@@ -11,4 +12,15 @@ export class RegisterDto extends CreateUserDto {
   @IsString()
   @MaxLength(2048)
   captchaToken?: string;
+
+  @ApiProperty({
+    description:
+      'The declared country of residence (ISO 3166-1 alpha-2). It selects the data region; a country of another region is refused.',
+    enum: COUNTRY_CODES,
+    example: 'DE'
+  })
+  @IsIn([...COUNTRY_CODES], {
+    message: 'residenceCountry must be an ISO 3166-1 alpha-2 country code'
+  })
+  residenceCountry: CountryCode;
 }

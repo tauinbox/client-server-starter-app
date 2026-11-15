@@ -33,7 +33,7 @@ function register(body: Record<string, unknown>): Promise<Response> {
   return fetch(`${baseUrl}/api/v1/auth/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify({ residenceCountry: 'DE', ...body })
   });
 }
 
@@ -107,6 +107,20 @@ describe('register conflict audit parity', () => {
 
     expect(created.status).toBe(409);
 
+    expect(auditRows('USER_REGISTER_CONFLICT')).toHaveLength(0);
+  });
+
+  it('does not audit a country of residence that this cell refuses', async () => {
+    const res = await register({
+      ...validBody,
+      email: 'admin@example.com',
+      residenceCountry: 'RU'
+    });
+
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { errorKey: string }).errorKey).toBe(
+      ErrorKeys.AUTH.RESIDENCE_REGION_NOT_SERVED
+    );
     expect(auditRows('USER_REGISTER_CONFLICT')).toHaveLength(0);
   });
 });

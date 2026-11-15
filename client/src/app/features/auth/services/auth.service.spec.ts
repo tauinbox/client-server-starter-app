@@ -374,7 +374,8 @@ describe('AuthService', () => {
       const registerData = {
         email: 'new@example.com',
         name: 'New User',
-        password: 'password123'
+        password: 'password123',
+        residenceCountry: 'DE' as const
       };
       const mockUser = createMockAuthResponse().user;
 
@@ -396,7 +397,8 @@ describe('AuthService', () => {
       const registerData = {
         email: 'new@example.com',
         name: 'New User',
-        password: 'password123'
+        password: 'password123',
+        residenceCountry: 'DE' as const
       };
       const mockUser = createMockAuthResponse().user;
 

@@ -92,7 +92,7 @@ runWithInfra('List search and filters (e2e)', () => {
   async function register(email: string): Promise<void> {
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email, password, name: 'List Query' })
+      .send({ email, password, name: 'List Query', residenceCountry: 'DE' })
       .expect(201);
   }
 

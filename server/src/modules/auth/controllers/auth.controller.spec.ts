@@ -314,7 +314,8 @@ describe('AuthController', () => {
       const dto = {
         email: 'new@example.com',
         password: 'Password1',
-        name: 'New User'
+        name: 'New User',
+        residenceCountry: 'DE' as const
       };
       const req = mockExpressRequest() as ExpressRequest;
 

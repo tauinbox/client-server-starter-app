@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   inject,
   signal
@@ -15,6 +16,7 @@ import {
 import {
   email as emailValidator,
   form,
+  FormField,
   maxLength,
   minLength,
   required
@@ -27,7 +29,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { CaptchaWidgetComponent } from '@shared/components/captcha-widget/captcha-widget.component';
@@ -35,15 +37,32 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import {
   ErrorKeys,
   MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH
+  MIN_PASSWORD_LENGTH,
+  regionForCountry,
+  type CountryCode
 } from '@app/shared/constants';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { LegalLinksComponent } from '@features/legal/components/legal-links/legal-links.component';
+import { RegionConfigService } from '@core/services/region-config.service';
+import {
+  MatFormField,
+  MatError,
+  MatHint,
+  MatLabel
+} from '@angular/material/form-field';
+import { MatSelect } from '@angular/material/select';
+import { MatOption } from '@angular/material/core';
+import { MatIcon } from '@angular/material/icon';
+import {
+  countryOptions,
+  presetResidenceCountry
+} from '../../utils/residence-country';
 
 type RegisterData = {
   email: string;
   name: string;
   password: string;
+  residenceCountry: CountryCode | '';
 };
 
 @Component({
@@ -62,7 +81,15 @@ type RegisterData = {
     PasswordStrengthComponent,
     CaptchaWidgetComponent,
     LegalLinksComponent,
-    TranslocoDirective
+    TranslocoDirective,
+    FormField,
+    MatFormField,
+    MatLabel,
+    MatHint,
+    MatError,
+    MatSelect,
+    MatOption,
+    MatIcon
   ],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss',
@@ -73,6 +100,7 @@ export class RegisterComponent {
   readonly #router = inject(Router);
   readonly #destroyRef = inject(DestroyRef);
   readonly #translocoService = inject(TranslocoService);
+  readonly #regionConfig = inject(RegionConfigService);
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -82,13 +110,26 @@ export class RegisterComponent {
   protected readonly appRouteSegmentEnum = AppRouteSegmentEnum;
   protected readonly legalKinds = ['terms', 'privacy'] as const;
 
+  readonly #lang = toSignal(this.#translocoService.langChanges$, {
+    initialValue: this.#translocoService.getActiveLang()
+  });
+
+  protected readonly countries = computed(() => countryOptions(this.#lang()));
+
+  /** The cell that serves the declared country, after a refusal that names one. */
+  protected readonly peerUrl = signal<string | null>(null);
+
   readonly registerModel = signal<RegisterData>({
     email: '',
     name: '',
-    password: ''
+    password: '',
+    residenceCountry: presetResidenceCountry(navigator.languages)
   });
 
   readonly registerForm = form(this.registerModel, (path) => {
+    required(path.residenceCountry, {
+      message: 'auth.register.residenceCountryRequired'
+    });
     required(path.email, { message: 'auth.register.emailRequired' });
     emailValidator(path.email, { message: 'auth.register.emailInvalid' });
     requiredNotBlank(path.name, { message: 'auth.register.nameRequired' });
@@ -118,13 +159,16 @@ export class RegisterComponent {
   }
 
   onSubmit(): void {
-    if (!this.canSubmit()) return;
+    const { residenceCountry, ...fields } = this.registerModel();
+
+    if (!this.canSubmit() || !residenceCountry) return;
 
     this.loading.set(true);
     this.error.set(null);
+    this.peerUrl.set(null);
 
     this.#authService
-      .register(this.registerModel(), this.captchaToken())
+      .register({ ...fields, residenceCountry }, this.captchaToken())
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {
@@ -148,7 +192,11 @@ export class RegisterComponent {
             return;
           }
 
-          if (err.status === 409) {
+          if (errorKey === ErrorKeys.AUTH.RESIDENCE_OTHER_REGION) {
+            this.showPeerRegion(residenceCountry);
+          }
+
+          if (errorKey === ErrorKeys.USERS.EMAIL_EXISTS) {
             this.error.set(
               this.#translocoService.translate('auth.register.errorEmailExists')
             );
@@ -162,6 +210,27 @@ export class RegisterComponent {
             );
           }
         }
+      });
+  }
+
+  /**
+   * The link comes from the region config of this deployment, the one list of
+   * peers it trusts, and only an https URL becomes a link.
+   */
+  private showPeerRegion(country: CountryCode): void {
+    this.#regionConfig
+      .get()
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe({
+        next: ({ peers }) => {
+          const url = peers[regionForCountry(country)];
+
+          if (url && URL.parse(url)?.protocol === 'https:') {
+            this.peerUrl.set(url);
+          }
+        },
+        // The refusal text is already on screen; the link is an extra.
+        error: () => undefined
       });
   }
 }

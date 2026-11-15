@@ -44,7 +44,8 @@ type _ExcludedFields =
   | 'totpRecoveryCodes'
   | 'totpLastUsedStep'
   | 'failedLoginAttempts'
-  | 'lockedUntil';
+  | 'lockedUntil'
+  | 'residenceCountry';
 
 // ── Coverage checks ──────────────────────────────────────────────────────────
 

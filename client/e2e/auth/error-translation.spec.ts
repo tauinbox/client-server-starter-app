@@ -1,4 +1,9 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import {
+  chooseOption,
+  expect,
+  loginViaUi,
+  test
+} from '../fixtures/base.fixture';
 import { ErrorKeys } from '@app/shared/constants';
 
 // These tests verify that when the server returns an `errorKey` in the error
@@ -139,6 +144,7 @@ test.describe('Error translation: register component errors', () => {
     await page.getByLabel('Full name').fill('John Doe');
     await page.getByLabel('Full name').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await chooseOption(page, 'Country of residence', 'Germany');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page.locator('.error-message')).toContainText(

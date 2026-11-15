@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import type {
+  CountryCode,
   LegalDocumentVersion,
   LegalJurisdiction,
   StepUpOperation
@@ -28,6 +29,8 @@ export interface MockUser {
   roles: string[];
   isEmailVerified: boolean;
   locale: string;
+  /** Null for an account created before the column or by an administrator. */
+  residenceCountry: CountryCode | null;
   failedLoginAttempts: number;
   lockedUntil: string | null;
   tokenRevokedAt: string | null;

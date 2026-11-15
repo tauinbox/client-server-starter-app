@@ -67,7 +67,7 @@ runWithInfra('POST /users/:id/mfa/reset (e2e)', () => {
     for (const email of [supportEmail, ownerEmail, superEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, name: 'Mfa Reset' })
+        .send({ email, password, name: 'Mfa Reset', residenceCountry: 'DE' })
         .expect(201);
     }
 

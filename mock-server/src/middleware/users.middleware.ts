@@ -135,7 +135,10 @@ router.post('/', permissionGuard('create', 'User'), (req, res) => {
     return;
   }
 
-  const user = buildMockUser(validated.fields, { isEmailVerified: true });
+  const user = buildMockUser(validated.fields, {
+    isEmailVerified: true,
+    residenceCountry: null
+  });
 
   getState().users.set(user.id, user);
 

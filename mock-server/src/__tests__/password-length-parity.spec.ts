@@ -56,7 +56,8 @@ describe('POST /api/v1/auth/register', () => {
       body: JSON.stringify({
         email: 'long.cyrillic@example.com',
         name: 'Olga Smirnova',
-        password: CYRILLIC_64
+        password: CYRILLIC_64,
+        residenceCountry: 'DE'
       })
     });
 

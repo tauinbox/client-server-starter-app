@@ -21,6 +21,28 @@
           autocomplete="name"
         />
 
+        @let country = registerForm.residenceCountry();
+        <mat-form-field
+          appearance="outline"
+          class="full-width residence-country"
+          subscriptSizing="dynamic"
+        >
+          <mat-label>{{ t('auth.register.residenceCountry') }}</mat-label>
+          <mat-icon matPrefix aria-hidden="true">public</mat-icon>
+          <mat-select [formField]="registerForm.residenceCountry">
+            @for (option of countries(); track option.code) {
+              <mat-option [value]="option.code">{{ option.name }}</mat-option>
+            }
+          </mat-select>
+          @if (country.touched() && country.invalid()) {
+            <mat-error>{{
+              t('auth.register.residenceCountryRequired')
+            }}</mat-error>
+          } @else {
+            <mat-hint>{{ t('auth.register.residenceCountryHint') }}</mat-hint>
+          }
+        </mat-form-field>
+
         <nxs-form-field
           [field]="registerForm.password"
           label="auth.register.password"
@@ -40,6 +62,11 @@
         @if (error()) {
           <div class="error-message" role="alert">
             {{ error() }}
+            @if (peerUrl(); as url) {
+              <a class="peer-region-link" [href]="url">{{
+                t('auth.register.openPeerRegion')
+              }}</a>
+            }
           </div>
         }
 

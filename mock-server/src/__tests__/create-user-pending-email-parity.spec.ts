@@ -84,7 +84,7 @@ describe('create-user pending-email conflict parity with server', () => {
     await claimAsPendingEmail();
 
     const { status, body } = await send('POST', '/api/v1/auth/register', {
-      body: createBody
+      body: { ...createBody, residenceCountry: 'DE' }
     });
 
     expect(status).toBe(409);
@@ -108,7 +108,8 @@ describe('create-user pending-email conflict parity with server', () => {
     const registered = await send('POST', '/api/v1/auth/register', {
       body: {
         ...createBody,
-        email: 'fresh-register@example.com'
+        email: 'fresh-register@example.com',
+        residenceCountry: 'DE'
       }
     });
 

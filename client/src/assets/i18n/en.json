@@ -155,7 +155,9 @@
       "stepUpLocked": "Too many incorrect passwords. Try again later.",
       "sessionNotFound": "That session has already ended.",
       "sessionIsCurrent": "Use Sign out to end the session of this device.",
-      "refreshTokenRequired": "Your session has ended. Please sign in again."
+      "refreshTokenRequired": "Your session has ended. Please sign in again.",
+      "residenceOtherRegion": "Accounts for this country are kept on another site.",
+      "residenceRegionNotServed": "Registration for this country is not available yet."
     },
     "users": {
       "notFound": "User not found",

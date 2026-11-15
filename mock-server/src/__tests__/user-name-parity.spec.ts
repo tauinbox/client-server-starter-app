@@ -56,6 +56,7 @@ describe('the user name', () => {
     const res = await send('POST', '/auth/register', {
       body: {
         ...NEW_USER,
+        residenceCountry: 'DE',
         email: 'trimmed@example.com',
         name: '  Ada Lovelace  '
       }

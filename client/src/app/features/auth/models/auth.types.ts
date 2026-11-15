@@ -1,5 +1,6 @@
 import type { CreateUser, User } from '@shared/models/user.types';
 import type { JwtPayload } from 'jwt-decode';
+import type { CountryCode } from '@app/shared/constants';
 
 export type {
   TokensResponse,
@@ -15,7 +16,7 @@ export type LoginCredentials = {
   password: string;
 };
 
-export type RegisterRequest = CreateUser;
+export type RegisterRequest = CreateUser & { residenceCountry: CountryCode };
 
 export type UpdateProfile = {
   name?: string;

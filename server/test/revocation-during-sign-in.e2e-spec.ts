@@ -63,7 +63,7 @@ runWithInfra('Revocation during a sign-in (e2e)', () => {
 
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email, password, name: 'Revoke Race' })
+      .send({ email, password, name: 'Revoke Race', residenceCountry: 'DE' })
       .expect(201);
 
     await dataSource

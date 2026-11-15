@@ -20,6 +20,7 @@ import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { OAuthService } from '../src/modules/auth/services/oauth.service';
 import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.service';
+import { RegionService } from '../src/modules/core/region/region.service';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { TokenGeneratorService } from '../src/modules/auth/services/token-generator.service';
@@ -250,6 +251,8 @@ describe('Auth response serialization (e2e)', () => {
             })
           }
         },
+        // No test here registers an account.
+        { provide: RegionService, useValue: {} },
         {
           provide: OAuthAccountService,
           useValue: {

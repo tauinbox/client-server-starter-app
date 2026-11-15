@@ -37,7 +37,12 @@ runWithInfra('Login lockout envelope (e2e)', () => {
 
     await request(app.getHttpServer() as Server)
       .post('/api/v1/auth/register')
-      .send({ email, password, name: 'Lockout Envelope' })
+      .send({
+        email,
+        password,
+        name: 'Lockout Envelope',
+        residenceCountry: 'DE'
+      })
       .expect(201);
   }, 60000);
 

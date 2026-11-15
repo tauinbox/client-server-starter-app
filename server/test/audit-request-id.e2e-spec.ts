@@ -64,7 +64,12 @@ runWithInfra('Audit rows carry the sanitised request id (e2e)', () => {
     const response = await request(app.getHttpServer() as Server)
       .post('/api/v1/auth/register')
       .set('X-Request-Id', malformed)
-      .send({ email, password, name: 'Audit RequestId' })
+      .send({
+        email,
+        password,
+        name: 'Audit RequestId',
+        residenceCountry: 'DE'
+      })
       .expect(201);
 
     const header = response.headers['x-request-id'];

@@ -235,7 +235,8 @@ describe('the breach blocklist mirrors the server verdict', () => {
       body: JSON.stringify({
         email: 'admin@example.com',
         name: 'Taken Address',
-        password: BREACHED_PASSWORD
+        password: BREACHED_PASSWORD,
+        residenceCountry: 'DE'
       })
     });
 
@@ -270,7 +271,8 @@ describe('the breach blocklist mirrors the server verdict', () => {
       body: JSON.stringify({
         email: 'seeded-clean@example.com',
         name: 'Clean Value',
-        password
+        password,
+        residenceCountry: 'DE'
       })
     });
 
@@ -284,7 +286,8 @@ describe('the breach blocklist mirrors the server verdict', () => {
       body: JSON.stringify({
         email: 'seeded-breached@example.com',
         name: 'Seeded Value',
-        password
+        password,
+        residenceCountry: 'DE'
       })
     });
 
@@ -301,7 +304,8 @@ describe('the breach blocklist mirrors the server verdict', () => {
       body: JSON.stringify({
         email: 'lowercase-only@example.com',
         name: 'Lower Case',
-        password: 'kettlesunrise'
+        password: 'kettlesunrise',
+        residenceCountry: 'DE'
       })
     });
 

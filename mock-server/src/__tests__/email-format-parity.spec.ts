@@ -48,7 +48,8 @@ const REFUSED = EMAIL_ADDRESS_CORPUS.filter((entry) => !entry.valid).map(
 
 const REGISTER_BODY = {
   name: 'Format Parity',
-  password: 'Sunrise-Kettle-19'
+  password: 'Sunrise-Kettle-19',
+  residenceCountry: 'DE'
 };
 
 /*

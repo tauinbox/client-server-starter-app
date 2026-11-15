@@ -78,7 +78,12 @@ runWithInfra('The email change needs update:Profile (e2e)', () => {
   async function register(email: string): Promise<string> {
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email, password: PASSWORD, name: 'Profile Grant' })
+      .send({
+        email,
+        password: PASSWORD,
+        name: 'Profile Grant',
+        residenceCountry: 'DE'
+      })
       .expect(201);
     const user = await dataSource
       .getRepository(User)

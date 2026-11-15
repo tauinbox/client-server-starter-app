@@ -28,6 +28,7 @@ import {
   AuditLogParams
 } from '../../audit/audit.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { RegionService } from '../../core/region/region.service';
 import { BreachedPasswordService } from '../breached-password/breached-password.service';
 import { MfaService } from './mfa.service';
 import { OAuthAccountService } from './oauth-account.service';
@@ -202,6 +203,7 @@ export class AuthService {
     private breachedPasswordService: BreachedPasswordService,
     private mfaService: MfaService,
     private oauthAccountService: OAuthAccountService,
+    private regionService: RegionService,
     private eventEmitter: EventEmitter2,
     @Inject(CACHE_MANAGER) cache: Cache
   ) {
@@ -341,6 +343,10 @@ export class AuthService {
     registerDto: RegisterDto,
     auditContext?: AuditContext
   ): Promise<{ message: string }> {
+    // First: the verdict depends on the country only, so it says nothing about
+    // the address, and a refused resident costs no breach lookup.
+    this.regionService.assertServesCountry(registerDto.residenceCountry);
+
     // Ahead of the address conflict below, so the caller reads the same verdict
     // whether or not the address happens to be taken, and ahead of the hash so
     // a refused password never costs a bcrypt round.

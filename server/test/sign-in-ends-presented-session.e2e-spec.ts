@@ -79,7 +79,12 @@ runWithInfra('A sign-in ends the session of the presented cookie (e2e)', () => {
     for (const email of [ownerEmail, otherEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, name: 'Relogin Owner' })
+        .send({
+          email,
+          password,
+          name: 'Relogin Owner',
+          residenceCountry: 'DE'
+        })
         .expect(201);
     }
 

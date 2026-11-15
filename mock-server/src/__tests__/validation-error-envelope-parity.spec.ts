@@ -65,7 +65,8 @@ describe('validation-error envelope parity with server', () => {
         body: {
           email: 'not-an-email',
           name: 'A B',
-          password: 'Password1'
+          password: 'Password1',
+          residenceCountry: 'DE'
         }
       });
 

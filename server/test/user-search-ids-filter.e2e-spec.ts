@@ -56,7 +56,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
     for (const email of [adminEmail, ...emails]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, name: 'Ids Filter' })
+        .send({ email, password, name: 'Ids Filter', residenceCountry: 'DE' })
         .expect(201);
     }
 

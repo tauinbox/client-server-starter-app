@@ -1,4 +1,6 @@
-import { expect, test } from '../fixtures/base.fixture';
+import { chooseOption, expect, test } from '../fixtures/base.fixture';
+
+const COUNTRY = 'Country of residence';
 
 test.describe('Register page', () => {
   test('should display the registration form', async ({
@@ -73,6 +75,7 @@ test.describe('Register page', () => {
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
+    await chooseOption(page, COUNTRY, 'Germany');
 
     await expect(main.getByRole('button', { name: 'Register' })).toBeEnabled();
   });
@@ -157,6 +160,7 @@ test.describe('Register page', () => {
     // The composition rules are gone: a lower-case value of adequate length is
     // a valid password and the form must let it through.
     await expect(page.getByText(/uppercase letter/i)).toBeHidden();
+    await chooseOption(page, COUNTRY, 'Germany');
     await expect(main.getByRole('button', { name: 'Register' })).toBeEnabled();
   });
 
@@ -190,6 +194,7 @@ test.describe('Register page', () => {
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
+    await chooseOption(page, COUNTRY, 'Germany');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page).toHaveURL(/.*\/login\?registered=pending-verification$/);
@@ -214,6 +219,7 @@ test.describe('Register page', () => {
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
+    await chooseOption(page, COUNTRY, 'Germany');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(
@@ -247,6 +253,7 @@ test.describe('Register page', () => {
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
+    await chooseOption(page, COUNTRY, 'Germany');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page.locator('.error-message')).toBeVisible();
@@ -300,6 +307,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Full name').fill('Jane Smith');
     await page.getByLabel('Full name').blur();
     await page.getByLabel('Password', { exact: true }).fill(breached);
+    await chooseOption(page, COUNTRY, 'Germany');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(
@@ -323,6 +331,7 @@ test.describe('Register page', () => {
     await page.getByLabel('Full name').fill('Jane Smith');
     await page.getByLabel('Full name').blur();
     await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await chooseOption(page, COUNTRY, 'Germany');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(
@@ -330,6 +339,29 @@ test.describe('Register page', () => {
         'This password is too common, or it contains your name, your email address or the product name. Please choose a different one.'
       )
     ).toBeVisible();
+    await expect(page).toHaveURL(/.*\/register$/);
+  });
+
+  test('refuses a country that no site of this service serves yet', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/register');
+
+    const main = page.getByRole('main');
+
+    await page.getByLabel('Email').fill('resident@example.com');
+    await page.getByLabel('Full name').fill('Jane Smith');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
+    await chooseOption(page, COUNTRY, 'Russia');
+    await main.getByRole('button', { name: 'Register' }).click();
+
+    await expect(page.locator('.error-message')).toHaveText(
+      'Registration for this country is not available yet.'
+    );
+    await expect(page.locator('.peer-region-link')).toHaveCount(0);
     await expect(page).toHaveURL(/.*\/register$/);
   });
 

@@ -25,6 +25,7 @@ import { BreachedPasswordService } from '../src/modules/auth/breached-password/b
 import { AuditService } from '../src/modules/audit/audit.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
+import { RegionService } from '../src/modules/core/region/region.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -96,7 +97,8 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
         { provide: SessionIssuerService, useValue: {} },
         { provide: PurposeTokenService, useValue: {} },
         { provide: MfaService, useValue: {} },
-        { provide: MetricsService, useValue: {} }
+        { provide: MetricsService, useValue: {} },
+        { provide: RegionService, useValue: {} }
       ]
     }).compile();
 
