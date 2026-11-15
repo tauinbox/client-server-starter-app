@@ -12,6 +12,7 @@ function buildConfigService(overrides: Record<string, unknown> = {}): {
   getOrThrow: jest.Mock;
 } {
   const values: Record<string, unknown> = {
+    DATA_REGION: 'intl',
     JWT_ALGORITHM: 'HS256',
     JWT_SECRET: 'test-secret',
     JWT_MIN_IAT: undefined,

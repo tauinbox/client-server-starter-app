@@ -96,6 +96,12 @@ export {
   type AppEnvironment
 } from './environment.constants';
 
+export {
+  DATA_REGIONS,
+  type DataRegion,
+  type PeerRegions
+} from './data-region.constants';
+
 export { ErrorKeys } from './error-keys';
 export { ERROR_STATUS, type ErrorKey, type ErrorStatus } from './error-status';
 

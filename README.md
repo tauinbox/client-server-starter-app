@@ -1148,6 +1148,8 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `DB_NAME` | `my-db` | Database name |
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `password` | Database password |
+| `DATA_REGION` | `intl` | Necessary. The data region of this deployment: `intl` or `ru`. Another value aborts the boot. It is part of the JWT issuer, so a deployment refuses a token of another region |
+| `PEER_REGIONS` | `{}` | JSON object of the other regions: region to public `https` URL. The own region aborts the boot |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
 | `JWT_SECRET` | - | HS256 secret, a minimum of 32 characters, that is the 256-bit key size RFC 7518 makes necessary for HS256. It is necessary when `JWT_ALGORITHM=HS256` |
 | `JWT_PRIVATE_KEY` | - | RSA private key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
@@ -1637,6 +1639,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/resend-verification` | None | Send the verification email again. A deactivated account gets no token and no mail. A CAPTCHA token is necessary near the rate limit |
 | POST | `/auth/forgot-password` | None | Request a password reset email. A CAPTCHA token is necessary near the rate limit |
 | GET | `/auth/captcha-config` | None | Public CAPTCHA configuration: the site key and the enabled flag |
+| GET | `/config/region` | None | The data region of this deployment and the public URL of each other region |
 | POST | `/auth/reset-password` | None | Reset the password with a token. Ends every session and removes every linked sign-in provider, with one `OAUTH_UNLINK` audit row each (`source: 'password_reset'`) |
 | POST | `/auth/oauth/reauth-init` | Bearer | Start a step-up re-authentication for an account that holds no password. The body names the operation the proof is for. Sets a short-lived cookie tied to the authorization flow that starts next. The callback mints a `reauth_proof` cookie for that operation, and only when the provider identity already belongs to the caller |
 | POST | `/auth/oauth/link-init` | Bearer + step-up | Start an OAuth account link. The body carries the current password, or the account proves itself with a `reauth_proof` minted for the operation `oauth_link`. A linked provider signs the account in and outlives every session, thus a stolen session must not plant one. Sets a cookie with a short life, thus the OAuth flow that starts next attaches the provider to the current user. The flow that starts next claims it, and no other flow can use it. A logout cancels it |

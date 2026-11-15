@@ -1,8 +1,11 @@
 import * as Joi from 'joi';
 import {
   APP_ENVIRONMENTS,
+  DATA_REGIONS,
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
-  MIN_JWT_EXPIRATION_SECONDS
+  MIN_JWT_EXPIRATION_SECONDS,
+  type DataRegion,
+  type PeerRegions
 } from '@app/shared/constants';
 import {
   DEFAULT_BILLING_PROVIDER_TIMEOUT_MS,
@@ -13,6 +16,36 @@ import {
   DEFAULT_WEBHOOK_RETENTION_DAYS
 } from '../billing/webhooks/billing-webhook-queue.constants';
 
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return raw;
+  }
+}
+
+const PEER_REGIONS_SCHEMA = Joi.object()
+  .pattern(
+    Joi.string().valid(...DATA_REGIONS),
+    Joi.string().uri({ scheme: ['https'] })
+  )
+  .prefs({ errors: { label: 'key' } });
+
+// A cell cannot be its own peer: the client would send a user of this region
+// to this cell again.
+function refuseOwnRegionAsPeer(
+  env: { DATA_REGION?: DataRegion; PEER_REGIONS?: PeerRegions },
+  helpers: Joi.CustomHelpers
+): unknown {
+  const { DATA_REGION: region, PEER_REGIONS: peers = {} } = env;
+
+  return region && Object.hasOwn(peers, region)
+    ? helpers.message({
+        custom: 'PEER_REGIONS must not name the own DATA_REGION'
+      })
+    : env;
+}
+
 // Validated by ConfigModule at bootstrap: a malformed value or a missing
 // required key aborts startup instead of degrading behavior at runtime.
 // Joi also coerces values (e.g. numbers) and applies defaults, and
@@ -22,6 +55,25 @@ export const configValidationSchema = Joi.object({
   ENVIRONMENT: Joi.string()
     .valid(...APP_ENVIRONMENTS)
     .default('production'),
+  // No default: a cell that guessed its region could store the personal data
+  // of one jurisdiction in the database of another.
+  DATA_REGION: Joi.string()
+    .valid(...DATA_REGIONS)
+    .required(),
+  // JSON object of region to the public https URL of that cell. Joi.object()
+  // does not parse a JSON string, so the rule parses it. The rule at the end
+  // of the schema refuses the own region.
+  PEER_REGIONS: Joi.string()
+    .empty('')
+    .default({})
+    .custom((raw: string, helpers) => {
+      const result = PEER_REGIONS_SCHEMA.validate(parseJson(raw));
+
+      return result.error
+        ? helpers.error('any.invalid', { reason: result.error.message })
+        : (result.value as PeerRegions);
+    })
+    .messages({ 'any.invalid': '{{#label}} is invalid: {{#reason}}' }),
   DB_HOST: Joi.string().required(),
   DB_PORT: Joi.number().default(5432),
   DB_NAME: Joi.string().required(),
@@ -137,4 +189,4 @@ export const configValidationSchema = Joi.object({
     .integer()
     .min(1)
     .default(DEFAULT_WEBHOOK_PAYLOAD_RETENTION_DAYS)
-});
+}).custom(refuseOwnRegionAsPeer);

@@ -37,11 +37,13 @@ describe('jwt-module-options.factory', () => {
 
   const configs = {
     HS256: configOf({
+      DATA_REGION: 'intl',
       JWT_ALGORITHM: 'HS256',
       JWT_SECRET: 'test-secret',
       JWT_EXPIRATION: 900
     }),
     RS256: configOf({
+      DATA_REGION: 'intl',
       JWT_ALGORITHM: 'RS256',
       JWT_PUBLIC_KEY: base64(publicKey),
       JWT_PRIVATE_KEY: base64(privateKey),
@@ -67,6 +69,21 @@ describe('jwt-module-options.factory', () => {
       ).not.toThrow();
     }
   );
+
+  it('puts the data region of the cell in the issuer', () => {
+    expect(buildJwtVerification(configs.HS256).issuer).toBe('nexus-api@intl');
+    expect(
+      buildJwtVerification(
+        configOf({ DATA_REGION: 'ru', JWT_SECRET: 'test-secret' })
+      ).issuer
+    ).toBe('nexus-api@ru');
+  });
+
+  it('throws when DATA_REGION is unset', () => {
+    expect(() =>
+      buildJwtVerification(configOf({ JWT_SECRET: 'test-secret' }))
+    ).toThrow('Missing: DATA_REGION');
+  });
 
   it('decodes the base64 public key for RS256', () => {
     expect(buildJwtVerification(configs.RS256).key).toBe(publicKey);

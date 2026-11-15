@@ -10,6 +10,7 @@ import { configValidationSchema } from './config-validation.schema';
 const options = { allowUnknown: true, abortEarly: false };
 
 const validEnv = {
+  DATA_REGION: 'intl',
   DB_HOST: 'localhost',
   DB_NAME: 'db',
   DB_USER: 'user',
@@ -235,5 +236,52 @@ describe('configValidationSchema', () => {
     expect(3 * MAX_BILLING_PROVIDER_TIMEOUT_MS).toBeLessThan(
       PLAN_CHANGE_LEASE_MS
     );
+  });
+
+  describe('DATA_REGION and PEER_REGIONS', () => {
+    function validate(env: Record<string, string>): {
+      error?: Error;
+      value: Record<string, unknown>;
+    } {
+      return configValidationSchema.validate(env, options);
+    }
+
+    it('refuses a missing or unknown DATA_REGION', () => {
+      const { DATA_REGION: _omitted, ...withoutRegion } = validEnv;
+
+      expect(validate(withoutRegion).error?.message).toContain('DATA_REGION');
+      expect(
+        validate({ ...validEnv, DATA_REGION: 'eu' }).error?.message
+      ).toContain('DATA_REGION');
+    });
+
+    it('defaults PEER_REGIONS to no peers, also when the value is empty', () => {
+      expect(validate(validEnv).value['PEER_REGIONS']).toEqual({});
+      expect(
+        validate({ ...validEnv, PEER_REGIONS: '' }).value['PEER_REGIONS']
+      ).toEqual({});
+    });
+
+    it('parses the JSON of PEER_REGIONS into an object', () => {
+      const { error, value } = validate({
+        ...validEnv,
+        PEER_REGIONS: '{"ru":"https://ru.example.com"}'
+      });
+
+      expect(error).toBeUndefined();
+      expect(value['PEER_REGIONS']).toEqual({ ru: 'https://ru.example.com' });
+    });
+
+    it.each([
+      ['an unknown region', '{"eu":"https://eu.example.com"}'],
+      ['a plain http URL', '{"ru":"http://ru.example.com"}'],
+      ['a value that is not a URL', '{"ru":"ru.example.com"}'],
+      ['the own region', '{"intl":"https://intl.example.com"}'],
+      ['a value that is not JSON', 'ru=https://ru.example.com']
+    ])('refuses a PEER_REGIONS with %s', (_case, peers) => {
+      expect(
+        validate({ ...validEnv, PEER_REGIONS: peers }).error?.message
+      ).toContain('PEER_REGIONS');
+    });
   });
 });

@@ -16,7 +16,7 @@ import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { buildJwtModuleOptions } from '../src/modules/auth/jwt-module-options.factory';
-import { TOKEN_PURPOSE } from '@app/shared/constants';
+import { JWT_AUDIENCE, JWT_ISSUER, TOKEN_PURPOSE } from '@app/shared/constants';
 
 const TEST_SECRET = 'test-secret-for-token-purpose-e2e';
 
@@ -39,6 +39,7 @@ describe('JWT token purpose (e2e)', () => {
 
   beforeAll(async () => {
     const config = new ConfigService({
+      DATA_REGION: 'intl',
       JWT_ALGORITHM: 'HS256',
       JWT_EXPIRATION: '3600',
       JWT_SECRET: TEST_SECRET
@@ -132,15 +133,22 @@ describe('JWT token purpose (e2e)', () => {
       .expect(401);
   });
 
-  it('rejects a token signed for a different issuer', async () => {
+  // Each token is a genuine access token in every other claim, so the issuer is
+  // the only reason for the refusal.
+  it.each([
+    ['an unrelated issuer', 'someone-else'],
+    ['the issuer from before the region was added', JWT_ISSUER],
+    ['the cell of another region', `${JWT_ISSUER}@ru`]
+  ])('rejects a token signed for %s', async (_case, issuer) => {
     const foreign = new JwtService({
       secret: TEST_SECRET,
-      signOptions: { issuer: 'someone-else', audience: 'someone-else' }
+      signOptions: { issuer, audience: JWT_AUDIENCE }
     });
     const token = foreign.sign({
       sub: 'user-1',
       email: 'user@example.com',
-      purpose: TOKEN_PURPOSE.ACCESS
+      purpose: TOKEN_PURPOSE.ACCESS,
+      sid: 'session-1'
     });
 
     await request(server)

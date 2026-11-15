@@ -1,7 +1,11 @@
 import type { JwtModuleOptions } from '@nestjs/jwt';
 import type { ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
-import { JWT_AUDIENCE, JWT_ISSUER } from '@app/shared/constants';
+import {
+  JWT_AUDIENCE,
+  JWT_ISSUER,
+  type DataRegion
+} from '@app/shared/constants';
 
 /** What a verifier needs to accept a token this service signed. */
 export interface JwtVerification {
@@ -20,7 +24,13 @@ export interface JwtVerification {
 export function buildJwtVerification(
   configService: ConfigService
 ): JwtVerification {
-  const issuerAudience = { issuer: JWT_ISSUER, audience: JWT_AUDIENCE };
+  // The region in the issuer makes a cell refuse a token of another cell even
+  // when an operator copies one key into both.
+  const region = configService.getOrThrow<DataRegion>('DATA_REGION');
+  const issuerAudience = {
+    issuer: `${JWT_ISSUER}@${region}`,
+    audience: JWT_AUDIENCE
+  };
 
   if (configService.get<string>('JWT_ALGORITHM') === 'RS256') {
     return {

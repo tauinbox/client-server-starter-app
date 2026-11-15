@@ -7,6 +7,7 @@ import sessionsRouter from './sessions.middleware';
 import rolesRouter from './roles.middleware';
 import rbacRouter from './rbac.middleware';
 import healthRouter from '../routes/health';
+import configRouter from '../routes/config';
 import notificationsRouter from './notifications.middleware';
 import {
   featureFlagsAdminRouter,
@@ -19,6 +20,7 @@ import billingWebhooksRouter, {
 
 export function registerRoutes(app: Express): void {
   app.use('/api/health', healthRouter);
+  app.use('/api/v1/config', configRouter);
   app.use('/api/v1/auth/oauth', oauthRouter);
   app.use('/api/v1/auth/mfa', mfaRouter);
   app.use('/api/v1/auth/sessions', sessionsRouter);
