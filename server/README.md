@@ -2807,7 +2807,10 @@ repository.
   that runs outside Nest (`seed-admin.ts`). Runtime code uses the logger.
 
   The reusable fakes for a context, a configuration and an Express object are in
-  `src/common/testing/`. The billing service specs share their repository and provider stubs
+  `src/common/testing/`. A test that needs a real `ConfigService` builds it with
+  `isolatedConfig(values)` from the same folder: the plain constructor falls back to `process.env`
+  for a key that the test did not give, so the result changes with the shell or the CI job env.
+  ESLint refuses `new ConfigService(` in `*.spec.ts` and `test/`. The billing service specs share their repository and provider stubs
   through `src/modules/billing/testing/`. The production build excludes each `testing/` directory.
 
 ```bash

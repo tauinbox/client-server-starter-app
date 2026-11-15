@@ -1,4 +1,4 @@
-import { ConfigService } from '@nestjs/config';
+import { isolatedConfig } from '../../../common/testing/isolated-config';
 import type { Request } from 'express';
 import { AttributeRegistryService } from '../../feature-flags/services/attribute-registry.service';
 import { OAuthProviderFlagAttributesRegistrar } from './oauth-provider-flag-attributes.registrar';
@@ -8,7 +8,7 @@ describe('OAuthProviderFlagAttributesRegistrar', () => {
 
   function setup(env: Record<string, unknown>): AttributeRegistryService {
     const registry = new AttributeRegistryService();
-    const config = new ConfigService(env);
+    const config = isolatedConfig(env);
 
     new OAuthProviderFlagAttributesRegistrar(config, registry).onModuleInit();
 

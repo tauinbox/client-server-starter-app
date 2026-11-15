@@ -16,6 +16,7 @@ import { JwtStrategy } from '../src/modules/auth/strategies/jwt.strategy';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { buildJwtModuleOptions } from '../src/modules/auth/jwt-module-options.factory';
+import { isolatedConfig } from '../src/common/testing/isolated-config';
 import { JWT_AUDIENCE, JWT_ISSUER, TOKEN_PURPOSE } from '@app/shared/constants';
 
 const TEST_SECRET = 'test-secret-for-token-purpose-e2e';
@@ -38,7 +39,7 @@ describe('JWT token purpose (e2e)', () => {
   let jwt: JwtService;
 
   beforeAll(async () => {
-    const config = new ConfigService({
+    const config = isolatedConfig({
       DATA_REGION: 'intl',
       JWT_ALGORITHM: 'HS256',
       JWT_EXPIRATION: '3600',
