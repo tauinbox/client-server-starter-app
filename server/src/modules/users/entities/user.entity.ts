@@ -9,7 +9,7 @@ import {
   UpdateDateColumn
 } from 'typeorm';
 import { Exclude, Expose } from 'class-transformer';
-import { DEFAULT_LOCALE } from '@app/shared/constants';
+import { DEFAULT_LOCALE, type CountryCode } from '@app/shared/constants';
 import { bigintNumberTransformer } from '../../../common/utils/bigint-number.transformer';
 import { Role } from '../../auth/entities/role.entity';
 
@@ -57,6 +57,16 @@ export class User {
 
   @Column({ default: DEFAULT_LOCALE })
   locale: string;
+
+  // Null for an account created before the column or by an administrator.
+  @Column({
+    name: 'residence_country',
+    type: 'varchar',
+    length: 2,
+    nullable: true
+  })
+  @Exclude()
+  residenceCountry: CountryCode | null;
 
   @Column({
     name: 'email_verification_token',

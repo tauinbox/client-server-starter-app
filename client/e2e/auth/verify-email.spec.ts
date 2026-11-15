@@ -1,4 +1,4 @@
-import { expect, test } from '../fixtures/base.fixture';
+import { chooseOption, expect, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { mockId } from '../fixtures/ids';
 
@@ -16,6 +16,7 @@ test.describe('Email verification', () => {
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
+    await chooseOption(page, 'Country of residence', 'Germany');
     await main.getByRole('button', { name: 'Register' }).click();
 
     // Should redirect to login with pending-verification
@@ -144,6 +145,7 @@ test.describe('Email verification', () => {
     await page
       .getByLabel('Password', { exact: true })
       .fill('Sunrise-Kettle-19');
+    await chooseOption(page, 'Country of residence', 'Germany');
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page).toHaveURL(/.*\/login\?registered=pending-verification$/);

@@ -2,7 +2,10 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting
+} from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
@@ -11,6 +14,8 @@ import { ErrorKeys } from '@app/shared/constants';
 
 import { RegisterComponent } from './register.component';
 import { AuthService } from '../../services/auth.service';
+import { presetResidenceCountry } from '../../utils/residence-country';
+import { REGION_CONFIG_API_V1 } from '@core/services/region-config.service';
 
 const mockRegisterResponse = {
   message:
@@ -22,6 +27,7 @@ describe('RegisterComponent', () => {
   let fixture: ComponentFixture<RegisterComponent>;
   let authServiceMock: { register: ReturnType<typeof vi.fn> };
   let router: Router;
+  let httpTesting: HttpTestingController;
 
   beforeEach(async () => {
     authServiceMock = { register: vi.fn() };
@@ -40,6 +46,7 @@ describe('RegisterComponent', () => {
     fixture = TestBed.createComponent(RegisterComponent);
     component = fixture.componentInstance;
     router = TestBed.inject(Router);
+    httpTesting = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
   });
 
@@ -62,6 +69,7 @@ describe('RegisterComponent', () => {
 
     it('accepts 64 Cyrillic characters, which are 128 bytes', async () => {
       component.registerModel.set({
+        residenceCountry: 'DE',
         email: 'user@example.com',
         name: 'Test User',
         password: 'Пароль1' + 'я'.repeat(57)
@@ -73,6 +81,7 @@ describe('RegisterComponent', () => {
 
     it('rejects 129 characters on the length cap', async () => {
       component.registerModel.set({
+        residenceCountry: 'DE',
         email: 'user@example.com',
         name: 'Test User',
         password: 'A1' + 'a'.repeat(127)
@@ -99,6 +108,7 @@ describe('RegisterComponent', () => {
 
     it('should validate email format', async () => {
       component.registerModel.set({
+        residenceCountry: 'DE',
         email: 'invalid',
         name: '',
         password: ''
@@ -109,6 +119,7 @@ describe('RegisterComponent', () => {
       expect(emailErrors.some((e) => e.kind === 'email')).toBe(true);
 
       component.registerModel.set({
+        residenceCountry: 'DE',
         email: 'test@example.com',
         name: '',
         password: ''
@@ -142,6 +153,7 @@ describe('RegisterComponent', () => {
 
     it('should enforce password minLength of 8', async () => {
       component.registerModel.set({
+        residenceCountry: 'DE',
         email: 'test@example.com',
         name: 'Test User',
         password: 'short'
@@ -152,6 +164,7 @@ describe('RegisterComponent', () => {
       expect(errors.some((e) => e.kind === 'minLength')).toBe(true);
 
       component.registerModel.set({
+        residenceCountry: 'DE',
         email: 'test@example.com',
         name: 'Test User',
         password: 'LongPassword1'
@@ -162,6 +175,7 @@ describe('RegisterComponent', () => {
 
     it('accepts a password made only of lower-case letters', async () => {
       component.registerModel.set({
+        residenceCountry: 'DE',
         email: 'test@example.com',
         name: 'Test User',
         password: 'passwordonly'
@@ -174,6 +188,7 @@ describe('RegisterComponent', () => {
 
     it('rejects a password longer than the server ceiling', async () => {
       component.registerModel.set({
+        residenceCountry: 'DE',
         email: 'test@example.com',
         name: 'Test User',
         password: `Aa1${'x'.repeat(126)}`
@@ -188,8 +203,27 @@ describe('RegisterComponent', () => {
       );
     });
 
+    it('should require a country of residence', async () => {
+      component.registerModel.update((m) => ({ ...m, residenceCountry: '' }));
+      await fixture.whenStable();
+
+      expect(
+        component.registerForm
+          .residenceCountry()
+          .errors()
+          .map((e) => [e.kind, e.message])
+      ).toEqual([['required', 'auth.register.residenceCountryRequired']]);
+    });
+
+    it('presets the country from the region of the browser language', () => {
+      expect(component.registerModel().residenceCountry).toBe(
+        presetResidenceCountry(navigator.languages)
+      );
+    });
+
     it('should be valid with correct values', async () => {
       component.registerModel.set({
+        residenceCountry: 'DE',
         email: 'test@example.com',
         name: 'Test User',
         password: 'Password123'
@@ -203,7 +237,8 @@ describe('RegisterComponent', () => {
     const validForm = {
       email: 'test@example.com',
       name: 'Test User',
-      password: 'Password123'
+      password: 'Password123',
+      residenceCountry: 'DE' as const
     };
 
     it('should not call register when form is invalid', () => {
@@ -236,9 +271,9 @@ describe('RegisterComponent', () => {
       expect(component['loading']()).toBe(false);
     });
 
-    it('should show "email exists" error on 409', async () => {
+    it('should show "email exists" error on a taken address', async () => {
       const httpError = new HttpErrorResponse({
-        error: { message: 'Conflict' },
+        error: { message: 'Conflict', errorKey: ErrorKeys.USERS.EMAIL_EXISTS },
         status: 409
       });
 
@@ -250,6 +285,76 @@ describe('RegisterComponent', () => {
 
       expect(component['error']()).toBe('User with this email already exists.');
       expect(component['loading']()).toBe(false);
+    });
+
+    it('says a region with no site is not served, with no link', async () => {
+      authServiceMock.register.mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              error: {
+                message: 'Not served',
+                errorKey: ErrorKeys.AUTH.RESIDENCE_REGION_NOT_SERVED
+              },
+              status: 409
+            })
+        )
+      );
+
+      component.registerModel.set({ ...validForm, residenceCountry: 'RU' });
+      await fixture.whenStable();
+      component.onSubmit();
+
+      expect(component['error']()).toBe(
+        'Registration for this country is not available yet.'
+      );
+      expect(component['peerUrl']()).toBeNull();
+    });
+
+    describe('a country of another region', () => {
+      const otherRegion = new HttpErrorResponse({
+        error: {
+          message: 'Other region',
+          errorKey: ErrorKeys.AUTH.RESIDENCE_OTHER_REGION
+        },
+        status: 409
+      });
+
+      async function submitAs(peers: Record<string, string>): Promise<void> {
+        authServiceMock.register.mockReturnValue(throwError(() => otherRegion));
+        component.registerModel.set({ ...validForm, residenceCountry: 'RU' });
+        await fixture.whenStable();
+        component.onSubmit();
+        httpTesting
+          .expectOne(REGION_CONFIG_API_V1)
+          .flush({ region: 'intl', peers });
+        fixture.detectChanges();
+      }
+
+      it('links to the site of that region', async () => {
+        await submitAs({ ru: 'https://ru.example.com' });
+
+        expect(component['error']()).toBe(
+          'Accounts for this country are kept on another site.'
+        );
+
+        const link: HTMLAnchorElement =
+          fixture.nativeElement.querySelector('.peer-region-link');
+
+        expect(link.getAttribute('href')).toBe('https://ru.example.com');
+        expect(link.textContent?.trim()).toBe(
+          'Go to the site for this country'
+        );
+      });
+
+      it('makes no link of a URL that is not https', async () => {
+        await submitAs({ ru: 'javascript:alert(1)' });
+
+        expect(component['peerUrl']()).toBeNull();
+        expect(
+          fixture.nativeElement.querySelector('.peer-region-link')
+        ).toBeNull();
+      });
     });
 
     it('should show fallback translation on non-409 error without errorKey', async () => {
@@ -330,7 +435,8 @@ describe('RegisterComponent', () => {
     const validForm = {
       email: 'test@example.com',
       name: 'Test User',
-      password: 'Password123'
+      password: 'Password123',
+      residenceCountry: 'DE' as const
     };
 
     it('shows captcha on CAPTCHA_REQUIRED response and disables submit until token', async () => {

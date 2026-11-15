@@ -65,7 +65,12 @@ runWithInfra('A step-up request with no secret spends no budget (e2e)', () => {
     for (const email of [actorEmail, targetEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password: 'Lantern-Orchard-47', name: 'Step Up' })
+        .send({
+          email,
+          password: 'Lantern-Orchard-47',
+          name: 'Step Up',
+          residenceCountry: 'DE'
+        })
         .expect(201);
     }
 

@@ -69,7 +69,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
     ]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, name: 'Super Target' })
+        .send({ email, password, name: 'Super Target', residenceCountry: 'DE' })
         .expect(201);
     }
 

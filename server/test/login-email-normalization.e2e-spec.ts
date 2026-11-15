@@ -38,7 +38,12 @@ runWithInfra('Login email normalization (e2e)', () => {
 
     await request(app.getHttpServer() as Server)
       .post('/api/v1/auth/register')
-      .send({ email, password, name: 'Login Normalize' })
+      .send({
+        email,
+        password,
+        name: 'Login Normalize',
+        residenceCountry: 'DE'
+      })
       .expect(201);
 
     await dataSource

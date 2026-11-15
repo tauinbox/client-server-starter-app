@@ -150,6 +150,7 @@ function createAccount(fixture: ActorFixture): MockUser {
     roles: ['user'],
     isEmailVerified: true,
     locale: 'en',
+    residenceCountry: null,
     failedLoginAttempts: 0,
     lockedUntil: null,
     tokenRevokedAt: null,

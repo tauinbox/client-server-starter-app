@@ -120,7 +120,8 @@ test.describe('User list - live changes', () => {
       body: JSON.stringify({
         email: 'newcomer@example.com',
         password: 'Tq7-vRw2-Lp9z',
-        name: 'Newcomer Person'
+        name: 'Newcomer Person',
+        residenceCountry: 'DE'
       })
     });
 
@@ -162,7 +163,8 @@ test.describe('User list - live changes', () => {
       body: JSON.stringify({
         email: 'gap-newcomer@example.com',
         password: 'Tq7-vRw2-Lp9z',
-        name: 'Gap Newcomer'
+        name: 'Gap Newcomer',
+        residenceCountry: 'DE'
       })
     });
 

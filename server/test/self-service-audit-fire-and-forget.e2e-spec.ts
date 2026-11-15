@@ -124,7 +124,8 @@ runWithInfra('Self-service audit rows: fire-and-forget (e2e)', () => {
       .send({
         email: registeredEmail,
         password,
-        name: 'New Account'
+        name: 'New Account',
+        residenceCountry: 'DE'
       })
       .expect(201);
     await settle();

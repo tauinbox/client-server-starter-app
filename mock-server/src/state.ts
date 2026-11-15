@@ -508,6 +508,7 @@ export function toUserResponse(user: MockUser): UserResponse {
     totpEnabledAt: _________,
     totpRecoveryCodes: __________,
     totpLastUsedStep: ___________,
+    residenceCountry: ____________,
     roles: roleNames,
     ...rest
   } = user;

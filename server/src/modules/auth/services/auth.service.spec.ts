@@ -46,6 +46,10 @@ import { createMockCache } from '../../../common/testing/cache.mock';
 import { hashToken } from '../../../common/utils/hash-token';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { OAuthAccountService } from './oauth-account.service';
+import { RegionService } from '../../core/region/region.service';
+import { isolatedConfig } from '../../../common/testing/isolated-config';
+import { expectApiRejection } from '../../../common/testing/api-error.expect';
+import type { RegisterDto } from '../dtos/register.dto';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -160,6 +164,7 @@ describe('AuthService', () => {
     isActive: true,
     isEmailVerified: true,
     locale: 'en',
+    residenceCountry: null,
     failedLoginAttempts: 0,
     lockedUntil: null,
     emailVerificationToken: null,
@@ -364,6 +369,15 @@ describe('AuthService', () => {
         },
         { provide: MfaService, useValue: mockMfaService },
         { provide: OAuthAccountService, useValue: mockOAuthAccountService },
+        {
+          provide: RegionService,
+          useValue: new RegionService(
+            isolatedConfig({
+              DATA_REGION: 'intl',
+              PEER_REGIONS: { ru: 'https://ru.example.com' }
+            })
+          )
+        },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: CACHE_MANAGER, useValue: createMockCache() }
       ]
@@ -944,13 +958,38 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    const registerDto = {
+    const registerDto: RegisterDto = {
       email: 'new@example.com',
       password: 'Password1',
-      name: 'Jane Doe'
+      name: 'Jane Doe',
+      residenceCountry: 'DE'
     };
 
     const savedUser = { ...mockUser, ...registerDto, id: 'new-user-1' };
+
+    it('stores the declared country of residence', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+      mockManager.save.mockResolvedValue(savedUser);
+
+      await service.register(registerDto);
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ residenceCountry: 'DE' })
+      );
+    });
+
+    it('refuses a resident of a region that a peer cell serves, before any other check', async () => {
+      await expectApiRejection(
+        service.register({ ...registerDto, residenceCountry: 'RU' }),
+        ErrorKeys.AUTH.RESIDENCE_OTHER_REGION
+      );
+      expect(
+        mockBreachedPasswordService.assertNotBreached
+      ).not.toHaveBeenCalled();
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      expect(mockAuditService.logFireAndForget).not.toHaveBeenCalled();
+    });
 
     it('should create user with verification token atomically and send email', async () => {
       mockManager.findOne.mockResolvedValue(null); // no conflict

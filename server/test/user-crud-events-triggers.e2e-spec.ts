@@ -251,7 +251,8 @@ runWithInfra(
       await authService.register({
         email: emails.registered,
         password: 'Sunrise-Kettle-19',
-        name: 'Self Registered'
+        name: 'Self Registered',
+        residenceCountry: 'DE'
       });
       await app.get(OAuthService).loginWithOAuth({
         provider: 'vk',

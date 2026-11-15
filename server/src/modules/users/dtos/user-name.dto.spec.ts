@@ -20,7 +20,7 @@ const CREATE_BASE = {
 
 const CASES: [string, Type<unknown>, Record<string, unknown>][] = [
   ['CreateUserDto', CreateUserDto, CREATE_BASE],
-  ['RegisterDto', RegisterDto, CREATE_BASE],
+  ['RegisterDto', RegisterDto, { ...CREATE_BASE, residenceCountry: 'DE' }],
   ['UpdateUserDto', UpdateUserDto, {}],
   ['UpdateProfileDto', UpdateProfileDto, {}]
 ];

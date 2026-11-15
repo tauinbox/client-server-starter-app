@@ -61,7 +61,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     for (const email of [adminEmail, targetEmail]) {
       await request(http())
         .post('/api/v1/auth/register')
-        .send({ email, password, name: 'Audit Fields' })
+        .send({ email, password, name: 'Audit Fields', residenceCountry: 'DE' })
         .expect(201);
     }
 

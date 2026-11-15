@@ -101,7 +101,12 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
   async function register(label: string): Promise<User> {
     await request(http())
       .post('/api/v1/auth/register')
-      .send({ email: address(label), password, name: 'Mailed Proof' })
+      .send({
+        email: address(label),
+        password,
+        name: 'Mailed Proof',
+        residenceCountry: 'DE'
+      })
       .expect(201);
 
     return dataSource

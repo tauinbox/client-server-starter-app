@@ -98,6 +98,10 @@ export {
 
 export {
   DATA_REGIONS,
+  COUNTRY_CODES,
+  isCountryCode,
+  regionForCountry,
+  type CountryCode,
   type DataRegion,
   type PeerRegions
 } from './data-region.constants';

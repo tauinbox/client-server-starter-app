@@ -69,7 +69,8 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       .send({
         email,
         password: 'Lantern-Orchard-47',
-        name: 'Step Up'
+        name: 'Step Up',
+        residenceCountry: 'DE'
       })
       .expect(201);
     id = (

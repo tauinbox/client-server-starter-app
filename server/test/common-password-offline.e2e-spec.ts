@@ -63,7 +63,8 @@ runWithInfra('Common password check without the range lookup (e2e)', () => {
       .send({
         email: commonEmail,
         password: 'Password123',
-        name: 'Common Check'
+        name: 'Common Check',
+        residenceCountry: 'DE'
       })
       .expect(422);
 
@@ -81,7 +82,8 @@ runWithInfra('Common password check without the range lookup (e2e)', () => {
       .send({
         email: cleanEmail,
         password: 'Sunrise-Kettle-19',
-        name: 'Clean Check'
+        name: 'Clean Check',
+        residenceCountry: 'DE'
       })
       .expect(201);
   }, 30000);

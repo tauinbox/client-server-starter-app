@@ -194,7 +194,10 @@ router.post('/register', (req, res) => {
     // Registering against a taken address is the cheapest account-existence
     // probe there is, so the conflict is audited even though the request fails.
     // The admin create route shares this helper and is deliberately not logged.
-    if (validated.status === 409) {
+    if (
+      'errorKey' in validated.body &&
+      validated.body.errorKey === ErrorKeys.USERS.EMAIL_EXISTS
+    ) {
       logAudit('USER_REGISTER_CONFLICT', {
         actorEmail: normalizeEmail(req.body?.email) ?? null,
         ip: req.ip
@@ -206,7 +209,10 @@ router.post('/register', (req, res) => {
     return;
   }
 
-  const user = buildMockUser(validated.fields, { isEmailVerified: false });
+  const user = buildMockUser(validated.fields, {
+    isEmailVerified: false,
+    residenceCountry: validated.fields.residenceCountry
+  });
 
   const state = getState();
 

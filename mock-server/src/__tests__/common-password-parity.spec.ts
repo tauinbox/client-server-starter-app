@@ -75,7 +75,8 @@ describe('the local common-password check mirrors the server verdict', () => {
       body: {
         email: 'common-register@example.com',
         name: 'Common Register',
-        password: COMMON_PASSWORD
+        password: COMMON_PASSWORD,
+        residenceCountry: 'DE'
       }
     });
 
@@ -89,7 +90,8 @@ describe('the local common-password check mirrors the server verdict', () => {
       body: {
         email: 'k.ivanova@example.com',
         name: 'Katerina Ivanova',
-        password: 'Katerina-Sunrise-19'
+        password: 'Katerina-Sunrise-19',
+        residenceCountry: 'DE'
       }
     });
 
@@ -103,7 +105,8 @@ describe('the local common-password check mirrors the server verdict', () => {
       body: {
         email: 'both-lists@example.com',
         name: 'Both Lists',
-        password: 'Password1'
+        password: 'Password1',
+        residenceCountry: 'DE'
       }
     });
 

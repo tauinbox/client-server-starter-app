@@ -41,6 +41,7 @@ describe('SessionIssuerService', () => {
     isActive: true,
     isEmailVerified: true,
     locale: 'en',
+    residenceCountry: null,
     failedLoginAttempts: 0,
     lockedUntil: null,
     emailVerificationToken: null,
