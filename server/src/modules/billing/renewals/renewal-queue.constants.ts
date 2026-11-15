@@ -47,3 +47,11 @@ export const DUNNING_RETRY_DELAY_MS = 3 * 24 * 60 * 60 * 1000;
  */
 export const PLAN_CHANGE_LEASE_MS =
   3 * MAX_BILLING_PROVIDER_TIMEOUT_MS + 5 * 60 * 1000;
+
+/** True while a plan change claimed at `startedAt` keeps the scan off its row. */
+export function planChangeLeaseIsLive(
+  startedAt: Date,
+  now: Date = new Date()
+): boolean {
+  return startedAt.getTime() > now.getTime() - PLAN_CHANGE_LEASE_MS;
+}

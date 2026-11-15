@@ -7,7 +7,8 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
+import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
@@ -32,6 +33,7 @@ import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
 } from './billing-db-lock';
+import { waitsOnLock } from './lock-wait';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -311,6 +313,21 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     expect(current.planChangeStartedAt).toBeNull();
   }
 
+  async function expectRenewalWithoutRefundLeg(): Promise<void> {
+    expect(chargedPrefixes()).toEqual(['change-charge', 'renewal']);
+    expect(provider.refund).not.toHaveBeenCalled();
+    expect(
+      (await invoices()).map((i) => [
+        i.providerEventId?.split(':')[0],
+        i.status,
+        i.refundedMinor.toNumber()
+      ])
+    ).toEqual([
+      ['change-charge', 'paid', 0],
+      ['renewal', 'paid', 0]
+    ]);
+  }
+
   it('a scan during the proration charge leaves the row to the change', async () => {
     await build();
     await seed();
@@ -370,29 +387,153 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
       planChange.changePlan(userId as string, FIXED_KEY)
     ).rejects.toMatchObject({ status: 409 });
 
-    // The renewal charges the plan the row still carries. Both legs of the
-    // refused change stay recorded, as for every guard miss: the proration
-    // charge, and the refund leg, whose source is the renewal invoice that the
-    // scan paid while the change waited.
-    expect(chargedPrefixes()).toEqual(['change-charge', 'renewal']);
-    const all = await invoices();
+    // The renewal charges the plan the row still carries. The proration charge
+    // of the refused change stays recorded and refundable, as for every guard
+    // miss. No refund leg is taken from the renewal invoice of the new period.
+    await expectRenewalWithoutRefundLeg();
 
-    expect(
-      all.map((i) => [i.providerEventId?.split(':')[0], i.status])
-    ).toEqual([
-      ['change-charge', 'paid'],
-      ['renewal', 'paid'],
-      ['change-refund', 'refunded']
-    ]);
-    const [, renewal, refund] = all;
-
-    expect(renewal.refundedMinor.toNumber()).toBe(
-      refund.amountMinor.toNumber()
-    );
     const current = await row();
 
     expect(current.planKey).toBe(FROM_KEY);
     expect(current.currentPeriodStart).toEqual(periodEnd);
+  }, 30000);
+
+  it('a renewal that commits during the refund reservation is not its source', async () => {
+    await build();
+    await seed();
+    let scan: Promise<void> | undefined;
+
+    gateOn('change-charge:', async () => {
+      await ds.getRepository(Subscription).update(
+        { id: subscriptionId },
+        {
+          planChangeStartedAt: new Date(
+            Date.now() - PLAN_CHANGE_LEASE_MS - 1000
+          )
+        }
+      );
+      await waitPast(periodEnd);
+      // The scan runs while the reservation has read the row and has not yet
+      // looked up its source invoice.
+      const { findOne } = EntityManager.prototype;
+      const spy = jest
+        .spyOn(EntityManager.prototype, 'findOne')
+        .mockImplementation(async function (
+          this: EntityManager,
+          ...args: Parameters<EntityManager['findOne']>
+        ) {
+          const result = await findOne.apply(this, args);
+          const [entity] = args;
+
+          if (entity === Subscription) {
+            spy.mockRestore();
+            scan = renewals.runDueRenewals();
+            await Promise.race([
+              scan,
+              waitsOnLock(ds, '%UPDATE "subscriptions"%')
+            ]);
+          }
+
+          return result;
+        });
+    });
+
+    const outcome = await planChange
+      .changePlan(userId as string, FIXED_KEY)
+      .then(
+        () => 'switched',
+        (error: { status?: number }) => error.status
+      );
+
+    await scan;
+
+    // The scan waits on the row lock, so the change sees the period it priced
+    // and may still commit; either way no money is refunded from the renewal.
+    expect(['switched', 409]).toContain(outcome);
+    await expectRenewalWithoutRefundLeg();
+  }, 30000);
+
+  it('a renewal that its webhook paid before the advance is not the source, and the change is refused', async () => {
+    await build();
+    await seed();
+    // The invoice that paid for the period the change prices.
+    await ds.getRepository(Invoice).save(
+      ds.getRepository(Invoice).create({
+        customerId,
+        subscriptionId,
+        provider: 'yookassa',
+        providerEventId: `first-payment:${subscriptionId}`,
+        providerInvoiceRef: 'pay_first',
+        amountMinor: Money.fromMinor(FROM_PRICE),
+        currency: 'RUB',
+        status: 'paid',
+        billingMode: 'fixed',
+        kind: 'subscription',
+        periodStart: new Date(Date.now() - 30 * DAY_MS),
+        periodEnd: new Date(Date.now() - 30 * DAY_MS),
+        paidAt: new Date(Date.now() - 30 * DAY_MS),
+        receiptRef: null
+      })
+    );
+    const renewalKey = `renewal:${subscriptionId}:${periodEnd.getTime()}`;
+    let fired = false;
+
+    provider.chargeOffSession.mockImplementation(
+      async (
+        ...[, { amountMinor: amount, idempotencyKey: key = '' }]: Parameters<
+          PaymentProvider['chargeOffSession']
+        >
+      ): Promise<ChargeResult> => {
+        charges.push({ key, amount });
+
+        if (!fired && key.startsWith('change-charge:')) {
+          fired = true;
+          await ds.getRepository(Subscription).update(
+            { id: subscriptionId },
+            {
+              planChangeStartedAt: new Date(
+                Date.now() - PLAN_CHANGE_LEASE_MS - 1000
+              )
+            }
+          );
+          await scanPastAnchor();
+          // The confirming webhook settles the renewal; the next scan advances.
+          await ds
+            .getRepository(Invoice)
+            .update(
+              { providerEventId: renewalKey },
+              { status: 'paid', providerInvoiceRef: 'pay_renewal' }
+            );
+        }
+
+        // The renewal waits for its capture, so the scan does not advance.
+        return {
+          providerInvoiceRef: `pay_${key}`,
+          status: key.startsWith('renewal:') ? 'pending' : 'captured'
+        };
+      }
+    );
+
+    await expect(
+      planChange.changePlan(userId as string, FIXED_KEY)
+    ).rejects.toMatchObject({ status: 409 });
+
+    expect(provider.refund).not.toHaveBeenCalled();
+    expect(
+      (await invoices()).map((i) => [
+        i.providerEventId?.split(':')[0],
+        i.status,
+        i.refundedMinor.toNumber()
+      ])
+    ).toEqual([
+      ['first-payment', 'paid', 0],
+      ['change-charge', 'paid', 0],
+      ['renewal', 'paid', 0]
+    ]);
+    const current = await row();
+
+    expect(current.planKey).toBe(FROM_KEY);
+    expect(current.currentPeriodEnd).toEqual(periodEnd);
   }, 30000);
 
   it('a declined proration charge releases the row for the renewal', async () => {

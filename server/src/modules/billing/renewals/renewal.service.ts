@@ -40,6 +40,7 @@ import {
   DUNNING_MAX_ATTEMPTS,
   DUNNING_RETRY_DELAY_MS,
   PLAN_CHANGE_LEASE_MS,
+  planChangeLeaseIsLive,
   RENEWAL_SCAN_MAX_PER_RUN
 } from './renewal-queue.constants';
 
@@ -185,8 +186,7 @@ export class RenewalService {
 
     if (
       subscription.planChangeStartedAt &&
-      subscription.planChangeStartedAt.getTime() >
-        now.getTime() - PLAN_CHANGE_LEASE_MS
+      planChangeLeaseIsLive(subscription.planChangeStartedAt, now)
     ) {
       // A plan change claimed the row after the due list was read.
       return;

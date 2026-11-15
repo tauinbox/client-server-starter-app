@@ -20,6 +20,7 @@ import { BillingService } from '../billing.service';
 import { ProrationCalculator } from '../rating/proration-calculator';
 import { ChargeDeclinedError } from '../providers/payment-provider.interface';
 import { ProviderTimeoutError } from '../providers/provider-deadline';
+import { PLAN_CHANGE_LEASE_MS } from '../renewals/renewal-queue.constants';
 import {
   expectRefusal,
   makePlan,
@@ -57,12 +58,31 @@ function statusMatches(
 }
 
 /**
+ * The subscription row as the claim left it: the lease is the last
+ * `planChangeStartedAt` that `subscriptions.update` wrote.
+ */
+async function claimedRow(subscriptions: RepoMock): Promise<unknown> {
+  const row = (await subscriptions.findOne()) as Subscription | null;
+  const leases = subscriptions.update.mock.calls
+    .map(([, patch]) => (patch as Partial<Subscription>).planChangeStartedAt)
+    .filter((lease) => lease !== undefined);
+
+  return row && { ...row, planChangeStartedAt: leases.at(-1) ?? null };
+}
+
+/**
  * Transactional manager stub: records invoice inserts, dedups on event id, and
  * applies invoice updates to the stored rows so a plant-then-settle sequence is
  * observable as the row's final state (the charge leg is now recorded before
  * the provider call and settled afterwards, not inserted once at the end).
  */
-function makeInsertStore(invoices: RepoMock) {
+function makeInsertStore({
+  invoices,
+  subscriptions
+}: {
+  invoices: RepoMock;
+  subscriptions: RepoMock;
+}) {
   const inserted: InsertedInvoice[] = [];
   let seq = 0;
   const applyInvoiceUpdate = (
@@ -110,8 +130,12 @@ function makeInsertStore(invoices: RepoMock) {
     findOne: jest.fn(
       (
         entity: unknown,
-        options: { where?: InvoiceCriteria }
+        options: { where?: InvoiceCriteria; lock?: unknown }
       ): Promise<unknown> => {
+        if (entity === Subscription && options.lock) {
+          return claimedRow(subscriptions);
+        }
+
         if (entity !== Invoice) return Promise.resolve(null);
 
         const eventId = options.where?.providerEventId;
@@ -190,7 +214,7 @@ async function build() {
 
   const billing = { getProviderById: jest.fn() };
 
-  const insertStore = makeInsertStore(invoices);
+  const insertStore = makeInsertStore({ invoices, subscriptions });
   const dataSource = {
     manager: insertStore.manager,
     transaction: jest.fn(async (cb: (m: unknown) => unknown) => {
@@ -1155,7 +1179,8 @@ describe('PlanChangeService', () => {
 
       // Nothing the concurrent writer owns (status, period, dunning, cancel
       // flag) may appear in the write set, and the guard carries the claimed
-      // version, mode and period so a row that moved during the charge loses.
+      // version, mode, period and lease so a row that moved during the charge
+      // loses.
       expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
         Subscription,
         {
@@ -1164,7 +1189,8 @@ describe('PlanChangeService', () => {
           billingMode: 'fixed',
           status: In(['trialing', 'active']),
           cancelAtPeriodEnd: false,
-          currentPeriodEnd: periodEnd
+          currentPeriodEnd: periodEnd,
+          planChangeStartedAt: frozenNow
         },
         {
           planKey: 'business',
@@ -1220,6 +1246,50 @@ describe('PlanChangeService', () => {
         InvoicePaidEvent.name,
         expect.objectContaining({ userId: 'user-1' })
       );
+    });
+
+    it('refuses the switch and takes no refund leg when its lease expires during the charge', async () => {
+      const ctx = await build();
+
+      plansByKey(ctx);
+      ctx.customers.findOne.mockResolvedValue(customer);
+      ctx.subscriptions.findOne.mockResolvedValue(makeSub());
+      ctx.invoices.findOne.mockResolvedValue({
+        id: 'inv-period',
+        amountMinor: Money.fromMinor(99000),
+        refundedMinor: Money.fromMinor(0),
+        currency: 'RUB',
+        providerInvoiceRef: 'pay_period',
+        status: 'paid',
+        billingMode: 'fixed'
+      });
+      const yoo = provider('yookassa', false);
+
+      // The process stalls in the charge until the renewal scan may own the row.
+      yoo.chargeOffSession.mockImplementation(() => {
+        jest.setSystemTime(frozenNow.getTime() + PLAN_CHANGE_LEASE_MS);
+
+        return Promise.resolve({
+          providerInvoiceRef: 'pay_charge',
+          status: 'captured'
+        });
+      });
+      ctx.billing.getProviderById.mockReturnValue(yoo);
+
+      await expectRefusal(
+        ctx.service.changePlan('user-1', 'business'),
+        ErrorKeys.BILLING.PLAN_CHANGE_PAYMENT_CONFLICT
+      );
+
+      expect(yoo.refund).not.toHaveBeenCalled();
+      expect(ctx.dataSource.manager.update).not.toHaveBeenCalledWith(
+        Subscription,
+        expect.anything(),
+        expect.anything()
+      );
+      expect(ctx.insertedInvoices).toEqual([
+        expect.objectContaining({ status: 'paid' })
+      ]);
     });
 
     it('rejects a provider-managed change whose local row moved during the provider call', async () => {
