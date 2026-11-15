@@ -66,6 +66,13 @@ function fakeProvider(): FakeProvider {
   };
 }
 
+/** True when the criteria of an `update` name `column`. */
+function namesColumn(criteria: unknown, column: string): boolean {
+  return (
+    typeof criteria === 'object' && criteria !== null && column in criteria
+  );
+}
+
 async function waitPast(moment: Date): Promise<void> {
   const remaining = moment.getTime() - Date.now() + 50;
 
@@ -451,6 +458,113 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     // and may still commit; either way no money is refunded from the renewal.
     expect(['switched', 409]).toContain(outcome);
     await expectRenewalWithoutRefundLeg();
+  }, 30000);
+
+  it('a scan that takes the row from a stalled change before its commit wins it', async () => {
+    await build();
+    await seed();
+    provider.chargeOffSession.mockImplementation(
+      (
+        ...[, { amountMinor: amount, idempotencyKey: key = '' }]: Parameters<
+          PaymentProvider['chargeOffSession']
+        >
+      ): Promise<ChargeResult> => {
+        charges.push({ key, amount });
+
+        // The renewal waits for its capture, so the scan does not advance.
+        return Promise.resolve({
+          providerInvoiceRef: `pay_${key}`,
+          status: key.startsWith('renewal:') ? 'pending' : 'captured'
+        });
+      }
+    );
+    // The commit stalls until a scan sees the lease expired: the scan runs
+    // with a clock past the lease. Only the commit guard names billingMode.
+    const { update } = EntityManager.prototype;
+    const spy = jest
+      .spyOn(EntityManager.prototype, 'update')
+      .mockImplementation(async function (
+        this: EntityManager,
+        ...args: Parameters<EntityManager['update']>
+      ) {
+        if (args[0] === Subscription && namesColumn(args[1], 'billingMode')) {
+          spy.mockRestore();
+          await renewals.runDueRenewals(
+            new Date(Date.now() + PLAN_CHANGE_LEASE_MS + DAY_MS)
+          );
+        }
+
+        return update.apply(this, args);
+      });
+
+    await expect(
+      planChange.changePlan(userId as string, FIXED_KEY)
+    ).rejects.toMatchObject({ status: 409 });
+
+    const renewal = await ds.getRepository(Invoice).findOneByOrFail({
+      providerEventId: `renewal:${subscriptionId}:${periodEnd.getTime()}`
+    });
+
+    expect(renewal.amountMinor.toNumber()).toBe(FROM_PRICE);
+    expect((await row()).planKey).toBe(FROM_KEY);
+  }, 30000);
+
+  it('a change that commits between the read and the take of a scan keeps its plan for the renewal', async () => {
+    await build();
+    await seed();
+    let scan: Promise<void> | undefined;
+    const { promise: committed, resolve: changeDone } =
+      Promise.withResolvers<void>();
+
+    gateOn('change-charge:', async () => {
+      await ds.getRepository(Subscription).update(
+        { id: subscriptionId },
+        {
+          planChangeStartedAt: new Date(
+            Date.now() - PLAN_CHANGE_LEASE_MS - 1000
+          )
+        }
+      );
+      await waitPast(periodEnd);
+      // The scan has read the row with the old plan; its take waits until the
+      // change has committed.
+      const { update } = EntityManager.prototype;
+      const spy = jest
+        .spyOn(EntityManager.prototype, 'update')
+        .mockImplementation(async function (
+          this: EntityManager,
+          ...args: Parameters<EntityManager['update']>
+        ) {
+          if (
+            args[0] === Subscription &&
+            namesColumn(args[1], 'planChangeStartedAt')
+          ) {
+            spy.mockRestore();
+            await committed;
+          }
+
+          return update.apply(this, args);
+        });
+
+      scan = renewals.runDueRenewals();
+    });
+
+    await planChange.changePlan(userId as string, FIXED_KEY);
+    changeDone();
+    await scan;
+
+    expect(chargedPrefixes()).toEqual(['change-charge']);
+
+    // The next scan renews the period at the price of the new plan. The lease
+    // that the test moved back is not the one the change releases.
+    await renewals.runDueRenewals();
+    expect(chargedPrefixes()).toEqual(['change-charge', 'renewal']);
+    const renewal = await ds.getRepository(Invoice).findOneByOrFail({
+      providerEventId: `renewal:${subscriptionId}:${periodEnd.getTime()}`
+    });
+
+    expect(renewal.amountMinor.toNumber()).toBe(FIXED_PRICE);
+    expect(await row()).toMatchObject({ planKey: FIXED_KEY });
   }, 30000);
 
   it('a renewal that its webhook paid before the advance is not the source, and the change is refused', async () => {

@@ -63,10 +63,7 @@ import {
   remainingRefundable,
   reserveRefund
 } from '../utils/refund-reservation.util';
-import {
-  PLAN_CHANGE_LEASE_MS,
-  planChangeMayWrite
-} from '../renewals/renewal-queue.constants';
+import { PLAN_CHANGE_LEASE_MS } from '../renewals/renewal-queue.constants';
 import { BillingService } from '../billing.service';
 
 /** Everything a plan change / proration preview operates on. */
@@ -155,8 +152,8 @@ export class PlanChangeService {
     // Claim the change before any money moves: a concurrent change or a
     // renewal scan is kept off the row until it is released, so the provider
     // is never asked for a second, conflicting charge.
-    return this.whileClaimed(subscription, (lease) =>
-      this.applySelfManagedChange(ctx, { quote, lease })
+    return this.whileClaimed(subscription, () =>
+      this.applySelfManagedChange(ctx, quote)
     );
   }
 
@@ -166,7 +163,7 @@ export class PlanChangeService {
    */
   private async applySelfManagedChange(
     ctx: ChangeContext,
-    { quote, lease }: { quote: ProrationQuote | null; lease: Date }
+    quote: ProrationQuote | null
   ): Promise<Subscription> {
     const { customer, subscription, fromPlan, toPlan, provider } = ctx;
     const seq = subscription.planChangeSeq;
@@ -225,8 +222,7 @@ export class PlanChangeService {
         ? await this.reserveProrationRefund(subscription, {
             refundMinor: quote.refundMinor,
             refundKey,
-            excludeInvoiceId: chargeInvoiceId,
-            lease
+            excludeInvoiceId: chargeInvoiceId
           })
         : null;
 
@@ -292,10 +288,11 @@ export class PlanChangeService {
           }
         }
 
-        const saved = await this.commitPlanChange(manager, subscription, {
-          toPlan,
-          lease
-        });
+        const saved = await this.commitPlanChange(
+          manager,
+          subscription,
+          toPlan
+        );
 
         return { saved, chargeSettled };
       }
@@ -370,12 +367,12 @@ export class PlanChangeService {
    */
   private async whileClaimed<T>(
     subscription: Subscription,
-    change: (lease: Date) => Promise<T>
+    change: () => Promise<T>
   ): Promise<T> {
     const lease = await this.claimChange(subscription);
 
     try {
-      return await change(lease);
+      return await change();
     } finally {
       await this.releaseChange(subscription.id, lease);
     }
@@ -387,21 +384,17 @@ export class PlanChangeService {
    * the provider round-trip, so committing it whole would write back every
    * column as it looked then - reverting whatever landed during that window (a
    * cancellation, a dunning write, a period advance, or a switch that the
-   * provider's webhook already applied). A self-managed switch commits only
-   * under its own live `lease`: past it, the renewal scan may have charged the
-   * next period at the old price, or advanced the period the switch priced.
-   * Returns the re-read row, or `null` when the guard missed and the caller
-   * must refuse the switch.
+   * provider's webhook already applied). A self-managed period that a renewal
+   * advanced past an expired lease is not the one the switch priced, and a
+   * renewal scan that took the row from an expired lease bumped its `version`
+   * before it charged the next period at the old price. Returns the re-read
+   * row, or `null` when the guard missed and the caller must refuse the switch.
    */
   private async commitPlanChange(
     manager: EntityManager,
     subscription: Subscription,
-    { toPlan, lease }: { toPlan: Plan; lease: Date | null }
+    toPlan: Plan
   ): Promise<Subscription | null> {
-    const selfManaged = subscription.lifecycleOwner === 'self';
-
-    if (selfManaged && !(lease && planChangeMayWrite(lease))) return null;
-
     const applied = await manager.update(
       Subscription,
       {
@@ -410,11 +403,8 @@ export class PlanChangeService {
         billingMode: subscription.billingMode,
         status: In([...CHANGEABLE_SUBSCRIPTION_STATUSES]),
         cancelAtPeriodEnd: false,
-        ...(selfManaged && lease
-          ? {
-              currentPeriodEnd: subscription.currentPeriodEnd,
-              planChangeStartedAt: lease
-            }
+        ...(subscription.lifecycleOwner === 'self'
+          ? { currentPeriodEnd: subscription.currentPeriodEnd }
           : {})
       },
       {
@@ -744,12 +734,7 @@ export class PlanChangeService {
    */
   private async reserveProrationRefund(
     subscription: Subscription,
-    {
-      refundMinor,
-      refundKey,
-      excludeInvoiceId = null,
-      lease
-    }: ProrationRefund & { lease: Date }
+    { refundMinor, refundKey, excludeInvoiceId = null }: ProrationRefund
   ): Promise<{ source: Invoice; minor: number; cumulative: Money } | null> {
     return withTransaction(this.dataSource, async (manager) => {
       const leg = await manager.findOne(Invoice, {
@@ -758,10 +743,7 @@ export class PlanChangeService {
 
       if (leg && leg.status !== 'pending') return null;
 
-      if (
-        !leg &&
-        !(await this.ownsPricedPeriod(manager, subscription, lease))
-      ) {
+      if (!leg && !(await this.ownsPricedPeriod(manager, subscription))) {
         return null;
       }
 
@@ -805,17 +787,17 @@ export class PlanChangeService {
   }
 
   /**
-   * False when the renewal scan may own the period that the quote was priced
-   * on: the `lease` expired, or a renewal advanced the period. The newest paid
-   * invoice can then be the renewal of the next period, and the commit guard
-   * will refuse the switch. The row lock makes a renewal that pays its invoice
-   * and advances the period in one transaction wait for this one, so the source
-   * lookup that follows cannot see that invoice.
+   * False when the renewal scan took the row from an expired lease (it bumps
+   * `version`) or advanced the period that the quote was priced on. The newest
+   * paid invoice can then be the renewal of the next period, and the commit
+   * guard will refuse the switch. The row lock makes the scan wait for this
+   * transaction: its take, and a renewal that pays its invoice and advances the
+   * period in one transaction, so the source lookup that follows cannot see
+   * that invoice.
    */
   private async ownsPricedPeriod(
     manager: EntityManager,
-    subscription: Subscription,
-    lease: Date
+    subscription: Subscription
   ): Promise<boolean> {
     const current = await manager.findOne(Subscription, {
       where: { id: subscription.id },
@@ -823,8 +805,7 @@ export class PlanChangeService {
     });
 
     return (
-      current?.planChangeStartedAt?.getTime() === lease.getTime() &&
-      planChangeMayWrite(lease) &&
+      current?.version === subscription.version &&
       current.currentPeriodEnd.getTime() ===
         subscription.currentPeriodEnd.getTime()
     );
@@ -863,11 +844,10 @@ export class PlanChangeService {
    */
   private async applyPlanChange(ctx: ChangeContext): Promise<Subscription> {
     const { customer, subscription, fromPlan, toPlan } = ctx;
-    // The scan never charges a provider-managed row, so no lease is checked.
     const saved = await this.commitPlanChange(
       this.dataSource.manager,
       subscription,
-      { toPlan, lease: null }
+      toPlan
     );
 
     if (!saved) {

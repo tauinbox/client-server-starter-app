@@ -84,6 +84,8 @@ export class Subscription {
   /**
    * Optimistic-concurrency token bumped by each self-service plan change so two
    * concurrent changes can't both charge: the loser's compare-and-swap misses.
+   * The renewal scan bumps it too when it takes a row from an expired change
+   * lease, so the stalled change misses its commit guard.
    */
   @Column({ type: 'integer', default: 1 })
   @Exclude()

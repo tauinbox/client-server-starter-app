@@ -6,6 +6,7 @@ import {
   DataSource,
   EntityManager,
   In,
+  LessThanOrEqual,
   Repository,
   type QueryDeepPartialEntity
 } from 'typeorm';
@@ -40,7 +41,6 @@ import {
   DUNNING_MAX_ATTEMPTS,
   DUNNING_RETRY_DELAY_MS,
   PLAN_CHANGE_LEASE_MS,
-  planChangeLeaseIsLive,
   RENEWAL_SCAN_MAX_PER_RUN
 } from './renewal-queue.constants';
 
@@ -186,9 +186,8 @@ export class RenewalService {
 
     if (
       subscription.planChangeStartedAt &&
-      planChangeLeaseIsLive(subscription.planChangeStartedAt, now)
+      !(await this.takeFromStalledChange(subscription, now))
     ) {
-      // A plan change claimed the row after the due list was read.
       return;
     }
 
@@ -258,6 +257,38 @@ export class RenewalService {
     }
 
     await this.handleSuccess(due, charge, { anchor, now });
+  }
+
+  /**
+   * Takes a row from a plan change whose lease expired, with the compare-and-swap
+   * on `version` that a change claims with. A stalled change commits under the
+   * version it claimed, so after this its commit guard misses and it can no
+   * longer put its plan on the period that this scan charges at the old price.
+   * The swap misses when the lease is still live (a change claimed the row after
+   * the due list was read) or when the change committed first: then the next
+   * scan renews the row under the plan that the change left.
+   */
+  private async takeFromStalledChange(
+    subscription: Subscription,
+    now: Date
+  ): Promise<boolean> {
+    const taken = await this.subscriptions.update(
+      {
+        id: subscription.id,
+        version: subscription.version,
+        planKey: subscription.planKey,
+        planChangeStartedAt: LessThanOrEqual(
+          new Date(now.getTime() - PLAN_CHANGE_LEASE_MS)
+        )
+      },
+      { version: subscription.version + 1 }
+    );
+
+    if (taken.affected !== 1) return false;
+
+    subscription.version += 1;
+
+    return true;
   }
 
   /**

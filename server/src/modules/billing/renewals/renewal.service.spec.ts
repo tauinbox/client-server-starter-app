@@ -121,6 +121,18 @@ function criterionStatuses(criterion: unknown): string[] | null {
   return (criterion as { value: string[] }).value ?? [];
 }
 
+/** The take of a stalled change sends `LessThanOrEqual(expiry)`. */
+function leaseExpiredBy(s: Subscription, criterion: unknown): boolean {
+  if (criterion === undefined) return true;
+
+  const { value: expiry } = criterion as { value: Date };
+
+  return (
+    s.planChangeStartedAt !== null &&
+    s.planChangeStartedAt.getTime() <= expiry.getTime()
+  );
+}
+
 function matchesSubscription(
   s: Subscription,
   criteria: Record<string, unknown>
@@ -129,6 +141,9 @@ function matchesSubscription(
 
   return (
     s.id === criteria['id'] &&
+    (criteria['version'] === undefined || s.version === criteria['version']) &&
+    (criteria['planKey'] === undefined || s.planKey === criteria['planKey']) &&
+    leaseExpiredBy(s, criteria['planChangeStartedAt']) &&
     (criteria['currentPeriodEnd'] === undefined ||
       s.currentPeriodEnd.getTime() ===
         (criteria['currentPeriodEnd'] as Date).getTime()) &&
@@ -897,6 +912,8 @@ describe('RenewalService', () => {
     expect(store.subscriptions[0].currentPeriodStart).toEqual(
       new Date('2026-06-01T00:00:00Z')
     );
+    // The take bumps the version, so the stalled change misses its commit.
+    expect(store.subscriptions[0].version).toBe(sub.version + 1);
   });
 
   it('does not sweep a self-managed subscription whose owning user is soft-deleted', async () => {

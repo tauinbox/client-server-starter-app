@@ -21,10 +21,6 @@ import { ProrationCalculator } from '../rating/proration-calculator';
 import { ChargeDeclinedError } from '../providers/payment-provider.interface';
 import { ProviderTimeoutError } from '../providers/provider-deadline';
 import {
-  PLAN_CHANGE_COMMIT_MARGIN_MS,
-  PLAN_CHANGE_LEASE_MS
-} from '../renewals/renewal-queue.constants';
-import {
   expectRefusal,
   makePlan,
   provider,
@@ -58,19 +54,6 @@ function statusMatches(
     : [expected.value];
 
   return allowed.includes(row.status ?? '');
-}
-
-/**
- * The subscription row as the claim left it: the lease is the last
- * `planChangeStartedAt` that `subscriptions.update` wrote.
- */
-async function claimedRow(subscriptions: RepoMock): Promise<unknown> {
-  const row = (await subscriptions.findOne()) as Subscription | null;
-  const leases = subscriptions.update.mock.calls
-    .map(([, patch]) => (patch as Partial<Subscription>).planChangeStartedAt)
-    .filter((lease) => lease !== undefined);
-
-  return row && { ...row, planChangeStartedAt: leases.at(-1) ?? null };
 }
 
 /**
@@ -135,8 +118,9 @@ function makeInsertStore({
         entity: unknown,
         options: { where?: InvoiceCriteria; lock?: unknown }
       ): Promise<unknown> => {
+        // The refund reservation reads the subscription row again under a lock.
         if (entity === Subscription && options.lock) {
-          return claimedRow(subscriptions);
+          return subscriptions.findOne(options) as Promise<unknown>;
         }
 
         if (entity !== Invoice) return Promise.resolve(null);
@@ -1182,8 +1166,7 @@ describe('PlanChangeService', () => {
 
       // Nothing the concurrent writer owns (status, period, dunning, cancel
       // flag) may appear in the write set, and the guard carries the claimed
-      // version, mode, period and lease so a row that moved during the charge
-      // loses.
+      // version, mode and period so a row that moved during the charge loses.
       expect(ctx.dataSource.manager.update).toHaveBeenCalledWith(
         Subscription,
         {
@@ -1192,8 +1175,7 @@ describe('PlanChangeService', () => {
           billingMode: 'fixed',
           status: In(['trialing', 'active']),
           cancelAtPeriodEnd: false,
-          currentPeriodEnd: periodEnd,
-          planChangeStartedAt: frozenNow
+          currentPeriodEnd: periodEnd
         },
         {
           planKey: 'business',
@@ -1251,7 +1233,7 @@ describe('PlanChangeService', () => {
       );
     });
 
-    it('refuses the switch and takes no refund leg when its lease nears expiry during the charge', async () => {
+    it('takes no refund leg when a renewal scan took the row during the charge', async () => {
       const ctx = await build();
 
       plansByKey(ctx);
@@ -1268,22 +1250,33 @@ describe('PlanChangeService', () => {
       });
       const yoo = provider('yookassa', false);
 
-      // The process stalls in the charge until the lease leaves less than the
-      // commit margin: the scan still skips the row, but may take it before a
-      // write that starts now commits.
-      yoo.chargeOffSession.mockImplementation(() => {
-        jest.setSystemTime(
-          frozenNow.getTime() +
-            PLAN_CHANGE_LEASE_MS -
-            PLAN_CHANGE_COMMIT_MARGIN_MS
-        );
+      // The scan takes a row with an expired lease by bumping its version, and
+      // the period stays where it is until the renewal is captured.
+      yoo.chargeOffSession.mockImplementation(async () => {
+        const claimed = (await ctx.subscriptions.findOne()) as Subscription;
 
-        return Promise.resolve({
-          providerInvoiceRef: 'pay_charge',
-          status: 'captured'
+        ctx.subscriptions.findOne.mockResolvedValue({
+          ...claimed,
+          version: claimed.version + 1
         });
+
+        return { providerInvoiceRef: 'pay_charge', status: 'captured' };
       });
       ctx.billing.getProviderById.mockReturnValue(yoo);
+      // The commit guard carries the claimed version, so it misses too.
+      const applyUpdate =
+        ctx.dataSource.manager.update.getMockImplementation() as (
+          target: unknown,
+          criteria: unknown,
+          patch: unknown
+        ) => Promise<{ affected: number }>;
+
+      ctx.dataSource.manager.update.mockImplementation(
+        (target: unknown, criteria: unknown, patch: unknown) =>
+          target === Subscription
+            ? Promise.resolve({ affected: 0 })
+            : applyUpdate(target, criteria, patch)
+      );
 
       await expectRefusal(
         ctx.service.changePlan('user-1', 'business'),
@@ -1291,11 +1284,6 @@ describe('PlanChangeService', () => {
       );
 
       expect(yoo.refund).not.toHaveBeenCalled();
-      expect(ctx.dataSource.manager.update).not.toHaveBeenCalledWith(
-        Subscription,
-        expect.anything(),
-        expect.anything()
-      );
       expect(ctx.insertedInvoices).toEqual([
         expect.objectContaining({ status: 'paid' })
       ]);
