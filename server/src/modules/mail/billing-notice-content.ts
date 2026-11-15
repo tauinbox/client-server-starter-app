@@ -35,7 +35,8 @@ function money(
 /**
  * A calendar day in UTC: the server does not know the time zone of the
  * reader, and every billing boundary is stored in UTC. The Russian form ends
- * in "г.", so a Russian text puts no period after it.
+ * in the abbreviation of "year" with its own period, so a Russian text puts
+ * no period after it.
  */
 function day(locale: SupportedLocale, iso: string): string {
   return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
