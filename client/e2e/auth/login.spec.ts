@@ -13,6 +13,44 @@ test.describe('Login page', () => {
     await expect(main.getByRole('button', { name: 'Login' })).toBeVisible();
   });
 
+  test('shows no link to another region while no other site exists', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/login');
+
+    await expect(page.getByRole('main').getByLabel('Email')).toBeVisible();
+    await expect(page.getByText('Account in another region?')).toHaveCount(0);
+  });
+
+  test('links to the site of each other region, and an unknown email gets the usual answer', async ({
+    _mockServer,
+    page
+  }) => {
+    await _mockServer.setRegionPeers({ ru: 'https://ru.example.com' });
+    await page.goto('/login');
+
+    const main = page.getByRole('main');
+
+    await expect(main.getByText('Account in another region?')).toBeVisible();
+    await expect(
+      main.getByRole('link', { name: 'Go to the site for Russia' })
+    ).toHaveAttribute('href', 'https://ru.example.com');
+
+    await page.getByLabel('Email').fill('resident@example.com');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
+    await main.getByRole('button', { name: 'Login' }).click();
+
+    await expect(page.locator('.error-message')).toHaveText(
+      'Invalid credentials'
+    );
+    await expect(
+      main.getByRole('link', { name: 'Go to the site for Russia' })
+    ).toBeVisible();
+  });
+
   test('should disable submit button when form is invalid', async ({
     _mockServer,
     page

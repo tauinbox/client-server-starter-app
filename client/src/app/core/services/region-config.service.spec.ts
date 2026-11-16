@@ -77,4 +77,48 @@ describe('RegionConfigService', () => {
       await expect(result).resolves.toBe(null);
     });
   });
+
+  describe('peerLinks', () => {
+    function flushPeers(peers: Record<string, string>): void {
+      httpTesting
+        .expectOne(REGION_CONFIG_API_V1)
+        .flush({ region: 'intl', peers });
+    }
+
+    it('gives each https peer in the order of the regions', async () => {
+      const result = firstValueFrom(service.peerLinks());
+
+      flushPeers({ ru: 'https://ru.example.com' });
+
+      await expect(result).resolves.toEqual([
+        { region: 'ru', url: 'https://ru.example.com' }
+      ]);
+    });
+
+    it('drops a peer whose URL is not https', async () => {
+      const result = firstValueFrom(service.peerLinks());
+
+      flushPeers({ ru: 'javascript:alert(1)' });
+
+      await expect(result).resolves.toEqual([]);
+    });
+
+    it('gives no links when the cell has no peers', async () => {
+      const result = firstValueFrom(service.peerLinks());
+
+      flushPeers({});
+
+      await expect(result).resolves.toEqual([]);
+    });
+
+    it('gives no links when the config does not load', async () => {
+      const result = firstValueFrom(service.peerLinks());
+
+      httpTesting
+        .expectOne(REGION_CONFIG_API_V1)
+        .flush(null, { status: 503, statusText: 'Unavailable' });
+
+      await expect(result).resolves.toEqual([]);
+    });
+  });
 });

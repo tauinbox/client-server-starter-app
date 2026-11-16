@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { MOCK_REGION_CONFIG } from '../helpers/region.helpers';
+import { regionConfig } from '../helpers/region.helpers';
 
 const router = Router();
 
 // GET /api/v1/config/region
 router.get('/region', (_req, res) => {
-  res.json(MOCK_REGION_CONFIG);
+  res.json(regionConfig());
 });
 
 export default router;

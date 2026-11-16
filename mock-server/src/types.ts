@@ -3,6 +3,7 @@ import type {
   CountryCode,
   LegalDocumentVersion,
   LegalJurisdiction,
+  PeerRegions,
   StepUpOperation
 } from '@app/shared/constants';
 import type {
@@ -519,6 +520,10 @@ export interface State {
   // Default: disabled. Tests can flip via /__control/captcha to exercise the
   // soft-trigger flow without an external Turnstile dependency.
   captchaConfig: CaptchaConfigResponse;
+  // The other cells (PEER_REGIONS of the server), advertised via
+  // /api/v1/config/region. Default: none, as production. E2E sets them via
+  // /__control/region-peers.
+  regionPeers: PeerRegions;
   // Per-route + per-IP attempt tracker for captcha soft-trigger. Keyed
   // `${routeName}:${ip}`.
   captchaAttempts: Map<string, CaptchaAttemptWindow>;
