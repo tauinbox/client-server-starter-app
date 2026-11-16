@@ -141,8 +141,9 @@ Copy `.env.example` to `.env`, and then configure it:
 | `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting, a shared permission cache and SSE pushes across instances for a deployment with more than one instance |
 | `E2E_REDIS_DB` | `15` | For a test only. `npm run test:e2e` uses this logical Redis database, and it clears the database before each run. The value must not be `0`. Refer to [E2E Tests](#e2e-tests-jest) |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry before the nightly deletion |
-| `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile site key, which is public. The two Turnstile keys are necessary before the CAPTCHA operates. Refer to [Enabling CAPTCHA in production](#enabling-captcha-in-production) |
-| `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key. The CAPTCHA stays disabled while one of the two keys is empty |
+| `CAPTCHA_PROVIDER` | - | The CAPTCHA vendor of this cell: `turnstile`, or empty for no CAPTCHA. The boot is refused when a key of the selected vendor is empty, and when a key of a vendor that is not selected is set. Turnstile receives the IP of the caller, thus it runs only in an `intl` cell. Refer to [Enabling CAPTCHA in production](#enabling-captcha-in-production) |
+| `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile site key, which is public. Necessary when `CAPTCHA_PROVIDER` is `turnstile` |
+| `TURNSTILE_SECRET_KEY` | - | Cloudflare Turnstile secret key. Necessary when `CAPTCHA_PROVIDER` is `turnstile` |
 | `PWNED_PASSWORDS_RANGE_URL` | `https://api.pwnedpasswords.com/range` | Range endpoint of the breached-password blocklist. Every path that SETS a password asks it, sending only the first five hex characters of the SHA-1 of the candidate. Point it at a self-hosted mirror when outbound access to the default host is closed. The check fails open, so an unreachable endpoint accepts the password and increments `password_breach_lookups_total{outcome="unavailable"}` |
 | `DB_POOL_MAX` | `10` | Maximum size of the PostgreSQL connection pool |
 | `DB_POOL_IDLE_TIMEOUT` | `30000` | Milliseconds before the pool closes an idle connection |
@@ -1938,11 +1939,12 @@ The server mails the token only to `user.email`. The same transaction clears the
 fields, thus a reset cannot confirm a change to another address that is in progress.
 
 **CAPTCHA soft trigger.** `CaptchaRequiredGuard` gates `/register`, `/forgot-password` and
-`/resend-verification` with a Cloudflare Turnstile challenge. These are the three unauthenticated
-routes that mail an address that the caller names. The challenge activates only when
-`X-RateLimit-Remaining` is 1 or less for the IP of the caller.
+`/resend-verification` with the challenge of the provider that `CAPTCHA_PROVIDER` selects (Cloudflare
+Turnstile is the only one). These are the three unauthenticated routes that mail an address that the
+caller names. The challenge activates only when `X-RateLimit-Remaining` is 1 or less for the IP of
+the caller. `CaptchaService` holds one `CaptchaVerifier` (`TurnstileVerifier`), or none.
 
-The CAPTCHA is **disabled by default**, because the two environment variables are empty. To activate
+The CAPTCHA is **disabled by default**, because `CAPTCHA_PROVIDER` is empty. To activate
 it in production you need a free Cloudflare account. The full steps are in
 [Enabling CAPTCHA in production](#enabling-captcha-in-production).
 
@@ -2268,7 +2270,10 @@ when an IP comes near the rate limit.
      invisible challenge from the risk score. This mode is the recommended one.
    - Save the site, and copy the **Site Key** and the **Secret Key**.
 
-2. **Set the keys.** Select one of the two methods.
+2. **Set the keys.** `docker-compose.yml` sets `CAPTCHA_PROVIDER=turnstile` for the production
+   cell, and the boot is refused while one of the two keys is empty. For a deployment that does not
+   use that file, also set `CAPTCHA_PROVIDER=turnstile` in `server/.env`. Select one of the two
+   methods.
 
    **The recommended method, which survives a rebuild.** Add the two values as GitHub repository
    secrets: `TURNSTILE_SITE_KEY` for the public site key, and `TURNSTILE_SECRET_KEY` for the
@@ -2318,15 +2323,19 @@ when an IP comes near the rate limit.
    422 and does not hold a request handler open. The gate stays fail closed through an outage: the
    two routes refuse every caller whose rate-limit budget is nearly spent, until you do this step.
 
-   Clear the two `TURNSTILE_*` GitHub secrets, that is set an empty value, and start a deploy. The
-   sync script skips an empty value. Thus this step alone does **not** clear `server/.env`. For an
-   immediate correction, also comment the keys out on the VPS:
+   The boot is refused when `CAPTCHA_PROVIDER` is empty and a `TURNSTILE_*` key is set, and when
+   `CAPTCHA_PROVIDER` is `turnstile` and a key is empty. Thus change the two together. For an
+   immediate correction on the VPS, comment the keys out and start the server with an empty
+   provider:
    ```bash
    sed -i 's/^TURNSTILE_/# TURNSTILE_/' server/.env
-   docker compose up -d server
+   CAPTCHA_PROVIDER= docker compose up -d server
    ```
-   To enable the CAPTCHA again, restore the secrets. Also remove the comment characters if you used
-   the manual method.
+   The next deploy selects `turnstile` again, because that is the default of `CAPTCHA_PROVIDER` in
+   `docker-compose.yml`, and writes the keys again from the GitHub secrets. To keep the CAPTCHA disabled across deploys,
+   clear the two `TURNSTILE_*` secrets, remove the keys from `server/.env` (the sync script skips an
+   empty value, thus it does not clear the file), and set `CAPTCHA_PROVIDER: ''` in
+   `docker-compose.yml`. To enable the CAPTCHA again, revert these changes.
 
 ### Content-Security-Policy requirements
 
@@ -2376,9 +2385,12 @@ requests each hour on the register route, and 2 requests each 5 minutes on the f
 
 If you see spam in `audit_logs` although the throttler runs, you have three options:
 
-- Change the provider to hCaptcha. Change the `siteverify` URL in `CaptchaService`, and the script
-  URL in `CaptchaService.loadScript()`. The protocol is identical: a form-encoded `secret` and
-  `response` request, and a JSON `{ success: boolean }` answer. hCaptcha also needs an account.
+- Add another provider, for example hCaptcha. A provider is one value in `CAPTCHA_PROVIDERS`
+  (`shared/src/constants/auth.constants.ts`), one `CaptchaVerifier` class beside
+  `turnstile.verifier.ts`, its env keys in `CAPTCHA_PROVIDER_ENV_KEYS` and its regions in
+  `REGION_INTEGRATIONS`, and its widget script in the client `CaptchaService.loadScript()`. The
+  hCaptcha protocol is the same as Turnstile: a form-encoded `secret` and `response` request, and a
+  JSON `{ success: boolean }` answer. hCaptcha also needs an account.
 - Host a proof-of-work challenge yourself, with no CAPTCHA. mCaptcha and Friendly Captcha are two
   such tools. This adds a container to `docker-compose.yml`, and it needs no external account.
 - Add a honeypot field and a minimum form-fill time as a first line. This operates immediately and

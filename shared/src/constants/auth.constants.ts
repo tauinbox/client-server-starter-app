@@ -114,6 +114,15 @@ export const SIGN_IN_REFUSAL_REASONS = [
 export type SignInRefusalReason = (typeof SIGN_IN_REFUSAL_REASONS)[number];
 
 /**
+ * The captcha providers a cell can select (the CAPTCHA_PROVIDER variable).
+ * Each one sends the IP address of the caller to its vendor, so each one is
+ * also an entry of REGION_INTEGRATIONS.
+ */
+export const CAPTCHA_PROVIDERS = ['turnstile'] as const;
+
+export type CaptchaProvider = (typeof CAPTCHA_PROVIDERS)[number];
+
+/**
  * How long before an access token expires the client refreshes it.
  *
  * Paired with MIN_JWT_EXPIRATION_SECONDS: a token whose whole lifetime fits

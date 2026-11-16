@@ -285,6 +285,60 @@ describe('configValidationSchema', () => {
     });
   });
 
+  describe('captcha provider', () => {
+    const turnstileKeys = {
+      TURNSTILE_SITE_KEY: 'site',
+      TURNSTILE_SECRET_KEY: 'secret'
+    };
+
+    function messageOf(env: Record<string, string>): string | undefined {
+      return configValidationSchema.validate(env, options).error?.message;
+    }
+
+    it('accepts no provider and no keys, and an empty provider', () => {
+      expect(messageOf(validEnv)).toBeUndefined();
+      expect(messageOf({ ...validEnv, CAPTCHA_PROVIDER: '' })).toBeUndefined();
+    });
+
+    it('accepts the selected provider with all its keys', () => {
+      expect(
+        messageOf({
+          ...validEnv,
+          CAPTCHA_PROVIDER: 'turnstile',
+          ...turnstileKeys
+        })
+      ).toBeUndefined();
+    });
+
+    it('refuses a provider outside the list', () => {
+      expect(
+        messageOf({ ...validEnv, CAPTCHA_PROVIDER: 'recaptcha' })
+      ).toContain('CAPTCHA_PROVIDER');
+    });
+
+    it.each([
+      [{}, 'TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY'],
+      [{ TURNSTILE_SITE_KEY: 'site' }, 'TURNSTILE_SECRET_KEY'],
+      [
+        { TURNSTILE_SITE_KEY: 'site', TURNSTILE_SECRET_KEY: '' },
+        'TURNSTILE_SECRET_KEY'
+      ]
+    ])('refuses the selected provider with keys %j', (keys, missing) => {
+      expect(
+        messageOf({ ...validEnv, CAPTCHA_PROVIDER: 'turnstile', ...keys })
+      ).toBe(`CAPTCHA_PROVIDER turnstile requires ${missing}`);
+    });
+
+    it.each([
+      [turnstileKeys, 'TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY'],
+      [{ TURNSTILE_SECRET_KEY: 'secret' }, 'TURNSTILE_SECRET_KEY']
+    ])('refuses keys %j of a provider that is not selected', (keys, stray) => {
+      expect(messageOf({ ...validEnv, ...keys })).toBe(
+        `${stray} set, but CAPTCHA_PROVIDER is not turnstile`
+      );
+    });
+  });
+
   describe('integrations outside the region of the cell', () => {
     const ruEnv = { ...validEnv, DATA_REGION: 'ru' };
 
@@ -298,8 +352,6 @@ describe('configValidationSchema', () => {
       ['ru', 'PADDLE_API_KEY', 'paddle'],
       ['ru', 'PADDLE_WEBHOOK_SECRET', 'paddle'],
       ['ru', 'PADDLE_CLIENT_TOKEN', 'paddle'],
-      ['ru', 'TURNSTILE_SITE_KEY', 'turnstile'],
-      ['ru', 'TURNSTILE_SECRET_KEY', 'turnstile'],
       ['ru', 'GOOGLE_CLIENT_ID', 'googleOAuth'],
       ['ru', 'GOOGLE_CLIENT_SECRET', 'googleOAuth'],
       ['ru', 'FACEBOOK_CLIENT_ID', 'facebookOAuth'],
@@ -312,12 +364,26 @@ describe('configValidationSchema', () => {
       );
     });
 
+    it('refuses a ru cell with the Turnstile captcha', () => {
+      expect(
+        messageOf({
+          ...ruEnv,
+          CAPTCHA_PROVIDER: 'turnstile',
+          TURNSTILE_SITE_KEY: 'site',
+          TURNSTILE_SECRET_KEY: 'secret'
+        })
+      ).toBe(
+        'turnstile may not run in DATA_REGION ru (TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY set)'
+      );
+    });
+
     it('accepts the integrations of each region', () => {
       expect(
         messageOf({
           ...validEnv,
           PADDLE_API_KEY: 'key',
           PADDLE_WEBHOOK_SECRET: 'secret',
+          CAPTCHA_PROVIDER: 'turnstile',
           TURNSTILE_SITE_KEY: 'site',
           TURNSTILE_SECRET_KEY: 'secret',
           GOOGLE_CLIENT_ID: 'id',

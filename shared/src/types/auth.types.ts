@@ -1,3 +1,4 @@
+import type { CaptchaProvider } from '../constants/auth.constants';
 import type { UserResponse } from './user.types';
 
 export type TokensResponse = {
@@ -63,10 +64,6 @@ export type ActiveSessionResponse = {
   lastActiveAt: string;
 };
 
-export type CaptchaProvider = 'turnstile';
-
-export type CaptchaConfigResponse = {
-  enabled: boolean;
-  provider: CaptchaProvider;
-  siteKey: string | null;
-};
+export type CaptchaConfigResponse =
+  | { enabled: false; provider: null; siteKey: null }
+  | { enabled: true; provider: CaptchaProvider; siteKey: string };

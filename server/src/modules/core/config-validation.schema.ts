@@ -1,11 +1,13 @@
 import * as Joi from 'joi';
 import {
   APP_ENVIRONMENTS,
+  CAPTCHA_PROVIDERS,
   DATA_REGIONS,
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   MIN_JWT_EXPIRATION_SECONDS,
   REGION_INTEGRATIONS,
   SMTP_PROVIDER_REGIONS,
+  type CaptchaProvider,
   type DataRegion,
   type PeerRegions,
   type RegionIntegration
@@ -49,12 +51,16 @@ function refuseOwnRegionAsPeer(
     : env;
 }
 
+const CAPTCHA_PROVIDER_ENV_KEYS: Record<CaptchaProvider, readonly string[]> = {
+  turnstile: ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY']
+};
+
 // Any one of these set counts as enabled, so a stray key of a provider that
 // may not run in this region refuses the boot as well.
 const INTEGRATION_ENV_KEYS: Record<RegionIntegration, readonly string[]> = {
   paddle: ['PADDLE_API_KEY', 'PADDLE_WEBHOOK_SECRET', 'PADDLE_CLIENT_TOKEN'],
   yookassa: ['YOOKASSA_SHOP_ID', 'YOOKASSA_SECRET_KEY'],
-  turnstile: ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'],
+  turnstile: CAPTCHA_PROVIDER_ENV_KEYS.turnstile,
   googleOAuth: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
   facebookOAuth: ['FACEBOOK_CLIENT_ID', 'FACEBOOK_CLIENT_SECRET'],
   vkOAuth: ['VK_CLIENT_ID', 'VK_CLIENT_SECRET']
@@ -106,6 +112,42 @@ function refuseEgressOutsideRegion(
   helpers: Joi.CustomHelpers
 ): unknown {
   const refusals = egressRefusals(env);
+
+  return refusals.length > 0
+    ? helpers.message({ custom: refusals.join('; ') })
+    : env;
+}
+
+function captchaRefusals(env: Record<string, unknown>): string[] {
+  const selected = env['CAPTCHA_PROVIDER'] as CaptchaProvider | undefined;
+
+  return CAPTCHA_PROVIDERS.flatMap((provider) => {
+    const keys = CAPTCHA_PROVIDER_ENV_KEYS[provider];
+
+    if (provider === selected) {
+      const missing = keys.filter((key) => !isSet(env[key]));
+
+      return missing.length > 0
+        ? [`CAPTCHA_PROVIDER ${provider} requires ${missing.join(', ')}`]
+        : [];
+    }
+
+    const stray = keys.filter((key) => isSet(env[key]));
+
+    return stray.length > 0
+      ? [`${stray.join(', ')} set, but CAPTCHA_PROVIDER is not ${provider}`]
+      : [];
+  });
+}
+
+// The captcha is on only by an explicit choice: half a key pair does not
+// silently switch it off, and a key of a vendor that the cell did not select
+// does not stay in the env unnoticed.
+function refuseIncompleteCaptcha(
+  env: Record<string, unknown>,
+  helpers: Joi.CustomHelpers
+): unknown {
+  const refusals = captchaRefusals(env);
 
   return refusals.length > 0
     ? helpers.message({ custom: refusals.join('; ') })
@@ -214,6 +256,12 @@ export const configValidationSchema = Joi.object({
   DB_POOL_CONNECTION_TIMEOUT: Joi.number().min(0).default(5000),
   TRUSTED_PROXIES: Joi.string().optional().allow(''),
   GEOIP_DB_PATH: Joi.string().optional().allow(''),
+  // Empty: no captcha. The rule at the end of the schema requires the keys of
+  // the selected provider and refuses the keys of any other.
+  CAPTCHA_PROVIDER: Joi.string()
+    .valid(...CAPTCHA_PROVIDERS)
+    .empty('')
+    .optional(),
   TURNSTILE_SITE_KEY: Joi.string().optional().allow(''),
   TURNSTILE_SECRET_KEY: Joi.string().optional().allow(''),
   SMTP_SECURE: Joi.string().valid('true', 'false').optional().allow(''),
@@ -264,4 +312,5 @@ export const configValidationSchema = Joi.object({
     .default(DEFAULT_WEBHOOK_PAYLOAD_RETENTION_DAYS)
 })
   .custom(refuseOwnRegionAsPeer)
+  .custom(refuseIncompleteCaptcha)
   .custom(refuseEgressOutsideRegion);

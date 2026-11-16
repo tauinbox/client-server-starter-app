@@ -63,7 +63,7 @@ describe('CaptchaService', () => {
 
       const req = httpMock.expectOne(AuthApiEnum.CaptchaConfig);
 
-      req.flush({ enabled: false, provider: 'turnstile', siteKey: null });
+      req.flush({ enabled: false, provider: null, siteKey: null });
 
       await expect(a).resolves.toEqual(await b);
     });

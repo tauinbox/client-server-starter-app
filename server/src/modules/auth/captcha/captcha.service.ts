@@ -1,86 +1,57 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { CaptchaProvider } from '@app/shared/constants';
+import type { CaptchaConfigResponse } from '@app/shared/types';
+import type { CaptchaVerifier } from './captcha-verifier';
+import { TurnstileVerifier } from './turnstile.verifier';
 
-const TURNSTILE_VERIFY_URL =
-  'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-
-/**
- * Siteverify is one round trip to Cloudflare. The cap exists so an endpoint
- * that accepts the connection and never answers cannot hold a request handler
- * open: the attempt is abandoned and refused by the fail-closed branch below.
- */
-const TURNSTILE_TIMEOUT_MS = 2500;
-
-interface TurnstileVerifyResponse {
-  success: boolean;
-  'error-codes'?: string[];
-  hostname?: string;
-  challenge_ts?: string;
+// The config validation guarantees the keys of the selected provider.
+function createVerifier(
+  provider: CaptchaProvider,
+  config: ConfigService
+): CaptchaVerifier {
+  switch (provider) {
+    case 'turnstile':
+      return new TurnstileVerifier({
+        siteKey: config.getOrThrow<string>('TURNSTILE_SITE_KEY'),
+        secretKey: config.getOrThrow<string>('TURNSTILE_SECRET_KEY')
+      });
+  }
 }
 
 @Injectable()
 export class CaptchaService {
-  private readonly logger = new Logger(CaptchaService.name);
-  private readonly secretKey: string | undefined;
-  private readonly siteKey: string | undefined;
+  private readonly verifier: CaptchaVerifier | null;
 
-  constructor(private readonly configService: ConfigService) {
-    this.secretKey = this.configService.get<string>('TURNSTILE_SECRET_KEY');
-    this.siteKey = this.configService.get<string>('TURNSTILE_SITE_KEY');
+  constructor(configService: ConfigService) {
+    // An empty value means no captcha, as the config validation reads it.
+    const provider = configService.get<CaptchaProvider | ''>(
+      'CAPTCHA_PROVIDER'
+    );
+
+    this.verifier = provider ? createVerifier(provider, configService) : null;
   }
 
   isEnabled(): boolean {
-    return Boolean(this.secretKey && this.siteKey);
+    return this.verifier !== null;
   }
 
-  getSiteKey(): string | null {
-    return this.siteKey ?? null;
+  getConfig(): CaptchaConfigResponse {
+    return this.verifier
+      ? {
+          enabled: true,
+          provider: this.verifier.provider,
+          siteKey: this.verifier.siteKey
+        }
+      : { enabled: false, provider: null, siteKey: null };
   }
 
   async verify(token: string, remoteIp?: string): Promise<boolean> {
-    // Captcha is switched off for this deployment - nothing to verify against.
-    // The only pass-through: with a secret present every path below fails closed.
-    if (!this.secretKey) return true;
+    // The only pass-through: this cell selects no captcha provider.
+    if (!this.verifier) return true;
 
     if (!token) return false;
 
-    const params = new URLSearchParams();
-
-    params.set('secret', this.secretKey);
-    params.set('response', token);
-
-    if (remoteIp) params.set('remoteip', remoteIp);
-
-    try {
-      const response = await fetch(TURNSTILE_VERIFY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString(),
-        signal: AbortSignal.timeout(TURNSTILE_TIMEOUT_MS)
-      });
-
-      if (!response.ok) {
-        this.logger.warn(
-          `Turnstile siteverify HTTP ${response.status} ${response.statusText}`
-        );
-
-        return false;
-      }
-
-      const data = (await response.json()) as TurnstileVerifyResponse;
-
-      if (!data.success) {
-        this.logger.warn(
-          `Turnstile rejected token: ${(data['error-codes'] ?? []).join(',')}`
-        );
-      }
-
-      return data.success === true;
-    } catch (err) {
-      // Network failure — fail closed (do NOT bypass captcha on outage).
-      this.logger.error('Turnstile siteverify request failed', err);
-
-      return false;
-    }
+    return this.verifier.verify(token, remoteIp);
   }
 }

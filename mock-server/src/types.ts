@@ -6,6 +6,7 @@ import type {
   StepUpOperation
 } from '@app/shared/constants';
 import type {
+  CaptchaConfigResponse,
   MfaRequiredResponse,
   PaddleClientConfigResponse,
   UserNotificationResponse
@@ -352,11 +353,6 @@ export interface MockUsageRecord {
   recordedAt: string;
 }
 
-export interface CaptchaConfig {
-  enabled: boolean;
-  siteKey: string | null;
-}
-
 export interface CaptchaAttemptWindow {
   // Sliding-window timestamps (epoch ms) of recent attempts within the route's TTL.
   timestamps: number[];
@@ -522,7 +518,7 @@ export interface State {
   // CAPTCHA — public configuration advertised via /api/v1/auth/captcha-config.
   // Default: disabled. Tests can flip via /__control/captcha to exercise the
   // soft-trigger flow without an external Turnstile dependency.
-  captchaConfig: CaptchaConfig;
+  captchaConfig: CaptchaConfigResponse;
   // Per-route + per-IP attempt tracker for captcha soft-trigger. Keyed
   // `${routeName}:${ip}`.
   captchaAttempts: Map<string, CaptchaAttemptWindow>;
