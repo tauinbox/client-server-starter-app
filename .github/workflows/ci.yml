@@ -82,6 +82,8 @@ jobs:
       - run: npm run check:versions
       # The deploy writes the production secrets with this script.
       - run: bash ../scripts/sync-prod-env.sh --self-test
+      # The guard that stops a cell env file from composing another cell.
+      - run: bash ../scripts/cell.sh --self-test
 
   server-tests:
     name: Server – Tests & Build
