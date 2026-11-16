@@ -179,9 +179,11 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
       .get(RolesController)
       .update(role.id, { name: `${role.name}-2` }, req, ability);
 
-    await eventually(() =>
+    const invalidated = await eventually(() =>
       Promise.resolve(invalidate.mock.results.length > 0 ? true : null)
     );
+
+    expect(invalidated).toBe(true);
     expect(invalidate).toHaveBeenCalledTimes(1);
     await invalidate.mock.results[0].value;
     invalidate.mockRestore();
