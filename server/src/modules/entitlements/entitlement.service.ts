@@ -104,14 +104,14 @@ export class EntitlementService {
   }
 
   /**
-   * The plan of the entitled subscription of the customer, or null when there
+   * The entitled subscription of the customer and its plan, or null when there
    * is none. The drop to Free happens on the `past_due -> canceled`
    * transition, not on entering `past_due`: the dunning grace window keeps
    * full entitlements.
    */
-  async subscriptionPlan(
+  async entitledSubscription(
     customerId: string
-  ): Promise<ResolvedEntitlements | null> {
+  ): Promise<{ subscriptionId: string; plan: ResolvedEntitlements } | null> {
     const subscription = await this.subscriptions.findOne({
       where: { customerId, status: In([...ENTITLED_SUBSCRIPTION_STATUSES]) },
       order: { createdAt: 'DESC' }
@@ -120,7 +120,15 @@ export class EntitlementService {
       ? await this.plans.findOne({ where: { key: subscription.planKey } })
       : null;
 
-    return plan ? this.toResolved(plan) : null;
+    return subscription && plan
+      ? { subscriptionId: subscription.id, plan: this.toResolved(plan) }
+      : null;
+  }
+
+  private async subscriptionPlan(
+    customerId: string
+  ): Promise<ResolvedEntitlements | null> {
+    return (await this.entitledSubscription(customerId))?.plan ?? null;
   }
 
   /**

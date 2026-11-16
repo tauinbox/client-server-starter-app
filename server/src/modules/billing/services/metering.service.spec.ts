@@ -49,13 +49,14 @@ async function build({
     )
   };
   const entitlements = {
-    subscriptionPlan: jest
-      .fn()
-      .mockResolvedValue(
-        planCapabilities
-          ? { planKey: 'pro', capabilities: planCapabilities, limits: {} }
-          : null
-      )
+    entitledSubscription: jest.fn().mockResolvedValue(
+      planCapabilities
+        ? {
+            subscriptionId: 'sub-1',
+            plan: { planKey: 'pro', capabilities: planCapabilities, limits: {} }
+          }
+        : null
+    )
   };
   const customers = {
     findOne: jest.fn().mockResolvedValue({ id: 'cust-1', userId: 'user-1' })
@@ -171,22 +172,68 @@ describe('MeteringService', () => {
     expect(ctx.emit).not.toHaveBeenCalled();
   });
 
-  it('does not debit a subscriber whose plan has the capability of the meter', async () => {
+  it.each([
+    ['a balance that covers the units', 500],
+    ['no credits', 0]
+  ])(
+    'does not debit a subscriber whose plan has the capability of the meter, with %s, and stores the use under the subscription',
+    async (_name, balance) => {
+      const ctx = await build({
+        balance,
+        planCapabilities: ['reports', 'api-access']
+      });
+
+      await expect(
+        ctx.service.consume('cust-1', use(), { audit: AUDIT })
+      ).resolves.toEqual({
+        recordId: 'use-1',
+        debited: false,
+        replayed: false,
+        balanceAfter: balance
+      });
+      expect(ctx.entitlements.entitledSubscription).toHaveBeenCalledWith(
+        'cust-1'
+      );
+      expect(ctx.manager.create).toHaveBeenCalledWith(UsageRecord, {
+        customerId: 'cust-1',
+        subscriptionId: 'sub-1',
+        meterKey: 'api_calls',
+        quantity: Money.fromMinor(3),
+        occurredAt: NOW,
+        idempotencyKey: 'evt-1'
+      });
+      expect(ctx.credits.spendOnMetering).not.toHaveBeenCalled();
+      expect(ctx.audit.logFireAndForget).toHaveBeenCalledWith({
+        ...AUDIT,
+        targetId: 'use-1'
+      });
+      expect(ctx.emit).not.toHaveBeenCalled();
+    }
+  );
+
+  it('answers a retry of a covered key after the plan ends as covered, and takes no credits', async () => {
     const ctx = await build({
-      balance: 500,
-      planCapabilities: ['reports', 'api-access']
+      balance: 100,
+      existing: {
+        id: 'use-1',
+        subscriptionId: 'sub-1',
+        meterKey: 'api_calls',
+        quantity: Money.fromMinor(3),
+        occurredAt: new Date(NOW.getTime() - 60_000)
+      }
     });
 
     await expect(
       ctx.service.consume('cust-1', use(), { audit: AUDIT })
     ).resolves.toEqual({
-      recordId: null,
+      recordId: 'use-1',
       debited: false,
-      replayed: false,
-      balanceAfter: 500
+      replayed: true,
+      balanceAfter: 100
     });
-    expect(ctx.entitlements.subscriptionPlan).toHaveBeenCalledWith('cust-1');
+    expect(ctx.entitlements.entitledSubscription).not.toHaveBeenCalled();
     expect(ctx.manager.save).not.toHaveBeenCalled();
+    expect(ctx.credits.spendOnMetering).not.toHaveBeenCalled();
     expect(ctx.audit.logFireAndForget).not.toHaveBeenCalled();
   });
 
@@ -204,6 +251,7 @@ describe('MeteringService', () => {
       balance: 7,
       existing: {
         id: 'use-1',
+        subscriptionId: null,
         meterKey: 'api_calls',
         quantity: Money.fromMinor(3),
         occurredAt: new Date(NOW.getTime() - 60_000)

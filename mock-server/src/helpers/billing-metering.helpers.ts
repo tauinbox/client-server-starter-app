@@ -8,7 +8,7 @@ import {
 } from '@app/shared/constants';
 import type { MeteringResponse } from '@app/shared/types';
 import { getState } from '../state';
-import type { MockPlan, MockUsageRecord } from '../types';
+import type { MockPlan, MockSubscription, MockUsageRecord } from '../types';
 import { noticeCreditBalanceCrossed } from './billing-notices.helpers';
 import {
   applyCreditDelta,
@@ -17,10 +17,12 @@ import {
 } from './billing-settle.helpers';
 
 /**
- * Mirrors the server's EntitlementService.subscriptionPlan: the plan of the
- * newest entitled subscription of the customer.
+ * Mirrors the server's EntitlementService.entitledSubscription: the newest
+ * entitled subscription of the customer and its plan.
  */
-export function subscriptionPlan(customerId: string): MockPlan | undefined {
+export function entitledSubscription(
+  customerId: string
+): { subscription: MockSubscription; plan: MockPlan } | undefined {
   const state = getState();
   const [subscription] = [...state.billingSubscriptions.values()]
     .filter(
@@ -29,10 +31,11 @@ export function subscriptionPlan(customerId: string): MockPlan | undefined {
         ENTITLED_SUBSCRIPTION_STATUSES.includes(s.status)
     )
     .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  return subscription
+  const plan = subscription
     ? state.plans.values().find((p) => p.key === subscription.planKey)
     : undefined;
+
+  return subscription && plan ? { subscription, plan } : undefined;
 }
 
 export interface MeteredUse {
@@ -51,8 +54,9 @@ export type MeteringOutcome =
 /**
  * Mirrors the transaction of MeteringService.consume, after its input checks:
  * a replay answers the first record, a plan with the capability of the meter
- * makes the use free, a balance that does not cover the units refuses it, and
- * otherwise the record is stored and the units are taken.
+ * makes the use free and stores it with that subscription, a balance that does
+ * not cover the units refuses it, and otherwise the record is stored and the
+ * units are taken.
  */
 export function consumeCredits(
   customerId: string,
@@ -92,7 +96,7 @@ export function consumeCredits(
     return {
       response: {
         recordId: existing.id,
-        debited: true,
+        debited: existing.subscriptionId === null,
         replayed: true,
         balanceAfter: balanceUnits
       },
@@ -100,19 +104,12 @@ export function consumeCredits(
     };
   }
 
-  if (subscriptionPlan(customerId)?.entitlements.includes(METERS[meterKey])) {
-    return {
-      response: {
-        recordId: null,
-        debited: false,
-        replayed: false,
-        balanceAfter: balanceUnits
-      },
-      record: null
-    };
-  }
+  const entitled = entitledSubscription(customerId);
+  const coveredBy = entitled?.plan.entitlements.includes(METERS[meterKey])
+    ? entitled.subscription.id
+    : null;
 
-  if (balanceUnits < units) {
+  if (coveredBy === null && balanceUnits < units) {
     return {
       refusal: {
         errorKey: ErrorKeys.BILLING.INSUFFICIENT_CREDITS,
@@ -124,7 +121,7 @@ export function consumeCredits(
   const record: MockUsageRecord = {
     id: randomUUID(),
     customerId,
-    subscriptionId: null,
+    subscriptionId: coveredBy,
     meterKey,
     quantity: units,
     occurredAt,
@@ -133,6 +130,19 @@ export function consumeCredits(
   };
 
   state.billingUsageRecords.set(record.id, record);
+
+  if (coveredBy !== null) {
+    return {
+      response: {
+        recordId: record.id,
+        debited: false,
+        replayed: false,
+        balanceAfter: balanceUnits
+      },
+      record
+    };
+  }
+
   const change = applyCreditDelta(customerId, -units);
 
   // The server emits CreditBalanceCrossedEvent here.
@@ -165,7 +175,8 @@ export function unitsSpentThisMonth(customerId: string): {
   const periodEnd = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
   );
-  // The server sums the ledger; each record is one debit of its quantity.
+  // The server sums the ledger; each record with no subscription is one debit
+  // of its quantity, and a use that a plan covered writes no ledger row.
   const unitsSpent = getState()
     .billingUsageRecords.values()
     .filter((r) => {
@@ -173,6 +184,7 @@ export function unitsSpentThisMonth(customerId: string): {
 
       return (
         r.customerId === customerId &&
+        r.subscriptionId === null &&
         recordedAt >= periodStart.getTime() &&
         recordedAt < periodEnd.getTime()
       );

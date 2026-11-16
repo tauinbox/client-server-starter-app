@@ -61,7 +61,7 @@ import {
 } from '../helpers/billing-notices.helpers';
 import {
   consumeCredits,
-  subscriptionPlan,
+  entitledSubscription,
   unitsSpentThisMonth
 } from '../helpers/billing-metering.helpers';
 import { mockCheckoutUrl } from '../routes/mock-checkout';
@@ -382,7 +382,8 @@ function resolveEntitlements(userId: string): EntitlementsResponse {
 
   if (!customer) return free;
 
-  const plan = subscriptionPlan(customer.id) ?? payAsYouGoPlan(customer.id);
+  const plan =
+    entitledSubscription(customer.id)?.plan ?? payAsYouGoPlan(customer.id);
   const base = plan ? toResolvedEntitlements(plan) : free;
 
   const now = Date.now();
@@ -1908,7 +1909,7 @@ billingAdminRouter.post(
       return;
     }
 
-    // A replay or a free use changes nothing, so it writes no audit row.
+    // A replay changes nothing, so it writes no audit row.
     if (outcome.record) {
       auditAdminAction(req, {
         action: 'BILLING_USAGE_RECORD',
