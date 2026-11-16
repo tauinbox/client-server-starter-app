@@ -204,14 +204,16 @@ runWithInfra('A provider sign-in writes audit rows (e2e)', () => {
     expect(await settledRows(requestId)).toEqual([]);
     expect(await settledRows(exchangeId)).toEqual([]);
 
+    // Each row is a separate fire-and-forget insert, so created_at does not
+    // give their order.
     const signupRows = await settledRows(signupId);
+    const rowOf = new Map(signupRows.map((row) => [row.action, row]));
 
-    expect(signupRows.map((row) => row.action)).toEqual([
-      AuditAction.USER_REGISTER,
-      AuditAction.USER_LOGIN_SUCCESS
-    ]);
-    expect(signupRows[0].details).toEqual({ provider: 'google' });
-    expect(signupRows[1].details).toEqual({
+    expect(signupRows).toHaveLength(2);
+    expect(rowOf.get(AuditAction.USER_REGISTER)?.details).toEqual({
+      provider: 'google'
+    });
+    expect(rowOf.get(AuditAction.USER_LOGIN_SUCCESS)?.details).toEqual({
       method: 'oauth',
       provider: 'google'
     });
