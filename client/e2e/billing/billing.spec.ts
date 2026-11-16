@@ -465,12 +465,12 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    // The ru profile locale routes the user to YooKassa, whose checkout leaves
+    // A residence in Russia routes the user to YooKassa, whose checkout leaves
     // an `incomplete` subscription until the payment settles.
     await loginViaUi(page, _mockServer.url, {
       id: USER_ID,
       roles: ['user'],
-      locale: 'ru'
+      residenceCountry: 'RU'
     });
 
     await page.goto('/billing');
@@ -508,7 +508,7 @@ test.describe('Billing', () => {
     await loginViaUi(page, _mockServer.url, {
       id: USER_ID,
       roles: ['user'],
-      locale: 'ru'
+      residenceCountry: 'RU'
     });
 
     await page.goto('/billing');
@@ -561,7 +561,7 @@ test.describe('Billing', () => {
       dialog.getByRole('heading', { name: 'Change plan' })
     ).toBeVisible();
 
-    // Selecting a target fetches the proration preview. The en-locale user is
+    // Selecting a target fetches the proration preview. The user (residence DE) is
     // on Paddle (delegated lifecycle), so the ledger shows the net amount:
     // business $29.00 minus the unused pro $12.00 with a full period left.
     await dialog.getByRole('radio', { name: /Business/ }).click();
@@ -580,11 +580,11 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    // The ru profile locale routes the user to YooKassa; the UI stays English.
+    // A residence in Russia routes the user to YooKassa; the UI stays English.
     await loginViaUi(page, _mockServer.url, {
       id: USER_ID,
       roles: ['user'],
-      locale: 'ru'
+      residenceCountry: 'RU'
     });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,

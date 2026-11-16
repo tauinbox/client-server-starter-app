@@ -13,8 +13,8 @@ import type {
   UsageSummaryResponse
 } from '@app/shared/types';
 import {
+  billingGeo,
   geoDefault,
-  geoFromLocale,
   overrideForRegion,
   prorationAmounts,
   regionForOverride,
@@ -49,6 +49,7 @@ import { authGuard, permissionGuard } from '../helpers/auth.helpers';
 import {
   applyCreditDelta,
   crossesZero,
+  ensureCustomer,
   notifyEntitlementsChanged
 } from '../helpers/billing-settle.helpers';
 import {
@@ -434,31 +435,6 @@ export function cancelSubscriptionsForDeletedUser(userId: string): void {
   }
 }
 
-function getOrCreateCustomer(userId: string, locale: string): MockCustomer {
-  const existing = findCustomer(userId);
-
-  if (existing) return existing;
-
-  const { country, currency } = geoFromLocale(locale);
-  const now = new Date().toISOString();
-  const customer: MockCustomer = {
-    id: randomUUID(),
-    userId,
-    provider: geoDefault(country),
-    providerOverride: null,
-    country,
-    currency,
-    defaultPaymentMethodId: null,
-    trialUsedAt: null,
-    createdAt: now,
-    updatedAt: now
-  };
-
-  getState().billingCustomers.set(customer.id, customer);
-
-  return customer;
-}
-
 /**
  * Mirrors the server's whitelisted `ORDER BY` for the billing lists
  * (`list-order.util.ts`): an unrecognized `sortBy` falls back to `createdAt`.
@@ -709,7 +685,7 @@ billingRouter.get('/products', authGuard, (req: Request, res: Response) => {
   const customer = findCustomer(user.id);
   const provider = customer
     ? effectiveProvider(customer)
-    : geoDefault(geoFromLocale(user.locale).country);
+    : geoDefault(billingGeo(user).country);
 
   const products = [...getState().billingProducts.values()]
     .filter((product) => product.active && product.prices[provider])
@@ -791,7 +767,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
     return;
   }
 
-  const customer = getOrCreateCustomer(user.id, user.locale);
+  const customer = ensureCustomer(user);
   const provider = effectiveProvider(customer);
 
   if (rejectUnavailableProvider(res, provider, user)) return;
@@ -960,7 +936,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     return;
   }
 
-  const customer = getOrCreateCustomer(user.id, user.locale);
+  const customer = ensureCustomer(user);
 
   const hasActive = getState()
     .billingSubscriptions.values()
@@ -1484,7 +1460,7 @@ billingRouter.get('/region', authGuard, (req: Request, res: Response) => {
     return;
   }
 
-  const { country } = geoFromLocale(user.locale);
+  const { country } = billingGeo(user);
 
   res.json(regionView(user, { providerOverride: null, country }));
 });
@@ -1503,7 +1479,7 @@ billingRouter.put('/region', authGuard, (req: Request, res: Response) => {
     return;
   }
 
-  const customer = getOrCreateCustomer(user.id, user.locale);
+  const customer = ensureCustomer(user);
   const newOverride = overrideForRegion(region as BillingRegion);
   const newEffective = newOverride ?? geoDefault(customer.country);
 

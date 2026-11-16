@@ -90,7 +90,7 @@ describe('GET /billing/products', () => {
       'credits-1000',
       'credits-5000'
     ]);
-    // en-locale seed user resolves to paddle/USD.
+    // The seed user (residence DE) resolves to paddle/USD.
     expect(products[0].prices.paddle).toEqual({
       currency: 'USD',
       amountMinor: 500,
