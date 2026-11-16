@@ -25,9 +25,9 @@ import { hashToken } from '../../../common/utils/hash-token';
 import { createMockConfigService } from '../../../common/testing/config-service.mock';
 import { createMockCache } from '../../../common/testing/cache.mock';
 
-// Under Jest one QR image costs about half a second of CPU, and most tests
-// enrol only to get a secret. A CPU-starved full run timed one of them out at
-// 5 s, so only the test that reads the image encodes it for real.
+// Under Jest one QR image costs about half a second of CPU, and a CPU-starved
+// full run timed a test that encoded one out at 5 s. No unit test encodes an
+// image: test/mfa-setup-qr-image.e2e-spec.ts reads a real one.
 const mockToDataUrl = jest
   .fn<Promise<string>, [string]>()
   .mockResolvedValue('data:image/png;base64,');
@@ -227,17 +227,17 @@ describe('MfaService', () => {
       expect(stored.totpLastUsedStep).toBeNull();
     });
 
-    it('returns a URI and a QR image the authenticator can read', async () => {
-      const qrcode = jest.requireActual<typeof import('qrcode')>('qrcode');
+    it('returns the URI and the QR image that the encoder makes of it', async () => {
+      const image = 'data:image/png;base64,image-of-the-uri';
 
-      mockToDataUrl.mockImplementationOnce((text) => qrcode.toDataURL(text));
+      mockToDataUrl.mockResolvedValueOnce(image);
 
       const setup = await service.beginEnrolment(buildUser());
 
       expect(setup.otpauthUri).toContain('otpauth://totp/');
       expect(setup.otpauthUri).toContain(`secret=${setup.secret}`);
       expect(mockToDataUrl).toHaveBeenLastCalledWith(setup.otpauthUri);
-      expect(setup.qrDataUrl).toMatch(/^data:image\/png;base64,.{100,}/);
+      expect(setup.qrDataUrl).toBe(image);
     });
 
     it('refuses when the account already carries the factor', async () => {
