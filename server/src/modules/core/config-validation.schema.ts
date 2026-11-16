@@ -4,8 +4,11 @@ import {
   DATA_REGIONS,
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   MIN_JWT_EXPIRATION_SECONDS,
+  REGION_INTEGRATIONS,
+  SMTP_PROVIDER_REGIONS,
   type DataRegion,
-  type PeerRegions
+  type PeerRegions,
+  type RegionIntegration
 } from '@app/shared/constants';
 import {
   DEFAULT_BILLING_PROVIDER_TIMEOUT_MS,
@@ -43,6 +46,69 @@ function refuseOwnRegionAsPeer(
     ? helpers.message({
         custom: 'PEER_REGIONS must not name the own DATA_REGION'
       })
+    : env;
+}
+
+// Any one of these set counts as enabled, so a stray key of a provider that
+// may not run in this region refuses the boot as well.
+const INTEGRATION_ENV_KEYS: Record<RegionIntegration, readonly string[]> = {
+  paddle: ['PADDLE_API_KEY', 'PADDLE_WEBHOOK_SECRET', 'PADDLE_CLIENT_TOKEN'],
+  yookassa: ['YOOKASSA_SHOP_ID', 'YOOKASSA_SECRET_KEY'],
+  turnstile: ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'],
+  googleOAuth: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
+  facebookOAuth: ['FACEBOOK_CLIENT_ID', 'FACEBOOK_CLIENT_SECRET'],
+  vkOAuth: ['VK_CLIENT_ID', 'VK_CLIENT_SECRET']
+};
+
+function isSet(value: unknown): boolean {
+  return typeof value === 'string' && value !== '';
+}
+
+function egressRefusals(env: Record<string, unknown>): string[] {
+  const region = env['DATA_REGION'] as DataRegion | undefined;
+
+  if (!region) return [];
+
+  const integrations = Object.keys(INTEGRATION_ENV_KEYS) as RegionIntegration[];
+  const refusals = integrations.flatMap((integration) => {
+    const allowed: readonly DataRegion[] = REGION_INTEGRATIONS[integration];
+    const setKeys = INTEGRATION_ENV_KEYS[integration].filter((key) =>
+      isSet(env[key])
+    );
+
+    return setKeys.length > 0 && !allowed.includes(region)
+      ? [
+          `${integration} may not run in DATA_REGION ${region} (${setKeys.join(', ')} set)`
+        ]
+      : [];
+  });
+
+  if (isSet(env['SMTP_HOST'])) {
+    const smtpRegion = env['SMTP_REGION'] as DataRegion | undefined;
+    const accepted: readonly DataRegion[] = SMTP_PROVIDER_REGIONS[region];
+
+    if (!smtpRegion) {
+      refusals.push('SMTP_REGION is required when SMTP_HOST is set');
+    } else if (!accepted.includes(smtpRegion)) {
+      refusals.push(
+        `an SMTP provider in ${smtpRegion} may not serve DATA_REGION ${region}`
+      );
+    }
+  }
+
+  return refusals;
+}
+
+// Personal data must not leave the jurisdiction of the cell through an
+// integration (architecture section 12.5).
+function refuseEgressOutsideRegion(
+  env: Record<string, unknown>,
+  helpers: Joi.CustomHelpers
+): unknown {
+  const refusals = egressRefusals(env);
+
+  return refusals.length > 0
+    ? helpers.message({ custom: refusals.join('; ') })
     : env;
 }
 
@@ -151,6 +217,13 @@ export const configValidationSchema = Joi.object({
   TURNSTILE_SITE_KEY: Joi.string().optional().allow(''),
   TURNSTILE_SECRET_KEY: Joi.string().optional().allow(''),
   SMTP_SECURE: Joi.string().valid('true', 'false').optional().allow(''),
+  // The region of the SMTP provider, declared by the operator, because the
+  // host name does not tell it. Required when SMTP_HOST is set (rule at the
+  // end of the schema).
+  SMTP_REGION: Joi.string()
+    .valid(...DATA_REGIONS)
+    .empty('')
+    .optional(),
   // Billing provider credentials — optional/empty by default so an
   // unconfigured provider simply makes billing unavailable. A provider
   // counts as configured only when both of its vars are set.
@@ -189,4 +262,6 @@ export const configValidationSchema = Joi.object({
     .integer()
     .min(1)
     .default(DEFAULT_WEBHOOK_PAYLOAD_RETENTION_DAYS)
-}).custom(refuseOwnRegionAsPeer);
+})
+  .custom(refuseOwnRegionAsPeer)
+  .custom(refuseEgressOutsideRegion);

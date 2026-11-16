@@ -99,11 +99,14 @@ export {
 export {
   DATA_REGIONS,
   COUNTRY_CODES,
+  REGION_INTEGRATIONS,
+  SMTP_PROVIDER_REGIONS,
   isCountryCode,
   regionForCountry,
   type CountryCode,
   type DataRegion,
-  type PeerRegions
+  type PeerRegions,
+  type RegionIntegration
 } from './data-region.constants';
 
 export { ErrorKeys } from './error-keys';

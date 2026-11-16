@@ -10,6 +10,31 @@ export type DataRegion = (typeof DATA_REGIONS)[number];
 /** The public URL of each other cell. A region with no entry is not served. */
 export type PeerRegions = Partial<Record<DataRegion, string>>;
 
+/**
+ * The cell regions where each integration that receives personal data may
+ * run. A cell whose env enables an integration outside its list refuses the
+ * boot.
+ */
+export const REGION_INTEGRATIONS = {
+  paddle: ['intl'],
+  yookassa: ['ru'],
+  turnstile: ['intl'],
+  googleOAuth: ['intl'],
+  facebookOAuth: ['intl'],
+  vkOAuth: ['intl', 'ru']
+} as const satisfies Record<string, readonly DataRegion[]>;
+
+export type RegionIntegration = keyof typeof REGION_INTEGRATIONS;
+
+/**
+ * The regions of an SMTP provider (the SMTP_REGION variable) that each cell
+ * accepts. The mail of a ru cell must not leave Russia (152-FZ Art. 18 p. 5).
+ */
+export const SMTP_PROVIDER_REGIONS = {
+  intl: ['intl', 'ru'],
+  ru: ['ru']
+} as const satisfies Record<DataRegion, readonly DataRegion[]>;
+
 /** The officially assigned ISO 3166-1 alpha-2 codes. */
 export const COUNTRY_CODES = [
   'AD',

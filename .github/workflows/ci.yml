@@ -113,6 +113,7 @@ jobs:
       # read the rendered message back over Mailpit's REST API.
       SMTP_HOST: localhost
       SMTP_PORT: 1025
+      SMTP_REGION: intl
 
     steps:
       # Anonymous Docker Hub pulls from shared runner IPs hit the 429 rate

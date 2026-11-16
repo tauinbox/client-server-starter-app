@@ -1148,7 +1148,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `DB_NAME` | `my-db` | Database name |
 | `DB_USER` | `postgres` | Database user |
 | `DB_PASSWORD` | `password` | Database password |
-| `DATA_REGION` | `intl` | Necessary. The data region of this deployment: `intl` or `ru`. Another value aborts the boot. It is part of the JWT issuer, so a deployment refuses a token of another region |
+| `DATA_REGION` | `intl` | Necessary. The data region of this deployment: `intl` or `ru`. Another value aborts the boot. It is part of the JWT issuer, so a deployment refuses a token of another region. A set key of an integration that may not run in the region also aborts the boot: Paddle, Turnstile, Google and Facebook only in `intl`, YooKassa only in `ru`, VK in both |
 | `PEER_REGIONS` | `{}` | JSON object of the other regions: region to public `https` URL. The own region aborts the boot |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
 | `JWT_SECRET` | - | HS256 secret, a minimum of 32 characters, that is the 256-bit key size RFC 7518 makes necessary for HS256. It is necessary when `JWT_ALGORITHM=HS256` |
@@ -1166,6 +1166,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `VK_CLIENT_SECRET` | - | VK OAuth client secret |
 | `CLIENT_URL` | `http://localhost:4200` | Client URL for the OAuth redirects |
 | `SMTP_HOST` | - | SMTP server host. A value enables the email delivery |
+| `SMTP_REGION` | - | The data region of the SMTP provider: `intl` or `ru`. Necessary when `SMTP_HOST` is set. A `ru` deployment accepts only `ru`; an `intl` deployment accepts both |
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
