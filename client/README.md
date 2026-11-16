@@ -61,8 +61,10 @@ src/app/
 │   │                       # provider sign-in on an enrolled account asks for a code too;
 │   │                       # components/oauth-residence asks the country of residence on
 │   │                       # the OAuth callback page before a provider sign-up creates
-│   │                       # the account; components/residence-country-field is the
-│   │                       # country select that it and the register form share)
+│   │                       # the account; components/residence asks it once of an
+│   │                       # account that has none, before any other signed-in page;
+│   │                       # components/residence-country-field is the country select
+│   │                       # that they and the register form share)
 │   │   ├── casl/           # app-ability.ts holds AppAbility, Actions and Subjects.
 │   │   │                   # Subjects contains the generated KnownSubjects and AnyObject.
 │   │   │                   # PermissionCheck holds action, subject and an optional instance.
@@ -494,6 +496,7 @@ src/app/
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |
+| `/residence` | ResidenceComponent | residenceGuard (signed in; an account with a country goes on to its `returnUrl`). `ensureAuthenticated`, which every guard of a signed-in page calls, sends an account with `residenceCountry: null` here first |
 | `/legal/:jurisdiction/:kind` | LegalDocumentComponent | legalDocumentGuard (canMatch; public; a draft only outside a production build) |
 | `/forbidden` | ForbiddenComponent | - |
 | `/**` | PageNotFoundComponent | - |
