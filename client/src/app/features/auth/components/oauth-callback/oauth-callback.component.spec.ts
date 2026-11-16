@@ -54,6 +54,7 @@ const mockAuthResponse: AuthResponse = {
     isEmailVerified: true,
     hasPassword: true,
     mfaEnabled: false,
+    residenceCountry: 'DE',
     locale: 'en',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

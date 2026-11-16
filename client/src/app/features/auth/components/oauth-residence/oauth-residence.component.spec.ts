@@ -96,7 +96,7 @@ describe('OAuthResidenceComponent', () => {
     await submit('RU');
 
     expect(component['error']()).toBe(
-      'Registration for this country is not available yet.'
+      'Accounts for this country are not available yet.'
     );
     expect(component['peerUrl']()).toBeNull();
     expect(failed).not.toHaveBeenCalled();

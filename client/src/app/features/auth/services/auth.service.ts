@@ -414,6 +414,35 @@ export class AuthService {
       .pipe(tap((user) => this.#authStore.updateCurrentUser(user)));
   }
 
+  /**
+   * A change of the declared country. It replaces a legal record, so it
+   * carries the step-up factors of the account, or rides on the proof of a
+   * provider round trip.
+   */
+  changeResidence(
+    residenceCountry: CountryCode,
+    factors: StepUpFactorsRequest
+  ): Observable<User> {
+    return this.#http
+      .patch<User>(
+        AuthApiEnum.Residence,
+        { residenceCountry, ...factors },
+        { context: silentContext() }
+      )
+      .pipe(tap((user) => this.#authStore.updateCurrentUser(user)));
+  }
+
+  /** The one declaration of an account that has no country of residence. */
+  declareResidence(residenceCountry: CountryCode): Observable<User> {
+    return this.#http
+      .post<User>(
+        AuthApiEnum.Residence,
+        { residenceCountry },
+        { context: silentContext() }
+      )
+      .pipe(tap((user) => this.#authStore.updateCurrentUser(user)));
+  }
+
   refreshTokens(): Observable<TokensResponse | null> {
     return this.#tokenService.refreshTokens();
   }

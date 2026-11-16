@@ -59,6 +59,7 @@ function createMockAuthResponse(): AuthResponse {
       isEmailVerified: true,
       hasPassword: true,
       mfaEnabled: false,
+      residenceCountry: 'DE',
       locale: 'en',
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
@@ -826,11 +827,64 @@ describe('AuthService', () => {
     });
   });
 
+  describe('declareResidence', () => {
+    it('posts the country and keeps the answer as the current user', async () => {
+      const declared = {
+        ...createMockAuthResponse().user,
+        residenceCountry: 'DE' as const
+      };
+      const result = firstValueFrom(service.declareResidence('DE'));
+
+      const req = httpMock.expectOne(AuthApiEnum.Residence);
+
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ residenceCountry: 'DE' });
+      req.flush(declared);
+
+      await expect(result).resolves.toEqual(declared);
+      expect(authStoreMock.updateCurrentUser).toHaveBeenCalledWith(declared);
+    });
+  });
+
+  describe('changeResidence', () => {
+    it('patches the country with the step-up factors and keeps the answer', async () => {
+      const changed = {
+        ...createMockAuthResponse().user,
+        residenceCountry: 'FR' as const
+      };
+      const result = firstValueFrom(
+        service.changeResidence('FR', { currentPassword: 'Lantern-Orchard-47' })
+      );
+
+      const req = httpMock.expectOne(AuthApiEnum.Residence);
+
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({
+        residenceCountry: 'FR',
+        currentPassword: 'Lantern-Orchard-47'
+      });
+      req.flush(changed);
+
+      await expect(result).resolves.toEqual(changed);
+      expect(authStoreMock.updateCurrentUser).toHaveBeenCalledWith(changed);
+    });
+  });
+
   // Each caller of these requests shows the refusal itself, so a global
   // notification would show the same error a second time.
   describe('error notifications', () => {
     it.each<[string, string, () => Observable<unknown>]>([
       ['getProfile', AuthApiEnum.Profile, () => service.getProfile()],
+      [
+        'declareResidence',
+        AuthApiEnum.Residence,
+        () => service.declareResidence('DE')
+      ],
+      [
+        'changeResidence',
+        AuthApiEnum.Residence,
+        () => service.changeResidence('FR', { code: '123456' })
+      ],
       [
         'updateProfile',
         AuthApiEnum.Profile,

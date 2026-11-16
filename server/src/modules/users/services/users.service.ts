@@ -11,7 +11,8 @@ import { hashPassword } from '../../../common/utils/password-hash';
 import {
   ErrorKeys,
   USER_LIST_QUERY,
-  VERIFICATION_TOKEN_EXPIRY_MS
+  VERIFICATION_TOKEN_EXPIRY_MS,
+  type CountryCode
 } from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
@@ -472,6 +473,48 @@ export class UsersService {
     }
 
     return saved;
+  }
+
+  /**
+   * Writes the declared country of residence over the value the caller read
+   * (`expected`, null for an account that has none). The write is keyed on
+   * that value, so of two concurrent writes one wins. Returns null when the
+   * value moved since the read; the caller names the refusal.
+   */
+  async declareResidence(
+    id: string,
+    {
+      country,
+      expected,
+      audit
+    }: {
+      country: CountryCode;
+      expected: CountryCode | null;
+      audit: UserAuditRows;
+    }
+  ): Promise<User | null> {
+    return withTransaction(this.dataSource, async (manager) => {
+      const live = { id, deletedAt: IsNull() };
+      const declared = await keyedUpdate(manager, User, {
+        where: { ...live, residenceCountry: expected ?? IsNull() },
+        changes: { residenceCountry: country }
+      });
+
+      if (!declared) {
+        if (await manager.exists(User, { where: live })) return null;
+
+        throw userNotFound(id);
+      }
+
+      const written = await manager.findOneOrFail(User, {
+        where: { id },
+        relations: { roles: true }
+      });
+
+      await this.writeAudit(manager, audit, written);
+
+      return written;
+    });
   }
 
   async incrementFailedAttemptsAndLockIfNeeded(

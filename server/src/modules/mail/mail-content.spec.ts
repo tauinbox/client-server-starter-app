@@ -46,6 +46,33 @@ describe('mail-content', () => {
     }
   });
 
+  it('names both countries of a residence change by name, with no link, in both locales', () => {
+    const details = { when: '2026-09-01 12:34 UTC', ip: '198.51.100.7' };
+    const change = { previous: 'DE', current: 'FR' };
+    const en = mailMessages('en').residenceChanged(change, details);
+    const ru = mailMessages('ru').residenceChanged(change, details);
+
+    expect(en.button).toBeUndefined();
+    expect(ru.button).toBeUndefined();
+    expect(en.paragraphs[0]).toBe(
+      'The country of residence of your account was changed from Germany to France.'
+    );
+    expect(ru.paragraphs[0]).toContain('Прежняя страна: Германия');
+    expect(ru.paragraphs[0]).toContain('Новая страна: Франция');
+    expect(en.paragraphs.join(' ')).toContain('198.51.100.7');
+  });
+
+  it('says a country was set when the account had none', () => {
+    const msg = mailMessages('en').residenceChanged(
+      { previous: null, current: 'FR' },
+      { when: '2026-09-01 12:34 UTC' }
+    );
+
+    expect(msg.paragraphs[0]).toBe(
+      'The country of residence of your account was set to France.'
+    );
+  });
+
   it('says the earlier recovery set stopped working, in both locales', () => {
     const details = { when: '2026-09-01 12:34 UTC', ip: '198.51.100.7' };
 

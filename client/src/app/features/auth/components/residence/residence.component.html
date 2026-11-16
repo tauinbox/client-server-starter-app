@@ -1,0 +1,54 @@
+<div class="residence-container" *transloco="let t; scope: 'auth'">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>{{ t('auth.residence.title') }}</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <p class="intro">{{ t('auth.residence.intro') }}</p>
+
+      <form (submit)="$event.preventDefault(); onSubmit()">
+        <nxs-residence-country-field [field]="residenceForm.residenceCountry" />
+
+        @if (error()) {
+          <div class="error-message" role="alert">
+            {{ error() }}
+            @if (peerUrl(); as url) {
+              <a class="peer-region-link" [href]="url">{{
+                t('auth.register.openPeerRegion')
+              }}</a>
+            }
+          </div>
+        }
+
+        <div class="form-actions">
+          <button matButton="filled" type="submit" [disabled]="!canSubmit()">
+            @if (loading()) {
+              <span class="app-btn-loading">
+                <mat-spinner
+                  [attr.aria-label]="t('common.loading')"
+                  diameter="24"
+                ></mat-spinner>
+                {{ t('auth.residence.saving') }}
+              </span>
+            } @else {
+              {{ t('auth.residence.submit') }}
+            }
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+
+    <mat-card-actions>
+      <button
+        matButton="text"
+        type="button"
+        class="full-width"
+        [disabled]="loading()"
+        (click)="onSignOut()"
+      >
+        {{ t('auth.residence.signOut') }}
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

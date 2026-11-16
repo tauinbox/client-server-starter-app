@@ -52,6 +52,8 @@ export const STATE_FIXTURES = [
   'oauth-signup',
   /** A linked `vk` account. */
   'vk-linked',
+  /** The actor has declared `DE` as its country of residence. */
+  'residence-declared',
   /** Wrong step-up codes of `user-mfa`, one below the lock. */
   'step-up-code-failures',
   /** A role that is not a system role, named `$roleName`; `$roleId`. */

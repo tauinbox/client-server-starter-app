@@ -61,7 +61,7 @@ import {
   REAUTH_PROOF_COOKIE
 } from '../constants/oauth.constants';
 import type { OAuthResidenceRequiredResponse } from '@app/shared/types';
-import { OAuthSignupDto } from '../dtos/register.dto';
+import { ResidenceDeclarationDto } from '../dtos/register.dto';
 import { RegionService } from '../../core/region/region.service';
 import { User } from '../../users/entities/user.entity';
 import { isEmailExistsConflict } from '../../users/utils/email-taken';
@@ -560,7 +560,7 @@ export class OAuthController {
   @ApiOkResponse({ description: 'Auth response of the new account' })
   async signUpWithOAuth(
     @Request() req: ExpressRequest,
-    @Body() dto: OAuthSignupDto,
+    @Body() dto: ResidenceDeclarationDto,
     @Res({ passthrough: true }) res: Response
   ) {
     const cookie = this.cookies.read(req, OAUTH_SIGNUP_COOKIE);

@@ -239,6 +239,7 @@ describe('FeatureFlagPreviewComponent', () => {
         isEmailVerified: true,
         hasPassword: true,
         mfaEnabled: false,
+        residenceCountry: 'DE',
         locale: 'en',
         createdAt: '',
         updatedAt: '',

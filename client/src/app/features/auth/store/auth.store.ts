@@ -61,6 +61,13 @@ export const AuthStore = signalStore(
      */
     mustEnrolMfa: computed(
       () => store.mfaMandatory() && store.user()?.mfaEnabled === false
+    ),
+    /**
+     * True while the account has no declared country of residence. The guards
+     * send such a session to the residence page before any other page.
+     */
+    mustDeclareResidence: computed(
+      () => store.user()?.residenceCountry === null
     )
   })),
   withMethods((store) => {

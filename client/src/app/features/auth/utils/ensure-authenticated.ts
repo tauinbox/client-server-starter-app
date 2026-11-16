@@ -1,11 +1,13 @@
 import { catchError, Observable, of, switchMap } from 'rxjs';
 import type { GuardResult, Router } from '@angular/router';
 import { loginUrlTree } from './navigate-to-login';
+import { residenceRedirect } from './residence-redirect';
 
 type AuthStoreLike = {
   isAuthenticated: () => boolean;
   isAccessTokenExpired: () => boolean;
   hasPersistedUser: () => boolean;
+  mustDeclareResidence: () => boolean;
 };
 
 type AuthServiceLike = {
@@ -20,8 +22,12 @@ export function ensureAuthenticated(
     router
   }: { authStore: AuthStoreLike; authService: AuthServiceLike; router: Router },
   returnUrl: string,
-  onAuthenticated: () => GuardResult | Observable<GuardResult>
+  onGranted: () => GuardResult | Observable<GuardResult>
 ): GuardResult | Observable<GuardResult> {
+  // Read after a refresh too: the refresh answer carries the user.
+  const onAuthenticated = () =>
+    residenceRedirect(authStore, router, returnUrl) ?? onGranted();
+
   if (authStore.isAuthenticated() && !authStore.isAccessTokenExpired()) {
     return onAuthenticated();
   }

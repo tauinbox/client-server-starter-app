@@ -635,6 +635,11 @@ runWithInfra('Request scenarios (e2e)', () => {
         providerId: `vk-${ctx.actor!.user.id}`
       });
     },
+    'residence-declared': async (ctx) => {
+      await dataSource
+        .getRepository(User)
+        .update(ctx.actor!.user.id, { residenceCountry: 'DE' });
+    },
     'custom-role': async (ctx) => {
       const role = await dataSource
         .getRepository(Role)

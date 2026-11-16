@@ -69,6 +69,21 @@ interface MessageBuilders {
   mfaDisabled: (details: CredentialChangeDetails) => EmailMessage;
   mfaRecoveryCodesReplaced: (details: CredentialChangeDetails) => EmailMessage;
   mfaResetByAdmin: (details: CredentialChangeDetails) => EmailMessage;
+  residenceChanged: (
+    change: ResidenceChange,
+    details: CredentialChangeDetails
+  ) => EmailMessage;
+}
+
+/** A change of the declared country, as ISO 3166-1 alpha-2 codes. */
+export interface ResidenceChange {
+  previous: string | null;
+  current: string;
+}
+
+/** The name of a country in the language of the message, or its code. */
+function countryName(code: string, locale: SupportedLocale): string {
+  return new Intl.DisplayNames([locale], { type: 'region' }).of(code) ?? code;
 }
 
 /**
@@ -239,6 +254,17 @@ const en: MessageBuilders = {
       'Set up two-factor authentication again from your profile.',
       EN_RECOVERY
     ]
+  }),
+  residenceChanged: ({ previous, current }, details) => ({
+    subject: 'The country of residence of your account was changed',
+    heading: 'Country of residence changed',
+    paragraphs: [
+      previous
+        ? `The country of residence of your account was changed from ${countryName(previous, 'en')} to ${countryName(current, 'en')}.`
+        : `The country of residence of your account was set to ${countryName(current, 'en')}.`,
+      enDetails(details),
+      EN_RECOVERY
+    ]
   })
 };
 
@@ -351,6 +377,17 @@ const ru: MessageBuilders = {
       'Администратор удалил аутентификатор и резервные коды вашего аккаунта. Теперь вход выполняется только по паролю, а все активные сеансы завершены.',
       ruDetails(details),
       'Снова включите двухфакторную аутентификацию в профиле.',
+      RU_RECOVERY
+    ]
+  }),
+  residenceChanged: ({ previous, current }, details) => ({
+    subject: 'Изменена страна проживания вашего аккаунта',
+    heading: 'Страна проживания изменена',
+    paragraphs: [
+      previous
+        ? `Страна проживания вашего аккаунта изменена. Прежняя страна: ${countryName(previous, 'ru')}. Новая страна: ${countryName(current, 'ru')}.`
+        : `Для вашего аккаунта указана страна проживания: ${countryName(current, 'ru')}.`,
+      ruDetails(details),
       RU_RECOVERY
     ]
   })

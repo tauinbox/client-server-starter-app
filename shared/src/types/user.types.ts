@@ -1,3 +1,4 @@
+import type { CountryCode } from '../constants/data-region.constants';
 import { RoleResponse, RoleAdminResponse } from './role.types';
 
 export type UserResponse = {
@@ -19,6 +20,11 @@ export type UserResponse = {
    * factor on.
    */
   mfaEnabled: boolean;
+  /**
+   * The declared country of residence. Null for an account that has not
+   * declared it yet; the client asks that account before anything else.
+   */
+  residenceCountry: CountryCode | null;
   locale: string;
   createdAt: string;
   updatedAt: string;

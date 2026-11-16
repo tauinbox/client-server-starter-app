@@ -32,7 +32,12 @@ import { MfaService } from '../services/mfa.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { MfaPolicyService } from '../services/mfa-policy.service';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
-import { RegisterDto } from '../dtos/register.dto';
+import {
+  ChangeResidenceDto,
+  RegisterDto,
+  ResidenceDeclarationDto
+} from '../dtos/register.dto';
+import { StepUpRoute } from '../decorators/step-up-route.decorator';
 import { UpdateProfileDto } from '../dtos/update-profile.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LoginDto } from '../dtos/login.dto';
@@ -355,6 +360,72 @@ export class AuthController {
     }
 
     return updatedUser;
+  }
+
+  // No @Authorize: the client asks every account with no country before
+  // anything else, so a role without the profile grant must still answer.
+  @Post('profile/residence')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Declare the country of residence of an account that has none'
+  })
+  @ApiBody({ type: ResidenceDeclarationDto })
+  @ApiOkResponse({
+    description: 'The country is declared',
+    type: UserResponseDto
+  })
+  @ApiConflictResponse({
+    description:
+      'The country is of another region, or the account has already declared one'
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  declareResidence(
+    @Request() req: JwtAuthRequest,
+    @Body() dto: ResidenceDeclarationDto
+  ) {
+    return this.authService.declareResidence(req.user.userId, {
+      residenceCountry: dto.residenceCountry,
+      auditContext: extractAuditContext(req)
+    });
+  }
+
+  // A change replaces a legal record, so it is an edit of the own profile
+  // with a fresh proof. Unlike the credential routes it keeps the two-factor
+  // gate: a country is not a way into the account.
+  @Authorize(['update', 'Profile'])
+  @StepUpRoute(ChangeResidenceDto)
+  @Patch('profile/residence')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change the declared country of residence' })
+  @ApiOkResponse({
+    description: 'The country is changed, or was already that country',
+    type: UserResponseDto
+  })
+  @ApiConflictResponse({
+    description:
+      'The country is of another region, or it changed during the request'
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async changeResidence(
+    @Request() req: JwtAuthRequest,
+    @Body() dto: ChangeResidenceDto,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    const user = await this.authService.changeResidence(req.user.userId, {
+      residenceCountry: dto.residenceCountry,
+      factors: {
+        currentPassword: dto.currentPassword,
+        code: dto.code,
+        reauthProof: this.cookies.readReauthProof(req)
+      },
+      auditContext: extractAuditContext(req)
+    });
+
+    // Cleared only after the change is accepted, as the email change does.
+    this.cookies.clearReauthProof(res);
+
+    return user;
   }
 
   // The address is the recovery channel of the password, so a role that may not

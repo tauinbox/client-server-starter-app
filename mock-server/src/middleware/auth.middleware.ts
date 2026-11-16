@@ -15,6 +15,8 @@ import {
   STEP_UP_OPERATION,
   SUPPORTED_LOCALES,
   VERIFICATION_TOKEN_EXPIRY_MS,
+  isCountryCode,
+  type CountryCode,
   type ErrorKey,
   type SignInRefusalReason
 } from '@app/shared/constants';
@@ -63,8 +65,10 @@ import {
 } from '../helpers/auth.helpers';
 import {
   buildMockUser,
+  RESIDENCE_COUNTRY_ERROR,
   validateCreateUserBody
 } from '../helpers/user-create.helpers';
+import { residenceRefusal } from '../helpers/region.helpers';
 import {
   CAPTCHA_ROUTE_LIMITS,
   evaluateCaptcha,
@@ -1053,6 +1057,123 @@ router.patch(
       pushUserCrudEvent('updated', user.id, previous);
     }
 
+    res.json(toUserResponse(user));
+  }
+);
+
+// POST /api/v1/auth/profile/residence
+// Mirrors AuthService.declareResidence: the region of the country first, then
+// one write over an empty column.
+router.post('/profile/residence', authGuard, (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const { residenceCountry } = body;
+  const bodyErrors = [
+    ...unknownPropertyErrors(body, ['residenceCountry']),
+    ...(isCountryCode(residenceCountry) ? [] : [RESIDENCE_COUNTRY_ERROR])
+  ];
+
+  if (bodyErrors.length > 0) {
+    sendValidationError(res, 'body', bodyErrors);
+
+    return;
+  }
+
+  // The validation above rejects any other value.
+  const country = residenceCountry as CountryCode;
+  const refusal = residenceRefusal(country);
+
+  if (refusal) {
+    sendError(res, refusal.errorKey, refusal.message);
+
+    return;
+  }
+
+  const { user } = req as AuthenticatedRequest;
+
+  if (user.residenceCountry !== null) {
+    sendError(
+      res,
+      ErrorKeys.AUTH.RESIDENCE_ALREADY_DECLARED,
+      'The country of residence is already declared'
+    );
+
+    return;
+  }
+
+  user.residenceCountry = country;
+  user.updatedAt = new Date().toISOString();
+  logAudit('USER_UPDATE', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    details: { changedFields: ['residenceCountry'], source: 'self' },
+    ip: req.ip
+  });
+  pushUserCrudEvent('updated', user.id);
+  res.json(toUserResponse(user));
+});
+
+// PATCH /api/v1/auth/profile/residence
+// Mirrors AuthService.changeResidence: the region first, then the step-up,
+// then one write over the value that the step-up read.
+router.patch(
+  '/profile/residence',
+  permissionGuard('update', 'Profile'),
+  requireStepUpBody({
+    fields: ['residenceCountry'],
+    fieldErrors: (body) =>
+      isCountryCode(body['residenceCountry']) ? [] : [RESIDENCE_COUNTRY_ERROR]
+  }),
+  (req, res) => {
+    const { user } = req as AuthenticatedRequest;
+    const { currentPassword, code } = req.body;
+    // The validation above rejects any other value.
+    const country = req.body.residenceCountry as CountryCode;
+    const refusal = residenceRefusal(country);
+
+    if (refusal) {
+      sendError(res, refusal.errorKey, refusal.message);
+
+      return;
+    }
+
+    const stepUp = stepUpError(req, user, {
+      currentPassword,
+      code,
+      operation: STEP_UP_OPERATION.RESIDENCE_CHANGE
+    });
+
+    if (stepUp) {
+      sendWithRetryAfter(res, stepUp);
+
+      return;
+    }
+
+    clearReauthProofCookie(res);
+
+    const previous = user.residenceCountry;
+
+    if (previous === country) {
+      res.json(toUserResponse(user));
+
+      return;
+    }
+
+    user.residenceCountry = country;
+    user.updatedAt = new Date().toISOString();
+    logAudit('USER_UPDATE', {
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { changedFields: ['residenceCountry'], source: 'self' },
+      ip: req.ip
+    });
+    pushUserCrudEvent('updated', user.id);
+    console.log(
+      `[RESIDENCE CHANGED] To: ${user.email}\n  From: ${previous ?? 'none'} | To: ${country} | IP: ${req.ip}`
+    );
     res.json(toUserResponse(user));
   }
 );

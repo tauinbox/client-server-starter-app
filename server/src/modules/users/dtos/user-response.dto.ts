@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type { CountryCode } from '@app/shared/constants';
 import type {
   StructuralDiff,
   UserResponse,
@@ -37,6 +38,15 @@ export class UserResponseDto {
     description: 'True when the account has a verified second factor'
   })
   mfaEnabled: boolean;
+
+  @ApiProperty({
+    example: 'DE',
+    nullable: true,
+    type: String,
+    description:
+      'The declared country of residence, ISO 3166-1 alpha-2. Null until the account declares it'
+  })
+  residenceCountry: CountryCode | null;
 
   @ApiProperty({ example: 'en' })
   locale: string;

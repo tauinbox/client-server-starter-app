@@ -1,0 +1,105 @@
+<mat-card *transloco="let t; scope: 'auth'">
+  <mat-card-header>
+    <mat-card-title>{{ t('auth.residenceCard.title') }}</mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    <p class="residence-current">
+      {{ countryName() ?? t('auth.residenceCard.notSet') }}
+    </p>
+    @if (!editing()) {
+      <p class="residence-note">{{ t('auth.residenceCard.hint') }}</p>
+    }
+
+    @if (editing()) {
+      <div class="residence-edit">
+        <nxs-residence-country-field [field]="countryForm.residenceCountry" />
+
+        @if (factor() === 'password') {
+          <nxs-form-field
+            [field]="passwordForm.currentPassword"
+            label="auth.residenceCard.currentPassword"
+            [type]="pwdToggle.show() ? 'text' : 'password'"
+            prefixIcon="lock"
+            autocomplete="current-password"
+          >
+            <nxs-password-toggle formFieldSuffix #pwdToggle />
+          </nxs-form-field>
+        } @else if (factor() === 'code') {
+          <nxs-form-field
+            [field]="codeForm.code"
+            label="auth.residenceCard.code"
+            type="text"
+            prefixIcon="password"
+            autocomplete="one-time-code"
+          />
+        } @else {
+          <p class="residence-note">
+            {{
+              t('auth.residenceCard.reauthNotice', {
+                provider: reauthProviderLabel()
+              })
+            }}
+          </p>
+        }
+
+        @if (error()) {
+          <div class="error-message" role="alert">
+            {{ error() }}
+            @if (peerUrl(); as url) {
+              <a class="peer-region-link" [href]="url">{{
+                t('auth.register.openPeerRegion')
+              }}</a>
+            }
+          </div>
+        }
+
+        <div class="residence-actions">
+          <button
+            matButton="filled"
+            type="button"
+            [disabled]="saveBlocked()"
+            (click)="save()"
+          >
+            @if (busy()) {
+              <span class="app-btn-loading">
+                <mat-spinner
+                  [attr.aria-label]="t('common.loading')"
+                  diameter="20"
+                ></mat-spinner>
+                {{ t('auth.residenceCard.saving') }}
+              </span>
+            } @else {
+              {{ t('auth.residenceCard.save') }}
+            }
+          </button>
+          <button
+            matButton="text"
+            type="button"
+            [disabled]="busy()"
+            (click)="cancel()"
+          >
+            {{ t('common.cancel') }}
+          </button>
+        </div>
+      </div>
+    } @else if (canChange()) {
+      @if (cannotStepUp()) {
+        <p class="residence-note" role="note">
+          {{ t('auth.residenceCard.needsFactor') }}
+        </p>
+      } @else {
+        <div class="residence-actions">
+          <button
+            matButton="outlined"
+            type="button"
+            [disabled]="busy()"
+            (click)="startChange()"
+          >
+            {{ t('auth.residenceCard.change') }}
+          </button>
+        </div>
+      }
+    }
+  </mat-card-content>
+</mat-card>

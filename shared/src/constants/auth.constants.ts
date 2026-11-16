@@ -50,7 +50,8 @@ export const STEP_UP_OPERATION = {
   OAUTH_LINK: 'oauth_link',
   OAUTH_UNLINK: 'oauth_unlink',
   SESSION_REVOKE: 'session_revoke',
-  USER_CREDENTIAL_CHANGE: 'user_credential_change'
+  USER_CREDENTIAL_CHANGE: 'user_credential_change',
+  RESIDENCE_CHANGE: 'residence_change'
 } as const;
 
 export type StepUpOperation =

@@ -61,8 +61,11 @@ src/app/
 │   │                       # provider sign-in on an enrolled account asks for a code too;
 │   │                       # components/oauth-residence asks the country of residence on
 │   │                       # the OAuth callback page before a provider sign-up creates
-│   │                       # the account; components/residence-country-field is the
-│   │                       # country select that it and the register form share)
+│   │                       # the account; components/residence asks it once of an
+│   │                       # account that has none, before any other signed-in page;
+│   │                       # components/residence-card shows it on the profile page and
+│   │                       # changes it with a step-up; components/residence-country-field
+│   │                       # is the country select that they and the register form share)
 │   │   ├── casl/           # app-ability.ts holds AppAbility, Actions and Subjects.
 │   │   │                   # Subjects contains the generated KnownSubjects and AnyObject.
 │   │   │                   # PermissionCheck holds action, subject and an optional instance.
@@ -494,6 +497,7 @@ src/app/
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |
+| `/residence` | ResidenceComponent | residenceGuard (signed in; an account with a country goes on to its `returnUrl`). `ensureAuthenticated`, which every guard of a signed-in page calls, sends an account with `residenceCountry: null` here first |
 | `/legal/:jurisdiction/:kind` | LegalDocumentComponent | legalDocumentGuard (canMatch; public; a draft only outside a production build) |
 | `/forbidden` | ForbiddenComponent | - |
 | `/**` | PageNotFoundComponent | - |
@@ -1256,8 +1260,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 355 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1808 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 361 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1853 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and

@@ -167,6 +167,16 @@ runWithInfra('A code is a step-up factor on every step-up route (e2e)', () => {
       }
     ],
     [
+      'a change of the country of residence',
+      'patch',
+      '/api/v1/auth/profile/residence',
+      { residenceCountry: 'FR' },
+      200,
+      async () => {
+        expect((await row()).residenceCountry).toBe('FR');
+      }
+    ],
+    [
       'a first password',
       'patch',
       '/api/v1/auth/profile',
