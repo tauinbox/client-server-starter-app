@@ -5,6 +5,9 @@
 *.key
 *.p12
 .env.local
+# Compose env files of the cells (docker-compose.yml, scripts/cell.sh)
+/.env
+/cells/*/
 
 # OS
 .DS_Store

@@ -1,3 +1,12 @@
+# One copy of this file runs one data-region cell. CELL is unset for the
+# intl cell, which keeps the names it had before cells existed: project
+# `nexus`, volume `nexus_postgres_data_18`, proxy network `shared-network`. A
+# new cell sets CELL=<region> in its own env file and runs through
+# `scripts/cell.sh`, which refuses an env file whose CELL does not match. Every
+# name below then carries the region, so no container, volume or network is
+# shared with another cell. See doc/architecture.md section 12.6a.
+name: nexus${CELL:+-${CELL}}
+
 services:
   redis:
     image: redis:7.4-alpine
@@ -63,14 +72,15 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile
-    env_file: server/.env
+    env_file: ${CELL:+cells/${CELL}/}server/.env
     environment:
       DB_HOST: db
       REDIS_URL: redis://redis:6379
       ENVIRONMENT: production
-      # The data region of this cell. PEER_REGIONS is unset: no other cell
-      # exists yet, so a registration for another region is refused.
-      DATA_REGION: intl
+      # The data region of this cell. This value wins over the env file. The
+      # intl cell has no PEER_REGIONS: no other cell runs yet, so a
+      # registration for another region is refused.
+      DATA_REGION: ${CELL:-intl}
       # The region of the SMTP provider in the SMTP_* secrets, which is in
       # Russia. Change it together with SMTP_HOST: a ru cell accepts only ru.
       SMTP_REGION: ru
@@ -119,11 +129,15 @@ services:
       redis:
         condition: service_healthy
     networks:
-      # `shared` lets the host Caddy reverse-proxy reach this service by name
+      default:
+      # `proxy` lets the host Caddy reverse-proxy reach this service by name
       # (Caddyfile: `/api/* -> server:3000`). Without it a recreate drops the
-      # container from shared-network and Caddy returns 502.
-      - default
-      - shared
+      # container from the proxy network and Caddy returns 502. Compose also
+      # registers the bare service name there, so a proxy that serves two
+      # cells routes only by the alias, which carries the region.
+      proxy:
+        aliases:
+          - nexus-${CELL:-intl}-server
     # Headroom over the deploy-time migration/boot spike (peak ~179 MiB) so the
     # server is never OOM-killed mid-migration; reservation keeps a floor.
     mem_limit: 384m
@@ -142,7 +156,8 @@ services:
       context: .
       dockerfile: client/Dockerfile
     ports:
-      - "127.0.0.1:4200:8080"
+      # Loopback only. Each cell on one host needs its own port.
+      - "127.0.0.1:${CLIENT_HOST_PORT:-4200}:8080"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ || exit 1"]
       interval: 30s
@@ -158,11 +173,11 @@ services:
         # already surface as API errors.
         condition: service_started
     networks:
-      # `shared` lets the host Caddy reverse-proxy reach this service by name
-      # (Caddyfile: `/nexus/* -> client:8080`). Without it a recreate drops the
-      # container from shared-network and Caddy returns 502.
-      - default
-      - shared
+      default:
+      # Caddyfile: `/nexus/* -> client:8080`. See the server service.
+      proxy:
+        aliases:
+          - nexus-${CELL:-intl}-client
     # nginx serving static files — tiny, peak ~10 MiB.
     mem_limit: 64m
     # nginx runs as the non-root `nginx` user on port 8080; no capabilities needed.
@@ -241,8 +256,11 @@ services:
     depends_on:
       - prometheus
     networks:
-      - default
-      - shared
+      default:
+      # Caddyfile: `grafana:3000`. See the server service.
+      proxy:
+        aliases:
+          - nexus-${CELL:-intl}-grafana
     # Grafana 13's unified-storage/apiserver working set exceeds the old 256m
     # cap: it pegged memory.max (peak == cap, 1600+ cgroup "max" reclaim events),
     # and the resulting reclaim/swap stalls made its internal apiserver time out
@@ -257,14 +275,18 @@ services:
     restart: unless-stopped
 
 networks:
-  shared:
+  # The intl cell keeps `shared-network`; another cell gets `nexus-<region>-proxy`,
+  # so the containers of two cells never share a network. The proxy joins both.
+  proxy:
     external: true
-    name: shared-network
+    name: ${CELL:+nexus-}${CELL:-shared-network}${CELL:+-proxy}
 
 volumes:
   postgres_data_18:
+    # External, so a wrong name makes `up` fail instead of starting an empty
+    # database. Never rename the volume of a running cell.
     external: true
-    name: nexus_postgres_data_18
+    name: nexus${CELL:+-${CELL}}_postgres_data_18
   uploads:
   prometheus_data:
   grafana_data:
