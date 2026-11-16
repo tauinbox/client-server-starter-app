@@ -1281,13 +1281,13 @@ Services:
 - **db** is postgres:18-alpine with a persistent named volume.
 - **server** is the NestJS API on port 3000. Its entrypoint runs the migrations, does the optional
   administrator seed, and then starts the server. It exposes `GET /metrics` for Prometheus. It joins
-  the `default` network and the external `shared` network, thus a Caddy instance on the host reaches
-  it as `server:3000`.
+  the `default` network and the external `proxy` network (`shared-network` for the intl cell), thus a
+  Caddy instance on the host reaches it as `server:3000`, and also as `nexus-intl-server:3000`.
 - **client** is the Angular SPA. nginx serves it on port 8080. The host binding is
   `127.0.0.1:4200:8080`, thus only the localhost reaches it, and Caddy uses `client:8080` internally.
   The build uses `--base-href /nexus/`, and `docker build --build-arg BASE_HREF=/` changes it. The
-  service joins the `default` network and the external `shared` network. The compose file declares
-  `shared`, and no person attaches it manually. Thus the proxy stays reachable after a recreate of a
+  service joins the `default` network and the external `proxy` network. The compose file declares
+  `proxy`, and no person attaches it manually. Thus the proxy stays reachable after a recreate of a
   container. Its access log records paths only, without the query string or the `Referer`, because the
   mailed verification, reset and email-change links carry a one-time token in the query.
 - **prometheus** is prom/prometheus:v3.12.0. It is on the internal network only and exposes no port.
@@ -1309,6 +1309,90 @@ Services:
 
   Grafana-managed alerting comes from the files in `monitoring/grafana/provisioning/alerting/`. Refer
   to [Alerting](#alerting) below.
+
+### Data-region cells
+
+One copy of `docker-compose.yml` runs one data-region cell: its own database, Redis, volumes,
+networks, env files, secrets and Grafana. The design is in `doc/architecture.md`, section 12.
+
+**Names.** The variable `CELL` selects the cell. The intl cell runs with `CELL` unset and keeps the
+names that it had before cells existed. Another cell sets `CELL=<region>`, and each name then carries
+the region:
+
+| | intl (`CELL` unset) | another cell (`CELL=ru`) |
+|---|---|---|
+| Compose project | `nexus` | `nexus-ru` |
+| Env files | `.env`, `server/.env` | `cells/ru/.env`, `cells/ru/server/.env` |
+| Database volume (external) | `nexus_postgres_data_18` | `nexus-ru_postgres_data_18` |
+| Other volumes | `nexus_uploads`, ... | `nexus-ru_uploads`, ... |
+| Proxy network (external) | `shared-network` | `nexus-ru-proxy` |
+| Proxy aliases | `nexus-intl-server`, `-client`, `-grafana` | `nexus-ru-server`, `-client`, `-grafana` |
+| Client loopback port | 4200 | `CLIENT_HOST_PORT` |
+| `DATA_REGION` of the server | `intl` | `ru` |
+
+Never rename the volume of a running cell: a new name starts an empty database. The database volume
+is external for that reason, so a wrong name makes `up` fail.
+
+**Run a cell only through `scripts/cell.sh`.** Compose lets the shell and the env file override the
+project name, so an env file with a wrong or missing `CELL` composes another cell, and `up` then
+recreates the containers of that cell. The script refuses such a file before Docker reads it:
+
+```bash
+scripts/cell.sh compose ru up -d --wait     # any docker compose command
+scripts/cell.sh backup ru                    # online backup
+scripts/cell.sh backup ru --stop-writers     # stops the server first (a move)
+scripts/cell.sh restore ru <backup dir>      # only on a host without the cell
+```
+
+The deploy workflows serve the intl cell only and run `docker compose` directly, as before.
+
+**The proxy routes only by the aliases.** Compose also registers the bare service name (`server`) on
+the proxy network. Each cell has its own proxy network, and a proxy that joins two of them and
+resolves `server` gets one of the two cells, and which one is not defined. Thus a Caddyfile that
+serves two cells must use `nexus-intl-server:3000` and `nexus-ru-server:3000`, never `server:3000`.
+The intl cell keeps the bare names, so the current Caddyfile works with one cell.
+
+**Start a new cell.**
+
+1. Copy `cells/.env.example` to `cells/<region>/.env` and `server/.env.example` to
+   `cells/<region>/server/.env`, and fill in both (`chmod 600`). Give the cell its own secrets: its
+   own JWT key pair, `MFA_ENCRYPTION_KEY` and database password. Set `PEER_REGIONS` in both cells.
+2. `docker network create nexus-<region>-proxy` and `docker volume create nexus-<region>_postgres_data_18`.
+3. `scripts/cell.sh compose <region> up -d --wait`.
+4. Connect the proxy to `nexus-<region>-proxy`, and route the domain of the cell to its aliases.
+
+**Backup.** `scripts/cell.sh backup <region>` writes `$BACKUP_ROOT/<project>-<UTC time>/` (default
+`BACKUP_ROOT`: `$HOME/nexus-backups`): `db.dump` (`pg_dump -Fc`), `counts.txt` (the exact row count
+of each table), `uploads.tar.gz`, `manifest` and `SHA256SUMS`. A failed backup stays under a
+`.partial` name. The backup does not keep Redis (no volume), Prometheus (the metrics history starts
+again) or Grafana (the repository provisions the dashboards and the alerts). The backup holds personal
+data: keep it on a host in the jurisdiction of the cell.
+
+**Restore.** `scripts/cell.sh restore <region> <backup dir>` checks the checksums and the region of
+the backup, and refuses when the database volume or a container of the cell exists. It creates the
+containers, restores the uploads, starts the db only, restores the dump and compares the row counts.
+It never starts the application. If it fails, remove what it made
+(`scripts/cell.sh compose <region> down -v` and `docker volume rm nexus-<region>_postgres_data_18`)
+and run it again. On Windows Git Bash, export `MSYS_NO_PATHCONV=1` first.
+
+**Move a cell to another host.**
+
+1. On the new host: Docker, the Docker Hub mirror (see above), a checkout of the repository, the two
+   env files of the cell (copy them directly, never through the backup) and the images.
+2. For the intl cell, disable the Deploy workflow first, so that no merge runs `up` during the move.
+3. On the old host: `scripts/cell.sh backup <region> --stop-writers`. From here on the cell takes no
+   write.
+4. Copy the backup directory to the new host (`scp -r`), and run
+   `scripts/cell.sh restore <region> <backup dir>` there. Stop on a count difference.
+5. `scripts/cell.sh compose <region> up -d --wait`. Check `/api/health/ready`, the region at
+   `/api/v1/config/region`, a sign-in and a search before any traffic reaches the host.
+6. Point the DNS of the cell domain to the new host. For the intl cell, point the `VPS_HOST`,
+   `VPS_HOST_KEY` and SSH secrets to the new host, and enable the Deploy workflow again.
+7. Keep the old host and its volumes until the new host passes a week of service. To roll back before
+   the DNS change, start the server on the old host again (`scripts/cell.sh compose <region> start server`).
+
+**Legal limit.** While the host is outside Russia, a `ru` cell runs for tests only, with no real
+Russian user (152-FZ Art. 18 p. 5).
 
 ### Alerting
 
