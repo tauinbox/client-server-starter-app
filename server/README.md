@@ -338,7 +338,10 @@ The metrics are `http_requests_total`, `http_request_duration_seconds`, `auth_ev
 `mail_jobs_processed_total{outcome}`, `db_pool_connections{state}`,
 `cache_requests_total{cache,outcome}`,
 `password_breach_lookups_total{outcome}`, `audit_write_failures_total{action}` and
-`dependency_up{dependency}`. The module also supplies `HttpMetricsInterceptor`.
+`dependency_up{dependency}`. The module also supplies `HttpMetricsInterceptor`. Its `route` label is
+the route template that Express matched (`/api/v1/users/:id`), never the raw path, so no label holds
+a value that the caller sent. `test/metric-labels-no-personal-data.e2e-spec.ts` refuses a label that
+holds a user id, an email or an IP address.
 
 `password_breach_lookups_total{outcome="unavailable"}` needs an alert. The breached-password check
 fails open, so a blocklist that stops answering is silent in every other signal: registrations keep

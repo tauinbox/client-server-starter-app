@@ -36,20 +36,22 @@ export class HttpMetricsInterceptor implements NestInterceptor {
   }
 
   private record(req: Request, statusCode: number, durationMs: number): void {
-    const route = this.normalizeRoute(req.path);
-
     this.metricsService.recordHttpRequest(
-      { method: req.method, route, statusCode },
+      { method: req.method, route: routeTemplate(req.route), statusCode },
       durationMs
     );
   }
+}
 
-  private normalizeRoute(path: string): string {
-    return path
-      .replaceAll(
-        /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
-        '/:id'
-      )
-      .replaceAll(/\/\d+/g, '/:id');
-  }
+export const UNMATCHED_ROUTE = 'unmatched';
+
+// The raw path holds what the caller sent (an email, an IP address, any
+// string), so the label is the template that Express matched.
+function routeTemplate(route: unknown): string {
+  return typeof route === 'object' &&
+    route !== null &&
+    'path' in route &&
+    typeof route.path === 'string'
+    ? route.path
+    : UNMATCHED_ROUTE;
 }
