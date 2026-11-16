@@ -1,4 +1,8 @@
-import type { LegalJurisdiction, StepUpOperation } from '@app/shared/constants';
+import type {
+  LegalJurisdiction,
+  PeerRegions,
+  StepUpOperation
+} from '@app/shared/constants';
 import type {
   BillingProviderId,
   MeteringResponse,
@@ -75,6 +79,10 @@ export type ControlApi = {
   // `siteKey: null` (or omit) to use the public Turnstile test site key
   // (1x00000000000000000000AA), which always passes the visible challenge.
   setCaptcha(enabled: boolean, siteKey?: string | null): Promise<void>;
+  // Replaces the other cells that /api/v1/config/region advertises (`{}`
+  // removes all). A peer also makes a registration for its region answer
+  // `errors.auth.residenceOtherRegion` instead of `residenceRegionNotServed`.
+  setRegionPeers(peers: PeerRegions): Promise<void>;
   // Sets the admin kill-switch flag of one billing provider. A disabled
   // provider is unavailable, as on a server where it is not configured.
   setBillingProviderEnabled(

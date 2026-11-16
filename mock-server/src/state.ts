@@ -102,6 +102,7 @@ export function resetState(): void {
     auditLogs: [],
     paddleClientConfig: { clientToken: null, environment: 'sandbox' },
     captchaConfig: { enabled: false, provider: null, siteKey: null },
+    regionPeers: {},
     captchaAttempts: new Map(),
     mfaChallengeFailures: new Map(),
     mfaStepUpFailures: new Map(),

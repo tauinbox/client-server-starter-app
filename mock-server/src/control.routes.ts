@@ -23,10 +23,13 @@ import type {
   State
 } from './types';
 import {
+  DATA_REGIONS,
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   isLegalJurisdiction,
-  MFA_PENDING_TOKEN_EXPIRY_SECONDS
+  MFA_PENDING_TOKEN_EXPIRY_SECONDS,
+  type PeerRegions
 } from '@app/shared/constants';
+import { MOCK_DATA_REGION } from './helpers/region.helpers';
 import {
   OAUTH_DATA_MAX_AGE_MS,
   OAUTH_SIGNUP_MAX_AGE_MS,
@@ -81,6 +84,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     auditLogs: state.auditLogs,
     paddleClientConfig: state.paddleClientConfig,
     captchaConfig: state.captchaConfig,
+    regionPeers: state.regionPeers,
     captchaAttempts: state.captchaAttempts.size,
     mfaChallengeFailures: state.mfaChallengeFailures.size,
     mfaStepUpFailures: state.mfaStepUpFailures.size,
@@ -618,6 +622,38 @@ router.post('/captcha', (req, res) => {
     : { enabled, provider: null, siteKey: null };
   state.captchaAttempts.clear();
   res.json({ message: `captcha ${enabled ? 'enabled' : 'disabled'}` });
+});
+
+// POST /__control/region-peers - replace the other cells that
+// /api/v1/config/region advertises. Refuses what the boot check of the server
+// refuses (an unknown region, a URL that is not https, the own region), so a
+// test cannot reach a config that no server serves. `{}` removes every peer.
+router.post('/region-peers', (req, res) => {
+  const { peers } = req.body as { peers?: unknown };
+
+  if (typeof peers !== 'object' || peers === null || Array.isArray(peers)) {
+    res.status(400).json({ message: 'peers (object) is required' });
+
+    return;
+  }
+
+  const entries = Object.entries(peers);
+  const refused = entries.find(
+    ([region, url]) =>
+      !(DATA_REGIONS as readonly string[]).includes(region) ||
+      region === MOCK_DATA_REGION ||
+      typeof url !== 'string' ||
+      URL.parse(url)?.protocol !== 'https:'
+  );
+
+  if (refused) {
+    res.status(400).json({ message: `peer ${refused[0]} is not valid` });
+
+    return;
+  }
+
+  getState().regionPeers = Object.fromEntries(entries) as PeerRegions;
+  res.json(getState().regionPeers);
 });
 
 // POST /__control/billing/paddle-config — set the Paddle.js client token that

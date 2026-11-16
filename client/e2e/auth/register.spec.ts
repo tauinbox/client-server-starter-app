@@ -365,6 +365,32 @@ test.describe('Register page', () => {
     await expect(page).toHaveURL(/.*\/register$/);
   });
 
+  test('links to the site that serves the country of another region', async ({
+    _mockServer,
+    page
+  }) => {
+    await _mockServer.setRegionPeers({ ru: 'https://ru.example.com' });
+    await page.goto('/register');
+
+    const main = page.getByRole('main');
+
+    await page.getByLabel('Email').fill('resident@example.com');
+    await page.getByLabel('Full name').fill('Jane Smith');
+    await page
+      .getByLabel('Password', { exact: true })
+      .fill('Sunrise-Kettle-19');
+    await chooseOption(page, COUNTRY, 'Russia');
+    await main.getByRole('button', { name: 'Register' }).click();
+
+    await expect(page.locator('.error-message')).toContainText(
+      'Accounts for this country are kept on another site.'
+    );
+    await expect(
+      main.getByRole('link', { name: 'Go to the site for this country' })
+    ).toHaveAttribute('href', 'https://ru.example.com');
+    await expect(page).toHaveURL(/.*\/register$/);
+  });
+
   test('should have a link to login page', async ({ _mockServer, page }) => {
     await page.goto('/register');
 

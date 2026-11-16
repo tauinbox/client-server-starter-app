@@ -63,8 +63,17 @@
     }
   }
 
+  // The peer region line goes under the register line, not beside it.
+  mat-card-actions {
+    flex-wrap: wrap;
+  }
+
   mat-card-actions p {
     font-size: vars.$font-size-sm;
+  }
+
+  .peer-regions {
+    margin-top: 0;
   }
 
   button[type='submit'] {

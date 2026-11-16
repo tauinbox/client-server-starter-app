@@ -25,6 +25,7 @@ import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.s
 import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 import type { EntitlementsResponse, UserResponse } from '@app/shared/types';
 import { LoginComponent } from '../components/login/login.component';
+import { REGION_CONFIG_API_V1 } from '@core/services/region-config.service';
 import { TranslocoTestingModuleWithLangs } from '../../../../test-utils/transloco-testing';
 
 // An older release cached the resource catalog under this key.
@@ -201,6 +202,9 @@ describe('session teardown', () => {
     httpMock
       .expectOne(FEATURE_FLAGS_URL)
       .flush({ flags: { 'oauth-google': true }, evaluatedAt: '' });
+    httpMock
+      .expectOne(REGION_CONFIG_API_V1)
+      .flush({ region: 'intl', peers: {} });
     await fixture.whenStable();
     fixture.detectChanges();
 

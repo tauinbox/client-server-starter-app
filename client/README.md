@@ -1260,8 +1260,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 361 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1853 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 364 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1859 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and
@@ -1284,6 +1284,10 @@ The session tests carry a control route of their own. `POST /__control/age-sessi
 of each live session of a user back, thus the next refresh of that session reads as past the absolute
 cap. It stands in for a 30-day wait, the same way `POST /__control/expire-token` stands in for the
 deadline of a mailed token.
+The region tests set the other cells with `POST /__control/region-peers` (`setRegionPeers`): the
+login page then shows its links to the peers, and a registration for the region of a peer gets the
+peer link. It stands in for `PEER_REGIONS` of a server, and refuses the values that the server boot
+check refuses.
 The two-factor tests carry one more control route. A code is single use on the server and on the
 mock, and the mock answers one fixed code, so a test that must present that code a second time
 calls `POST /__control/totp-ledger` to clear the recorded step. It stands in for the wait a real

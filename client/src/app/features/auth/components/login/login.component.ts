@@ -29,8 +29,8 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { OAuthIntentService } from '../../services/oauth-intent.service';
 import type { HttpErrorResponse } from '@angular/common/http';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { take } from 'rxjs/operators';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { map, take } from 'rxjs/operators';
 import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
 import {
   PASSWORD_CHANGED,
@@ -56,8 +56,10 @@ import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.s
 import {
   ErrorKeys,
   OAUTH_ERROR,
-  OAUTH_PROVIDER_FLAGS
+  OAUTH_PROVIDER_FLAGS,
+  type DataRegion
 } from '@app/shared/constants';
+import { RegionConfigService } from '@core/services/region-config.service';
 
 type LoginData = {
   email: string;
@@ -70,6 +72,11 @@ const OAUTH_ERROR_KEYS: Record<string, string> = {
   [OAUTH_ERROR.NO_EMAIL]: 'auth.login.errorNoEmail',
   [OAUTH_ERROR.EMAIL_ALREADY_REGISTERED]:
     'auth.login.errorEmailAlreadyRegistered'
+};
+
+const PEER_REGION_LABEL_KEYS: Record<DataRegion, string> = {
+  intl: 'auth.login.peerRegionIntl',
+  ru: 'auth.login.peerRegionRu'
 };
 
 @Component({
@@ -104,6 +111,22 @@ export class LoginComponent implements OnInit, OnDestroy {
   readonly #window = inject(DOCUMENT).defaultView;
   readonly #translocoService = inject(TranslocoService);
   readonly #flagsStore = inject(FeatureFlagsStore);
+
+  // Static links to the other cells. An email that this cell does not hold
+  // gets the usual invalid-credentials answer; no cell asks another one.
+  protected readonly peerLinks = toSignal(
+    inject(RegionConfigService)
+      .peerLinks()
+      .pipe(
+        map((links) =>
+          links.map(({ region, url }) => ({
+            url,
+            labelKey: PEER_REGION_LABEL_KEYS[region]
+          }))
+        )
+      ),
+    { initialValue: [] }
+  );
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);

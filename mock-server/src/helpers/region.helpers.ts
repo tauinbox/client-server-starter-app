@@ -2,15 +2,20 @@ import {
   ErrorKeys,
   regionForCountry,
   type CountryCode,
+  type DataRegion,
   type ErrorKey
 } from '@app/shared/constants';
 import type { RegionConfigResponse } from '@app/shared/types';
+import { getState } from '../state';
 
-// The mock is one cell of the `intl` region with no peers, as production.
-export const MOCK_REGION_CONFIG: RegionConfigResponse = {
-  region: 'intl',
-  peers: {}
-};
+// The mock is one cell of the `intl` region, as production. It has no peers
+// until a test sets them through /__control/region-peers.
+export const MOCK_DATA_REGION: DataRegion = 'intl';
+
+/** Mirrors `RegionService` of the server: this cell and its peers. */
+export function regionConfig(): RegionConfigResponse {
+  return { region: MOCK_DATA_REGION, peers: getState().regionPeers };
+}
 
 /** Mirrors `RegionService.assertServesCountry`. */
 export function residenceRefusal(
@@ -18,9 +23,9 @@ export function residenceRefusal(
 ): { errorKey: ErrorKey; message: string } | null {
   const region = regionForCountry(country);
 
-  if (region === MOCK_REGION_CONFIG.region) return null;
+  if (region === MOCK_DATA_REGION) return null;
 
-  if (MOCK_REGION_CONFIG.peers[region]) {
+  if (getState().regionPeers[region]) {
     return {
       errorKey: ErrorKeys.AUTH.RESIDENCE_OTHER_REGION,
       message: 'Accounts for this country are kept in another region'

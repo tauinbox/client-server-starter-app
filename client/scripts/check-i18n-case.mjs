@@ -17,7 +17,12 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const srcDir = resolve(__dirname, '..', 'src');
 
-const ALLOWED_CAPITALISED = new Set(['Enter', 'If-Match', 'MongoQuery']);
+const ALLOWED_CAPITALISED = new Set([
+  'Enter',
+  'If-Match',
+  'MongoQuery',
+  'Russia'
+]);
 const SENTENCE_PUNCTUATION = /[.!?:;"—]/;
 const PLACEHOLDER = /\{\{[^}]*\}\}/g;
 const CAPITALISED = /^\(?([A-Z][a-z][\w-]*)/;

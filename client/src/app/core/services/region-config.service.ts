@@ -3,13 +3,24 @@ import { HttpClient } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 import { catchError, map, of } from 'rxjs';
 import {
+  DATA_REGIONS,
   ErrorKeys,
   regionForCountry,
-  type CountryCode
+  type CountryCode,
+  type DataRegion
 } from '@app/shared/constants';
 import type { RegionConfigResponse } from '@app/shared/types';
 
 export const REGION_CONFIG_API_V1 = '/api/v1/config/region';
+
+/** The public URL of another cell. */
+export type PeerLink = { region: DataRegion; url: string };
+
+// The client makes a link only of an https URL, also when the list comes
+// from this deployment.
+function httpsUrl(url: string | undefined): string | null {
+  return url && URL.parse(url)?.protocol === 'https:' ? url : null;
+}
 
 /** The data region of this deployment and the public URLs of the others. */
 @Injectable({
@@ -36,12 +47,26 @@ export class RegionConfigService {
     if (errorKey !== ErrorKeys.AUTH.RESIDENCE_OTHER_REGION) return of(null);
 
     return this.get().pipe(
-      map(({ peers }) => {
-        const url = peers[regionForCountry(country)];
-
-        return url && URL.parse(url)?.protocol === 'https:' ? url : null;
-      }),
+      map(({ peers }) => httpsUrl(peers[regionForCountry(country)])),
       catchError(() => of(null))
+    );
+  }
+
+  /**
+   * Every other cell, in the order of `DATA_REGIONS`, for the static links of
+   * the sign-in page. Sign-in never asks another cell whether it holds an
+   * email. A failed load gives no links: the links are an extra.
+   */
+  peerLinks(): Observable<PeerLink[]> {
+    return this.get().pipe(
+      map(({ peers }) =>
+        DATA_REGIONS.flatMap((region) => {
+          const url = httpsUrl(peers[region]);
+
+          return url ? [{ region, url }] : [];
+        })
+      ),
+      catchError(() => of([]))
     );
   }
 }

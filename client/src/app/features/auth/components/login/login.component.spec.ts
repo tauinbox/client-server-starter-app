@@ -2,7 +2,11 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting
+} from '@angular/common/http/testing';
+import { REGION_CONFIG_API_V1 } from '@core/services/region-config.service';
 import { ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -816,6 +820,43 @@ describe('LoginComponent', () => {
       component.onOAuthLogin('twitter');
 
       expect(start).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('links to the other regions', () => {
+    async function flushRegionConfig(
+      peers: Record<string, string>
+    ): Promise<void> {
+      TestBed.inject(HttpTestingController)
+        .expectOne(REGION_CONFIG_API_V1)
+        .flush({ region: 'intl', peers });
+      fixture.detectChanges();
+      await fixture.whenStable();
+    }
+
+    function peerLinks(): HTMLAnchorElement[] {
+      return Array.from(
+        fixture.nativeElement.querySelectorAll('.peer-region-link')
+      );
+    }
+
+    it('links to the site of each peer, with the name of its region', async () => {
+      await flushRegionConfig({ ru: 'https://ru.example.com' });
+
+      const [link] = peerLinks();
+
+      expect(peerLinks()).toHaveLength(1);
+      expect(link.getAttribute('href')).toBe('https://ru.example.com');
+      expect(link.textContent.trim()).toBe('Go to the site for Russia');
+      expect(
+        fixture.nativeElement.querySelector('.peer-regions').textContent
+      ).toContain('Account in another region?');
+    });
+
+    it('shows no line when the cell has no peers', async () => {
+      await flushRegionConfig({});
+
+      expect(fixture.nativeElement.querySelector('.peer-regions')).toBeNull();
     });
   });
 });

@@ -177,6 +177,17 @@
         {{ t('auth.login.noAccount') }}
         <a routerLink="/register">{{ t('auth.login.register') }}</a>
       </p>
+
+      @if (peerLinks().length > 0) {
+        <p class="peer-regions text-center full-width">
+          {{ t('auth.login.peerRegionsPrompt') }}
+          @for (link of peerLinks(); track link.url) {
+            <a class="peer-region-link" [href]="link.url">{{
+              t(link.labelKey)
+            }}</a>
+          }
+        </p>
+      }
     </mat-card-actions>
   </mat-card>
 </div>
