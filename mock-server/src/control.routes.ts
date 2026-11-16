@@ -608,11 +608,14 @@ router.post('/captcha', (req, res) => {
 
   const state = getState();
 
-  state.captchaConfig = {
-    enabled,
-    // Default to the Turnstile public test sitekey that always passes.
-    siteKey: siteKey ?? (enabled ? '1x00000000000000000000AA' : null)
-  };
+  state.captchaConfig = enabled
+    ? {
+        enabled,
+        provider: 'turnstile',
+        // Default to the Turnstile public test sitekey that always passes.
+        siteKey: siteKey ?? '1x00000000000000000000AA'
+      }
+    : { enabled, provider: null, siteKey: null };
   state.captchaAttempts.clear();
   res.json({ message: `captcha ${enabled ? 'enabled' : 'disabled'}` });
 });

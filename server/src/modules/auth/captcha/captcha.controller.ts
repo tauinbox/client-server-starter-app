@@ -19,10 +19,6 @@ export class CaptchaController {
   })
   @ApiOkResponse({ description: 'Captcha public configuration' })
   getConfig(): CaptchaConfigResponse {
-    return {
-      enabled: this.captchaService.isEnabled(),
-      provider: 'turnstile',
-      siteKey: this.captchaService.getSiteKey()
-    };
+    return this.captchaService.getConfig();
   }
 }

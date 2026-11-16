@@ -8,10 +8,10 @@ import { CaptchaService } from './captcha.service';
  * Soft-trigger captcha verification. Runs AFTER the global ThrottlerGuard
  * so that `X-RateLimit-Remaining` is already set on the response. When the
  * remaining count for this client drops to {@link CAPTCHA_THRESHOLD} or
- * below, a valid `captchaToken` (Turnstile token) becomes mandatory.
+ * below, a valid `captchaToken` becomes mandatory.
  *
- * When TURNSTILE_SECRET_KEY/TURNSTILE_SITE_KEY are not configured, the
- * guard is a no-op so local dev and tests work without external dependency.
+ * When CAPTCHA_PROVIDER is empty, the guard is a no-op so local dev and tests
+ * work without an external dependency.
  */
 const CAPTCHA_THRESHOLD = 1;
 

@@ -41,7 +41,7 @@ export class CaptchaWidgetComponent implements OnInit {
     from(this.#captchaService.loadConfig())
       .pipe(
         switchMap((cfg) => {
-          if (!cfg.enabled || !cfg.siteKey) {
+          if (!cfg.enabled) {
             this.status.set('unavailable');
 
             return of(null);
@@ -50,7 +50,7 @@ export class CaptchaWidgetComponent implements OnInit {
           return from(this.#captchaService.loadScript()).pipe(
             switchMap((api) => {
               this.widgetId = api.render(this.container().nativeElement, {
-                sitekey: cfg.siteKey as string,
+                sitekey: cfg.siteKey,
                 callback: (token) => this.tokenChange.emit(token),
                 'error-callback': () => {
                   this.status.set('error');

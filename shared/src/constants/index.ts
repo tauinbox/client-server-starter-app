@@ -33,6 +33,8 @@ export {
   TOTP_EPOCH_TOLERANCE_SECONDS,
   MFA_RECOVERY_CODE_COUNT,
   MFA_RECOVERY_CODE_BYTES,
+  CAPTCHA_PROVIDERS,
+  type CaptchaProvider,
   type TokenPurpose,
   type StepUpOperation,
   type OAuthError,

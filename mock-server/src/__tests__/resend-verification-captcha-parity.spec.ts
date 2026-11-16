@@ -39,7 +39,11 @@ function resend(body: unknown): Promise<Response> {
 }
 
 function enableCaptcha(): void {
-  getState().captchaConfig = { enabled: true, siteKey: 'test-site-key' };
+  getState().captchaConfig = {
+    enabled: true,
+    provider: 'turnstile',
+    siteKey: 'test-site-key'
+  };
 }
 
 // The server gates the route with CaptchaRequiredGuard behind

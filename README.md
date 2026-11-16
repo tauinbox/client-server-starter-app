@@ -108,7 +108,8 @@ management and theming.
   Turnstile challenge only when `X-RateLimit-Remaining` is 1 or less for the IP of the caller. Thus a
   legitimate user usually does not see it.
 
-  The CAPTCHA is **disabled by default**. To activate it in production you need a free Cloudflare
+  The CAPTCHA is **disabled by default** (`CAPTCHA_PROVIDER` is empty). Each cell selects one vendor
+  with that variable; Cloudflare Turnstile is the only one now. To activate it in production you need a free Cloudflare
   account. The included test keys give no protection against abuse in production. Use them for local
   development and for CI only. The deploy steps are in
   [`server/README.md`, "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production).
@@ -1183,7 +1184,8 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `ADMIN_EMAIL` | - | Email address of the initial administrator. The server seeds the account at startup, and it skips this step when the value is empty |
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
 | `ADMIN_NAME` | `Admin` | Full name of the initial administrator |
-| `TURNSTILE_SITE_KEY` | - | Public site key of Cloudflare Turnstile. The CAPTCHA on `/register`, `/forgot-password` and `/resend-verification` stays disabled while one of the two keys is empty. Get a true pair at `dash.cloudflare.com`, then Turnstile, then Add site. It is free. The test keys (`1x00000000000000000000AA` and `1x0000000000000000000000000000000AA`) operate for local development and for CI. They are public and give no protection in production. Refer to [`server/README.md`, "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production) |
+| `CAPTCHA_PROVIDER` | - | The CAPTCHA vendor of the cell for `/register`, `/forgot-password` and `/resend-verification`: `turnstile`, or empty for no CAPTCHA. The boot is refused when a key of the selected vendor is empty, and when a key of a vendor that is not selected is set. Production sets `turnstile` in `docker-compose.yml` |
+| `TURNSTILE_SITE_KEY` | - | Public site key of Cloudflare Turnstile. Necessary when `CAPTCHA_PROVIDER` is `turnstile`. Get a true pair at `dash.cloudflare.com`, then Turnstile, then Add site. It is free. The test keys (`1x00000000000000000000AA` and `1x0000000000000000000000000000000AA`) operate for local development and for CI. They are public and give no protection in production. Refer to [`server/README.md`, "Enabling CAPTCHA in production"](server/README.md#enabling-captcha-in-production) |
 | `TURNSTILE_SECRET_KEY` | - | Secret key of Cloudflare Turnstile for the `siteverify` calls on the server. Use it with `TURNSTILE_SITE_KEY` |
 | `PADDLE_API_KEY` | - | Paddle server API key. Use it with `PADDLE_WEBHOOK_SECRET`. The two values are necessary before Paddle counts as configured |
 | `PADDLE_WEBHOOK_SECRET` | - | Paddle webhook HMAC secret for the signature verification |
@@ -1580,7 +1582,7 @@ the script is the authoritative reference for the key list.
 | `MFA_ENCRYPTION_KEY` | deploy, rebuild | `server/.env` | The AES-256-GCM key of the two-factor secret column. It is not stored with the data it protects. While the secret is empty, two-factor enrolment answers HTTP 501 and nothing else changes |
 | `MFA_REQUIRED_FOR_ADMINS` | deploy, rebuild | `server/.env` | Not a credential, but carried the same way because this is the only channel that survives a from-scratch rebuild of the host. Set it to `true` to make two-factor authentication mandatory for every account with a super role. It has no effect while `MFA_ENCRYPTION_KEY` is empty |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | deploy, rebuild | `server/.env` | Outgoing email |
-| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register`, `/forgot-password` and `/resend-verification`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. The CAPTCHA stays disabled while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | deploy, rebuild | `server/.env` | The Cloudflare Turnstile CAPTCHA on `/register`, `/forgot-password` and `/resend-verification`. The site key is public, but the workflow injects it in the same way for safety during a rebuild. `docker-compose.yml` selects `CAPTCHA_PROVIDER=turnstile`, thus the boot is refused while one of the two is empty. Refer to [Enabling CAPTCHA in production](server/README.md#enabling-captcha-in-production) |
 | `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` | deploy, rebuild | `server/.env` | The credentials of the billing providers. Billing stays hidden until the full pair of a provider has a value. YooKassa also needs `REDIS_URL`. Keep them empty until a person connects a provider |
 | `PADDLE_CLIENT_TOKEN` | deploy, rebuild | `server/.env` | The public client-side token of Paddle.js. It is not a credential, but the workflow injects it in the same way, as it does for `TURNSTILE_SITE_KEY`. Without it no Paddle payment can complete |
 | `CI_JWT_SECRET` | ci.yml | - (CI tests only) | Production does not use it. The `Server E2E` job runs on HS256, thus the value must hold a minimum of 32 characters |
@@ -1961,11 +1963,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3337 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3366 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 997 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 975 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1853 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 361 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1506 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1509 tests pass |
 
 ## CI/CD
 

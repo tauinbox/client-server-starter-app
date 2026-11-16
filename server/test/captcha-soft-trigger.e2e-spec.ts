@@ -58,6 +58,7 @@ describe('CAPTCHA soft-trigger (e2e)', () => {
   const ORIGINAL_ENV = { ...process.env };
 
   beforeAll(async () => {
+    process.env['CAPTCHA_PROVIDER'] = 'turnstile';
     process.env['TURNSTILE_SITE_KEY'] = 'test-site-key';
     process.env['TURNSTILE_SECRET_KEY'] = 'test-secret-key';
 

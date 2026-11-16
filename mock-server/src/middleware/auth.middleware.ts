@@ -168,13 +168,7 @@ const router = Router();
 
 // GET /api/v1/auth/captcha-config — public configuration consumed by the client
 router.get('/captcha-config', (_req, res) => {
-  const state = getState();
-
-  res.json({
-    enabled: state.captchaConfig.enabled,
-    provider: 'turnstile',
-    siteKey: state.captchaConfig.siteKey
-  });
+  res.json(getState().captchaConfig);
 });
 
 // POST /api/v1/auth/register

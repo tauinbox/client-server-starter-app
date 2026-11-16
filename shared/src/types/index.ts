@@ -16,7 +16,6 @@ export type {
   MfaSetupResponse,
   MfaRecoveryCodesResponse,
   ActiveSessionResponse,
-  CaptchaProvider,
   CaptchaConfigResponse
 } from './auth.types';
 
