@@ -284,4 +284,128 @@ describe('configValidationSchema', () => {
       ).toContain('PEER_REGIONS');
     });
   });
+
+  describe('integrations outside the region of the cell', () => {
+    const ruEnv = { ...validEnv, DATA_REGION: 'ru' };
+
+    function messageOf(env: Record<string, string>): string | undefined {
+      return configValidationSchema.validate(env, options).error?.message;
+    }
+
+    it.each([
+      ['intl', 'YOOKASSA_SHOP_ID', 'yookassa'],
+      ['intl', 'YOOKASSA_SECRET_KEY', 'yookassa'],
+      ['ru', 'PADDLE_API_KEY', 'paddle'],
+      ['ru', 'PADDLE_WEBHOOK_SECRET', 'paddle'],
+      ['ru', 'PADDLE_CLIENT_TOKEN', 'paddle'],
+      ['ru', 'TURNSTILE_SITE_KEY', 'turnstile'],
+      ['ru', 'TURNSTILE_SECRET_KEY', 'turnstile'],
+      ['ru', 'GOOGLE_CLIENT_ID', 'googleOAuth'],
+      ['ru', 'GOOGLE_CLIENT_SECRET', 'googleOAuth'],
+      ['ru', 'FACEBOOK_CLIENT_ID', 'facebookOAuth'],
+      ['ru', 'FACEBOOK_CLIENT_SECRET', 'facebookOAuth']
+    ])('refuses a %s cell with %s set', (region, key, integration) => {
+      expect(
+        messageOf({ ...validEnv, DATA_REGION: region, [key]: 'value' })
+      ).toBe(
+        `${integration} may not run in DATA_REGION ${region} (${key} set)`
+      );
+    });
+
+    it('accepts the integrations of each region', () => {
+      expect(
+        messageOf({
+          ...validEnv,
+          PADDLE_API_KEY: 'key',
+          PADDLE_WEBHOOK_SECRET: 'secret',
+          TURNSTILE_SITE_KEY: 'site',
+          TURNSTILE_SECRET_KEY: 'secret',
+          GOOGLE_CLIENT_ID: 'id',
+          FACEBOOK_CLIENT_ID: 'id',
+          VK_CLIENT_ID: 'id'
+        })
+      ).toBeUndefined();
+      expect(
+        messageOf({
+          ...ruEnv,
+          YOOKASSA_SHOP_ID: 'shop',
+          YOOKASSA_SECRET_KEY: 'secret',
+          VK_CLIENT_ID: 'id',
+          VK_CLIENT_SECRET: 'secret'
+        })
+      ).toBeUndefined();
+    });
+
+    it('treats an empty value as not set', () => {
+      expect(
+        messageOf({ ...ruEnv, PADDLE_API_KEY: '', GOOGLE_CLIENT_ID: '' })
+      ).toBeUndefined();
+    });
+
+    it('names every refused integration in one message', () => {
+      expect(
+        messageOf({
+          ...ruEnv,
+          PADDLE_API_KEY: 'key',
+          PADDLE_WEBHOOK_SECRET: 'secret',
+          GOOGLE_CLIENT_ID: 'id'
+        })
+      ).toBe(
+        'paddle may not run in DATA_REGION ru (PADDLE_API_KEY, PADDLE_WEBHOOK_SECRET set); googleOAuth may not run in DATA_REGION ru (GOOGLE_CLIENT_ID set)'
+      );
+    });
+
+    it('requires SMTP_REGION when SMTP_HOST is set', () => {
+      expect(messageOf({ ...validEnv, SMTP_HOST: 'smtp.example.com' })).toBe(
+        'SMTP_REGION is required when SMTP_HOST is set'
+      );
+      expect(
+        messageOf({
+          ...validEnv,
+          SMTP_HOST: 'smtp.example.com',
+          SMTP_REGION: ''
+        })
+      ).toBe('SMTP_REGION is required when SMTP_HOST is set');
+      expect(messageOf({ ...validEnv, SMTP_REGION: 'ru' })).toBeUndefined();
+    });
+
+    it('refuses an SMTP provider outside Russia for a ru cell', () => {
+      expect(
+        messageOf({
+          ...ruEnv,
+          SMTP_HOST: 'smtp.example.com',
+          SMTP_REGION: 'intl'
+        })
+      ).toBe('an SMTP provider in intl may not serve DATA_REGION ru');
+      expect(
+        messageOf({
+          ...ruEnv,
+          SMTP_HOST: 'smtp.example.com',
+          SMTP_REGION: 'ru'
+        })
+      ).toBeUndefined();
+    });
+
+    it('accepts an SMTP provider of either region for an intl cell', () => {
+      for (const smtpRegion of ['intl', 'ru']) {
+        expect(
+          messageOf({
+            ...validEnv,
+            SMTP_HOST: 'smtp.example.com',
+            SMTP_REGION: smtpRegion
+          })
+        ).toBeUndefined();
+      }
+    });
+
+    it('refuses an unknown SMTP_REGION', () => {
+      expect(
+        messageOf({
+          ...validEnv,
+          SMTP_HOST: 'smtp.example.com',
+          SMTP_REGION: 'eu'
+        })
+      ).toContain('SMTP_REGION');
+    });
+  });
 });

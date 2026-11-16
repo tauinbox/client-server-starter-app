@@ -109,7 +109,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `DB_SLOW_QUERY_THRESHOLD` | `200` | Slow query threshold in milliseconds |
 | `DB_LOGGER` | - | TypeORM logger type, for example `advanced-console` or `file`. A value replaces the default logger |
 | `REQUEST_LOG_LEVEL` | `all` | Request logging level. `all` logs each request. `warn` logs a 4xx and a 5xx. `error` logs a 5xx. The logged URL never carries the value of a `code`, `state` or `token` query parameter |
-| `DATA_REGION` | `intl` | Necessary. The data region of this deployment (a cell): `intl` or `ru` (`DATA_REGIONS`). Another value aborts the boot. The JWT issuer is `nexus-api@<region>`, so a cell refuses a token of another cell |
+| `DATA_REGION` | `intl` | Necessary. The data region of this deployment (a cell): `intl` or `ru` (`DATA_REGIONS`). Another value aborts the boot. The JWT issuer is `nexus-api@<region>`, so a cell refuses a token of another cell. A set key of an integration outside its regions in `REGION_INTEGRATIONS` also aborts the boot (Paddle, Turnstile, Google and Facebook OAuth: `intl`; YooKassa: `ru`; VK: both) |
 | `PEER_REGIONS` | `{}` | JSON object of the other cells: region to public `https` URL. An unknown region, a URL that is not `https`, a value that is not JSON and the own region abort the boot |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
 | `JWT_SECRET` | - | Symmetric secret, a minimum of 32 characters, that is the 256-bit key size RFC 7518 makes necessary for HS256. It is necessary when `JWT_ALGORITHM=HS256` |
@@ -132,6 +132,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `ADMIN_PASSWORD` | - | Password of the initial administrator |
 | `ADMIN_NAME` | `Admin` | Full name of the initial administrator |
 | `SMTP_HOST` | - | SMTP server host. When it is empty, the server writes each email to the console |
+| `SMTP_REGION` | - | The data region of the SMTP provider: `intl` or `ru`. Necessary when `SMTP_HOST` is set, because the host name does not tell it. A `ru` cell accepts only `ru`, an `intl` cell accepts both (`SMTP_PROVIDER_REGIONS`); another value aborts the boot |
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_SECURE` | - | The value `true` forces implicit TLS. When it is empty, the server uses STARTTLS on port 587 and implicit TLS on port 465. TLS is always necessary |
 | `SMTP_USER` | - | SMTP username |

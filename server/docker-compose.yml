@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
 
   # SMTP sink — captures all outgoing email instead of delivering it. Set
-  # SMTP_HOST=localhost / SMTP_PORT=1025 in server/.env to route mail here;
+  # SMTP_HOST=localhost / SMTP_PORT=1025 / SMTP_REGION=intl in server/.env to route mail here;
   # inspect captured messages at http://localhost:8025 (web UI + REST API).
   mailpit:
     container_name: mailpit_container
