@@ -10,6 +10,7 @@ import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { CoreModule } from '../src/modules/core/core.module';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
+import { waitsOnLock } from './lock-wait';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
 // The write is keyed on the empty column, so only a real database shows that
@@ -75,20 +76,8 @@ runWithInfra('Residence declaration (e2e)', () => {
     await app?.close();
   });
 
-  /** Waits until `count` declarations wait on the row lock of the user. */
-  async function waitForLockWaiters(count: number): Promise<void> {
-    for (let poll = 0; poll < 200; poll++) {
-      const [{ waiting }] = await dataSource.query<Array<{ waiting: number }>>(
-        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%residence_country%'`
-      );
-
-      if (waiting >= count) return;
-
-      await new Promise((resolve) => setImmediate(resolve));
-    }
-
-    throw new Error(`Fewer than ${count} declarations waited on the row lock`);
-  }
+  const bothWaitOnTheRowLock = () =>
+    waitsOnLock(dataSource, '%residence_country%', 2);
 
   const declare = (residenceCountry: string) =>
     request(http)
@@ -111,7 +100,7 @@ runWithInfra('Residence declaration (e2e)', () => {
       ]);
       const pending = Promise.all([declare('DE'), declare('FR')]);
 
-      await waitForLockWaiters(2);
+      expect(await bothWaitOnTheRowLock()).toBe(true);
       await holder.rollbackTransaction();
       answers = await pending;
     } finally {
@@ -181,7 +170,7 @@ runWithInfra('Residence declaration (e2e)', () => {
       ]);
       const pending = Promise.all([change('FR'), change('IT')]);
 
-      await waitForLockWaiters(2);
+      expect(await bothWaitOnTheRowLock()).toBe(true);
       await holder.rollbackTransaction();
       answers = await pending;
     } finally {

@@ -36,6 +36,7 @@ import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
 } from './billing-db-lock';
+import { eventually } from './eventually';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -226,20 +227,18 @@ runWithInfra('Removal of the saved card (e2e)', () => {
     });
   }
 
-  /** Resolves once another backend waits for a lock that `pid` holds. */
-  async function waitForBlockedBy(pid: number): Promise<void> {
-    for (let attempt = 0; attempt < 200; attempt += 1) {
-      const [{ blocked }] = await ds.query<[{ blocked: number }]>(
-        'SELECT count(*)::int AS blocked FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))',
+  /** True once another backend waits for a lock that `pid` holds. */
+  async function blockedBy(pid: number): Promise<boolean> {
+    const blocked = await eventually(async () => {
+      const [{ count }] = await ds.query<[{ count: number }]>(
+        'SELECT count(*)::int AS count FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))',
         [pid]
       );
 
-      if (blocked > 0) return;
+      return count > 0 ? true : null;
+    });
 
-      await new Promise((resolve) => setImmediate(resolve));
-    }
-
-    throw new Error('The re-bind never waited for the removal lock');
+    return blocked === true;
   }
 
   function cards(): Promise<PaymentMethod[]> {
@@ -383,7 +382,7 @@ runWithInfra('Removal of the saved card (e2e)', () => {
     )) as [{ pid: number }];
     const pending = rebind(createdBeforeRemoval, `pm_race_${customerId}`);
 
-    await waitForBlockedBy(removalPid);
+    expect(await blockedBy(removalPid)).toBe(true);
     await removal.manager.delete(PaymentMethod, { customerId });
     await removal.manager.update(
       Customer,
