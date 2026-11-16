@@ -40,7 +40,7 @@ async function login(email: string): Promise<string> {
   return body.tokens.access_token;
 }
 
-// user@example.com lives in Germany → paddle/USD in the mock's geo rules.
+// user@example.com lives in Germany: paddle/USD in the mock's geo rules.
 async function activateSubscription(planKey: string): Promise<string> {
   const res = await fetch(
     `${baseUrl}/__control/billing/activate-subscription`,
