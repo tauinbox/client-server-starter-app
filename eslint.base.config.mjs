@@ -34,6 +34,21 @@ const promiseResolverSyntax = {
     'Do not take the resolve function out of a Promise executor. Use Promise.withResolvers().'
 };
 
+// A loop paced by a pause of zero length ends after a number of polls, so its
+// time budget is the speed of the machine: it passes on a fast run and fails
+// on a loaded CI runner. A loop paced by a real delay (`setTimeout(r, 50)`)
+// waits at least count x delay and is not refused.
+const LOOP =
+  ':matches(ForStatement, ForInStatement, ForOfStatement, WhileStatement, DoWhileStatement)';
+const ZERO_PAUSE_POLL_MESSAGE =
+  'Do not pace a poll loop with setImmediate, a zero setTimeout, process.nextTick or queueMicrotask: the loop then ends after a number of polls, not after a time. Poll against a deadline: pollUntil (server/test/poll.ts), expect.poll in Playwright, vi.waitFor in Vitest.';
+const zeroPausePollSyntax = [
+  `${LOOP} Identifier[name=/^(setImmediate|queueMicrotask)$/]`,
+  `${LOOP} MemberExpression[object.name='process'][property.name='nextTick']`,
+  `${LOOP} CallExpression[callee.name='setTimeout'][arguments.length=1]`,
+  `${LOOP} CallExpression[callee.name='setTimeout'] > Literal.arguments[value=0]`
+].map((selector) => ({ selector, message: ZERO_PAUSE_POLL_MESSAGE }));
+
 // Not in the default rules: `npm run lint:shared` reads `error-keys.ts`,
 // which defines the keys as strings.
 export const errorKeyLiteralSyntax = {
@@ -105,6 +120,7 @@ export default {
         'Do not use `as unknown as T` double casts. Fix the type at its root (widen the parameter, use a typed partial mock), or use `// @ts-expect-error` in tests.'
     },
     promiseResolverSyntax,
-    ...maxParamsSyntax
+    ...maxParamsSyntax,
+    ...zeroPausePollSyntax
   ]
 };

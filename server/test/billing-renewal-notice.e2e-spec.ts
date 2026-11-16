@@ -18,6 +18,7 @@ import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
 } from './billing-db-lock';
+import { waitsOnLock } from './lock-wait';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -152,21 +153,6 @@ runWithInfra('Renewal notice scan (e2e)', () => {
     return subscription;
   }
 
-  /** Waits until `count` claim statements wait on a row lock. */
-  async function waitForLockWaiters(count: number): Promise<void> {
-    for (let poll = 0; poll < 200; poll++) {
-      const [{ waiting }] = await ds.query<Array<{ waiting: number }>>(
-        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%renewal_notice_for%'`
-      );
-
-      if (waiting >= count) return;
-
-      await new Promise((resolve) => setImmediate(resolve));
-    }
-
-    throw new Error(`Fewer than ${count} scans waited on the row lock`);
-  }
-
   /** The renewal events that the scan emitted for the given rows. */
   function emitted(...subscriptions: Subscription[]): RenewalUpcomingEvent[] {
     const ids = new Set(subscriptions.map(({ id }) => id));
@@ -221,7 +207,7 @@ runWithInfra('Renewal notice scan (e2e)', () => {
         notices.sendRenewalNotices()
       ]);
 
-      await waitForLockWaiters(2);
+      expect(await waitsOnLock(ds, '%renewal_notice_for%', 2)).toBe(true);
       await holder.rollbackTransaction();
       await scans;
     } finally {
