@@ -5,12 +5,15 @@ import { CountFailuresOnlyWhenBody } from '../../core/failure-counter.decorator'
 import { CHALLENGE_THROTTLE } from '../constants/throttle.constants';
 import { MfaSetupDto } from '../dtos/mfa.dto';
 import { StepUpFactorsDto } from '../dtos/step-up-factors.dto';
+import { ChangeResidenceDto } from '../dtos/register.dto';
 
-type StepUpBody = typeof StepUpFactorsDto | typeof MfaSetupDto;
+type StepUpBody =
+  typeof StepUpFactorsDto | typeof MfaSetupDto | typeof ChangeResidenceDto;
 
 const SECRET_FIELDS = new Map<StepUpBody, string[]>([
   [StepUpFactorsDto, ['currentPassword', 'code']],
-  [MfaSetupDto, ['currentPassword']]
+  [MfaSetupDto, ['currentPassword']],
+  [ChangeResidenceDto, ['currentPassword', 'code']]
 ]);
 
 /**

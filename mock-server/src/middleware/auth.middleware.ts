@@ -1114,6 +1114,70 @@ router.post('/profile/residence', authGuard, (req, res) => {
   res.json(toUserResponse(user));
 });
 
+// PATCH /api/v1/auth/profile/residence
+// Mirrors AuthService.changeResidence: the region first, then the step-up,
+// then one write over the value that the step-up read.
+router.patch(
+  '/profile/residence',
+  permissionGuard('update', 'Profile'),
+  requireStepUpBody({
+    fields: ['residenceCountry'],
+    fieldErrors: (body) =>
+      isCountryCode(body['residenceCountry']) ? [] : [RESIDENCE_COUNTRY_ERROR]
+  }),
+  (req, res) => {
+    const { user } = req as AuthenticatedRequest;
+    const { currentPassword, code } = req.body;
+    // The validation above rejects any other value.
+    const country = req.body.residenceCountry as CountryCode;
+    const refusal = residenceRefusal(country);
+
+    if (refusal) {
+      sendError(res, refusal.errorKey, refusal.message);
+
+      return;
+    }
+
+    const stepUp = stepUpError(req, user, {
+      currentPassword,
+      code,
+      operation: STEP_UP_OPERATION.RESIDENCE_CHANGE
+    });
+
+    if (stepUp) {
+      sendWithRetryAfter(res, stepUp);
+
+      return;
+    }
+
+    clearReauthProofCookie(res);
+
+    const previous = user.residenceCountry;
+
+    if (previous === country) {
+      res.json(toUserResponse(user));
+
+      return;
+    }
+
+    user.residenceCountry = country;
+    user.updatedAt = new Date().toISOString();
+    logAudit('USER_UPDATE', {
+      actorId: user.id,
+      actorEmail: user.email,
+      targetId: user.id,
+      targetType: 'User',
+      details: { changedFields: ['residenceCountry'], source: 'self' },
+      ip: req.ip
+    });
+    pushUserCrudEvent('updated', user.id);
+    console.log(
+      `[RESIDENCE CHANGED] To: ${user.email}\n  From: ${previous ?? 'none'} | To: ${country} | IP: ${req.ip}`
+    );
+    res.json(toUserResponse(user));
+  }
+);
+
 // POST /api/v1/auth/profile/email/initiate
 // Gated like PATCH /profile: the address is the recovery channel of the password.
 router.post(

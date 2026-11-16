@@ -158,7 +158,8 @@
       "refreshTokenRequired": "Сеанс завершён. Войдите снова.",
       "residenceOtherRegion": "Аккаунты этой страны хранятся на другом сайте.",
       "residenceRegionNotServed": "Аккаунты для этой страны пока недоступны.",
-      "residenceAlreadyDeclared": "Страна проживания уже указана."
+      "residenceAlreadyDeclared": "Страна проживания уже указана.",
+      "residenceConflict": "Страну проживания изменили в другом окне. Обновите страницу и попробуйте ещё раз."
     },
     "users": {
       "notFound": "Пользователь не найден",

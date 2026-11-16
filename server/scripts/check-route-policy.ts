@@ -34,7 +34,11 @@ const THROTTLE_CONSTANTS = path.join(
 );
 const MOCK_INDEX = path.join(REPO_ROOT, 'mock-server/src/middleware/index.ts');
 
-const STEP_UP_BODIES = new Set(['StepUpFactorsDto', 'MfaSetupDto']);
+const STEP_UP_BODIES = new Set([
+  'StepUpFactorsDto',
+  'MfaSetupDto',
+  'ChangeResidenceDto'
+]);
 
 type Throttle = string[] | 'skip' | null;
 

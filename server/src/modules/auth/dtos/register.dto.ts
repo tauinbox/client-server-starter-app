@@ -3,6 +3,7 @@ import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { COUNTRY_CODES, type CountryCode } from '@app/shared/constants';
 import { CreateUserDto } from '../../users/dtos/create-user.dto';
+import { StepUpFactorsDto } from './step-up-factors.dto';
 
 /** The rules of a declared country of residence, for every sign-up body. */
 function ResidenceCountryProperty(): PropertyDecorator {
@@ -25,6 +26,15 @@ function ResidenceCountryProperty(): PropertyDecorator {
  * has none.
  */
 export class ResidenceDeclarationDto {
+  @ResidenceCountryProperty()
+  residenceCountry: CountryCode;
+}
+
+/**
+ * A change of a declared country: the new country and the step-up factors of
+ * the account. A change replaces a legal record, so it needs a fresh proof.
+ */
+export class ChangeResidenceDto extends StepUpFactorsDto {
   @ResidenceCountryProperty()
   residenceCountry: CountryCode;
 }

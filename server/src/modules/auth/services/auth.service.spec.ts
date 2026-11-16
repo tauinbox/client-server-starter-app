@@ -115,6 +115,7 @@ describe('AuthService', () => {
     sendEmailChangeNotificationOld: jest.Mock;
     sendEmailChangeCompletedNotification: jest.Mock;
     sendOAuthUnlinkedNotification: jest.Mock;
+    sendResidenceChangedNotification: jest.Mock;
   };
   let mockOAuthAccountService: { removeAllForUser: jest.Mock };
   let mockRoleService: {
@@ -302,7 +303,8 @@ describe('AuthService', () => {
       sendEmailChangeCompletedNotification: jest
         .fn()
         .mockResolvedValue(undefined),
-      sendOAuthUnlinkedNotification: jest.fn().mockResolvedValue(undefined)
+      sendOAuthUnlinkedNotification: jest.fn().mockResolvedValue(undefined),
+      sendResidenceChangedNotification: jest.fn().mockResolvedValue(undefined)
     };
 
     mockOAuthAccountService = {
@@ -1200,15 +1202,126 @@ describe('AuthService', () => {
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
 
-    it('announces nothing when the write is refused', async () => {
-      mockUsersService.declareResidence.mockRejectedValue(
-        new Error('already declared')
+    it('refuses an account that has a country and announces nothing', async () => {
+      mockUsersService.declareResidence.mockResolvedValue(null);
+
+      await expectApiRejection(
+        service.declareResidence('user-1', { residenceCountry: 'DE' }),
+        ErrorKeys.AUTH.RESIDENCE_ALREADY_DECLARED
+      );
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('keys the first declaration on an empty column', async () => {
+      await service.declareResidence('user-1', { residenceCountry: 'DE' });
+
+      expect(mockUsersService.declareResidence).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ country: 'DE', expected: null })
+      );
+    });
+  });
+
+  describe('changeResidence', () => {
+    const factors = { currentPassword: 'Lantern-Orchard-47' };
+    let stepUp: jest.SpyInstance;
+
+    beforeEach(() => {
+      stepUp = jest
+        .spyOn(service, 'assertStepUpForUser')
+        .mockResolvedValue({ ...mockUser, residenceCountry: 'DE' });
+    });
+
+    it('refuses a country of another region before the step-up', async () => {
+      await expectApiRejection(
+        service.changeResidence('user-1', { residenceCountry: 'RU', factors }),
+        ErrorKeys.AUTH.RESIDENCE_OTHER_REGION
+      );
+      expect(stepUp).not.toHaveBeenCalled();
+      expect(mockUsersService.declareResidence).not.toHaveBeenCalled();
+    });
+
+    it('asks the step-up of the residence change with every factor', async () => {
+      await service.changeResidence('user-1', {
+        residenceCountry: 'FR',
+        factors: { code: '123456', reauthProof: 'proof' },
+        auditContext: { ip: '203.0.113.7' }
+      });
+
+      expect(stepUp).toHaveBeenCalledWith('user-1', {
+        currentPassword: undefined,
+        reauthProof: 'proof',
+        operation: STEP_UP_OPERATION.RESIDENCE_CHANGE,
+        totpCode: '123456',
+        auditContext: { ip: '203.0.113.7' }
+      });
+    });
+
+    it('writes over the country the step-up read and tells the owner', async () => {
+      const changed = { ...mockUser, residenceCountry: 'FR' };
+
+      mockUsersService.declareResidence.mockResolvedValue(changed);
+
+      const result = await service.changeResidence('user-1', {
+        residenceCountry: 'FR',
+        factors,
+        auditContext: { ip: '203.0.113.7' }
+      });
+
+      expect(result).toBe(changed);
+      expect(mockUsersService.declareResidence).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ country: 'FR', expected: 'DE' })
+      );
+      expect(
+        mockMailService.sendResidenceChangedNotification
+      ).toHaveBeenCalledWith(changed.email, {
+        previous: 'DE',
+        current: 'FR',
+        locale: changed.locale,
+        ip: '203.0.113.7'
+      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        UserUpdatedEvent.name,
+        new UserUpdatedEvent('user-1')
+      );
+    });
+
+    it('writes, announces and sends nothing for the same country', async () => {
+      await service.changeResidence('user-1', {
+        residenceCountry: 'DE',
+        factors
+      });
+
+      expect(mockUsersService.declareResidence).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendResidenceChangedNotification
+      ).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('refuses a change that lost to a concurrent one and tells nobody', async () => {
+      mockUsersService.declareResidence.mockResolvedValue(null);
+
+      await expectApiRejection(
+        service.changeResidence('user-1', { residenceCountry: 'FR', factors }),
+        ErrorKeys.AUTH.RESIDENCE_CONFLICT
+      );
+      expect(
+        mockMailService.sendResidenceChangedNotification
+      ).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('keeps a completed change when the notice fails', async () => {
+      mockUsersService.declareResidence.mockResolvedValue(mockUser);
+      mockMailService.sendResidenceChangedNotification.mockRejectedValue(
+        new Error('smtp down')
       );
 
       await expect(
-        service.declareResidence('user-1', { residenceCountry: 'DE' })
-      ).rejects.toThrow('already declared');
-      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+        service.changeResidence('user-1', { residenceCountry: 'FR', factors })
+      ).resolves.toBe(mockUser);
     });
   });
 

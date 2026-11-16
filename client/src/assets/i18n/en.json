@@ -158,7 +158,8 @@
       "refreshTokenRequired": "Your session has ended. Please sign in again.",
       "residenceOtherRegion": "Accounts for this country are kept on another site.",
       "residenceRegionNotServed": "Accounts for this country are not available yet.",
-      "residenceAlreadyDeclared": "Your country of residence is already set."
+      "residenceAlreadyDeclared": "Your country of residence is already set.",
+      "residenceConflict": "Your country of residence was changed in another window. Reload the page and try again."
     },
     "users": {
       "notFound": "User not found",

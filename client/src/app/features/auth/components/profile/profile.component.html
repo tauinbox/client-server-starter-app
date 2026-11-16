@@ -217,6 +217,15 @@
             [canSaveLocale]="canEditProfile()"
             (userUpdated)="user.set($event)"
           />
+
+          <nxs-residence-card
+            [user]="u"
+            [canChange]="canEditProfile()"
+            [reauthProviderLabel]="reauthProviderLabel()"
+            [resumeChange]="resumeResidenceChange()"
+            (reauthRequested)="startResidenceReauth($event)"
+            (userUpdated)="user.set($event)"
+          />
         </div>
       </div>
     }

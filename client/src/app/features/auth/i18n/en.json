@@ -194,6 +194,22 @@
     "signOut": "Sign out",
     "errorFailed": "The country of residence could not be saved. Please try again."
   },
+  "residenceCard": {
+    "title": "Country of residence",
+    "notSet": "Not set",
+    "hint": "It decides where your data is stored. To change it, you confirm who you are.",
+    "change": "Change",
+    "save": "Save",
+    "saving": "Saving...",
+    "currentPassword": "Current password",
+    "passwordRequired": "Current password is required",
+    "code": "Authenticator code",
+    "codeRequired": "Authenticator code is required",
+    "reauthNotice": "To confirm the change, you sign in again with {{ provider }}.",
+    "needsFactor": "To change it, add a password, an authenticator or a sign-in provider to your account.",
+    "successChanged": "Your country of residence was changed.",
+    "errorChangeFailed": "The country of residence could not be changed. Please try again."
+  },
   "providers": {
     "google": "Google",
     "facebook": "Facebook",

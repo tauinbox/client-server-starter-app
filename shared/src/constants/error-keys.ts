@@ -59,7 +59,8 @@ export const ErrorKeys = {
     REFRESH_TOKEN_REQUIRED: 'errors.auth.refreshTokenRequired',
     RESIDENCE_OTHER_REGION: 'errors.auth.residenceOtherRegion',
     RESIDENCE_REGION_NOT_SERVED: 'errors.auth.residenceRegionNotServed',
-    RESIDENCE_ALREADY_DECLARED: 'errors.auth.residenceAlreadyDeclared'
+    RESIDENCE_ALREADY_DECLARED: 'errors.auth.residenceAlreadyDeclared',
+    RESIDENCE_CONFLICT: 'errors.auth.residenceConflict'
   },
   USERS: {
     NOT_FOUND: 'errors.users.notFound',

@@ -94,6 +94,7 @@ export const ERROR_STATUS: Readonly<Record<ErrorKey, ErrorStatus>> = {
   [ErrorKeys.AUTH.RESIDENCE_OTHER_REGION]: 409,
   [ErrorKeys.AUTH.RESIDENCE_REGION_NOT_SERVED]: 409,
   [ErrorKeys.AUTH.RESIDENCE_ALREADY_DECLARED]: 409,
+  [ErrorKeys.AUTH.RESIDENCE_CONFLICT]: 409,
 
   [ErrorKeys.USERS.NOT_FOUND]: 404,
   [ErrorKeys.USERS.EMAIL_EXISTS]: 409,

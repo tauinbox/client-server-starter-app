@@ -154,4 +154,60 @@ runWithInfra('Residence declaration (e2e)', () => {
       (profile.body as { residenceCountry: string }).residenceCountry
     ).toBe(winner);
   }, 30000);
+
+  const change = (residenceCountry: string) =>
+    request(http)
+      .patch('/api/v1/auth/profile/residence')
+      .auth(bearer, { type: 'bearer' })
+      .send({ residenceCountry, currentPassword: password })
+      .then((res) => res);
+
+  it('keeps the first of two concurrent changes, which both read the same country', async () => {
+    const users = dataSource.getRepository(User);
+
+    await users.update({ id: userId }, { residenceCountry: 'DE' });
+    await dataSource.getRepository(AuditLog).delete({ targetId: userId });
+
+    const holder = dataSource.createQueryRunner();
+
+    await holder.connect();
+    await holder.startTransaction();
+
+    let answers: Awaited<ReturnType<typeof change>>[];
+
+    try {
+      await holder.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [
+        userId
+      ]);
+      const pending = Promise.all([change('FR'), change('IT')]);
+
+      await waitForLockWaiters(2);
+      await holder.rollbackTransaction();
+      answers = await pending;
+    } finally {
+      await holder.release();
+    }
+
+    expect(answers.map(({ status }) => status).toSorted()).toEqual([200, 409]);
+
+    const won = answers.find(({ status }) => status === 200)!;
+    const lost = answers.find(({ status }) => status === 409)!;
+
+    expect((lost.body as { errorKey: string }).errorKey).toBe(
+      ErrorKeys.AUTH.RESIDENCE_CONFLICT
+    );
+
+    const stored = await users.findOneByOrFail({ id: userId });
+
+    expect(stored.residenceCountry).toBe(
+      (won.body as { residenceCountry: string }).residenceCountry
+    );
+
+    const rows = await dataSource.getRepository(AuditLog).findBy({
+      targetId: userId,
+      action: AuditAction.USER_UPDATE
+    });
+
+    expect(rows).toHaveLength(1);
+  }, 30000);
 });

@@ -41,13 +41,16 @@ import {
   type ProviderChange
 } from '../linked-providers/linked-providers.component';
 import { PreferencesCardComponent } from '../preferences-card/preferences-card.component';
+import { ResidenceCardComponent } from '../residence-card/residence-card.component';
 import type { UserResponse } from '@app/shared/types';
 import {
   ErrorKeys,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
   OAUTH_ERROR,
-  STEP_UP_OPERATION
+  STEP_UP_OPERATION,
+  isCountryCode,
+  type CountryCode
 } from '@app/shared/constants';
 import type {
   SessionRevokeTarget,
@@ -116,6 +119,10 @@ type PendingReauth =
   | {
       operation: typeof STEP_UP_OPERATION.SESSION_REVOKE;
       target: SessionRevokeTarget;
+    }
+  | {
+      operation: typeof STEP_UP_OPERATION.RESIDENCE_CHANGE;
+      country: CountryCode;
     };
 
 function isSessionRevokeTarget(value: unknown): value is SessionRevokeTarget {
@@ -149,6 +156,8 @@ function isPendingReauth(value: unknown): value is PendingReauth {
       );
     case STEP_UP_OPERATION.SESSION_REVOKE:
       return isSessionRevokeTarget(pending['target']);
+    case STEP_UP_OPERATION.RESIDENCE_CHANGE:
+      return isCountryCode(pending['country']);
     default:
       return false;
   }
@@ -193,7 +202,8 @@ function canonicalEmail(value: string | undefined): string {
     LinkedProvidersComponent,
     TwoFactorComponent,
     ActiveSessionsComponent,
-    PreferencesCardComponent
+    PreferencesCardComponent,
+    ResidenceCardComponent
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
@@ -396,6 +406,9 @@ export class ProfileComponent implements OnInit {
   /** The same signal for the providers card. */
   protected readonly resumeProviderChange = signal<ProviderChange | null>(null);
 
+  /** The same signal for the residence card. */
+  protected readonly resumeResidenceChange = signal<CountryCode | null>(null);
+
   /**
    * True once a sign-in method changed on this page. A device that signed in
    * with the old method keeps its session, so the sessions card offers to end
@@ -476,6 +489,10 @@ export class ProfileComponent implements OnInit {
         this.resumeSessionRevoke.set(pending.target);
 
         return;
+      case STEP_UP_OPERATION.RESIDENCE_CHANGE:
+        this.resumeResidenceChange.set(pending.country);
+
+        return;
       // The card holds the enrolment, so all it needs is the signal that the
       // proof its request will carry is now there.
       case STEP_UP_OPERATION.MFA_SETUP:
@@ -503,6 +520,14 @@ export class ProfileComponent implements OnInit {
   /** The sessions card asks for the round trip the same way. */
   protected startSessionsReauth(target: SessionRevokeTarget): void {
     this.#startReauth({ operation: STEP_UP_OPERATION.SESSION_REVOKE, target });
+  }
+
+  /** The residence card asks for it with the country the user chose. */
+  protected startResidenceReauth(country: CountryCode): void {
+    this.#startReauth({
+      operation: STEP_UP_OPERATION.RESIDENCE_CHANGE,
+      country
+    });
   }
 
   /** And so does the providers card, for a link or an unlink. */

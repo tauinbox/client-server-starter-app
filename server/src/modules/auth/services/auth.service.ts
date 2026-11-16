@@ -462,8 +462,101 @@ export class AuthService {
   ): Promise<User> {
     this.regionService.assertServesCountry(residenceCountry);
 
-    const user = await this.usersService.declareResidence(userId, {
+    const user = await this.writeResidence(userId, {
       country: residenceCountry,
+      expected: null,
+      auditContext
+    });
+
+    if (!user) {
+      throw new ApiError(
+        ErrorKeys.AUTH.RESIDENCE_ALREADY_DECLARED,
+        'The country of residence is already declared'
+      );
+    }
+
+    return user;
+  }
+
+  /**
+   * A change of the declared country by its owner. A first declaration needs
+   * no proof, because it grants nothing; a change replaces a legal record, so
+   * it needs the step-up of the account, and the owner gets a notice. The
+   * region is checked first, so a refused country spends no factor. The same
+   * country writes nothing and sends nothing.
+   */
+  async changeResidence(
+    userId: string,
+    {
+      residenceCountry,
+      factors,
+      auditContext
+    }: {
+      residenceCountry: CountryCode;
+      factors: {
+        currentPassword?: string;
+        code?: string;
+        reauthProof?: string;
+      };
+      auditContext?: AuditContext;
+    }
+  ): Promise<User> {
+    this.regionService.assertServesCountry(residenceCountry);
+
+    const verified = await this.assertStepUpForUser(userId, {
+      currentPassword: factors.currentPassword,
+      reauthProof: factors.reauthProof,
+      operation: STEP_UP_OPERATION.RESIDENCE_CHANGE,
+      totpCode: factors.code,
+      auditContext
+    });
+    const previous = verified.residenceCountry;
+
+    if (previous === residenceCountry) return verified;
+
+    const user = await this.writeResidence(userId, {
+      country: residenceCountry,
+      expected: previous,
+      auditContext
+    });
+
+    if (!user) {
+      throw new ApiError(
+        ErrorKeys.AUTH.RESIDENCE_CONFLICT,
+        'The country of residence changed during this request'
+      );
+    }
+
+    this.mailService
+      .sendResidenceChangedNotification(user.email, {
+        previous,
+        current: residenceCountry,
+        locale: user.locale,
+        ip: auditContext?.ip
+      })
+      .catch((err) =>
+        this.logger.error('Failed to send residence-changed notification', err)
+      );
+
+    return user;
+  }
+
+  /** One audited write of the country; null when it moved since the read. */
+  private async writeResidence(
+    userId: string,
+    {
+      country,
+      expected,
+      auditContext
+    }: {
+      country: CountryCode;
+      expected: CountryCode | null;
+      auditContext?: AuditContext;
+    }
+  ): Promise<User | null> {
+    const user = await this.usersService.declareResidence(userId, {
+      country,
+      expected,
       audit: (written) => [
         {
           action: AuditAction.USER_UPDATE,
@@ -477,7 +570,12 @@ export class AuthService {
       ]
     });
 
-    this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(userId));
+    if (user) {
+      this.eventEmitter.emit(
+        UserUpdatedEvent.name,
+        new UserUpdatedEvent(userId)
+      );
+    }
 
     return user;
   }

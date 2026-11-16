@@ -18,7 +18,8 @@ import {
   MAIL_APP_NAME,
   MAIL_FOOTER,
   mailMessages,
-  PasswordChangeSource
+  PasswordChangeSource,
+  ResidenceChange
 } from './mail-content';
 
 /**
@@ -203,6 +204,25 @@ export class MailService {
     const loc = normalizeLocale(locale);
     const message = mailMessages(loc).oauthLinked(
       provider,
+      credentialChangeDetails(ip)
+    );
+
+    await this.send(email, message, loc);
+  }
+
+  /** The declared country is a legal record, so its owner sees each change. */
+  async sendResidenceChangedNotification(
+    email: string,
+    {
+      previous,
+      current,
+      locale = DEFAULT_LOCALE,
+      ip
+    }: ResidenceChange & CredentialChangeContext
+  ): Promise<void> {
+    const loc = normalizeLocale(locale);
+    const message = mailMessages(loc).residenceChanged(
+      { previous, current },
       credentialChangeDetails(ip)
     );
 

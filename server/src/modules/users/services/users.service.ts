@@ -476,28 +476,32 @@ export class UsersService {
   }
 
   /**
-   * Writes the country of residence of an account that has none. The write is
-   * keyed on the empty column, so of two concurrent declarations one wins and
-   * the other is refused: a declaration is never replaced.
+   * Writes the declared country of residence over the value the caller read
+   * (`expected`, null for an account that has none). The write is keyed on
+   * that value, so of two concurrent writes one wins. Returns null when the
+   * value moved since the read; the caller names the refusal.
    */
   async declareResidence(
     id: string,
-    { country, audit }: { country: CountryCode; audit: UserAuditRows }
-  ): Promise<User> {
+    {
+      country,
+      expected,
+      audit
+    }: {
+      country: CountryCode;
+      expected: CountryCode | null;
+      audit: UserAuditRows;
+    }
+  ): Promise<User | null> {
     return withTransaction(this.dataSource, async (manager) => {
       const live = { id, deletedAt: IsNull() };
       const declared = await keyedUpdate(manager, User, {
-        where: { ...live, residenceCountry: IsNull() },
+        where: { ...live, residenceCountry: expected ?? IsNull() },
         changes: { residenceCountry: country }
       });
 
       if (!declared) {
-        if (await manager.exists(User, { where: live })) {
-          throw new ApiError(
-            ErrorKeys.AUTH.RESIDENCE_ALREADY_DECLARED,
-            'The country of residence is already declared'
-          );
-        }
+        if (await manager.exists(User, { where: live })) return null;
 
         throw userNotFound(id);
       }
