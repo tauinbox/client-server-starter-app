@@ -296,10 +296,13 @@ URL in a log message (`GlobalExceptionFilter`, `RequestLoggingMiddleware` and th
 `region/` holds `RegionModule`, with `RegionService` (the `DATA_REGION` and `PEER_REGIONS` of the
 cell, validated at boot) and `GET /api/v1/config/region`. `RegionService.assertServesCountry`
 refuses a registration whose declared country of residence belongs to another region, before any
-other check of `POST /auth/register`. `POST /auth/oauth/signup` and `POST /auth/profile/residence`
-call it first too. The second route is the one declaration of an account with no country (an
-account from before the column, or one that an administrator created): `UsersService.declareResidence`
-keys the write on `residence_country IS NULL`, so a declared country is never replaced.
+other check of `POST /auth/register`. `POST /auth/oauth/signup` and both residence routes call it
+first too. `POST /auth/profile/residence` is the first declaration of an account with no country
+(an account from before the column, or one that an administrator created) and needs no step-up,
+because it grants nothing. `PATCH /auth/profile/residence` changes a declared country: it needs
+`update:Profile` and a step-up with the operation `residence_change`, and it mails a notice to the
+owner. `UsersService.declareResidence` keys both writes on the country that the caller read, so a
+concurrent write loses with a 409 and overwrites nothing.
 
 `health/` holds `HealthModule`, with `GET /api/health/live` and `GET /api/health/ready`. The
 readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value or the
