@@ -235,13 +235,14 @@ export type UsageResponse = {
 /**
  * Result of `POST /admin/billing/usage`. `debited` is false when the plan of
  * the subscription of the customer has the capability of the meter: the use is
- * free, and no record is written (`recordId` is null). `replayed` is true when
+ * free and stored under its key with the subscription that covered it, so a
+ * retry of the key after the plan ends takes no credits. `replayed` is true when
  * the idempotency key was already used with the same body; the first record
  * answers and nothing is debited again. `balanceAfter` is the credit balance
  * after this call.
  */
 export type MeteringResponse = {
-  recordId: string | null;
+  recordId: string;
   debited: boolean;
   replayed: boolean;
   balanceAfter: number;

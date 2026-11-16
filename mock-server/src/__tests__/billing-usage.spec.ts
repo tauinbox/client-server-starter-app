@@ -95,6 +95,12 @@ async function fundedCustomer(
   return ids;
 }
 
+function subscriptionsOf(customerId: string) {
+  return [...getState().billingSubscriptions.values()].filter(
+    (s) => s.customerId === customerId
+  );
+}
+
 function balanceOf(customerId: string): number | undefined {
   return getState().billingCreditBalances.get(customerId)?.balanceUnits;
 }
@@ -144,6 +150,19 @@ describe('GET /api/v1/billing/usage parity with server', () => {
 
     expect(await res.json()).toMatchObject({ unitsSpent: 12 });
   });
+
+  it('does not count a use that the plan covered, because it takes no credits', async () => {
+    const admin = await login('admin@example.com');
+    const { customerId } = await activateSubscription('user@example.com', {
+      planKey: 'pro'
+    });
+
+    await postUsage(admin, use(customerId, { quantity: 7 }));
+
+    const res = await getUsage(await login('user@example.com'));
+
+    expect(await res.json()).toMatchObject({ unitsSpent: 0 });
+  });
 });
 
 describe('POST /api/v1/admin/billing/usage parity with server', () => {
@@ -163,9 +182,9 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
       balanceAfter: 7
     });
     expect(balanceOf(customerId)).toBe(7);
-    expect(
-      getState().billingUsageRecords.get(body.recordId as string)
-    ).toMatchObject({ subscriptionId: null, quantity: 3 });
+    expect([...getState().billingUsageRecords.values()]).toMatchObject([
+      { id: body.recordId, subscriptionId: null, quantity: 3 }
+    ]);
   });
 
   it('is idempotent: a replayed key answers the first record and debits once', async () => {
@@ -242,22 +261,60 @@ describe('POST /api/v1/admin/billing/usage parity with server', () => {
     });
   });
 
-  it('does not debit a subscriber whose plan has the capability of the meter', async () => {
+  it('does not debit a subscriber whose plan has the capability of the meter, and stores the use under the subscription', async () => {
+    const token = await login('admin@example.com');
+    const { customerId } = await activateSubscription('user@example.com', {
+      planKey: 'pro'
+    });
+    const [subscription] = subscriptionsOf(customerId);
+
+    const res = await postUsage(token, use(customerId));
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as MeteringResponse;
+
+    expect(body).toEqual({
+      recordId: expect.any(String) as string,
+      debited: false,
+      replayed: false,
+      balanceAfter: 0
+    });
+    expect([...getState().billingUsageRecords.values()]).toMatchObject([
+      { id: body.recordId, subscriptionId: subscription?.id, quantity: 3 }
+    ]);
+  });
+
+  it('answers a retry of a covered key after the plan ends as covered, and takes no credits', async () => {
     const token = await login('admin@example.com');
     const { customerId } = await activateSubscription('user@example.com', {
       planKey: 'pro'
     });
 
-    const res = await postUsage(token, use(customerId));
-
-    expect(res.status).toBe(201);
-    expect(await res.json()).toEqual({
-      recordId: null,
-      debited: false,
-      replayed: false,
-      balanceAfter: 0
+    getState().billingCreditBalances.set(customerId, {
+      customerId,
+      balanceUnits: 100,
+      updatedAt: new Date().toISOString()
     });
-    expect(getState().billingUsageRecords.size).toBe(0);
+
+    const first = (await (
+      await postUsage(token, use(customerId, { quantity: 5 }))
+    ).json()) as MeteringResponse;
+
+    for (const subscription of subscriptionsOf(customerId)) {
+      subscription.status = 'canceled';
+    }
+
+    const retry = await postUsage(token, use(customerId, { quantity: 5 }));
+
+    expect(retry.status).toBe(201);
+    expect(await retry.json()).toEqual({
+      recordId: first.recordId,
+      debited: false,
+      replayed: true,
+      balanceAfter: 100
+    });
+    expect(balanceOf(customerId)).toBe(100);
+    expect(getState().billingUsageRecords.size).toBe(1);
   });
 
   it('tells the owner once when a debit takes the balance to 0', async () => {

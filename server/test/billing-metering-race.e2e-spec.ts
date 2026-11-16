@@ -15,6 +15,7 @@ import { EntitlementService } from '../src/modules/entitlements/entitlement.serv
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
 import { CreditLedger } from '../src/modules/billing/entities/credit-ledger.entity';
+import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity';
 import { CreditBalanceCrossedEvent } from '../src/modules/billing/events/billing.events';
 import { CreditService } from '../src/modules/billing/services/credit.service';
@@ -66,6 +67,7 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
     // The ledger holds the customer under RESTRICT, so it goes first.
     await ds.getRepository(CreditLedger).delete({ customerId });
     await ds.getRepository(UsageRecord).delete({ customerId });
+    await ds.getRepository(Subscription).delete({ customerId });
     await ds.getRepository(CreditBalance).delete({ customerId });
 
     if (userId) {
@@ -78,7 +80,12 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
     await ds?.destroy();
   });
 
-  async function build(credits: CreditService): Promise<MeteringService> {
+  async function build(
+    credits: CreditService,
+    entitlements: Pick<EntitlementService, 'entitledSubscription'> = {
+      entitledSubscription: () => Promise.resolve(null)
+    }
+  ): Promise<MeteringService> {
     const module = await Test.createTestingModule({
       providers: [
         MeteringService,
@@ -92,10 +99,7 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
           provide: getRepositoryToken(Customer),
           useValue: ds.getRepository(Customer)
         },
-        {
-          provide: EntitlementService,
-          useValue: { subscriptionPlan: () => Promise.resolve(null) }
-        },
+        { provide: EntitlementService, useValue: entitlements },
         { provide: EventEmitter2, useValue: { emit } },
         { provide: AuditService, useValue: { logFireAndForget: jest.fn() } }
       ]
@@ -249,7 +253,7 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
 
     const ledger = await ds
       .getRepository(CreditLedger)
-      .findOneByOrFail({ customerId, refUsageRecordId: recordId as string });
+      .findOneByOrFail({ customerId, refUsageRecordId: recordId });
 
     expect(ledger).toMatchObject({ reason: 'usage', refInvoiceId: null });
     expect(ledger.delta.toNumber()).toBe(-1);
@@ -260,5 +264,62 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
     });
 
     expect(spent).toBe(2);
+  }, 30_000);
+
+  it('stores a covered use under its key, so a retry after the plan ends takes no credits', async () => {
+    await setBalance(100);
+    const subscription = await ds.getRepository(Subscription).save(
+      ds.getRepository(Subscription).create({
+        customerId,
+        planKey: 'pro',
+        provider: 'yookassa',
+        billingMode: 'fixed',
+        status: 'active',
+        lifecycleOwner: 'self',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 86_400_000),
+        billingAnchorAt: new Date(),
+        cancelAtPeriodEnd: false,
+        trialEnd: null,
+        providerSubscriptionId: null,
+        paymentMethodId: null
+      })
+    );
+    let planActive = true;
+    const metering = await build(realCredits(), {
+      entitledSubscription: () =>
+        Promise.resolve(
+          planActive
+            ? {
+                subscriptionId: subscription.id,
+                plan: {
+                  planKey: 'pro',
+                  capabilities: ['api-access'],
+                  limits: {}
+                }
+              }
+            : null
+        )
+    });
+
+    const first = await metering.consume(customerId, use('covered-1', 5));
+
+    planActive = false;
+    const retry = await metering.consume(customerId, use('covered-1', 5));
+
+    expect(first).toMatchObject({ debited: false, replayed: false });
+    expect(retry).toEqual({
+      recordId: first.recordId,
+      debited: false,
+      replayed: true,
+      balanceAfter: 100
+    });
+    expect(await balance()).toBe(100);
+    expect(
+      await ds.getRepository(UsageRecord).findBy({ customerId })
+    ).toMatchObject([{ id: first.recordId, subscriptionId: subscription.id }]);
+    expect(
+      await ds.getRepository(CreditLedger).count({ where: { customerId } })
+    ).toBe(0);
   }, 30_000);
 });

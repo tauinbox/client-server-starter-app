@@ -309,7 +309,7 @@
       }
     },
     {
-      "name": "a use of a subscriber whose plan has the capability of the meter is free and writes no row",
+      "name": "a use of a subscriber whose plan has the capability of the meter is free and audits its new record",
       "route": "POST /api/v1/admin/billing/usage",
       "actor": "admin",
       "auth": "bearer",
@@ -326,7 +326,9 @@
       "expect": {
         "status": 201,
         "errorKey": null,
-        "audit": []
+        "audit": [
+          "BILLING_USAGE_RECORD"
+        ]
       }
     }
   ]

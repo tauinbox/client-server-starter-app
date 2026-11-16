@@ -335,19 +335,31 @@ describe('admin billing mutations write audit entries', () => {
     });
   });
 
-  it('writes no audit row for a use that a plan with the capability makes free', async () => {
+  it('audits a use that a plan with the capability makes free once, because it stores a record', async () => {
     const { token, userId } = await loginAdmin();
     const { customerId } = await activateSubscription(userId);
-    const res = await post(token, '/admin/billing/usage', {
+    const payload = {
       customerId,
       meterKey: 'api_calls',
       quantity: 1,
       idempotencyKey: 'evt-audit-free'
-    });
+    };
+
+    const res = await post(token, '/admin/billing/usage', payload);
 
     expect(res.status).toBe(201);
-    expect(await res.json()).toMatchObject({ debited: false, recordId: null });
-    expect(entriesFor('BILLING_USAGE_RECORD')).toHaveLength(0);
+    const body = (await res.json()) as { recordId: string; debited: boolean };
+
+    expect(body.debited).toBe(false);
+    await post(token, '/admin/billing/usage', payload);
+
+    const entries = entriesFor('BILLING_USAGE_RECORD');
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      targetId: body.recordId,
+      details: { customerId, meterKey: 'api_calls', quantity: 1 }
+    });
   });
 
   it('never audits the usage idempotency key', async () => {

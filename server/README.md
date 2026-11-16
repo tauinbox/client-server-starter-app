@@ -460,7 +460,7 @@ logging.
 `@LogAudit` metadata and calls `logFireAndForget` after a success. Only three billing
 administrator routes use it: the cancel, the refund and the webhook replay. The usage route does
 not, because a replay of an idempotency key is also a success: `MeteringService.consume` writes
-the row with `logFireAndForget` only after a debit. An administrator change to a user, a role, a resource or a feature flag
+the row with `logFireAndForget` only for a new record, not for a replay. An administrator change to a user, a role, a resource or a feature flag
 writes its row with `AuditService.log(params, manager)` in the transaction of the change instead.
 
 `entities/` holds the `AuditLog` entity, with `action`, `actorId`, `actorEmail`, `targetId`, `ip`,
@@ -826,12 +826,14 @@ the units of one use from the credit balance of the customer at the moment of us
   uses of one customer serialize. A known key with the same body is a replay: it answers the first
   record and debits nothing. A known key with another `meterKey`, `quantity` or `occurredAt` gets a
   409 (`errors.billing.usageKeyReused`). A subscriber whose plan has the capability of the meter is
-  not debited and nothing is recorded. A balance below the units gets a 409
+  not debited: the record is stored with the `subscription_id` of the entitled subscription
+  (`EntitlementService.entitledSubscription`) and no ledger row, so a retry of the key after the
+  plan ends is a replay and takes no credits. A balance below the units gets a 409
   (`errors.billing.insufficientCredits`) and nothing is written. Else it inserts the record (no
   subscription) and calls `CreditService.spendOnMetering`, which writes the delta and a ledger row
   tied to the record.
-- After the commit it writes the audit row of a debit and emits `CreditBalanceCrossedEvent` when
-  the debit took the balance to 0.
+- After the commit it writes the audit row of each new record and emits `CreditBalanceCrossedEvent`
+  when the debit took the balance to 0.
 
 The answer is `{ recordId, debited, replayed, balanceAfter }`.
 `server/test/billing-metering-race.e2e-spec.ts` proves the lock on a real PostgreSQL.
@@ -1166,8 +1168,8 @@ The module reads four row types from `billing/entities/`. That is a schema depen
 behavioral one.
 
 `entitlement.service.ts` supplies `capabilitiesFor(userId)`. A subscription with the status active,
-trialing or past_due in the grace window gives `plan.entitlements` (`subscriptionPlan`, which
-`MeteringService` also reads). Else a credit balance above 0 gives the pay-as-you-go plan `usage`,
+trialing or past_due in the grace window gives `plan.entitlements` (`entitledSubscription`, which
+`MeteringService` also reads, with the id of the subscription). Else a credit balance above 0 gives the pay-as-you-go plan `usage`,
 which has every capability. Else the result is the Free entitlements. The result is the union with
 the active `CustomerGrant` rows, that is the grants that are not revoked and not expired, from a paid
 one-time sku purchase. A delta that moves the balance across 0 emits `CreditBalanceCrossedEvent`,

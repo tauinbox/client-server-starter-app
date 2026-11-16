@@ -9,12 +9,10 @@ import type {
 export class MeteringResponseDto {
   @ApiProperty({
     example: '123e4567-e89b-12d3-a456-426614174000',
-    nullable: true,
-    type: String,
     description:
-      'The usage record of the debit. Null when the plan of the customer includes the meter and nothing was recorded.'
+      'The usage record of the use. A use that the plan of the customer includes has a record too, with no debit.'
   })
-  recordId: string | null;
+  recordId: string;
 
   @ApiProperty({
     example: true,

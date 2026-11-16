@@ -35,7 +35,7 @@ export interface ConsumeInput {
 }
 
 export interface ConsumeOptions {
-  /** Written for a debit only; `targetId` is the id of its new record. */
+  /** Written for each new record, not for a replay; `targetId` is its id. */
   audit?: Omit<AuditLogParams, 'targetId'>;
 }
 
@@ -63,10 +63,11 @@ interface DebitOutcome {
  * use.
  *
  * A customer whose entitled subscription plan has the capability of the meter
- * is not debited: a fixed plan buys unlimited use for its period, and nothing
- * is recorded. The idempotency key is unique per customer: a replay with the
- * same body answers the first record and debits nothing, and another body under
- * the same key is refused.
+ * is not debited: a fixed plan buys unlimited use for its period. The use is
+ * still recorded under its key, with the subscription that covered it, so a
+ * retry after the plan ends replays it and takes no credits. The idempotency
+ * key is unique per customer: a replay with the same body answers the first
+ * record and debits nothing, and another body under the same key is refused.
  */
 @Injectable()
 export class MeteringService {
@@ -115,7 +116,7 @@ export class MeteringService {
 
     const { response, change } = outcome;
 
-    if (audit && change && response.recordId) {
+    if (audit && !response.replayed) {
       this.auditService.logFireAndForget({
         ...audit,
         targetId: response.recordId
@@ -151,21 +152,12 @@ export class MeteringService {
       return { response: replayOf(existing, balance), change: null };
     }
 
-    const plan = await this.entitlements.subscriptionPlan(customerId);
+    const entitled = await this.entitlements.entitledSubscription(customerId);
+    const coveredBy = entitled?.plan.capabilities.includes(METERS[meterKey])
+      ? entitled.subscriptionId
+      : null;
 
-    if (plan?.capabilities.includes(METERS[meterKey])) {
-      return {
-        response: {
-          recordId: null,
-          debited: false,
-          replayed: false,
-          balanceAfter: balance
-        },
-        change: null
-      };
-    }
-
-    if (balance < units) {
+    if (coveredBy === null && balance < units) {
       throw new ApiError(
         ErrorKeys.BILLING.INSUFFICIENT_CREDITS,
         'There are not enough credits for this use. Top up credits.'
@@ -175,13 +167,26 @@ export class MeteringService {
     const record = await manager.save(
       manager.create(UsageRecord, {
         customerId,
-        subscriptionId: null,
+        subscriptionId: coveredBy,
         meterKey,
         quantity: Money.fromMinor(units),
         occurredAt,
         idempotencyKey
       })
     );
+
+    if (coveredBy !== null) {
+      return {
+        response: {
+          recordId: record.id,
+          debited: false,
+          replayed: false,
+          balanceAfter: balance
+        },
+        change: null
+      };
+    }
+
     const change = await this.credits.spendOnMetering(
       manager,
       { customerId, usageRecordId: record.id },
@@ -278,7 +283,7 @@ function assertSameBody(
 function replayOf(record: UsageRecord, balance: number): MeteringResponse {
   return {
     recordId: record.id,
-    debited: true,
+    debited: record.subscriptionId === null,
     replayed: true,
     balanceAfter: balance
   };
