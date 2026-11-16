@@ -36,7 +36,7 @@ import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
 } from './billing-db-lock';
-import { pollUntil } from './poll';
+import { eventually } from './eventually';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -228,15 +228,17 @@ runWithInfra('Removal of the saved card (e2e)', () => {
   }
 
   /** True once another backend waits for a lock that `pid` holds. */
-  function blockedBy(pid: number): Promise<boolean> {
-    return pollUntil(async () => {
-      const [{ blocked }] = await ds.query<[{ blocked: number }]>(
-        'SELECT count(*)::int AS blocked FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))',
+  async function blockedBy(pid: number): Promise<boolean> {
+    const blocked = await eventually(async () => {
+      const [{ count }] = await ds.query<[{ count: number }]>(
+        'SELECT count(*)::int AS count FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))',
         [pid]
       );
 
-      return blocked > 0;
+      return count > 0 ? true : null;
     });
+
+    return blocked === true;
   }
 
   function cards(): Promise<PaymentMethod[]> {

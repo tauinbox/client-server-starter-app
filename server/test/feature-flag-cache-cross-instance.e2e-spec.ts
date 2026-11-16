@@ -24,7 +24,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { flagAuditActor } from './flag-audit-actor';
-import { pollUntil } from './poll';
+import { eventually } from './eventually';
 
 // Two server instances share one flags cache. A load in the second instance
 // that read the rows before a change must not put them back after the first
@@ -179,8 +179,8 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
       .get(RolesController)
       .update(role.id, { name: `${role.name}-2` }, req, ability);
 
-    expect(await pollUntil(() => invalidate.mock.results.length > 0)).toBe(
-      true
+    await eventually(() =>
+      Promise.resolve(invalidate.mock.results.length > 0 ? true : null)
     );
     expect(invalidate).toHaveBeenCalledTimes(1);
     await invalidate.mock.results[0].value;

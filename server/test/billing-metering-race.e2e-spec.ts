@@ -19,11 +19,10 @@ import { UsageRecord } from '../src/modules/billing/entities/usage-record.entity
 import { CreditBalanceCrossedEvent } from '../src/modules/billing/events/billing.events';
 import { CreditService } from '../src/modules/billing/services/credit.service';
 import { MeteringService } from '../src/modules/billing/services/metering.service';
+import { waitsOnLock } from './lock-wait';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
-
-const WAIT_TIMEOUT_MS = 10_000;
 
 runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
   let ds: DataSource;
@@ -127,22 +126,9 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
     return { meterKey: 'api_calls', units, idempotencyKey };
   }
 
-  /** Resolves once a backend waits on a row lock, or fails after a timeout. */
+  /** Fails unless a second debit waits on the balance row lock. */
   async function untilABackendWaitsOnALock(): Promise<void> {
-    const deadline = Date.now() + WAIT_TIMEOUT_MS;
-
-    while (Date.now() < deadline) {
-      const [{ waiting }] = await ds.query<{ waiting: string }[]>(
-        `SELECT count(*) AS waiting FROM pg_stat_activity
-         WHERE datname = current_database() AND wait_event_type = 'Lock'`
-      );
-
-      if (Number(waiting) > 0) return;
-
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
-
-    throw new Error('No second debit waited on the balance row lock');
+    expect(await waitsOnLock(ds, '%')).toBe(true);
   }
 
   /**

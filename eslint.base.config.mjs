@@ -41,7 +41,7 @@ const promiseResolverSyntax = {
 const LOOP =
   ':matches(ForStatement, ForInStatement, ForOfStatement, WhileStatement, DoWhileStatement)';
 const ZERO_PAUSE_POLL_MESSAGE =
-  'Do not pace a poll loop with setImmediate, a zero setTimeout, process.nextTick or queueMicrotask: the loop then ends after a number of polls, not after a time. Poll against a deadline: pollUntil (server/test/poll.ts), expect.poll in Playwright, vi.waitFor in Vitest.';
+  'Do not pace a poll loop with setImmediate, a zero setTimeout, process.nextTick or queueMicrotask: the loop then ends after a number of polls, not after a time. Poll against a deadline: eventually or waitsOnLock in server/test, expect.poll in Playwright, vi.waitFor in Vitest.';
 const zeroPausePollSyntax = [
   `${LOOP} Identifier[name=/^(setImmediate|queueMicrotask)$/]`,
   `${LOOP} MemberExpression[object.name='process'][property.name='nextTick']`,
