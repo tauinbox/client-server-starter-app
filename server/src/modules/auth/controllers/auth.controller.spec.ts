@@ -81,6 +81,7 @@ function mockLocalAuthRequest(
     isEmailVerified: true,
     hasPassword: true,
     mfaEnabled: false,
+    residenceCountry: null,
     locale: 'en',
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),

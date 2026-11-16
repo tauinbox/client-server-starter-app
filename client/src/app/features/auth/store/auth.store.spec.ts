@@ -39,6 +39,7 @@ function createMockUser(): UserResponse {
     isEmailVerified: true,
     hasPassword: true,
     mfaEnabled: false,
+    residenceCountry: 'DE',
     locale: 'en',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
@@ -305,6 +306,35 @@ describe('AuthStore', () => {
       store.clearSession();
 
       expect(store.mustEnrolMfa()).toBe(false);
+    });
+  });
+
+  describe('mustDeclareResidence', () => {
+    it('is true for an account with no country', () => {
+      const store = createStore({
+        ...createMockUser(),
+        residenceCountry: null
+      });
+
+      expect(store.mustDeclareResidence()).toBe(true);
+    });
+
+    it('is false once the account has a country', () => {
+      expect(createStore(createMockUser()).mustDeclareResidence()).toBe(false);
+    });
+
+    it('is false for an anonymous session', () => {
+      expect(createStore(null).mustDeclareResidence()).toBe(false);
+    });
+
+    // A browser that ran an older release persisted a user without the field;
+    // the refresh at bootstrap replaces it with the answer of the server.
+    it('is false for a persisted user from before the field', () => {
+      const { residenceCountry: _country, ...older } = createMockUser();
+      // @ts-expect-error - a persisted entry from an older release
+      const store = createStore(older);
+
+      expect(store.mustDeclareResidence()).toBe(false);
     });
   });
 

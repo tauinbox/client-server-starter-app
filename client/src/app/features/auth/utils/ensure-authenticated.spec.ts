@@ -12,6 +12,7 @@ describe('ensureAuthenticated', () => {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
+    mustDeclareResidence: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
@@ -43,7 +44,8 @@ describe('ensureAuthenticated', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
       isAccessTokenExpired: vi.fn().mockReturnValue(true),
-      hasPersistedUser: vi.fn().mockReturnValue(true)
+      hasPersistedUser: vi.fn().mockReturnValue(true),
+      mustDeclareResidence: vi.fn().mockReturnValue(false)
     };
 
     authServiceMock = {
@@ -141,5 +143,42 @@ describe('ensureAuthenticated', () => {
     );
 
     expect(String(value)).toBe('/forbidden');
+  });
+
+  describe('an account with no country of residence', () => {
+    beforeEach(() => {
+      authStoreMock.isAuthenticated.mockReturnValue(true);
+      authStoreMock.isAccessTokenExpired.mockReturnValue(false);
+      authStoreMock.mustDeclareResidence.mockReturnValue(true);
+    });
+
+    it('goes to the residence page before the guard answers', () => {
+      const onAuthenticated = vi.fn(() => true);
+
+      expect(String(run('/billing?tab=plans', onAuthenticated))).toBe(
+        '/residence?returnUrl=%2Fbilling%3Ftab%3Dplans'
+      );
+      expect(onAuthenticated).not.toHaveBeenCalled();
+    });
+
+    it('keeps the residence page itself', () => {
+      expect(run('/residence?returnUrl=%2Fprofile')).toBe(true);
+    });
+
+    it('is read after a refresh, which brings the user', async () => {
+      authStoreMock.isAuthenticated.mockReturnValue(false);
+      authStoreMock.mustDeclareResidence.mockReturnValue(false);
+      authServiceMock.refreshTokens.mockImplementation(() => {
+        authStoreMock.mustDeclareResidence.mockReturnValue(true);
+
+        return of(mockTokens);
+      });
+
+      const value = await firstValueFrom(
+        run('/profile') as Observable<GuardResult>
+      );
+
+      expect(String(value)).toBe('/residence?returnUrl=%2Fprofile');
+    });
   });
 });

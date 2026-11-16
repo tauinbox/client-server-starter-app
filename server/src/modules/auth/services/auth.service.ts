@@ -59,6 +59,7 @@ import {
   SYSTEM_ROLES,
   TOKEN_PURPOSE,
   VERIFICATION_TOKEN_EXPIRY_MS,
+  type CountryCode,
   type SignInRefusalReason,
   type StepUpOperation
 } from '@app/shared/constants';
@@ -445,6 +446,40 @@ export class AuthService {
       message:
         'Registration successful. Please check your email to verify your account.'
     };
+  }
+
+  /**
+   * The one declaration of the country of residence of an account that has
+   * none. The country is checked first, as at registration, so a refused
+   * country writes nothing and the owner can choose again.
+   */
+  async declareResidence(
+    userId: string,
+    {
+      residenceCountry,
+      auditContext
+    }: { residenceCountry: CountryCode; auditContext?: AuditContext }
+  ): Promise<User> {
+    this.regionService.assertServesCountry(residenceCountry);
+
+    const user = await this.usersService.declareResidence(userId, {
+      country: residenceCountry,
+      audit: (written) => [
+        {
+          action: AuditAction.USER_UPDATE,
+          actorId: userId,
+          actorEmail: written.email,
+          targetId: userId,
+          targetType: 'User',
+          details: { changedFields: ['residenceCountry'], source: 'self' },
+          context: auditContext
+        }
+      ]
+    });
+
+    this.eventEmitter.emit(UserUpdatedEvent.name, new UserUpdatedEvent(userId));
+
+    return user;
   }
 
   async verifyEmail(

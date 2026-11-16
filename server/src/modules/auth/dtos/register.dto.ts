@@ -19,8 +19,12 @@ function ResidenceCountryProperty(): PropertyDecorator {
   );
 }
 
-/** The body that creates the account of a provider identity. */
-export class OAuthSignupDto {
+/**
+ * A declared country of residence and nothing else: the body that creates the
+ * account of a provider identity, and the one declaration of an account that
+ * has none.
+ */
+export class ResidenceDeclarationDto {
   @ResidenceCountryProperty()
   residenceCountry: CountryCode;
 }

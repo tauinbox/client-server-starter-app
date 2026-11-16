@@ -88,6 +88,7 @@ describe('AuthService', () => {
     findByPasswordResetToken: jest.Mock;
     clearPendingEmailChange: jest.Mock;
     update: jest.Mock;
+    declareResidence: jest.Mock;
   };
   let mockTokenGenerator: {
     generateTokens: jest.Mock;
@@ -232,7 +233,8 @@ describe('AuthService', () => {
       setPasswordResetToken: jest.fn().mockResolvedValue(true),
       findByPasswordResetToken: jest.fn(),
       clearPendingEmailChange: jest.fn().mockResolvedValue(undefined),
-      update: jest.fn().mockResolvedValue(mockUser)
+      update: jest.fn().mockResolvedValue(mockUser),
+      declareResidence: jest.fn().mockResolvedValue(mockUser)
     };
 
     mockTokenGenerator = {
@@ -1154,6 +1156,59 @@ describe('AuthService', () => {
           action: AuditAction.USER_REGISTER_CONFLICT
         })
       );
+    });
+  });
+
+  describe('declareResidence', () => {
+    const auditContext = { ip: '203.0.113.7', requestId: 'req-1' };
+
+    it('writes the country with one audit row of the owner and announces the change', async () => {
+      const result = await service.declareResidence('user-1', {
+        residenceCountry: 'DE',
+        auditContext
+      });
+
+      expect(result).toBe(mockUser);
+      const [[userId, { country, audit }]] = mockUsersService.declareResidence
+        .mock.calls as Parameters<UsersService['declareResidence']>[];
+
+      expect(userId).toBe('user-1');
+      expect(country).toBe('DE');
+      expect(audit({ ...mockUser, email: 'owner@example.com' })).toEqual([
+        {
+          action: AuditAction.USER_UPDATE,
+          actorId: 'user-1',
+          actorEmail: 'owner@example.com',
+          targetId: 'user-1',
+          targetType: 'User',
+          details: { changedFields: ['residenceCountry'], source: 'self' },
+          context: auditContext
+        }
+      ]);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        UserUpdatedEvent.name,
+        new UserUpdatedEvent('user-1')
+      );
+    });
+
+    it('refuses a country of another region before any write, so the owner can choose again', async () => {
+      await expectApiRejection(
+        service.declareResidence('user-1', { residenceCountry: 'RU' }),
+        ErrorKeys.AUTH.RESIDENCE_OTHER_REGION
+      );
+      expect(mockUsersService.declareResidence).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('announces nothing when the write is refused', async () => {
+      mockUsersService.declareResidence.mockRejectedValue(
+        new Error('already declared')
+      );
+
+      await expect(
+        service.declareResidence('user-1', { residenceCountry: 'DE' })
+      ).rejects.toThrow('already declared');
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });
   });
 

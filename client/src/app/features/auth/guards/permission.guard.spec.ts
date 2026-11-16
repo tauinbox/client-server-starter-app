@@ -18,6 +18,7 @@ describe('permissionGuard', () => {
     hasPersistedUser: ReturnType<typeof vi.fn>;
     hasPermissions: ReturnType<typeof vi.fn>;
     mustEnrolMfa: ReturnType<typeof vi.fn>;
+    mustDeclareResidence: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
@@ -33,7 +34,8 @@ describe('permissionGuard', () => {
       isAccessTokenExpired: vi.fn().mockReturnValue(false),
       hasPersistedUser: vi.fn().mockReturnValue(true),
       hasPermissions: vi.fn().mockReturnValue(false),
-      mustEnrolMfa: vi.fn().mockReturnValue(false)
+      mustEnrolMfa: vi.fn().mockReturnValue(false),
+      mustDeclareResidence: vi.fn().mockReturnValue(false)
     };
 
     authServiceMock = {

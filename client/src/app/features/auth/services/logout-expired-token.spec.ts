@@ -25,6 +25,7 @@ const user: UserResponse = {
   isEmailVerified: true,
   hasPassword: true,
   mfaEnabled: false,
+  residenceCountry: 'DE',
   locale: 'en',
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',

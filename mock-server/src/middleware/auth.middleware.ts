@@ -15,6 +15,8 @@ import {
   STEP_UP_OPERATION,
   SUPPORTED_LOCALES,
   VERIFICATION_TOKEN_EXPIRY_MS,
+  isCountryCode,
+  type CountryCode,
   type ErrorKey,
   type SignInRefusalReason
 } from '@app/shared/constants';
@@ -63,8 +65,10 @@ import {
 } from '../helpers/auth.helpers';
 import {
   buildMockUser,
+  RESIDENCE_COUNTRY_ERROR,
   validateCreateUserBody
 } from '../helpers/user-create.helpers';
+import { residenceRefusal } from '../helpers/region.helpers';
 import {
   CAPTCHA_ROUTE_LIMITS,
   evaluateCaptcha,
@@ -1056,6 +1060,59 @@ router.patch(
     res.json(toUserResponse(user));
   }
 );
+
+// POST /api/v1/auth/profile/residence
+// Mirrors AuthService.declareResidence: the region of the country first, then
+// one write over an empty column.
+router.post('/profile/residence', authGuard, (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const { residenceCountry } = body;
+  const bodyErrors = [
+    ...unknownPropertyErrors(body, ['residenceCountry']),
+    ...(isCountryCode(residenceCountry) ? [] : [RESIDENCE_COUNTRY_ERROR])
+  ];
+
+  if (bodyErrors.length > 0) {
+    sendValidationError(res, 'body', bodyErrors);
+
+    return;
+  }
+
+  // The validation above rejects any other value.
+  const country = residenceCountry as CountryCode;
+  const refusal = residenceRefusal(country);
+
+  if (refusal) {
+    sendError(res, refusal.errorKey, refusal.message);
+
+    return;
+  }
+
+  const { user } = req as AuthenticatedRequest;
+
+  if (user.residenceCountry !== null) {
+    sendError(
+      res,
+      ErrorKeys.AUTH.RESIDENCE_ALREADY_DECLARED,
+      'The country of residence is already declared'
+    );
+
+    return;
+  }
+
+  user.residenceCountry = country;
+  user.updatedAt = new Date().toISOString();
+  logAudit('USER_UPDATE', {
+    actorId: user.id,
+    actorEmail: user.email,
+    targetId: user.id,
+    targetType: 'User',
+    details: { changedFields: ['residenceCountry'], source: 'self' },
+    ip: req.ip
+  });
+  pushUserCrudEvent('updated', user.id);
+  res.json(toUserResponse(user));
+});
 
 // POST /api/v1/auth/profile/email/initiate
 // Gated like PATCH /profile: the address is the recovery channel of the password.

@@ -109,12 +109,10 @@ export class OAuthResidenceComponent {
             return;
           }
 
-          if (errorKey === ErrorKeys.AUTH.RESIDENCE_OTHER_REGION) {
-            this.#regionConfig
-              .peerUrl(residenceCountry)
-              .pipe(takeUntilDestroyed(this.#destroyRef))
-              .subscribe((url) => this.peerUrl.set(url));
-          }
+          this.#regionConfig
+            .peerUrl(residenceCountry, errorKey)
+            .pipe(takeUntilDestroyed(this.#destroyRef))
+            .subscribe((url) => this.peerUrl.set(url));
 
           this.error.set(
             parseHttpErrorMessage(

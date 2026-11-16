@@ -414,6 +414,17 @@ export class AuthService {
       .pipe(tap((user) => this.#authStore.updateCurrentUser(user)));
   }
 
+  /** The one declaration of an account that has no country of residence. */
+  declareResidence(residenceCountry: CountryCode): Observable<User> {
+    return this.#http
+      .post<User>(
+        AuthApiEnum.Residence,
+        { residenceCountry },
+        { context: silentContext() }
+      )
+      .pipe(tap((user) => this.#authStore.updateCurrentUser(user)));
+  }
+
   refreshTokens(): Observable<TokensResponse | null> {
     return this.#tokenService.refreshTokens();
   }

@@ -92,7 +92,7 @@ test.describe('OAuth sign-up - country of residence', () => {
     await page.getByRole('button', { name: 'Create account' }).click();
 
     await expect(page.getByRole('alert')).toHaveText(
-      'Registration for this country is not available yet.'
+      'Accounts for this country are not available yet.'
     );
     await expect(page).toHaveURL(/\/oauth\/callback/);
 

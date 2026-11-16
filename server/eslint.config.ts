@@ -62,7 +62,7 @@ const handBuiltErrorSyntax: RestrictedSyntax[] = [
 const uncheckedUserLookupSyntax: RestrictedSyntax[] = [
   {
     selector:
-      'CallExpression[callee.object.property.name=/^users?Service$/][callee.property.name=/^(findById|findByIdWithDeleted|findByEmail|incrementFailedAttemptsAndLockIfNeeded|upgradePasswordHash|resetLoginAttempts|setEmailVerificationToken|findByEmailVerificationToken|markEmailVerified|setPasswordResetToken|findByPasswordResetToken|clearPendingEmailChange)$/]',
+      'CallExpression[callee.object.property.name=/^users?Service$/][callee.property.name=/^(findById|findByIdWithDeleted|findByEmail|incrementFailedAttemptsAndLockIfNeeded|upgradePasswordHash|resetLoginAttempts|setEmailVerificationToken|findByEmailVerificationToken|markEmailVerified|setPasswordResetToken|findByPasswordResetToken|clearPendingEmailChange|declareResidence)$/]',
     message:
       'This UsersService method takes no ability and runs no instance check. In a controller, use a method that takes an ability, such as findOne(id, ability). If the server, not the client, chose the key, disable this line and give the reason.'
   }

@@ -32,7 +32,7 @@ import { MfaService } from '../services/mfa.service';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { MfaPolicyService } from '../services/mfa-policy.service';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
-import { RegisterDto } from '../dtos/register.dto';
+import { RegisterDto, ResidenceDeclarationDto } from '../dtos/register.dto';
 import { UpdateProfileDto } from '../dtos/update-profile.dto';
 import { UserResponseDto } from '../../users/dtos/user-response.dto';
 import { LoginDto } from '../dtos/login.dto';
@@ -355,6 +355,34 @@ export class AuthController {
     }
 
     return updatedUser;
+  }
+
+  // No @Authorize: the client asks every account with no country before
+  // anything else, so a role without the profile grant must still answer.
+  @Post('profile/residence')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Declare the country of residence of an account that has none'
+  })
+  @ApiBody({ type: ResidenceDeclarationDto })
+  @ApiOkResponse({
+    description: 'The country is declared',
+    type: UserResponseDto
+  })
+  @ApiConflictResponse({
+    description:
+      'The country is of another region, or the account has already declared one'
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  declareResidence(
+    @Request() req: JwtAuthRequest,
+    @Body() dto: ResidenceDeclarationDto
+  ) {
+    return this.authService.declareResidence(req.user.userId, {
+      residenceCountry: dto.residenceCountry,
+      auditContext: extractAuditContext(req)
+    });
   }
 
   // The address is the recovery channel of the password, so a role that may not

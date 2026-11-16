@@ -157,7 +157,8 @@
       "sessionIsCurrent": "Чтобы завершить сеанс этого устройства, нажмите «Выйти».",
       "refreshTokenRequired": "Сеанс завершён. Войдите снова.",
       "residenceOtherRegion": "Аккаунты этой страны хранятся на другом сайте.",
-      "residenceRegionNotServed": "Регистрация для этой страны пока недоступна."
+      "residenceRegionNotServed": "Аккаунты для этой страны пока недоступны.",
+      "residenceAlreadyDeclared": "Страна проживания уже указана."
     },
     "users": {
       "notFound": "Пользователь не найден",

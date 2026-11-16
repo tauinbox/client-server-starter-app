@@ -16,6 +16,7 @@ describe('authGuard', () => {
     isAuthenticated: ReturnType<typeof vi.fn>;
     isAccessTokenExpired: ReturnType<typeof vi.fn>;
     hasPersistedUser: ReturnType<typeof vi.fn>;
+    mustDeclareResidence: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     refreshTokens: ReturnType<typeof vi.fn>;
@@ -29,7 +30,8 @@ describe('authGuard', () => {
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(false),
       isAccessTokenExpired: vi.fn().mockReturnValue(true),
-      hasPersistedUser: vi.fn().mockReturnValue(true)
+      hasPersistedUser: vi.fn().mockReturnValue(true),
+      mustDeclareResidence: vi.fn().mockReturnValue(false)
     };
 
     authServiceMock = {

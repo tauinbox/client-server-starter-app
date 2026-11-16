@@ -5,10 +5,13 @@ import {
   provideHttpClientTesting
 } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
+import { ErrorKeys } from '@app/shared/constants';
 import {
   REGION_CONFIG_API_V1,
   RegionConfigService
 } from './region-config.service';
+
+const OTHER_REGION = ErrorKeys.AUTH.RESIDENCE_OTHER_REGION;
 
 describe('RegionConfigService', () => {
   let service: RegionConfigService;
@@ -28,7 +31,7 @@ describe('RegionConfigService', () => {
     async function peerUrlWith(
       peers: Record<string, string>
     ): Promise<string | null> {
-      const result = firstValueFrom(service.peerUrl('RU'));
+      const result = firstValueFrom(service.peerUrl('RU', OTHER_REGION));
 
       httpTesting
         .expectOne(REGION_CONFIG_API_V1)
@@ -36,6 +39,17 @@ describe('RegionConfigService', () => {
 
       return result;
     }
+
+    it.each([
+      ErrorKeys.AUTH.RESIDENCE_REGION_NOT_SERVED,
+      ErrorKeys.AUTH.RESIDENCE_ALREADY_DECLARED,
+      undefined
+    ])('gives null with no request after %s', async (errorKey) => {
+      await expect(
+        firstValueFrom(service.peerUrl('RU', errorKey))
+      ).resolves.toBeNull();
+      httpTesting.expectNone(REGION_CONFIG_API_V1);
+    });
 
     it('gives the https URL of the cell that serves the country', async () => {
       await expect(peerUrlWith({ ru: 'https://ru.example.com' })).resolves.toBe(
@@ -54,7 +68,7 @@ describe('RegionConfigService', () => {
     });
 
     it('gives null when the config does not load', async () => {
-      const result = firstValueFrom(service.peerUrl('RU'));
+      const result = firstValueFrom(service.peerUrl('RU', OTHER_REGION));
 
       httpTesting
         .expectOne(REGION_CONFIG_API_V1)

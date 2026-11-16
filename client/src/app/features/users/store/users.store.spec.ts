@@ -29,6 +29,7 @@ const mockUser: User = {
   isEmailVerified: true,
   hasPassword: true,
   mfaEnabled: false,
+  residenceCountry: 'DE',
   locale: 'en',
   lockedUntil: null,
   createdAt: '2024-01-01T00:00:00.000Z',

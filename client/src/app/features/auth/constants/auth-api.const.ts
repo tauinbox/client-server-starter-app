@@ -19,6 +19,7 @@ export enum AuthApiEnum {
   CaptchaConfig = `${AUTH_API_V1}/captcha-config`,
   InitiateEmailChange = `${AUTH_API_V1}/profile/email/initiate`,
   ConfirmEmailChange = `${AUTH_API_V1}/profile/email/confirm`,
+  Residence = `${AUTH_API_V1}/profile/residence`,
   MfaSetup = `${AUTH_API_V1}/mfa/setup`,
   MfaEnable = `${AUTH_API_V1}/mfa/enable`,
   MfaDisable = `${AUTH_API_V1}/mfa/disable`,

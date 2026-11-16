@@ -186,6 +186,14 @@
     "creating": "Creating account...",
     "errorFailed": "The account could not be created. Please try again."
   },
+  "residence": {
+    "title": "Country of residence",
+    "intro": "Choose your country of residence to continue. You set it once.",
+    "submit": "Continue",
+    "saving": "Saving...",
+    "signOut": "Sign out",
+    "errorFailed": "The country of residence could not be saved. Please try again."
+  },
   "providers": {
     "google": "Google",
     "facebook": "Facebook",

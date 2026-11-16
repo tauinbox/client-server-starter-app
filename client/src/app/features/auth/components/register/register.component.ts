@@ -165,9 +165,7 @@ export class RegisterComponent {
             return;
           }
 
-          if (errorKey === ErrorKeys.AUTH.RESIDENCE_OTHER_REGION) {
-            this.showPeerRegion(residenceCountry);
-          }
+          this.showPeerRegion(residenceCountry, errorKey);
 
           if (errorKey === ErrorKeys.USERS.EMAIL_EXISTS) {
             this.error.set(
@@ -186,9 +184,12 @@ export class RegisterComponent {
       });
   }
 
-  private showPeerRegion(country: CountryCode): void {
+  private showPeerRegion(
+    country: CountryCode,
+    errorKey: string | undefined
+  ): void {
     this.#regionConfig
-      .peerUrl(country)
+      .peerUrl(country, errorKey)
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe((url) => this.peerUrl.set(url));
   }

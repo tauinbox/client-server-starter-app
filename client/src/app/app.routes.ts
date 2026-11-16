@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import type { Routes } from '@angular/router';
 import { authGuard } from '@features/auth/guards/auth.guard';
 import { guestGuard } from '@features/auth/guards/guest.guard';
+import { residenceGuard } from '@features/auth/guards/residence.guard';
 import { SidenavStateService } from '@core/services/sidenav-state.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { legalDocumentGuard } from '@features/legal/guards/legal-document.guard';
@@ -48,6 +49,14 @@ export const routes: Routes = [
         (c) => c.ProfileComponent
       ),
     canActivate: [authGuard]
+  },
+  {
+    path: AppRouteSegmentEnum.Residence,
+    loadComponent: () =>
+      import('./features/auth/components/residence/residence.component').then(
+        (c) => c.ResidenceComponent
+      ),
+    canActivate: [residenceGuard]
   },
   {
     path: AppRouteSegmentEnum.Users,

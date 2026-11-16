@@ -18,6 +18,7 @@ export enum AppRouteSegmentEnum {
   ResetPassword = 'reset-password',
   VerifyEmail = 'verify-email',
   ConfirmEmailChange = 'confirm-email-change',
+  Residence = 'residence',
   Legal = 'legal',
   Any = '**'
 }

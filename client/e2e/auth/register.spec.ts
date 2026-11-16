@@ -359,7 +359,7 @@ test.describe('Register page', () => {
     await main.getByRole('button', { name: 'Register' }).click();
 
     await expect(page.locator('.error-message')).toHaveText(
-      'Registration for this country is not available yet.'
+      'Accounts for this country are not available yet.'
     );
     await expect(page.locator('.peer-region-link')).toHaveCount(0);
     await expect(page).toHaveURL(/.*\/register$/);

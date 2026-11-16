@@ -147,7 +147,11 @@ router.post('/users', (req, res) => {
       totpSecret: user.totpSecret ?? null,
       totpEnabledAt: user.totpEnabledAt ?? null,
       totpRecoveryCodes: user.totpRecoveryCodes ?? null,
-      totpLastUsedStep: user.totpLastUsedStep ?? null
+      totpLastUsedStep: user.totpLastUsedStep ?? null,
+      // A declared country unless the test sends null, as createMockUser does,
+      // so a seeded account is not sent to the residence page.
+      residenceCountry:
+        user.residenceCountry === undefined ? 'DE' : user.residenceCountry
     });
   }
 

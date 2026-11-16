@@ -58,14 +58,14 @@ export class User {
   @Column({ default: DEFAULT_LOCALE })
   locale: string;
 
-  // Null for an account created before the column or by an administrator.
+  // Null for an account created before the column or by an administrator,
+  // until the owner declares it once (POST /auth/profile/residence).
   @Column({
     name: 'residence_country',
     type: 'varchar',
     length: 2,
     nullable: true
   })
-  @Exclude()
   residenceCountry: CountryCode | null;
 
   @Column({

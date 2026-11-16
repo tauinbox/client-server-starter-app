@@ -346,6 +346,11 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     return Promise.resolve();
   },
+  'residence-declared': (ctx) => {
+    ctx.actor!.residenceCountry = 'DE';
+
+    return Promise.resolve();
+  },
   'custom-role': (ctx) => {
     const now = new Date().toISOString();
     const role = {

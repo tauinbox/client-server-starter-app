@@ -11,7 +11,8 @@ import { hashPassword } from '../../../common/utils/password-hash';
 import {
   ErrorKeys,
   USER_LIST_QUERY,
-  VERIFICATION_TOKEN_EXPIRY_MS
+  VERIFICATION_TOKEN_EXPIRY_MS,
+  type CountryCode
 } from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
@@ -472,6 +473,44 @@ export class UsersService {
     }
 
     return saved;
+  }
+
+  /**
+   * Writes the country of residence of an account that has none. The write is
+   * keyed on the empty column, so of two concurrent declarations one wins and
+   * the other is refused: a declaration is never replaced.
+   */
+  async declareResidence(
+    id: string,
+    { country, audit }: { country: CountryCode; audit: UserAuditRows }
+  ): Promise<User> {
+    return withTransaction(this.dataSource, async (manager) => {
+      const live = { id, deletedAt: IsNull() };
+      const declared = await keyedUpdate(manager, User, {
+        where: { ...live, residenceCountry: IsNull() },
+        changes: { residenceCountry: country }
+      });
+
+      if (!declared) {
+        if (await manager.exists(User, { where: live })) {
+          throw new ApiError(
+            ErrorKeys.AUTH.RESIDENCE_ALREADY_DECLARED,
+            'The country of residence is already declared'
+          );
+        }
+
+        throw userNotFound(id);
+      }
+
+      const written = await manager.findOneOrFail(User, {
+        where: { id },
+        relations: { roles: true }
+      });
+
+      await this.writeAudit(manager, audit, written);
+
+      return written;
+    });
   }
 
   async incrementFailedAttemptsAndLockIfNeeded(
