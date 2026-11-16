@@ -6,11 +6,13 @@ import { DataSource, In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
+  billingGeo,
   geoDefault,
   geoFromLocale,
   overrideForRegion,
   regionForOverride
 } from '@app/shared/utils/billing-rules';
+import type { BillingGeo } from '@app/shared/utils/billing-rules';
 import {
   BILLING_PROVIDER_FLAGS,
   ENTITLED_SUBSCRIPTION_STATUSES,
@@ -711,8 +713,8 @@ export class BillingUserService {
 
     if (customer) return this.regionView(userId, customer);
 
-    // No customer yet: report the geo default derived from the registration
-    // locale; nothing is persisted until the first checkout / region change.
+    // No customer yet: report the geo default of the declared residence;
+    // nothing is persisted until the first checkout / region change.
     const country = await this.detectCountry(userId);
 
     return this.regionView(userId, { providerOverride: null, country });
@@ -796,7 +798,7 @@ export class BillingUserService {
     };
   }
 
-  /** Finds-or-creates the billing customer for a user (geo from locale). */
+  /** Finds-or-creates the billing customer for a user (geo from residence). */
   private async getOrCreateCustomer(userId: string): Promise<Customer> {
     const existing = await this.customers.findOne({ where: { userId } });
 
@@ -847,16 +849,14 @@ export class BillingUserService {
     return ((await this.detectGeo(userId)) ?? geoFromLocale('en')).country;
   }
 
-  /** The billing geo of the user's locale; null when the user is gone. */
-  private async detectGeo(
-    userId: string
-  ): Promise<{ country: string; currency: string } | null> {
+  /** The billing geo of the user; null when the user is gone. */
+  private async detectGeo(userId: string): Promise<BillingGeo | null> {
     const user = await this.users.findOne({
       where: { id: userId },
-      select: { id: true, locale: true }
+      select: { id: true, locale: true, residenceCountry: true }
     });
 
-    return user ? geoFromLocale(user.locale) : null;
+    return user ? billingGeo(user) : null;
   }
 
   // Must match the client's checkout-return routes (/billing/success|cancel).

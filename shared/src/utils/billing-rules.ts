@@ -1,3 +1,4 @@
+import type { CountryCode } from '../constants/data-region.constants';
 import type {
   BillingProviderId,
   BillingRegion,
@@ -14,14 +15,32 @@ function epochMs(at: Instant): number {
   return new Date(at).getTime();
 }
 
-/** Maps the registration locale of a user to a billing country and currency. */
-export function geoFromLocale(locale: string): {
+export interface BillingGeo {
   country: string;
   currency: string;
-} {
-  return locale.toLowerCase().startsWith('ru')
-    ? { country: 'RU', currency: 'RUB' }
-    : { country: 'US', currency: 'USD' };
+}
+
+function geoFromCountry(country: string): BillingGeo {
+  return { country, currency: country === 'RU' ? 'RUB' : 'USD' };
+}
+
+/** Maps a locale to a billing country and currency. */
+export function geoFromLocale(locale: string): BillingGeo {
+  return geoFromCountry(locale.toLowerCase().startsWith('ru') ? 'RU' : 'US');
+}
+
+/**
+ * The billing country of a user is the declared country of residence. An
+ * account with no declaration (created by an administrator) falls back to its
+ * locale.
+ */
+export function billingGeo(user: {
+  residenceCountry: CountryCode | null;
+  locale: string;
+}): BillingGeo {
+  return user.residenceCountry
+    ? geoFromCountry(user.residenceCountry)
+    : geoFromLocale(user.locale);
 }
 
 /** Geo default: country code 'RU' -> YooKassa, everywhere else -> Paddle. */

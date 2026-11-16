@@ -719,7 +719,7 @@ and the usage record checks `create`. No check reads the record, so `Billing` de
 
 `BillingUserService` does this work:
 
-- It gets or makes the customer. The geography comes from the registration locale.
+- It gets or makes the customer. The geography comes from the declared country of residence (`billingGeo`); an account with no country falls back to its locale.
 - It does the checkout and the cancel.
 - It makes the usage summary: the credit units that metered uses took this calendar month (`CreditService.spentOnMetering`).
 - It reads and sets the region, with the guard against a cross-provider migration.

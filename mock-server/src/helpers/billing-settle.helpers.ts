@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { BillingProviderId } from '@app/shared/types';
+import { billingGeo, geoDefault } from '@app/shared/utils/billing-rules';
 import { getState } from '../state';
 import { pushToUser } from '../sse-hub';
 import {
@@ -32,8 +33,8 @@ export function notifyEntitlementsChanged(customerId: string): void {
 }
 
 /**
- * The billing customer of the user. A new one gets the provider of the profile
- * locale.
+ * The billing customer of the user. A new one gets the geo of the declared
+ * residence (`billingGeo`), as `BillingUserService.getOrCreateCustomer` does.
  */
 export function ensureCustomer(user: MockUser): MockCustomer {
   const state = getState();
@@ -44,14 +45,14 @@ export function ensureCustomer(user: MockUser): MockCustomer {
   if (existing) return existing;
 
   const nowIso = new Date().toISOString();
-  const isRu = (user.locale ?? 'en').toLowerCase().startsWith('ru');
+  const { country, currency } = billingGeo(user);
   const customer: MockCustomer = {
     id: randomUUID(),
     userId: user.id,
-    provider: isRu ? 'yookassa' : 'paddle',
+    provider: geoDefault(country),
     providerOverride: null,
-    country: isRu ? 'RU' : 'US',
-    currency: isRu ? 'RUB' : 'USD',
+    country,
+    currency,
     defaultPaymentMethodId: null,
     trialUsedAt: null,
     createdAt: nowIso,

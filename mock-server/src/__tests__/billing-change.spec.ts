@@ -40,7 +40,7 @@ async function login(email: string): Promise<string> {
   return body.tokens.access_token;
 }
 
-// user@example.com has an English locale → paddle/USD in the mock's geo rules.
+// user@example.com lives in Germany: paddle/USD in the mock's geo rules.
 async function activateSubscription(planKey: string): Promise<string> {
   const res = await fetch(
     `${baseUrl}/__control/billing/activate-subscription`,
@@ -57,13 +57,13 @@ async function activateSubscription(planKey: string): Promise<string> {
   return sub.id;
 }
 
-/** The ru locale routes user@example.com to YooKassa, a self-managed provider. */
-function useRussianLocale(): void {
+/** A residence in Russia routes user@example.com to YooKassa, a self-managed provider. */
+function useRussianResidence(): void {
   const user = getState().users.get(mockId('user-2'));
 
   if (!user) throw new Error('user not seeded');
 
-  user.locale = 'ru';
+  user.residenceCountry = 'RU';
 }
 
 /** The paid invoice that the activation records for the period. */
@@ -90,7 +90,7 @@ function post(token: string, path: string, body: unknown): Promise<Response> {
 
 describe('POST /billing/subscription/change', () => {
   it('switches the plan, records the charge and refund invoices', async () => {
-    useRussianLocale();
+    useRussianResidence();
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const source = periodInvoice(subId);
@@ -140,7 +140,7 @@ describe('POST /billing/subscription/change', () => {
   });
 
   it('marks a YooKassa source invoice refunded when the switch refunds all of it', async () => {
-    useRussianLocale();
+    useRussianResidence();
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const source = periodInvoice(subId);
@@ -159,7 +159,7 @@ describe('POST /billing/subscription/change', () => {
   });
 
   it('keeps the source invoice paid when the switch refunds only part of it', async () => {
-    useRussianLocale();
+    useRussianResidence();
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const source = periodInvoice(subId);
@@ -184,7 +184,7 @@ describe('POST /billing/subscription/change', () => {
   });
 
   it('refuses fixed → usage and its preview: pay as you go is a credit balance', async () => {
-    useRussianLocale();
+    useRussianResidence();
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const invoicesBefore = getState().billingInvoices.size;
@@ -292,7 +292,7 @@ describe('POST /billing/subscription/change/preview', () => {
     expect(res.status).toBe(200);
     const preview = (await res.json()) as ProrationPreviewResponse;
 
-    // Paddle (user locale en) delegates: net only, no split.
+    // Paddle (residence DE) delegates: net only, no split.
     expect(preview.provider).toBe('paddle');
     expect(preview.creditMinor).toBeNull();
     expect(preview.chargeMinor).toBeNull();
@@ -305,7 +305,7 @@ describe('POST /billing/subscription/change/preview', () => {
 
     if (!user) throw new Error('user not seeded');
 
-    user.locale = 'ru';
+    user.residenceCountry = 'RU';
     const token = await login('user@example.com');
     const subId = await activateSubscription('pro');
     const source = getState()
@@ -410,7 +410,7 @@ describe('a plan with no Paddle price id (server parity)', () => {
   it('leaves a YooKassa change unaffected', async () => {
     const token = await login('user@example.com');
 
-    useRussianLocale();
+    useRussianResidence();
     await activateSubscription('pro');
     removePaddlePriceId('business');
 

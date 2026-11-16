@@ -89,6 +89,52 @@ describe('GET /billing/region available providers (server parity)', () => {
   });
 });
 
+describe('billing country from the declared residence (server parity)', () => {
+  function declare(residenceCountry: 'DE' | 'RU' | null, locale: string) {
+    const user = getState()
+      .users.values()
+      .find((u) => u.email === 'user@example.com')!;
+
+    Object.assign(user, { residenceCountry, locale });
+
+    return user;
+  }
+
+  it('detects the provider of the residence, not of the locale', async () => {
+    declare('DE', 'ru');
+    const token = await login('user@example.com');
+
+    const current = await region('GET', token);
+
+    expect(current.body).toMatchObject({
+      detectedProvider: 'paddle',
+      effectiveProvider: 'paddle'
+    });
+  });
+
+  it('creates the customer with the country and currency of the residence', async () => {
+    const user = declare('RU', 'en');
+    const token = await login('user@example.com');
+
+    expect((await region('PUT', token, { region: 'auto' })).status).toBe(200);
+
+    expect(
+      getState()
+        .billingCustomers.values()
+        .find((c) => c.userId === user.id)
+    ).toMatchObject({ provider: 'yookassa', country: 'RU', currency: 'RUB' });
+  });
+
+  it('falls back to the locale when no residence is declared', async () => {
+    declare(null, 'ru');
+    const token = await login('user@example.com');
+
+    const current = await region('GET', token);
+
+    expect(current.body['detectedProvider']).toBe('yookassa');
+  });
+});
+
 describe('PUT /billing/region provider availability (server parity)', () => {
   it('refuses a region whose provider is unavailable and keeps the stored region', async () => {
     await disableProvider('yookassa');

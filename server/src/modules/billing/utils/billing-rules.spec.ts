@@ -1,4 +1,5 @@
 import {
+  billingGeo,
   geoDefault,
   geoFromLocale,
   overrideForRegion,
@@ -20,6 +21,26 @@ describe('geoFromLocale and geoDefault', () => {
   it('maps any other locale to US, USD and Paddle', () => {
     expect(geoFromLocale('en')).toEqual({ country: 'US', currency: 'USD' });
     expect(geoDefault('us')).toBe('paddle');
+  });
+});
+
+describe('billingGeo', () => {
+  it('takes the declared residence over the locale', () => {
+    expect(billingGeo({ residenceCountry: 'DE', locale: 'ru' })).toEqual({
+      country: 'DE',
+      currency: 'USD'
+    });
+    expect(billingGeo({ residenceCountry: 'RU', locale: 'en' })).toEqual({
+      country: 'RU',
+      currency: 'RUB'
+    });
+  });
+
+  it('falls back to the locale when no residence is declared', () => {
+    expect(billingGeo({ residenceCountry: null, locale: 'ru-RU' })).toEqual({
+      country: 'RU',
+      currency: 'RUB'
+    });
   });
 });
 

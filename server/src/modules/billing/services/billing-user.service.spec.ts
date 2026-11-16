@@ -1652,6 +1652,49 @@ describe('BillingUserService', () => {
       });
     });
 
+    it('reports the geo default of the declared residence over the locale', async () => {
+      const ctx = await build();
+
+      ctx.customers.findOne.mockResolvedValue(null);
+      ctx.users.findOne.mockResolvedValue({
+        id: 'user-1',
+        locale: 'ru',
+        residenceCountry: 'DE'
+      });
+
+      const region = await ctx.service.getRegion('user-1');
+
+      expect(region).toMatchObject({
+        detectedProvider: 'paddle',
+        effectiveProvider: 'paddle'
+      });
+      expect(ctx.users.findOne).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        select: { id: true, locale: true, residenceCountry: true }
+      });
+    });
+
+    it('creates the customer with the country and currency of the declared residence', async () => {
+      const ctx = await build();
+
+      ctx.users.findOne.mockResolvedValue({
+        id: 'user-1',
+        locale: 'en',
+        residenceCountry: 'RU'
+      });
+
+      await ctx.service.setRegion('user-1', 'auto');
+
+      expect(ctx.customers.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          provider: 'yookassa',
+          country: 'RU',
+          currency: 'RUB'
+        })
+      );
+    });
+
     it('reports the terms version that a payment on the effective provider must accept', async () => {
       const ctx = await build();
 
