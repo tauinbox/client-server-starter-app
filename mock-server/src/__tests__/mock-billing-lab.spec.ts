@@ -8,6 +8,7 @@ import { createApp } from '../app';
 import { MOCK_BILLING_LAB_PATH } from '../routes/mock-billing-lab';
 import { baseUrlOf, listenOnUnblockedPort } from '../utils/listen';
 import { resetState } from '../state';
+import * as sseHub from '../sse-hub';
 
 let server: Server;
 let baseUrl: string;
@@ -24,6 +25,10 @@ afterAll((done) => {
 
 beforeEach(() => {
   resetState();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 async function login(): Promise<{ token: string; userId: string }> {
@@ -125,6 +130,31 @@ describe('billing lab', () => {
     expect(
       await read<SubscriptionResponse | null>(token, '/billing/subscription')
     ).toBeNull();
+  });
+
+  it('the Free preset pushes nothing to a user who is on Free already', async () => {
+    const { userId } = await login();
+
+    // A billing customer with no subscription.
+    await lab('preset', { userId, preset: 'payg-empty', provider: 'auto' });
+    const push = jest.spyOn(sseHub, 'pushToUser');
+
+    expect(
+      await lab('preset', { userId, preset: 'free', provider: 'auto' })
+    ).toMatchObject({ status: 200 });
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('the Free preset pushes one entitlement change when it closes a subscription', async () => {
+    const { userId } = await login();
+
+    await lab('preset', { userId, preset: 'pro', provider: 'auto' });
+    const push = jest.spyOn(sseHub, 'pushToUser');
+
+    await lab('preset', { userId, preset: 'free', provider: 'auto' });
+    expect(push.mock.calls).toEqual([
+      [userId, { type: 'entitlements_updated' }]
+    ]);
   });
 
   it('uses units from the credits, and refuses a use that the balance does not cover', async () => {
