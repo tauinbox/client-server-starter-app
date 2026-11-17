@@ -1,5 +1,8 @@
 import type { BillingProviderId } from '@app/shared/types';
-import { geoDefault } from '@app/shared/utils/billing-rules';
+import {
+  effectiveProviderId,
+  geoDefault
+} from '@app/shared/utils/billing-rules';
 import { getState } from '../state';
 import type { MockSubscription, MockUser } from '../types';
 import {
@@ -117,10 +120,7 @@ export function applyBillingPreset(
         ? 'past_due'
         : 'active';
   const resolved =
-    provider ??
-    (existing
-      ? (existing.providerOverride ?? geoDefault(existing.country))
-      : undefined);
+    provider ?? (existing ? effectiveProviderId(existing) : undefined);
   const subscription = activateSubscription(user, plan, {
     status,
     provider: resolved

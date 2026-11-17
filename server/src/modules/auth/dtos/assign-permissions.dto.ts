@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { permissionIdOf } from '@app/shared/utils/permission-id';
 import { ArrayUniqueWithin } from '../../../common/validators/array-unique-within.validator';
 import { PermissionConditionDto } from './permission-condition.dto';
 
@@ -51,14 +52,6 @@ export class PermissionItemDto {
   @ValidateNested()
   @Type(() => PermissionConditionDto)
   conditions?: PermissionConditionDto | null;
-}
-
-// An item that is not an object, or that has no permissionId, gets its own
-// key, so that only a repeated permissionId fails the uniqueness check.
-function permissionIdOf(item: unknown): unknown {
-  return typeof item === 'object' && item !== null && 'permissionId' in item
-    ? item.permissionId
-    : Symbol();
 }
 
 export class SetPermissionsDto {

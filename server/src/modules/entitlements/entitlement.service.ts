@@ -9,6 +9,7 @@ import {
   FREE_PLAN_KEY,
   PAY_AS_YOU_GO_PLAN_KEY
 } from '@app/shared/constants';
+import { entitlementsOfPlan } from '@app/shared/utils/billing-rules';
 import { CacheVersionCounter } from '../../common/utils/cache-version-counter';
 import { MetricsService } from '../core/metrics/metrics.service';
 import { CreditBalance } from '../billing/entities/credit-balance.entity';
@@ -121,7 +122,7 @@ export class EntitlementService {
       : null;
 
     return subscription && plan
-      ? { subscriptionId: subscription.id, plan: this.toResolved(plan) }
+      ? { subscriptionId: subscription.id, plan: entitlementsOfPlan(plan) }
       : null;
   }
 
@@ -168,7 +169,7 @@ export class EntitlementService {
       where: { key: PAY_AS_YOU_GO_PLAN_KEY }
     });
 
-    return plan ? this.toResolved(plan) : null;
+    return plan ? entitlementsOfPlan(plan) : null;
   }
 
   /** Entitlements from non-revoked, non-expired one-time purchase grants. */
@@ -187,15 +188,7 @@ export class EntitlementService {
     const free = await this.plans.findOne({ where: { key: FREE_PLAN_KEY } });
 
     return free
-      ? this.toResolved(free)
+      ? entitlementsOfPlan(free)
       : { planKey: FREE_PLAN_KEY, capabilities: [], limits: {} };
-  }
-
-  private toResolved(plan: Plan): ResolvedEntitlements {
-    return {
-      planKey: plan.key,
-      capabilities: plan.entitlements,
-      limits: plan.limits ?? {}
-    };
   }
 }

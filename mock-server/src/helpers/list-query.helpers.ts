@@ -6,6 +6,7 @@ import {
   MAX_PAGE_SIZE
 } from '@app/shared/constants';
 import { parseCursor } from '@app/shared/utils/cursor';
+import { splitIdList } from '@app/shared/utils/list-query-param';
 import { sendError } from './error-envelope.helpers';
 import type {
   ListFilterDefinition,
@@ -29,11 +30,6 @@ export function parseOptionalBoolean(value: unknown): boolean | undefined {
   if (value === 'false' || value === false) return false;
 
   return undefined;
-}
-
-/** Mirrors the `toIdList` @Transform: a comma-separated string is split. */
-function parseIdList(value: unknown): unknown {
-  return typeof value === 'string' ? value.split(',') : value;
 }
 
 type FilterKindHandler<K extends ListFilterKind> = {
@@ -116,7 +112,7 @@ const FILTER_KINDS: { [K in ListFilterKind]: FilterKindHandler<K> } = {
   },
   uuidList: {
     errors: (name, value) => {
-      const ids = parseIdList(value);
+      const ids = splitIdList(value);
 
       if (!Array.isArray(ids)) return [`${name} must be an array`];
 
@@ -134,7 +130,7 @@ const FILTER_KINDS: { [K in ListFilterKind]: FilterKindHandler<K> } = {
 
       return errors;
     },
-    parse: (value) => (parseIdList(value) as string[]).map(String),
+    parse: (value) => (splitIdList(value) as string[]).map(String),
     matches: (fieldValue, wanted) =>
       wanted.some((id) => id.toLowerCase() === String(fieldValue).toLowerCase())
   }

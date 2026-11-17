@@ -1,6 +1,7 @@
 import { createMongoAbility, ForcedSubject, MongoAbility } from '@casl/ability';
 import { packRules } from '@casl/ability/extra';
 import { stampedBeforeRevocation } from '@app/shared/utils/token-revocation';
+import { capAuditField } from '@app/shared/utils/audit-field';
 import { generateSessionId } from './jwt.utils';
 import type {
   AdminUserResponse,
@@ -606,16 +607,6 @@ export function removeLinkedProviders(
       `[PROVIDER UNLINKED] To: ${user.email}\n  Provider: ${provider} | IP: ${ip}`
     );
   }
-}
-
-// Mirrors AUDIT_FIELD_MAX_LENGTH in the server AuditService: the audit columns
-// are unbounded, so every string field is capped at write time.
-const AUDIT_FIELD_MAX_LENGTH = 255;
-
-function capAuditField(value: string | null | undefined): string | null {
-  if (value === null || value === undefined) return null;
-
-  return value.slice(0, AUDIT_FIELD_MAX_LENGTH);
 }
 
 export function logAudit(

@@ -18,7 +18,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MailService } from '../../mail/mail.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { issueMailedToken } from '../../../common/utils/issue-mailed-token.util';
-import { maskEmail } from '../../../common/utils/escape-html';
+import { maskEmail } from '../../../common/utils/mask-email';
 import { isUniqueViolation } from '../../../common/utils/is-unique-violation.util';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
 import {

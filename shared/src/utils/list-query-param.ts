@@ -7,6 +7,15 @@ import type {
   ListFilterValueMap
 } from '../types/list-query.types';
 
+/**
+ * Splits a comma-separated id list and leaves any other value as it is. An
+ * empty `?ids=` becomes `['']` and fails the UUID check, so it can never read
+ * as "no id filter" and widen the result to every row.
+ */
+export function splitIdList(value: unknown): unknown {
+  return typeof value === 'string' ? value.split(',') : value;
+}
+
 type ParamParser<K extends ListFilterKind> = (
   raw: string,
   definition: ListFilterDefinition

@@ -1,3 +1,5 @@
+import { splitIdList } from '@app/shared/utils/list-query-param';
+
 /**
  * Recognises the two spellings a query string can carry for a boolean and
  * leaves anything else untouched, so `@IsBoolean()` rejects it as a bad query
@@ -15,10 +17,6 @@ export function toOptionalBoolean({ value }: { value: unknown }): unknown {
   return value;
 }
 
-/**
- * An empty `?ids=` becomes `['']` and fails the UUID check, so it can never
- * read as "no id filter" and widen the result to every row.
- */
 export function toIdList({ value }: { value: unknown }): unknown {
-  return typeof value === 'string' ? value.split(',') : value;
+  return splitIdList(value);
 }

@@ -16,6 +16,7 @@ import type { PermissionCondition } from '@app/shared/types';
 import { findCustomQueryError } from '@app/shared/utils/mongo-query-safety';
 import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
+import { permissionIdOf } from '@app/shared/utils/permission-id';
 import {
   findConditionActionError,
   findConditionFieldError,
@@ -179,13 +180,6 @@ function isUniqueArray(
   );
 
   return new Set(keys).size === keys.length;
-}
-
-// Mirrors `permissionIdOf` of SetPermissionsDto.
-function permissionIdOf(item: unknown): unknown {
-  return typeof item === 'object' && item !== null && 'permissionId' in item
-    ? item.permissionId
-    : Symbol();
 }
 
 // Mirrors AssignPermissionsDto. `permissionIds` carries `@IsArray()
