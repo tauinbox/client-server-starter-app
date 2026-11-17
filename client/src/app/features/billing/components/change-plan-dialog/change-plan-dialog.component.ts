@@ -24,6 +24,7 @@ import type {
   ProrationPreviewResponse,
   SubscriptionResponse
 } from '@app/shared/types';
+import { renewalAnchor } from '@app/shared/utils/billing-rules';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { CatalogTextPipe } from '../../pipes/catalog-text.pipe';
 import { BillingService } from '../../services/billing.service';
@@ -103,7 +104,7 @@ export class ChangePlanDialogComponent {
   #previewSeq = 0;
 
   protected readonly isTrial = this.data.subscription.status === 'trialing';
-  protected readonly periodEnd = this.data.subscription.currentPeriodEnd;
+  protected readonly periodEnd = renewalAnchor(this.data.subscription);
 
   /** Valid switch targets, priced for the sub's provider. */
   protected readonly options = computed<PlanOption[]>(() => {

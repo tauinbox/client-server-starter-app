@@ -10,6 +10,17 @@ import unicorn from 'eslint-plugin-unicorn';
 import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 import baseRules, { errorKeyLiteralSyntax } from '../eslint.base.config.mjs';
 
+// The server renews or ends a trial at trialEnd, not at currentPeriodEnd.
+// The second selector reads the template AST of angular-eslint.
+const periodEndSyntax = [
+  "MemberExpression[property.name='currentPeriodEnd']",
+  "PropertyRead[name='currentPeriodEnd']"
+].map((selector) => ({
+  selector,
+  message:
+    'Show the renewal day or the end of access with renewalAnchor from @app/shared/utils/billing-rules; a trial ends at trialEnd.'
+}));
+
 const restrictedSyntax = [
   // Never compare a role.name against the raw 'admin' literal:
   // always go through SYSTEM_ROLES.ADMIN from @app/shared/constants so the
@@ -72,6 +83,7 @@ const restrictedSyntax = [
     message:
       'Do not pass a server errorKey as a NotifyService message key. Pass the HttpErrorResponse itself and a client-owned fallback key.'
   },
+  ...periodEndSyntax,
   {
     // Playwright discourages networkidle: an open request can hang the
     // wait for the whole test timeout.
@@ -191,6 +203,9 @@ export default tseslint.config(
       ...angular.configs.templateRecommended,
       ...angular.configs.templateAccessibility,
       prettier
-    ]
+    ],
+    rules: {
+      'no-restricted-syntax': ['error', ...periodEndSyntax]
+    }
   }
 );

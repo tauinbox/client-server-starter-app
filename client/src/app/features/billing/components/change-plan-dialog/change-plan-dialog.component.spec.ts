@@ -308,6 +308,28 @@ describe('ChangePlanDialogComponent', () => {
     ).not.toBeNull();
   });
 
+  it('dates the charge row of a trial at the trial end, not the period end', () => {
+    billingMock.previewChange.mockReturnValue(
+      of({ ...splitPreview, creditMinor: 0, chargeMinor: 0, dueNowMinor: 0 })
+    );
+    createComponent({
+      subscription: {
+        ...subscription,
+        status: 'trialing',
+        trialEnd: '2026-06-15T00:00:00.000Z'
+      }
+    });
+
+    optionButtons()[0].click();
+    fixture.detectChanges();
+
+    const [, chargeRow] =
+      fixture.nativeElement.querySelectorAll('.ledger-row dt');
+
+    expect(chargeRow.textContent).toContain('Jun 15, 2026');
+    expect(chargeRow.textContent).not.toContain('Jul 1, 2026');
+  });
+
   it('confirm closes the dialog with the selected plan key', () => {
     createComponent();
 
