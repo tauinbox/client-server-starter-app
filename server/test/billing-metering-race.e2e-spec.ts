@@ -7,6 +7,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, type EntityManager } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -30,6 +31,7 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
   let userId: string | undefined;
   let customerId: string;
   let emit: jest.Mock;
+  let logAudit: jest.Mock;
 
   beforeAll(async () => {
     ds = new DataSource({ ...postgresConfig(), logging: false });
@@ -38,6 +40,7 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
 
   beforeEach(async () => {
     emit = jest.fn();
+    logAudit = jest.fn();
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const user = await ds.getRepository(User).save(
       ds.getRepository(User).create({
@@ -101,7 +104,7 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
         },
         { provide: EntitlementService, useValue: entitlements },
         { provide: EventEmitter2, useValue: { emit } },
-        { provide: AuditService, useValue: { logFireAndForget: jest.fn() } }
+        { provide: AuditService, useValue: { logFireAndForget: logAudit } }
       ]
     }).compile();
 
@@ -128,6 +131,33 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
 
   function use(idempotencyKey: string, units = 1) {
     return { meterKey: 'api_calls', units, idempotencyKey };
+  }
+
+  function saveActiveSubscription(): Promise<Subscription> {
+    return ds.getRepository(Subscription).save(
+      ds.getRepository(Subscription).create({
+        customerId,
+        planKey: 'pro',
+        provider: 'yookassa',
+        billingMode: 'fixed',
+        status: 'active',
+        lifecycleOwner: 'self',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 86_400_000),
+        billingAnchorAt: new Date(),
+        cancelAtPeriodEnd: false,
+        trialEnd: null,
+        providerSubscriptionId: null,
+        paymentMethodId: null
+      })
+    );
+  }
+
+  function proEntitlement(subscriptionId: string) {
+    return {
+      subscriptionId,
+      plan: { planKey: 'pro', capabilities: ['api-access'], limits: {} }
+    };
   }
 
   /** Fails unless a second debit waits on the balance row lock. */
@@ -268,38 +298,11 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
 
   it('stores a covered use under its key, so a retry after the plan ends takes no credits', async () => {
     await setBalance(100);
-    const subscription = await ds.getRepository(Subscription).save(
-      ds.getRepository(Subscription).create({
-        customerId,
-        planKey: 'pro',
-        provider: 'yookassa',
-        billingMode: 'fixed',
-        status: 'active',
-        lifecycleOwner: 'self',
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 86_400_000),
-        billingAnchorAt: new Date(),
-        cancelAtPeriodEnd: false,
-        trialEnd: null,
-        providerSubscriptionId: null,
-        paymentMethodId: null
-      })
-    );
+    const subscription = await saveActiveSubscription();
     let planActive = true;
     const metering = await build(realCredits(), {
       entitledSubscription: () =>
-        Promise.resolve(
-          planActive
-            ? {
-                subscriptionId: subscription.id,
-                plan: {
-                  planKey: 'pro',
-                  capabilities: ['api-access'],
-                  limits: {}
-                }
-              }
-            : null
-        )
+        Promise.resolve(planActive ? proEntitlement(subscription.id) : null)
     });
 
     const first = await metering.consume(customerId, use('covered-1', 5));
@@ -321,5 +324,59 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
     expect(
       await ds.getRepository(CreditLedger).count({ where: { customerId } })
     ).toBe(0);
+  }, 30_000);
+
+  it('records a covered use once when the same key arrives twice and the customer has no balance row', async () => {
+    const subscription = await saveActiveSubscription();
+    const bothPassedTheReplayCheck = Promise.withResolvers<void>();
+    let arrivals = 0;
+    const metering = await build(realCredits(), {
+      entitledSubscription: async () => {
+        arrivals += 1;
+
+        if (arrivals === 2) {
+          bothPassedTheReplayCheck.resolve();
+        }
+
+        await bothPassedTheReplayCheck.promise;
+
+        return proEntitlement(subscription.id);
+      }
+    });
+    const audit = {
+      action: AuditAction.BILLING_USAGE_RECORD,
+      targetType: 'UsageRecord'
+    };
+
+    const results = await Promise.all([
+      metering.consume(customerId, use('covered-race', 5), { audit }),
+      metering.consume(customerId, use('covered-race', 5), { audit })
+    ]);
+    const [first, replay] = results.toSorted(
+      (a, b) => Number(a.replayed) - Number(b.replayed)
+    );
+
+    expect(first).toMatchObject({
+      debited: false,
+      replayed: false,
+      balanceAfter: 0
+    });
+    expect(replay).toEqual({
+      recordId: first.recordId,
+      debited: false,
+      replayed: true,
+      balanceAfter: 0
+    });
+    expect(await ds.getRepository(CreditBalance).countBy({ customerId })).toBe(
+      0
+    );
+    expect(
+      await ds.getRepository(UsageRecord).findBy({ customerId })
+    ).toMatchObject([{ id: first.recordId, subscriptionId: subscription.id }]);
+    expect(logAudit).toHaveBeenCalledTimes(1);
+    expect(logAudit).toHaveBeenCalledWith({
+      ...audit,
+      targetId: first.recordId
+    });
   }, 30_000);
 });

@@ -825,7 +825,9 @@ the units of one use from the credit balance of the customer at the moment of us
   `errors.billing.meterNotDeclared`) and an `occurredAt` more than 5 minutes
   (`USAGE_FUTURE_TOLERANCE_MS`) after the server clock (`errors.billing.usageInFuture`).
 - In one transaction it reads the balance row `FOR UPDATE` (`CreditService.lockedBalance`), so two
-  uses of one customer serialize. A known key with the same body is a replay: it answers the first
+  debits of one customer serialize. A covered use of a customer with no balance row takes no lock:
+  the unique index on `(customer_id, idempotency_key)` refuses the second of two inserts with one
+  key, and `consume` answers that call as a replay. A known key with the same body is a replay: it answers the first
   record and debits nothing. A known key with another `meterKey`, `quantity` or `occurredAt` gets a
   409 (`errors.billing.usageKeyReused`). A subscriber whose plan has the capability of the meter is
   not debited: the record is stored with the `subscription_id` of the entitled subscription

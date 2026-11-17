@@ -57,8 +57,10 @@ interface DebitOutcome {
 /**
  * Pay as you go: each metered use takes its units from the prepaid credit
  * balance at the moment of use. The balance row is read `FOR UPDATE`, and the
- * usage record and the debit commit in that transaction, so two uses of one
+ * usage record and the debit commit in that transaction, so two debits of one
  * customer serialize and the second sees the balance that the first left. A
+ * covered use of a customer with no balance row takes no lock: the unique index
+ * on the idempotency key decides between two calls with one key. A
  * use that the balance does not cover is refused with
  * `errors.billing.insufficientCredits`; the balance never goes below 0 from a
  * use.
@@ -97,8 +99,9 @@ export class MeteringService {
         this.debit(manager, customerId, checked)
       );
     } catch (error: unknown) {
-      // The balance lock serializes the writers of one customer, so this only
-      // answers a writer that inserted the key outside `consume`.
+      // A covered use with no balance row takes no lock, so two calls with one
+      // key can both pass the replay check; the index refuses the second insert,
+      // and this answers it as a replay of the first.
       if (isUniqueViolation(error)) {
         const winner = await this.usageRecords.findOne({
           where: { customerId, idempotencyKey: checked.idempotencyKey }
