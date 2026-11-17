@@ -19,8 +19,6 @@
  */
 
 import { execFileSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
 import {
   ERROR_STATUS,
   ErrorKeys,
@@ -31,41 +29,26 @@ import {
   ACCOUNT_STATES,
   loadScenarioFiles,
   RequestScenario,
-  ROUTES_DIR,
   ScenarioFile,
   scenarioErrors,
   SIGN_IN_ROUTES,
   StateFixture
 } from '@app/shared/utils/request-scenarios';
+import {
+  CONTRACTS_DIR,
+  loadRouteContractFiles,
+  type RouteContract
+} from '@app/shared/utils/route-contracts';
 
 const PENDING_ROUTES = new Set<string>();
 
 const STATE_CHANGING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-interface RouteEntry {
-  method: string;
-  path: string;
-  noSuccessScenario?: string;
-}
+type RouteEntry = Pick<RouteContract, 'method' | 'path' | 'noSuccessScenario'>;
 
 export interface RouteFile {
   file: string;
   routes: RouteEntry[];
-}
-
-function loadRouteFiles(): RouteFile[] {
-  return fs
-    .readdirSync(ROUTES_DIR)
-    .filter((f) => f.endsWith('.json'))
-    .toSorted()
-    .map((file) => ({
-      file,
-      routes: (
-        JSON.parse(fs.readFileSync(path.join(ROUTES_DIR, file), 'utf-8')) as {
-          routes: RouteEntry[];
-        }
-      ).routes
-    }));
 }
 
 /** The state-changing routes that have no scenario with a status below 400. */
@@ -92,7 +75,7 @@ function routesWithoutScenario(
 
 function git(args: string[]): string {
   return execFileSync('git', args, {
-    cwd: path.resolve(ROUTES_DIR, '..', '..'),
+    cwd: CONTRACTS_DIR,
     encoding: 'utf-8'
   });
 }
@@ -521,15 +504,19 @@ function main(): void {
     process.exit(1);
   }
 
-  const errors = scenarioCoverageErrors(loadRouteFiles(), loadScenarioFiles(), {
-    pending: PENDING_ROUTES,
-    base: ref ? routesWithoutScenarioAt(ref) : undefined,
-    matrix: {
-      routes: SIGN_IN_ROUTES,
-      states: ACCOUNT_STATES,
-      reasons: SIGN_IN_REFUSAL_REASONS
+  const errors = scenarioCoverageErrors(
+    loadRouteContractFiles(),
+    loadScenarioFiles(),
+    {
+      pending: PENDING_ROUTES,
+      base: ref ? routesWithoutScenarioAt(ref) : undefined,
+      matrix: {
+        routes: SIGN_IN_ROUTES,
+        states: ACCOUNT_STATES,
+        reasons: SIGN_IN_REFUSAL_REASONS
+      }
     }
-  });
+  );
 
   if (errors.length > 0) {
     console.error('Request scenario coverage failed:');

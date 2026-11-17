@@ -5,12 +5,15 @@
  *  1. a policy field differs from the decorators of the handler and of its
  *     class (`@Public`, `@OptionalAuth`, `@Authorize`, `@StepUpRoute`,
  *     `@CountFailuresOnlyWhenBody`, `@SkipMfaEnrolmentGate`, `@Throttle`,
- *     `@SkipThrottle`), or an entry has no valid policy;
+ *     `@SkipThrottle`);
  *  2. two routes with the same `writes` have a different `access`, and
  *     neither carries `accessExempt`;
  *  3. a handler whose `@Body()` is a step-up DTO has no `@StepUpRoute`;
  *  4. the mock-server route has a different gate (`authGuard`,
  *     `permissionGuard(action, subject)` or none) or no route at all.
+ *
+ * The schema of each entry is checked when `loadRouteContracts` reads the
+ * files (`shared/src/utils/route-contracts.ts`); the self-test proves it too.
  *
  * Usage (from server/): npm run check:route-policy [-- --self-test]
  */
@@ -18,6 +21,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
+import {
+  type LoadedRoute,
+  loadRouteContracts,
+  routeContractErrors,
+  type RoutePolicy,
+  type RouteThrottle
+} from '@app/shared/utils/route-contracts';
 import {
   type ControllerRoute,
   decoratorArgs,
@@ -27,7 +37,6 @@ import {
 } from './lib/controller-routes';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const ROUTES_DIR = path.join(REPO_ROOT, 'contracts/routes');
 const THROTTLE_CONSTANTS = path.join(
   REPO_ROOT,
   'server/src/modules/auth/constants/throttle.constants.ts'
@@ -40,24 +49,7 @@ const STEP_UP_BODIES = new Set([
   'ChangeResidenceDto'
 ]);
 
-type Throttle = string[] | 'skip' | null;
-
-interface Policy {
-  access: string;
-  writes: string | null;
-  stepUp: boolean;
-  countFailuresOnlyWhenBody: boolean;
-  skipMfaEnrolmentGate: boolean;
-  throttle: Throttle;
-  accessExempt?: string;
-}
-
-interface ContractEntry {
-  method: string;
-  path: string;
-  file: string;
-  policy?: Policy;
-}
+type ContractEntry = Pick<LoadedRoute, 'method' | 'path' | 'file' | 'policy'>;
 
 type MockGate =
   | { kind: 'public' }
@@ -151,7 +143,7 @@ function accessOf(d: ts.Decorator): string {
 export function derivePolicy(
   route: ControllerRoute,
   constants: Map<string, string[]>
-): Omit<Policy, 'writes' | 'accessExempt'> {
+): Omit<RoutePolicy, 'writes' | 'accessExempt'> {
   const own = route.decorators;
   const cls = route.classDecorators;
   const either = (name: string) => find(own, name) ?? find(cls, name);
@@ -167,7 +159,7 @@ export function derivePolicy(
   }
 
   const stepUp = find(own, 'StepUpRoute');
-  let throttle: Throttle = null;
+  let throttle: RouteThrottle = null;
 
   if (either('SkipThrottle')) {
     throttle = 'skip';
@@ -423,35 +415,14 @@ function findMockRoute(
 
 // --- rules ---
 
-const POLICY_FIELDS = [
+/** The policy fields that the decorators decide. */
+const DERIVED_POLICY_FIELDS = [
   'access',
   'stepUp',
   'countFailuresOnlyWhenBody',
   'skipMfaEnrolmentGate',
   'throttle'
 ] as const;
-
-function validPolicy(p: unknown): p is Policy {
-  if (typeof p !== 'object' || p === null) return false;
-
-  const v: Partial<Record<keyof Policy, unknown>> = p;
-  const throttleOk =
-    v.throttle === null ||
-    v.throttle === 'skip' ||
-    (Array.isArray(v.throttle) &&
-      v.throttle.every((n) => typeof n === 'string'));
-
-  return (
-    typeof v.access === 'string' &&
-    (v.writes === null || typeof v.writes === 'string') &&
-    typeof v.stepUp === 'boolean' &&
-    typeof v.countFailuresOnlyWhenBody === 'boolean' &&
-    typeof v.skipMfaEnrolmentGate === 'boolean' &&
-    throttleOk &&
-    (v.accessExempt === undefined ||
-      (typeof v.accessExempt === 'string' && v.accessExempt.length > 0))
-  );
-}
 
 function show(value: unknown): string {
   return JSON.stringify(value);
@@ -468,16 +439,10 @@ export function evaluate(input: Input): string[] {
     if (!route) continue; // check:routes reports a stale entry
 
     const where = `${key} (${entry.file})`;
-
-    if (!validPolicy(entry.policy)) {
-      problems.push(`[rule 1] ${where}: no valid "policy" field`);
-      continue;
-    }
-
     const { policy } = entry;
     const actual = derivePolicy(route, input.throttleConstants);
 
-    for (const field of POLICY_FIELDS) {
+    for (const field of DERIVED_POLICY_FIELDS) {
       if (show(policy[field]) !== show(actual[field])) {
         problems.push(
           `[rule 1] ${where}: ${field} is ${show(policy[field])} in the contract and ${show(actual[field])} in the decorators`
@@ -521,21 +486,21 @@ export function evaluate(input: Input): string[] {
   const byWrites = new Map<string, ContractEntry[]>();
 
   for (const entry of input.contract) {
-    const writes = entry.policy?.writes;
+    const { writes, accessExempt } = entry.policy;
 
-    if (!writes || entry.policy?.accessExempt) continue;
+    if (!writes || accessExempt) continue;
 
     byWrites.set(writes, [...(byWrites.get(writes) ?? []), entry]);
   }
 
   for (const [writes, entries] of byWrites) {
-    const accesses = new Set(entries.map((e) => e.policy?.access));
+    const accesses = new Set(entries.map((e) => e.policy.access));
 
     if (accesses.size > 1) {
       problems.push(
         `[rule 2] routes that write ${writes} have different access: ` +
           entries
-            .map((e) => `${e.method} ${e.path} = ${e.policy?.access}`)
+            .map((e) => `${e.method} ${e.path} = ${e.policy.access}`)
             .join('; ')
       );
     }
@@ -545,20 +510,6 @@ export function evaluate(input: Input): string[] {
 }
 
 // --- loading ---
-
-function loadContract(): ContractEntry[] {
-  return fs
-    .readdirSync(ROUTES_DIR)
-    .filter((f) => f.endsWith('.json'))
-    .toSorted()
-    .flatMap((f) => {
-      const { routes } = JSON.parse(
-        fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')
-      ) as { routes: Omit<ContractEntry, 'file'>[] };
-
-      return routes.map((r) => ({ ...r, file: `contracts/routes/${f}` }));
-    });
-}
 
 function readFile(file: string): string {
   return fs.readFileSync(file, 'utf-8');
@@ -595,7 +546,7 @@ router.post('/secure', authGuard, (req, res) => {});
 export default router;
 `;
 
-function policy(overrides: Partial<Policy>): Policy {
+function policy(overrides: Partial<RoutePolicy>): RoutePolicy {
   return {
     access: 'signed-in',
     writes: null,
@@ -681,7 +632,101 @@ function selfTest(): void {
     process.exit(1);
   }
 
-  console.log('✓ check-route-policy self-test: all four rules report');
+  const schemaFailures = schemaSelfTest();
+
+  if (schemaFailures.length > 0) {
+    console.error('✗ check-route-policy self-test of the route schema failed:');
+    schemaFailures.forEach((f) => console.error(`  ${f}`));
+    process.exit(1);
+  }
+
+  console.log(
+    '✓ check-route-policy self-test: all four rules and all route schema rules report'
+  );
+}
+
+/**
+ * Each case breaks one field of a valid route file. `routeContractErrors`
+ * must report exactly one problem that holds the expected text. Returns the
+ * failed cases, as text.
+ */
+function schemaSelfTest(): string[] {
+  const entry = {
+    method: 'PATCH',
+    path: '/api/v1/things/1',
+    expectedStatus: 401,
+    policy: policy({
+      access: 'update:Thing',
+      writes: 'update:Thing',
+      throttle: ['default']
+    })
+  };
+
+  type Entry = typeof entry;
+  const file = (...routes: object[]) => [
+    { file: 'things.json', data: { routes } }
+  ];
+  const broken = (change: (e: Entry) => object) =>
+    file(change(structuredClone(entry)));
+  const withPolicy = (change: Record<string, unknown>) =>
+    broken((e) => ({ ...e, policy: { ...e.policy, ...change } }));
+  const cases: [string, { file: string; data: unknown }[]][] = [
+    [
+      'things.json: unknown key "route"',
+      [{ file: 'things.json', data: { routes: [entry], route: [] } }]
+    ],
+    ['things.json: routes: is not a list', [{ file: 'things.json', data: {} }]],
+    [
+      'PATCH /api/v1/things/1: unknown key "expected"',
+      broken((e) => ({ ...e, expected: 401 }))
+    ],
+    ['unknown method "FETCH"', broken((e) => ({ ...e, method: 'FETCH' }))],
+    [
+      'path: "api/v1/things/1" is not an API path',
+      broken((e) => ({ ...e, path: 'api/v1/things/1' }))
+    ],
+    [
+      'expectedStatus: is not an HTTP status',
+      broken((e) => ({ ...e, expectedStatus: '401' }))
+    ],
+    ['policy: unknown key "acess"', withPolicy({ acess: 'public' })],
+    ['policy: stepUp: is not true or false', withPolicy({ stepUp: 'false' })],
+    [
+      'policy: access: "signed_in" is not one of',
+      withPolicy({ access: 'signed_in' })
+    ],
+    [
+      'policy: writes: "update thing" is not a permission',
+      withPolicy({ writes: 'update thing' })
+    ],
+    [
+      'policy: throttle: is not a non-empty string',
+      withPolicy({ throttle: [''] })
+    ],
+    [
+      'writes: no route checks the permission "update:Thig"',
+      withPolicy({ writes: 'update:Thig' })
+    ],
+    [
+      'PATCH /api/v1/things/1: the route is also in things.json',
+      file(entry, entry)
+    ]
+  ];
+  const failures = routeContractErrors(file(entry)).map(
+    (p) => `the valid file reports: ${p}`
+  );
+
+  for (const [text, files] of cases) {
+    const problems = routeContractErrors(files);
+
+    if (problems.length !== 1 || !problems[0].includes(text)) {
+      failures.push(
+        `expected only "${text}", got: ${problems.join(' | ') || 'nothing'}`
+      );
+    }
+  }
+
+  return failures;
 }
 
 // --- main ---
@@ -690,7 +735,7 @@ function main(): void {
   const routes = findControllers().flatMap((f) => extractRoutes(f));
   const problems = evaluate({
     routes,
-    contract: loadContract(),
+    contract: loadRouteContracts(),
     mock: parseMockRoutes(MOCK_INDEX, readFile),
     throttleConstants: objectConstants(readFile(THROTTLE_CONSTANTS))
   });

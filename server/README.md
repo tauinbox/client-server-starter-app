@@ -1418,6 +1418,14 @@ Each manifest entry also declares its access `policy` (`contracts/README.md`, "A
 route. Routes that write the same `<action>:<Subject>` must have the same `access`, unless one
 states an `accessExempt` reason.
 
+Every reader of `contracts/routes/` (`check:routes`, `check:route-policy`, `check:scenarios`, the
+`check-auth-coverage` e2e suite and the mock `contract.spec.ts`) uses the one loader
+`shared/src/utils/route-contracts.ts`. It validates each entry against one schema before it
+returns: an unknown key, a wrong type, a duplicate route, or a `writes` permission that no `access`
+checks stops every reader with the same message. Before this loader, an `expectedStatus` written as
+the string `"401"` passed every check and dropped the route from `check-auth-coverage` without a
+failure.
+
 **Request scenarios** (`contracts/scenarios/`) state the result of one request: the actor, the state
 before the request, the status, the `errorKey` and the audit rows it writes (the action, or the
 action with its reason and target). The e2e suite

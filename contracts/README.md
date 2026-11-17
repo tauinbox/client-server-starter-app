@@ -21,6 +21,28 @@ per server module:
 | `routes/billing-admin.json` | `billing` (admin controller) |
 
 Each file is `{ "routes": [{ "method", "path", "expectedStatus", "policy" }, ...] }`.
+An entry can also carry `"noSuccessScenario": "<reason>"` (see the request
+scenarios below).
+
+## One loader and one schema
+
+`shared/src/utils/route-contracts.ts` is the one loader of `routes/*.json`
+(`loadRouteContracts`, `loadRouteContractFiles`), and every consumer below uses
+it. It checks each file before it returns, and throws with every problem:
+
+- a key that the schema does not know, in a file, an entry or a `policy`;
+- `method` outside `GET`, `POST`, `PUT`, `PATCH`, `DELETE`; a `path` that is not
+  `/api/...`; an `expectedStatus` that is not an HTTP status;
+- an `access` that is not a keyword or permissions joined by ` & `; a `writes`
+  that is not one `action:Subject`; a `policy` flag that is not a boolean;
+- the same `METHOD path` in two entries;
+- a `writes` permission that the `access` of no route checks (a typo such as
+  `update:Biling` would otherwise form its own group and pass rule 2).
+
+The checks come from `shared/src/utils/contract-schema.ts`, which the request
+scenarios use too: one check for each field of each contract type, so a new
+field with no check does not compile. `npm run check:route-policy -- --self-test`
+breaks one field of a valid file for each schema rule.
 
 ## Access policy (`policy`)
 
@@ -57,15 +79,16 @@ class must equal it, and so must the gate of the mock-server route.
 
 ## How it's consumed
 
-All consumers glob `routes/*.json` and flatten every `routes` array — there is no
-list of modules to maintain. **Adding a feature = drop a new `routes/<feature>.json`.**
+The loader globs `routes/*.json` and flattens every `routes` array, so there is
+no list of modules to maintain. **Adding a feature = drop a new `routes/<feature>.json`.**
 
 - `server/scripts/check-routes.ts` (`npm run check:routes`) — verifies the manifest
   matches the routes extracted from server controllers, and that `version` matches
   `server/package.json`.
 - `server/scripts/check-route-policy.ts` (`npm run check:route-policy`) — verifies
   each `policy` against the decorators and the mock-server gate, as described
-  above. `--self-test` runs the four rules against planted fixtures.
+  above. `--self-test` runs the four rules and the schema rules against planted
+  fixtures.
 - `server/test/check-auth-coverage.e2e-spec.ts` — asserts every `expectedStatus: 401`
   route actually returns 401 unauthenticated.
 - `mock-server/src/__tests__/contract.spec.ts` — asserts the mock server returns each

@@ -18,6 +18,7 @@
     "src/utils/cursor.ts",
     "src/utils/feature-flag-evaluator.ts",
     "src/utils/request-scenarios.ts",
+    "src/utils/route-contracts.ts",
     "src/utils/time.ts"
   ]
 }
