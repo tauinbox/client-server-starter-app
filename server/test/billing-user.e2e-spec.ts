@@ -211,16 +211,9 @@ describe('Billing user self-service (e2e)', () => {
 
   it('returns the current-period usage summary for the caller', async () => {
     billingUser.getUsageSummary.mockResolvedValue({
-      subscriptionId: 'sub-1',
-      meterKey: 'api_calls',
       periodStart: new Date('2026-06-01T00:00:00Z'),
       periodEnd: new Date('2026-07-01T00:00:00Z'),
-      totalUnits: 142,
-      includedUnits: 100,
-      billableUnits: 42,
-      unitPriceMinor: 200,
-      amountMinor: 8400,
-      currency: 'RUB'
+      unitsSpent: 142
     });
 
     const res = await request(server)
@@ -230,16 +223,9 @@ describe('Billing user self-service (e2e)', () => {
 
     expect(billingUser.getUsageSummary).toHaveBeenCalledWith('user-7');
     expect(res.body).toEqual({
-      subscriptionId: 'sub-1',
-      meterKey: 'api_calls',
       periodStart: '2026-06-01T00:00:00.000Z',
       periodEnd: '2026-07-01T00:00:00.000Z',
-      totalUnits: 142,
-      includedUnits: 100,
-      billableUnits: 42,
-      unitPriceMinor: 200,
-      amountMinor: 8400,
-      currency: 'RUB'
+      unitsSpent: 142
     });
   });
 

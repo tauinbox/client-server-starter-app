@@ -276,15 +276,7 @@ describe('PlanChangeService', () => {
       key: 'usage',
       name: 'Pay as you go',
       billingMode: 'usage',
-      meterKey: 'api_calls',
-      prices: {
-        yookassa: {
-          currency: 'RUB',
-          amountMinor: 0,
-          unitPriceMinor: 200,
-          includedUnits: 0
-        }
-      }
+      prices: { yookassa: { currency: 'RUB', amountMinor: 0 } }
     });
 
     function makeSub(overrides: Partial<Subscription> = {}): Subscription {

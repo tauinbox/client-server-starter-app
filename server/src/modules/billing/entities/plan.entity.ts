@@ -35,9 +35,6 @@ export class Plan {
   @Column({ type: 'varchar', length: 16 })
   interval: PlanInterval;
 
-  @Column({ name: 'meter_key', type: 'varchar', length: 100, nullable: true })
-  meterKey: string | null;
-
   @Column({ type: 'text', array: true, default: () => "'{}'" })
   entitlements: string[];
 

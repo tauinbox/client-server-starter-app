@@ -26,7 +26,6 @@ function plan(key: string, name: string, amountMinor: number): PlanResponse {
     description: null,
     billingMode: 'fixed',
     interval: 'month',
-    meterKey: null,
     entitlements: [],
     limits: null,
     trialDays: 0,
@@ -40,9 +39,8 @@ function plan(key: string, name: string, amountMinor: number): PlanResponse {
 const usagePlan: PlanResponse = {
   ...plan('usage', 'Pay as you go', 0),
   billingMode: 'usage',
-  meterKey: 'api_calls',
   prices: {
-    paddle: { currency: 'USD', amountMinor: 0, unitPriceMinor: 2 }
+    paddle: { currency: 'USD', amountMinor: 0 }
   }
 };
 

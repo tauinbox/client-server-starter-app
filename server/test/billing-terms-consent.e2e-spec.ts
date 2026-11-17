@@ -78,7 +78,6 @@ runWithInfra('Consent to the terms at checkout and purchase (e2e)', () => {
         description: null,
         billingMode: 'fixed',
         interval: 'month',
-        meterKey: null,
         entitlements: [],
         limits: null,
         trialDays: 0,

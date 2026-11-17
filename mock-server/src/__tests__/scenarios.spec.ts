@@ -223,7 +223,6 @@ function addFixedPlan(key: string, entitlements: string[] = []): Promise<void> {
     description: null,
     billingMode: 'fixed',
     interval: 'month',
-    meterKey: null,
     entitlements,
     limits: null,
     trialDays: 0,

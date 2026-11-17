@@ -56,7 +56,6 @@ runWithInfra('One trial for each customer (e2e)', () => {
         description: null,
         billingMode: 'fixed',
         interval: 'month',
-        meterKey: null,
         entitlements: [],
         limits: null,
         trialDays: 14,

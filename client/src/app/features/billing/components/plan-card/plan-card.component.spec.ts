@@ -12,7 +12,6 @@ const plan: PlanResponse = {
   description: 'For growing teams',
   billingMode: 'fixed',
   interval: 'month',
-  meterKey: null,
   entitlements: ['reports', 'api-access'],
   limits: null,
   trialDays: 0,

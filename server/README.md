@@ -981,7 +981,7 @@ images from `cdn.paddle.com` and `sandbox-cdn.paddle.com`, and the checkout fram
 `paddle.client.ts` and `yookassa.client.ts` build each SDK from the environment. Each one returns
 null when the provider is not configured.
 
-**Rating.** The directory holds the `RatedAmount` and `BillingPeriod` types, `FixedRating` and
+**Rating.** The directory holds the `RatedAmount` type, `FixedRating` and
 `ProrationCalculator`.
 
 `FixedRating` uses the plan price. No class rates usage: a metered use is a prepaid debit
@@ -2088,7 +2088,7 @@ a currency with zero decimals and a currency with three decimals correctly.
 
 | Table | Description |
 |-------|-------------|
-| `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `meter_key` (for usage), `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, unitPriceMinor?, includedUnits?, providerPriceId? }` for each provider. Paddle needs `providerPriceId`, and the seeder does not write it (refer to the Paddle price ids note under Billing) |
+| `plans` | UUID PK, unique `key`, `name`, `billing_mode` (`fixed` or `usage`), `interval`, `entitlements text[]` with a GIN index, `limits jsonb`, `trial_days`, `active`, `prices jsonb`. The `limits` column has the type of the closed `EntitlementLimits` map, and its keys come from the shared `EntitlementLimitKey` union, which currently holds `sessions`. The seeder writes Pro 10 and Business 25, and it leaves the value null on Free and on usage. The `prices` column holds `{ currency, amountMinor, providerPriceId? }` for each provider. Paddle needs `providerPriceId`, and the seeder does not write it (refer to the Paddle price ids note under Billing) |
 | `billing_customers` | UUID PK, `user_id` (unique FK to `users`, CASCADE), `provider`, `provider_override` (the manual region override), `provider_customer_id`, `country`, `currency`, `default_payment_method_id` (FK to `billing_payment_methods`, SET NULL), `trial_used_at` (nullable, the first move of a subscription to `trialing`; one trial for each customer) |
 | `billing_payment_methods` | UUID PK, `customer_id` (FK, CASCADE), `provider`, `provider_method_ref`, `brand`, `last4`, `is_default`. A partial unique index on `customer_id WHERE is_default` permits a maximum of one default for each customer |
 | `subscriptions` | UUID PK, `customer_id` (FK, CASCADE), `plan_key`, `provider`, `billing_mode`, `status`. Also `lifecycle_owner` (`provider` or `self`), the bounds of the current period, `billing_anchor_at`, `cancel_at_period_end`, `trial_end`, `provider_subscription_id` and `payment_method_id` (FK, SET NULL). `billing_anchor_at` is nullable. It is the billing day that each self-managed boundary returns to, thus a February clamp cannot move a month-end customer backwards. A provider-managed row keeps it NULL |

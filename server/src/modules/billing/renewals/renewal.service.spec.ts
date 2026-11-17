@@ -90,7 +90,6 @@ function makePlan(): Plan {
     description: null,
     billingMode: 'fixed',
     interval: 'month',
-    meterKey: null,
     entitlements: ['reports'],
     limits: null,
     trialDays: 0,

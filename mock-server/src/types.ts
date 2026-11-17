@@ -153,7 +153,6 @@ export interface MockPlan {
   description: string | null;
   billingMode: import('@app/shared/types').BillingMode;
   interval: import('@app/shared/types').PlanInterval;
-  meterKey: string | null;
   entitlements: string[];
   limits: import('@app/shared/types').EntitlementLimits | null;
   trialDays: number;

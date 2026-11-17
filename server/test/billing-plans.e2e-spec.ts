@@ -25,7 +25,6 @@ function makePlan(overrides: Partial<Plan>): Plan {
     description: 'Core access at no cost',
     billingMode: 'fixed',
     interval: 'month',
-    meterKey: null,
     entitlements: [],
     limits: null,
     trialDays: 0,

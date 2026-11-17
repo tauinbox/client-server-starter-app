@@ -406,7 +406,6 @@ runWithInfra('Request scenarios (e2e)', () => {
       description: null,
       billingMode: 'fixed',
       interval: 'month',
-      meterKey: null,
       entitlements: [],
       limits: null,
       trialDays: 0,

@@ -644,7 +644,6 @@ function generatePlans(): MockPlan[] {
       name: 'Free',
       description: 'Core access at no cost',
       billingMode: 'fixed',
-      meterKey: null,
       entitlements: [],
       limits: null,
       active: true,
@@ -664,7 +663,6 @@ function generatePlans(): MockPlan[] {
       name: 'Pro',
       description: 'For growing teams',
       billingMode: 'fixed',
-      meterKey: null,
       entitlements: ['reports', 'api-access', 'data-export'],
       limits: { sessions: 10 },
       active: true,
@@ -684,7 +682,6 @@ function generatePlans(): MockPlan[] {
       name: 'Business',
       description: 'More concurrent devices and priority support',
       billingMode: 'fixed',
-      meterKey: null,
       entitlements: [
         'reports',
         'api-access',
@@ -709,7 +706,6 @@ function generatePlans(): MockPlan[] {
       name: 'Pay as you go',
       description: 'Pay only for what you use',
       billingMode: 'usage',
-      meterKey: 'api_calls',
       entitlements: [
         'reports',
         'api-access',
@@ -719,17 +715,10 @@ function generatePlans(): MockPlan[] {
       limits: null,
       active: true,
       prices: {
-        yookassa: {
-          currency: 'RUB',
-          amountMinor: 0,
-          unitPriceMinor: 200,
-          includedUnits: 0
-        },
+        yookassa: { currency: 'RUB', amountMinor: 0 },
         paddle: {
           currency: 'USD',
           amountMinor: 0,
-          unitPriceMinor: 2,
-          includedUnits: 0,
           providerPriceId: 'pri_mock_usage'
         }
       }
