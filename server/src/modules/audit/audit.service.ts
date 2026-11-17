@@ -2,25 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { capAuditField } from '@app/shared/utils/audit-field';
 import { MetricsService } from '../core/metrics/metrics.service';
 import { AuditLog } from './entities/audit-log.entity';
-
-/**
- * Matches MAX_EMAIL_LENGTH, the cap on User.email. The audit columns are
- * unbounded varchar, so an over-long actor email or request id would be stored
- * as sent. Every string field is capped here, not at the call sites, because
- * some of them carry values the caller never validated (a login email reaches
- * the row without a DTO, and req.ip is resolved from a proxy header).
- */
-export const AUDIT_FIELD_MAX_LENGTH = 255;
-
-function capAuditField(value: string | null | undefined): string | null {
-  if (value === null || value === undefined) return null;
-
-  return value.length > AUDIT_FIELD_MAX_LENGTH
-    ? value.slice(0, AUDIT_FIELD_MAX_LENGTH)
-    : value;
-}
 
 export interface AuditContext {
   ip?: string;

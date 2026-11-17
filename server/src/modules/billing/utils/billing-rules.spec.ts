@@ -1,7 +1,13 @@
+import { ErrorKeys } from '@app/shared/constants';
+import type { CancelMode, SubscriptionStatus } from '@app/shared/types';
 import {
+  ALREADY_CANCELED,
   billingGeo,
   calendarMonthUtc,
+  cancelRefusal,
   crossesZero,
+  effectiveProviderId,
+  entitlementsOfPlan,
   geoDefault,
   isSameUsage,
   geoFromLocale,
@@ -14,6 +20,58 @@ import {
 function utc(year: number, monthIndex: number, day: number): Date {
   return new Date(Date.UTC(year, monthIndex, day));
 }
+
+describe('effectiveProviderId', () => {
+  it('takes the override first, then the geo default', () => {
+    expect(
+      effectiveProviderId({ providerOverride: 'paddle', country: 'RU' })
+    ).toBe('paddle');
+    expect(effectiveProviderId({ providerOverride: null, country: 'ru' })).toBe(
+      'yookassa'
+    );
+  });
+});
+
+describe('entitlementsOfPlan', () => {
+  it('maps the plan and reads absent limits as none', () => {
+    expect(
+      entitlementsOfPlan({
+        key: 'pro',
+        entitlements: ['reports'],
+        limits: null
+      })
+    ).toEqual({ planKey: 'pro', capabilities: ['reports'], limits: {} });
+  });
+});
+
+describe('cancelRefusal', () => {
+  const sub = (
+    status: SubscriptionStatus,
+    cancelAtPeriodEnd = false
+  ): { status: SubscriptionStatus; cancelAtPeriodEnd: boolean } => ({
+    status,
+    cancelAtPeriodEnd
+  });
+
+  it.each<[SubscriptionStatus, boolean, CancelMode, string | null]>([
+    ['canceled', false, 'immediate', ALREADY_CANCELED.errorKey],
+    ['canceled', false, 'period_end', ALREADY_CANCELED.errorKey],
+    ['incomplete', false, 'immediate', null],
+    ['incomplete', false, 'period_end', ErrorKeys.BILLING.NO_PAID_PERIOD],
+    ['active', true, 'immediate', null],
+    [
+      'active',
+      true,
+      'period_end',
+      ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
+    ],
+    ['active', false, 'period_end', null]
+  ])('%s (scheduled %s), %s -> %s', (status, scheduled, mode, key) => {
+    expect(cancelRefusal(sub(status, scheduled), mode)?.errorKey ?? null).toBe(
+      key
+    );
+  });
+});
 
 describe('crossesZero', () => {
   it.each([

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { BillingProviderId } from '@app/shared/types';
 import { BILLING_PROVIDER_FLAGS, ErrorKeys } from '@app/shared/constants';
-import { geoDefault } from '@app/shared/utils/billing-rules';
+import { effectiveProviderId } from '@app/shared/utils/billing-rules';
 import { FeatureFlagResolverService } from '../feature-flags/services/feature-flag-resolver.service';
 import type { Customer } from './entities/customer.entity';
 import {
@@ -78,7 +78,7 @@ export class BillingService {
   effectiveProviderId(
     customer: Pick<Customer, 'providerOverride' | 'country'>
   ): BillingProviderId {
-    return customer.providerOverride ?? geoDefault(customer.country);
+    return effectiveProviderId(customer);
   }
 
   /**

@@ -5,6 +5,7 @@ import type {
   UserNotificationKind,
   UserNotificationPayloads
 } from '@app/shared/types';
+import { formatUtcDay } from '@app/shared/utils/intl-format';
 import { minorUnitScale } from '@app/shared/utils/money';
 import type { EmailMessage } from './mail-content';
 
@@ -39,10 +40,7 @@ function money(
  * no period after it.
  */
 function day(locale: SupportedLocale, iso: string): string {
-  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
-    dateStyle: 'long',
-    timeZone: 'UTC'
-  }).format(new Date(iso));
+  return formatUtcDay(iso, INTL_LOCALE[locale]);
 }
 
 const en: NoticeBuilders = {

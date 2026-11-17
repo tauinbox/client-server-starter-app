@@ -61,7 +61,7 @@ import { changedFields } from '@app/shared/utils/changed-fields';
 import { Throttle } from '@nestjs/throttler';
 import { MfaService } from '../../auth/services/mfa.service';
 import { StepUpFactorsDto } from '../../auth/dtos/step-up-factors.dto';
-import { maskEmail } from '../../../common/utils/escape-html';
+import { maskEmail } from '../../../common/utils/mask-email';
 
 @ApiTags('Users API')
 @Controller({

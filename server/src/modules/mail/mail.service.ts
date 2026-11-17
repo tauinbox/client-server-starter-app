@@ -10,7 +10,7 @@ import { DEFAULT_LOCALE, normalizeLocale } from '@app/shared/constants';
 import type { SupportedLocale } from '@app/shared/constants';
 import type { UserNotificationContent } from '@app/shared/types';
 import { billingNoticeMessage } from './billing-notice-content';
-import { maskEmail } from '../../common/utils/escape-html';
+import { maskEmail } from '../../common/utils/mask-email';
 import { EMAIL_TEMPLATE_SOURCE } from './email.template';
 import {
   CredentialChangeDetails,

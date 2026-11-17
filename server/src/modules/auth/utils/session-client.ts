@@ -1,5 +1,5 @@
 import * as ipaddr from 'ipaddr.js';
-import { normalizeUserAgent } from '../../../common/utils/user-agent.util';
+import { normalizeUserAgent } from '@app/shared/utils/user-agent';
 
 /** What the session list records about the device that holds a session. */
 export interface SessionClient {

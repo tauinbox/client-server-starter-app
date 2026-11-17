@@ -22,7 +22,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { MailService } from '../src/modules/mail/mail.service';
-import { maskEmail } from '../src/common/utils/escape-html';
+import { maskEmail } from '../src/common/utils/mask-email';
 import { withPrivateThrottlerStorage } from './private-throttler';
 import { trackAuditWrites } from './audit-writes';
 

@@ -1,4 +1,5 @@
 import { SupportedLocale } from '@app/shared/constants';
+import { countryName } from '@app/shared/utils/intl-format';
 
 export const MAIL_APP_NAME = 'Nexus';
 
@@ -79,11 +80,6 @@ interface MessageBuilders {
 export interface ResidenceChange {
   previous: string | null;
   current: string;
-}
-
-/** The name of a country in the language of the message, or its code. */
-function countryName(code: string, locale: SupportedLocale): string {
-  return new Intl.DisplayNames([locale], { type: 'region' }).of(code) ?? code;
 }
 
 /**

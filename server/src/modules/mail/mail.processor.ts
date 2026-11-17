@@ -13,7 +13,7 @@ import {
   type MailQueueRef
 } from '../core/metrics/metrics.module';
 import { MetricsService } from '../core/metrics/metrics.service';
-import { maskEmail } from '../../common/utils/escape-html';
+import { maskEmail } from '../../common/utils/mask-email';
 
 /**
  * Delivers queued emails. Errors propagate so BullMQ applies the configured

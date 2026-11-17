@@ -21,6 +21,7 @@ import type {
   UserNotificationKind,
   UserNotificationResponse
 } from '@app/shared/types';
+import { formatUtcDay } from '@app/shared/utils/intl-format';
 import { NotificationsService } from '@core/services/notifications.service';
 import { LanguageService } from '@core/services/language.service';
 import { InfiniteScrollDirective } from '@shared/directives/infinite-scroll.directive';
@@ -118,14 +119,6 @@ export class NotificationsPageComponent {
   }
 }
 
-/** A calendar day in UTC, as every billing boundary is stored. */
-function day(iso: string, lang: string): string {
-  return new Intl.DateTimeFormat(lang, {
-    dateStyle: 'long',
-    timeZone: 'UTC'
-  }).format(new Date(iso));
-}
-
 function toRow(notice: UserNotificationResponse, lang: string): NoticeRow {
   const icon = KIND_ICONS[notice.kind];
 
@@ -162,7 +155,7 @@ function toRow(notice: UserNotificationResponse, lang: string): NoticeRow {
             notice,
             icon,
             textKey: 'payment_failed_retry',
-            params: { plan: planName, date: day(nextAttemptAt, lang) }
+            params: { plan: planName, date: formatUtcDay(nextAttemptAt, lang) }
           }
         : {
             notice,
@@ -178,7 +171,7 @@ function toRow(notice: UserNotificationResponse, lang: string): NoticeRow {
         notice,
         icon,
         textKey: notice.kind,
-        params: { plan: planName, date: day(accessEndsAt, lang) }
+        params: { plan: planName, date: formatUtcDay(accessEndsAt, lang) }
       };
     }
     case 'renewal_upcoming': {
@@ -190,7 +183,7 @@ function toRow(notice: UserNotificationResponse, lang: string): NoticeRow {
         textKey: notice.kind,
         params: {
           plan: planName,
-          date: day(renewsAt, lang),
+          date: formatUtcDay(renewsAt, lang),
           amount: formatMoney(amountMinor, currency, lang)
         }
       };

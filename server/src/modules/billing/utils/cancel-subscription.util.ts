@@ -2,11 +2,14 @@ import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, type Repository } from 'typeorm';
 import {
   ENTITLED_SUBSCRIPTION_STATUSES,
-  ErrorKeys,
-  OPEN_SUBSCRIPTION_STATUSES,
-  isOpenStatus
+  OPEN_SUBSCRIPTION_STATUSES
 } from '@app/shared/constants';
 import type { CancelMode } from '@app/shared/types';
+import {
+  ALREADY_CANCELED,
+  type CancelRefusal,
+  cancelRefusal
+} from '@app/shared/utils/billing-rules';
 import type { BillingService } from '../billing.service';
 import type { Subscription } from '../entities/subscription.entity';
 import {
@@ -16,46 +19,8 @@ import {
 import { cancelFields } from './cancel-fields.util';
 import { ApiError } from '../../../common/errors/api-error';
 
-function alreadyCanceled(): ApiError {
-  return new ApiError(
-    ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED,
-    'This subscription is already canceled.'
-  );
-}
-
-/**
- * Why `mode` cannot be applied to the row as it is now, or null. A period-end
- * cancel needs a paid period that no cancel has claimed yet; an immediate
- * cancel needs an open row only, so an administrator can still end an
- * `incomplete` or a scheduled row now.
- */
-function cancelRefusal(
-  subscription: Subscription,
-  mode: CancelMode
-): ApiError | null {
-  if (!isOpenStatus(subscription.status)) {
-    return alreadyCanceled();
-  }
-
-  if (mode === 'immediate') {
-    return null;
-  }
-
-  if (subscription.status === 'incomplete') {
-    return new ApiError(
-      ErrorKeys.BILLING.NO_PAID_PERIOD,
-      'This subscription has no paid period to end.'
-    );
-  }
-
-  if (subscription.cancelAtPeriodEnd) {
-    return new ApiError(
-      ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED,
-      'A cancellation is already scheduled for the end of the period.'
-    );
-  }
-
-  return null;
+function refusalError({ errorKey, message }: CancelRefusal): ApiError {
+  return new ApiError(errorKey, message);
 }
 
 /** What the cancel tail needs from whichever service is running it. */
@@ -93,7 +58,7 @@ export async function cancelOpenSubscription(
   const refusal = cancelRefusal(subscription, mode);
 
   if (refusal) {
-    throw refusal;
+    throw refusalError(refusal);
   }
 
   // Read before the write: an immediate cancel of an unpaid `incomplete` row
@@ -128,7 +93,9 @@ export async function cancelOpenSubscription(
       where: { id: subscription.id }
     });
 
-    throw (current && cancelRefusal(current, mode)) ?? alreadyCanceled();
+    throw refusalError(
+      (current && cancelRefusal(current, mode)) ?? ALREADY_CANCELED
+    );
   }
 
   Object.assign(subscription, fields);

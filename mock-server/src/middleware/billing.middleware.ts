@@ -14,7 +14,10 @@ import type {
 } from '@app/shared/types';
 import {
   billingGeo,
+  cancelRefusal,
   crossesZero,
+  effectiveProviderId,
+  entitlementsOfPlan,
   geoDefault,
   overrideForRegion,
   prorationAmounts,
@@ -27,7 +30,6 @@ import {
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   ENTITLED_SUBSCRIPTION_STATUSES,
   ErrorKeys,
-  type ErrorKey,
   FREE_PLAN_KEY,
   INVOICE_LIST_QUERY,
   OPEN_SUBSCRIPTION_STATUSES,
@@ -290,18 +292,12 @@ function rejectMissingPaddlePrice(
   return true;
 }
 
-function effectiveProvider(
-  customer: Pick<MockCustomer, 'providerOverride' | 'country'>
-): BillingProviderId {
-  return customer.providerOverride ?? geoDefault(customer.country);
-}
-
 // Mirrors BillingUserService.regionView: the body of GET and PUT /region.
 function regionView(
   user: MockUser,
   customer: Pick<MockCustomer, 'providerOverride' | 'country'>
 ): BillingRegionResponse {
-  const provider = effectiveProvider(customer);
+  const provider = effectiveProviderId(customer);
 
   return {
     region: regionForOverride(customer.providerOverride),
@@ -348,14 +344,6 @@ function findPlanByKey(key: string): MockPlan | undefined {
   return undefined;
 }
 
-function toResolvedEntitlements(plan: MockPlan): EntitlementsResponse {
-  return {
-    planKey: plan.key,
-    capabilities: plan.entitlements,
-    limits: plan.limits ?? {}
-  };
-}
-
 /** The pay-as-you-go plan while the credit balance is above 0. */
 function payAsYouGoPlan(customerId: string): MockPlan | undefined {
   const balance = getState().billingCreditBalances.get(customerId);
@@ -377,14 +365,14 @@ function resolveEntitlements(userId: string): EntitlementsResponse {
   const customer = findCustomer(userId);
   const freePlan = findPlanByKey(FREE_PLAN_KEY);
   const free: EntitlementsResponse = freePlan
-    ? toResolvedEntitlements(freePlan)
+    ? entitlementsOfPlan(freePlan)
     : { planKey: FREE_PLAN_KEY, capabilities: [], limits: {} };
 
   if (!customer) return free;
 
   const plan =
     entitledSubscription(customer.id)?.plan ?? payAsYouGoPlan(customer.id);
-  const base = plan ? toResolvedEntitlements(plan) : free;
+  const base = plan ? entitlementsOfPlan(plan) : free;
 
   const now = Date.now();
   const granted = [...getState().billingCustomerGrants.values()]
@@ -685,7 +673,7 @@ billingRouter.get('/products', authGuard, (req: Request, res: Response) => {
   const { user } = req as AuthenticatedRequest;
   const customer = findCustomer(user.id);
   const provider = customer
-    ? effectiveProvider(customer)
+    ? effectiveProviderId(customer)
     : geoDefault(billingGeo(user).country);
 
   const products = [...getState().billingProducts.values()]
@@ -769,7 +757,7 @@ billingRouter.post('/purchase', authGuard, (req: Request, res: Response) => {
   }
 
   const customer = ensureCustomer(user);
-  const provider = effectiveProvider(customer);
+  const provider = effectiveProviderId(customer);
 
   if (rejectUnavailableProvider(res, provider, user)) return;
 
@@ -953,7 +941,7 @@ billingRouter.post('/checkout', authGuard, (req: Request, res: Response) => {
     return;
   }
 
-  const provider = effectiveProvider(customer);
+  const provider = effectiveProviderId(customer);
 
   if (rejectUnavailableProvider(res, provider, user)) return;
 
@@ -1346,37 +1334,6 @@ billingRouter.post(
     res.json(preview);
   }
 );
-
-/** Mirrors `cancelRefusal` of the server cancel tail. */
-function cancelRefusal(
-  sub: MockSubscription,
-  mode: CancelMode
-): { message: string; errorKey: ErrorKey } | null {
-  if (!OPEN_SUBSCRIPTION_STATUSES.includes(sub.status)) {
-    return {
-      message: 'This subscription is already canceled.',
-      errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED
-    };
-  }
-
-  if (mode === 'immediate') return null;
-
-  if (sub.status === 'incomplete') {
-    return {
-      message: 'This subscription has no paid period to end.',
-      errorKey: ErrorKeys.BILLING.NO_PAID_PERIOD
-    };
-  }
-
-  if (sub.cancelAtPeriodEnd) {
-    return {
-      message: 'A cancellation is already scheduled for the end of the period.',
-      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED
-    };
-  }
-
-  return null;
-}
 
 /**
  * Mirrors `cancelOpenSubscription` of the server, which both cancel routes

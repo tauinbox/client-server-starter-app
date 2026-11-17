@@ -1,3 +1,5 @@
+import { countryName } from '@app/shared/utils/intl-format';
+
 /**
  * "City, Country" for a session, with the country named in the UI language.
  * The server stores the city in English only. Null when both are unknown.
@@ -11,13 +13,4 @@ export function describeLocation(
   const parts = [city, country].filter((part): part is string => !!part);
 
   return parts.length > 0 ? parts.join(', ') : null;
-}
-
-function countryName(code: string, lang: string): string {
-  try {
-    return new Intl.DisplayNames([lang], { type: 'region' }).of(code) ?? code;
-  } catch {
-    // A malformed code makes `of` throw; show the code as it came.
-    return code;
-  }
 }

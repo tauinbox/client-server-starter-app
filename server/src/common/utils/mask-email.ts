@@ -1,20 +1,4 @@
 /**
- * Escapes HTML special characters to prevent XSS when interpolating
- * user-controlled strings into HTML email bodies.
- *
- * Covers the five characters required by the OWASP HTML escaping rule:
- * &, <, >, ", and '.
- */
-export function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-/**
  * Masks an email address for display in security notifications sent to the
  * OLD address during a self-service email change. Reveals only the first and
  * last character of the local-part plus the full domain.

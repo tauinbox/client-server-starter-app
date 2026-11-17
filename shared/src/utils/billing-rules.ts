@@ -1,8 +1,15 @@
 import type { CountryCode } from '../constants/data-region.constants';
+import { ErrorKeys } from '../constants/error-keys';
+import type { ErrorKey } from '../constants/error-status';
+import { isOpenStatus } from '../constants/subscription-status.constants';
 import type {
   BillingProviderId,
   BillingRegion,
-  PlanPrice
+  CancelMode,
+  EntitlementLimits,
+  EntitlementsResponse,
+  PlanPrice,
+  SubscriptionStatus
 } from '../types/billing.types';
 import { Money } from './money';
 
@@ -46,6 +53,68 @@ export function billingGeo(user: {
 /** Geo default: country code 'RU' -> YooKassa, everywhere else -> Paddle. */
 export function geoDefault(country: string): BillingProviderId {
   return country.toUpperCase() === 'RU' ? 'yookassa' : 'paddle';
+}
+
+/** The provider a customer pays with: the override, else the geo default. */
+export function effectiveProviderId(customer: {
+  providerOverride: BillingProviderId | null;
+  country: string;
+}): BillingProviderId {
+  return customer.providerOverride ?? geoDefault(customer.country);
+}
+
+/** What a plan grants while it is in force. */
+export function entitlementsOfPlan(plan: {
+  key: string;
+  entitlements: string[];
+  limits: EntitlementLimits | null;
+}): EntitlementsResponse {
+  return {
+    planKey: plan.key,
+    capabilities: plan.entitlements,
+    limits: plan.limits ?? {}
+  };
+}
+
+export interface CancelRefusal {
+  errorKey: ErrorKey;
+  message: string;
+}
+
+export const ALREADY_CANCELED: CancelRefusal = {
+  errorKey: ErrorKeys.BILLING.SUBSCRIPTION_ALREADY_CANCELED,
+  message: 'This subscription is already canceled.'
+};
+
+/**
+ * Why `mode` cannot be applied to the row as it is now, or null. A period-end
+ * cancel needs a paid period that no cancel has claimed yet; an immediate
+ * cancel needs an open row only, so an administrator can still end an
+ * `incomplete` or a scheduled row now.
+ */
+export function cancelRefusal(
+  subscription: { status: SubscriptionStatus; cancelAtPeriodEnd: boolean },
+  mode: CancelMode
+): CancelRefusal | null {
+  if (!isOpenStatus(subscription.status)) return ALREADY_CANCELED;
+
+  if (mode === 'immediate') return null;
+
+  if (subscription.status === 'incomplete') {
+    return {
+      errorKey: ErrorKeys.BILLING.NO_PAID_PERIOD,
+      message: 'This subscription has no paid period to end.'
+    };
+  }
+
+  if (subscription.cancelAtPeriodEnd) {
+    return {
+      errorKey: ErrorKeys.BILLING.CANCELLATION_ALREADY_SCHEDULED,
+      message: 'A cancellation is already scheduled for the end of the period.'
+    };
+  }
+
+  return null;
 }
 
 /** Region selector -> provider override. */

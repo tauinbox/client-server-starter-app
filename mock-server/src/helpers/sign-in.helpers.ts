@@ -7,7 +7,7 @@ import {
 } from './refresh-cookie.helpers';
 import { generateSessionId, generateTokens } from '../jwt.utils';
 import { getState, logAudit, registerSession, toUserResponse } from '../state';
-import { normalizeUserAgent } from '../utils/user-agent';
+import { normalizeUserAgent } from '@app/shared/utils/user-agent';
 import { normalizeIpAddress } from '../utils/ip-address';
 import { resolveEntitlementLimit } from '../middleware/billing.middleware';
 import type { MockUser } from '../types';

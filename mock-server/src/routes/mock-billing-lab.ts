@@ -3,7 +3,10 @@ import type { Request, Response } from 'express';
 import { BILLING_PROVIDER_FLAGS, FREE_PLAN_KEY } from '@app/shared/constants';
 import type { BillingProviderId } from '@app/shared/types';
 import { randomUUID } from 'crypto';
-import { crossesZero, geoDefault } from '@app/shared/utils/billing-rules';
+import {
+  crossesZero,
+  effectiveProviderId
+} from '@app/shared/utils/billing-rules';
 import { getState, resetState } from '../state';
 import type { MockSubscription, MockUser } from '../types';
 import {
@@ -253,7 +256,7 @@ function renderState(user: MockUser): string {
   const rows = [
     row(
       'Billing region',
-      `${customer.providerOverride ?? geoDefault(customer.country)} (country ${customer.country}${customer.providerOverride ? ', override' : ''})`
+      `${effectiveProviderId(customer)} (country ${customer.country}${customer.providerOverride ? ', override' : ''})`
     ),
     row(
       'Credits',

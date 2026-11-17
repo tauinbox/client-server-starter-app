@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { AUDIT_FIELD_MAX_LENGTH, AuditService } from './audit.service';
+import { AUDIT_FIELD_MAX_LENGTH } from '@app/shared/utils/audit-field';
+import { AuditService } from './audit.service';
 import { MetricsService } from '../core/metrics/metrics.service';
 import { AuditLog } from './entities/audit-log.entity';
 

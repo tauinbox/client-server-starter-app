@@ -2,7 +2,7 @@ import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
 import type { Params } from 'nestjs-pino';
 import { stdSerializers } from 'pino';
 import type { LogFn } from 'pino';
-import { maskEmail } from '../../common/utils/escape-html';
+import { maskEmail } from '../../common/utils/mask-email';
 
 // Bounded quantifiers (RFC 5321 length limits) keep the scan linear, and the
 // alphabetic TLD keeps `pkg@1.2.3` and `node_modules/@scope` in a stack intact.

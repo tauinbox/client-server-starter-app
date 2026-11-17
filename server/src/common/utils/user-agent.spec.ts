@@ -1,4 +1,7 @@
-import { normalizeUserAgent } from '../utils/user-agent';
+import {
+  MAX_USER_AGENT_LENGTH,
+  normalizeUserAgent
+} from '@app/shared/utils/user-agent';
 
 describe('normalizeUserAgent', () => {
   it('keeps an ordinary header as it is', () => {
@@ -19,7 +22,9 @@ describe('normalizeUserAgent', () => {
   });
 
   it('cuts the value to the column width', () => {
-    expect(normalizeUserAgent('a'.repeat(600))).toHaveLength(512);
+    const result = normalizeUserAgent('a'.repeat(MAX_USER_AGENT_LENGTH + 50));
+
+    expect(result).toHaveLength(MAX_USER_AGENT_LENGTH);
   });
 
   it('reads the first value of a repeated header', () => {

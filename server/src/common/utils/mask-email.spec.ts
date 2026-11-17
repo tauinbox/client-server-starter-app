@@ -1,12 +1,4 @@
-import { escapeHtml, maskEmail } from './escape-html';
-
-describe('escapeHtml', () => {
-  it('escapes the five OWASP characters', () => {
-    expect(escapeHtml(`<a href="x">'&'</a>`)).toBe(
-      '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;'
-    );
-  });
-});
+import { maskEmail } from './mask-email';
 
 describe('maskEmail', () => {
   it.each([
