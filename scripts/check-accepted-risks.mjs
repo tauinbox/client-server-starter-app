@@ -23,6 +23,7 @@ import {
   REGISTRY_FILE,
   ROOT,
   TRIVYIGNORE_FILE,
+  auditReportProblem,
   changedRisks,
   judgeAudit,
   parseRegistry,
@@ -334,6 +335,41 @@ function selfTest() {
     'ignores a moderate advisory with no entry',
     judge(sampleAudit({ severity: 'moderate' }), { risks: [] }).blocking
       .length === 0
+  );
+
+  const counted = (total) => ({
+    vulnerabilities: {},
+    metadata: { vulnerabilities: { total } }
+  });
+  expect(
+    'accepts a clean report',
+    auditReportProblem(counted(0), 0) === undefined
+  );
+  expect(
+    'accepts a report with findings and exit 1',
+    auditReportProblem(counted(3), 1) === undefined
+  );
+  expect(
+    'fails closed on no JSON',
+    auditReportProblem(undefined, 1) !== undefined
+  );
+  expect(
+    'fails closed on an npm error object',
+    auditReportProblem({ message: 'x', error: { summary: '' } }, 1) !==
+      undefined
+  );
+  expect(
+    'fails closed on no vulnerabilities object',
+    auditReportProblem({ metadata: { vulnerabilities: { total: 0 } } }, 0) !==
+      undefined
+  );
+  expect(
+    'fails closed on no count block',
+    auditReportProblem({ vulnerabilities: {} }, 0) !== undefined
+  );
+  expect(
+    'fails closed on exit 1 with nothing counted',
+    auditReportProblem(counted(0), 1) !== undefined
   );
 
   const yaml = trivyignoreYaml({ risks: [sampleRisk()] });

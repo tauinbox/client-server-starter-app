@@ -9,6 +9,7 @@ import { basename, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   WORKSPACES,
+  auditReportProblem,
   judgeAudit,
   readRegistry,
   todayUtc
@@ -46,13 +47,21 @@ async function runAudit() {
     const output = `${result.stdout}${result.stderr}`;
 
     if (!output.includes(ENDPOINT_ERROR)) {
+      let report;
+
       try {
-        return JSON.parse(result.stdout);
+        report = JSON.parse(result.stdout);
       } catch {
-        process.stderr.write(output);
-        console.error('npm audit did not print a JSON report.');
-        process.exit(1);
+        report = undefined;
       }
+
+      const problem = auditReportProblem(report, result.status);
+
+      if (problem === undefined) return report;
+
+      process.stderr.write(output);
+      console.error(`\naudit-ci: npm audit gave no usable report: ${problem}.`);
+      process.exit(1);
     }
 
     if (attempt === MAX_ATTEMPTS) {

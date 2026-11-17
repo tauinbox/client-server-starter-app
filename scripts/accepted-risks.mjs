@@ -240,6 +240,33 @@ export function collectAdvisories(audit) {
   return advisories;
 }
 
+/**
+ * Why an `npm audit --json` result is not a usable report, or undefined. The
+ * gate fails closed: an error object, a missing count block, or a non-zero
+ * exit with no finding counted is never read as "no advisory".
+ */
+export function auditReportProblem(report, exitStatus) {
+  if (!report || typeof report !== 'object')
+    return 'the output is not a JSON object';
+  if (report.error)
+    return `npm reported an error: ${report.message ?? JSON.stringify(report.error)}`;
+  if (
+    typeof report.vulnerabilities !== 'object' ||
+    report.vulnerabilities === null
+  ) {
+    return 'the report has no "vulnerabilities" object';
+  }
+
+  const total = report.metadata?.vulnerabilities?.total;
+
+  if (!Number.isInteger(total))
+    return 'the report has no "metadata.vulnerabilities.total" count';
+  if (exitStatus !== 0 && total === 0)
+    return `npm exited ${exitStatus} with no advisory counted`;
+
+  return undefined;
+}
+
 function fixIsAvailable(fixAvailable) {
   return (
     fixAvailable === true ||
