@@ -634,7 +634,7 @@ The module imports `EntitlementsModule` and re-exports it. Thus an importer cont
 `BillingService`, `BillingConfigService`, `EntitlementsModule`, `MeteringService` and `CreditService`.
 
 **Geo-router (`billing.service.ts`).** `resolveProvider()` takes the provider from
-`effectiveProviderId()`, which computes `providerOverride ?? geoDefault(country)`. It answers 501 `PROVIDER_NOT_CONFIGURED` when the provider
+`effectiveProviderId()`, which calls the shared `effectiveProviderId` of `@app/shared/utils/billing-rules` (`providerOverride ?? geoDefault(country)`; the mock calls the same function). It answers 501 `PROVIDER_NOT_CONFIGURED` when the provider
 is not configured, and 503 `PROVIDER_UNAVAILABLE` when it is disabled. "Disabled" is the full evaluation of the kill-switch flag for the user of the customer
 (`FeatureFlagResolverService.isEnabledForUserId`), so the environments and the rules of the flag
 apply. The file also holds the `getProviderById()` helper. A caller that needs only the geo default
