@@ -36,7 +36,7 @@ export class BillingService {
   async resolveProvider(
     customer: Pick<Customer, 'providerOverride' | 'country' | 'userId'>
   ): Promise<PaymentProvider> {
-    const effective = this.effectiveProviderId(customer);
+    const effective = effectiveProviderId(customer);
 
     if (!this.billingConfig.isConfigured(effective)) {
       throw new ApiError(
@@ -68,17 +68,6 @@ export class BillingService {
       this.providers.some((p) => p.id === id) &&
       (await this.isProviderEnabled(id, userId))
     );
-  }
-
-  /**
-   * The provider the next checkout would use — a manual override wins over the
-   * geo default. Informational (the `GET /billing/region` view); unlike
-   * `resolveProvider` it does not assert availability.
-   */
-  effectiveProviderId(
-    customer: Pick<Customer, 'providerOverride' | 'country'>
-  ): BillingProviderId {
-    return effectiveProviderId(customer);
   }
 
   /**
