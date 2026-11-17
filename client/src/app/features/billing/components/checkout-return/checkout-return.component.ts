@@ -16,6 +16,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { renewalAnchor } from '@app/shared/utils/billing-rules';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import {
   dropPaddleTransactionId,
@@ -86,9 +87,11 @@ export class CheckoutReturnComponent implements OnInit {
     initialValue: this.#transloco.getActiveLang()
   });
 
-  protected readonly periodEnd = computed(
-    () => this.store.subscription()?.currentPeriodEnd ?? null
-  );
+  protected readonly periodEnd = computed(() => {
+    const sub = this.store.subscription();
+
+    return sub ? renewalAnchor(sub) : null;
+  });
 
   protected readonly purchaseAmount = computed(() => {
     const pending = this.purchase();

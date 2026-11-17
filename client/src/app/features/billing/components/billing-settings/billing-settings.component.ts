@@ -22,6 +22,7 @@ import {
   CHANGEABLE_SUBSCRIPTION_STATUSES,
   MAX_CONCURRENT_SESSIONS
 } from '@app/shared/constants';
+import { renewalAnchor } from '@app/shared/utils/billing-rules';
 import { LayoutService } from '@core/services/layout.service';
 import { NotifyService } from '@core/services/notify.service';
 import { DialogSize, dialogSizeConfig } from '@shared/utils/dialog.utils';
@@ -122,6 +123,12 @@ export class BillingSettingsComponent implements OnInit {
     if (!price) return '';
 
     return formatMoney(price.amountMinor, price.currency, this.#lang());
+  });
+
+  protected readonly accessEnd = computed(() => {
+    const sub = this.store.subscription();
+
+    return sub ? renewalAnchor(sub) : null;
   });
 
   protected readonly canCancel = computed(() => {

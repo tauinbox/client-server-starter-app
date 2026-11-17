@@ -34,9 +34,7 @@
                 <span class="renewal cancels">
                   {{
                     t('billing.settings.cancelsOn', {
-                      date:
-                        store.subscription()!.currentPeriodEnd
-                        | localizedDate: 'mediumDate' : 'UTC'
+                      date: accessEnd() | localizedDate: 'mediumDate' : 'UTC'
                     })
                   }}
                 </span>
@@ -44,9 +42,7 @@
                 <span class="renewal">
                   {{
                     t('billing.settings.renewsOn', {
-                      date:
-                        store.subscription()!.currentPeriodEnd
-                        | localizedDate: 'mediumDate' : 'UTC'
+                      date: accessEnd() | localizedDate: 'mediumDate' : 'UTC'
                     })
                   }}
                 </span>

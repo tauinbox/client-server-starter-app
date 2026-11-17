@@ -76,17 +76,24 @@ describe('CheckoutReturnComponent', () => {
     active: boolean,
     {
       invoices = [],
-      transactionId
-    }: { invoices?: InvoiceResponse[]; transactionId?: string } = {}
+      transactionId,
+      subscription = activeSub
+    }: {
+      invoices?: InvoiceResponse[];
+      transactionId?: string;
+      subscription?: SubscriptionResponse;
+    } = {}
   ): Promise<void> {
     storeMock = {
       plans: signal<PlanResponse[]>(active ? [proPlan] : []),
       currentPlan: signal<PlanResponse | null>(active ? proPlan : null),
       subscription: signal<SubscriptionResponse | null>(
-        active ? activeSub : null
+        active ? subscription : null
       ),
       hasActiveSubscription: signal(active),
-      refreshSubscription: vi.fn().mockResolvedValue(active ? activeSub : null),
+      refreshSubscription: vi
+        .fn()
+        .mockResolvedValue(active ? subscription : null),
       refreshInvoices: vi.fn().mockResolvedValue(invoices),
       loadPlans: vi.fn().mockResolvedValue(undefined)
     };
@@ -123,6 +130,20 @@ describe('CheckoutReturnComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
     expect(text).toContain('Pro');
+  });
+
+  it('names the trial end as the next billing day of a trial', async () => {
+    await setup('success', true, {
+      subscription: {
+        ...activeSub,
+        status: 'trialing',
+        trialEnd: '2026-06-15T00:00:00.000Z'
+      }
+    });
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).toContain('Next billing on Jun 15, 2026.');
+    expect(text).not.toContain('Jul 1, 2026');
   });
 
   it('shows the canceled state without polling on cancel return', async () => {

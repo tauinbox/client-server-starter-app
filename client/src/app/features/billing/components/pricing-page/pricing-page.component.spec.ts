@@ -332,6 +332,21 @@ describe('PricingPageComponent', () => {
     expect(free?.querySelector('.plan-note')?.textContent).toContain('From');
   });
 
+  it('names the trial end as the day a cancelled trial returns to Free', async () => {
+    await setup(true);
+    showSubscription('trialing', true, {
+      cancelAtPeriodEnd: true,
+      trialEnd: '2024-01-15T00:00:00.000Z'
+    });
+
+    const note = (fixture.nativeElement as HTMLElement).querySelector(
+      '.free-column nxs-plan-card .plan-note'
+    );
+
+    expect(note?.textContent).toContain('From Jan 15, 2024');
+    expect(note?.textContent).not.toContain('Feb 1, 2024');
+  });
+
   it('shows the region control in the page header', async () => {
     await setup(true);
     storeMock.region.set({

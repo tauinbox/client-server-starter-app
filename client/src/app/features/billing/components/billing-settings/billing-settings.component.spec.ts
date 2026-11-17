@@ -299,6 +299,33 @@ describe('BillingSettingsComponent', () => {
     );
   });
 
+  describe('during a self-managed trial', () => {
+    const trialSub: SubscriptionResponse = {
+      ...activeSub,
+      status: 'trialing',
+      lifecycleOwner: 'self',
+      trialEnd: '2026-06-15T00:00:00.000Z'
+    };
+
+    it('names the trial end as the renewal day', async () => {
+      await setup(true, { subscription: trialSub });
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+      expect(text).toContain('Renews Jun 15, 2026');
+      expect(text).not.toContain('Jul 1, 2026');
+    });
+
+    it('names the trial end as the cancel day', async () => {
+      await setup(true, {
+        subscription: { ...trialSub, cancelAtPeriodEnd: true }
+      });
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+      expect(text).toContain('Cancels on Jun 15, 2026');
+      expect(text).not.toContain('Jul 1, 2026');
+    });
+  });
+
   it('renders the usage meter when metered uses took credits this month', async () => {
     await setup(true, { usage: usageSummary });
     expect(
