@@ -36,26 +36,42 @@
     "@types/node": "^26.6.6",
     "@types/validator": "^13.15.10",
     "@typescript-eslint/parser": "^8.72.1",
-    "eslint": "^10.14.0",
+    "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.5",
-    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-import-x": "^4.18.1",
     "eslint-plugin-unicorn": "^79.0.0",
     "jest": "^30.5.2",
     "jiti": "^2.7.0",
     "prettier": "^3.9.10",
-    "ts-jest": "^29.4.14",
+    "ts-jest": "^29.4.15",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.72.1"
+    "typescript-eslint": "^8.73.0"
   },
   "overrides": {
     "@istanbuljs/load-nyc-config": {
       "js-yaml": "^4.3.2"
     },
     "babel-plugin-istanbul": {
-      "test-exclude": "^8.0.0"
+      "test-exclude": {
+        ".": "^8.0.0",
+        "glob": "^14.0.6",
+        "minimatch": "^11.0.9"
+      }
+    },
+    "@jest/reporters": {
+      "glob": "^14.0.6"
+    },
+    "jest-config": {
+      "glob": "^14.0.6"
+    },
+    "jest-runtime": {
+      "glob": "^14.0.6"
+    },
+    "eslint-plugin-import-x": {
+      "minimatch": "^11.0.9"
     }
   },
   "allowScripts": {
