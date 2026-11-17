@@ -45,8 +45,10 @@ function termsNotAccepted(): ApiError {
 
 /**
  * The consent of a buyer to the terms of the seller. A checkout and a purchase
- * check it before any write and record it just before the provider call, so a
- * refused request leaves no consent row.
+ * check it before any write of the payment (the subscription row, the consent
+ * row, the provider call) and record it just before the provider call, so a
+ * refused request leaves no consent row. The customer row is created first,
+ * because the check needs the provider of that customer.
  */
 @Injectable()
 export class BillingConsentService {

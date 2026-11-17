@@ -658,7 +658,8 @@ are:
   `errors.billing.alreadySubscribed` and writes nothing.
 - `POST checkout` and `POST purchase` take `acceptedTermsVersion`. While the terms of the
   jurisdiction of the resolved provider are published, a missing or different version answers 422
-  `errors.billing.termsNotAccepted` before any write, and an accepted version adds a
+  `errors.billing.termsNotAccepted` before any write of the payment (only the customer row exists
+  by then, because the check needs its provider), and an accepted version adds a
   `billing_consents` row and a `BILLING_TERMS_ACCEPT` audit row just before the provider call
   (`doc/billing-design.md` section 23).
 - `POST subscription/change` does an immediate prorated change of the plan or of the mode.
