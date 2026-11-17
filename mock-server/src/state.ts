@@ -825,7 +825,6 @@ export function toPlanResponse(plan: MockPlan): PlanResponse {
     description: plan.description,
     billingMode: plan.billingMode,
     interval: plan.interval,
-    meterKey: plan.meterKey,
     entitlements: plan.entitlements,
     limits: plan.limits,
     trialDays: plan.trialDays,

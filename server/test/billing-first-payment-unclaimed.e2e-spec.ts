@@ -57,7 +57,6 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
           description: null,
           billingMode: 'fixed',
           interval: 'month',
-          meterKey: null,
           entitlements: [],
           limits: null,
           trialDays: 0,

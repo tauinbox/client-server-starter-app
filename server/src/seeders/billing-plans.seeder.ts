@@ -15,7 +15,6 @@ type SeedPlan = {
   description: string;
   billingMode: BillingMode;
   interval: PlanInterval;
-  meterKey: string | null;
   entitlements: string[];
   limits: EntitlementLimits | null;
   trialDays: number;
@@ -34,7 +33,6 @@ const PLANS: SeedPlan[] = [
     description: 'Core access at no cost',
     billingMode: 'fixed',
     interval: 'month',
-    meterKey: null,
     entitlements: [],
     limits: null,
     trialDays: 0,
@@ -50,7 +48,6 @@ const PLANS: SeedPlan[] = [
     description: 'For growing teams',
     billingMode: 'fixed',
     interval: 'month',
-    meterKey: null,
     entitlements: ['reports', 'api-access', 'data-export'],
     limits: { sessions: 10 },
     trialDays: 0,
@@ -66,7 +63,6 @@ const PLANS: SeedPlan[] = [
     description: 'More concurrent devices and priority support',
     billingMode: 'fixed',
     interval: 'month',
-    meterKey: null,
     entitlements: ['reports', 'api-access', 'data-export', 'priority-support'],
     limits: { sessions: 25 },
     trialDays: 0,
@@ -82,24 +78,13 @@ const PLANS: SeedPlan[] = [
     description: 'Pay only for what you use',
     billingMode: 'usage',
     interval: 'month',
-    meterKey: 'api_calls',
     entitlements: ['reports', 'api-access', 'data-export', 'priority-support'],
     limits: null,
     trialDays: 0,
     active: true,
     prices: {
-      yookassa: {
-        currency: 'RUB',
-        amountMinor: 0,
-        unitPriceMinor: 200,
-        includedUnits: 0
-      },
-      paddle: {
-        currency: 'USD',
-        amountMinor: 0,
-        unitPriceMinor: 2,
-        includedUnits: 0
-      }
+      yookassa: { currency: 'RUB', amountMinor: 0 },
+      paddle: { currency: 'USD', amountMinor: 0 }
     }
   }
 ];

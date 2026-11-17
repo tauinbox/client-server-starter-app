@@ -23,7 +23,6 @@ function makePlan(prices: PlanResponse['prices']): PlanResponse {
     description: null,
     billingMode: 'fixed',
     interval: 'month',
-    meterKey: null,
     entitlements: [],
     limits: null,
     trialDays: 0,

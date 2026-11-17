@@ -139,7 +139,6 @@ runWithInfra('billing write paths (e2e)', () => {
         description: null,
         billingMode: 'fixed',
         interval: 'month',
-        meterKey: null,
         entitlements: ['reports'],
         limits: null,
         trialDays: 0,

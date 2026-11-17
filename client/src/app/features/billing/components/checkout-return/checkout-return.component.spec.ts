@@ -27,7 +27,6 @@ const proPlan: PlanResponse = {
   description: null,
   billingMode: 'fixed',
   interval: 'month',
-  meterKey: null,
   entitlements: [],
   limits: null,
   trialDays: 0,

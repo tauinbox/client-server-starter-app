@@ -112,7 +112,6 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         description: null,
         billingMode: 'fixed',
         interval: 'month',
-        meterKey: null,
         entitlements: [],
         limits: null,
         trialDays: 0,

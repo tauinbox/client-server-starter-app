@@ -24,7 +24,6 @@ function makePlan(overrides: Partial<PlanResponse>): PlanResponse {
     description: null,
     billingMode: 'fixed',
     interval: 'month',
-    meterKey: null,
     entitlements: [],
     limits: null,
     trialDays: 0,
@@ -47,10 +46,9 @@ const plans: PlanResponse[] = [
     key: 'usage',
     name: 'Pay as you go',
     billingMode: 'usage',
-    meterKey: 'api_calls',
     prices: {
-      yookassa: { currency: 'RUB', amountMinor: 0, unitPriceMinor: 200 },
-      paddle: { currency: 'USD', amountMinor: 0, unitPriceMinor: 2 }
+      yookassa: { currency: 'RUB', amountMinor: 0 },
+      paddle: { currency: 'USD', amountMinor: 0 }
     }
   })
 ];

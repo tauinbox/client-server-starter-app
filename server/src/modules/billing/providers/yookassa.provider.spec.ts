@@ -236,7 +236,7 @@ describe('YooKassaProvider', () => {
           trialDays: 0,
           billingMode: 'usage',
           prices: {
-            yookassa: { currency: 'RUB', amountMinor: 0, unitPriceMinor: 200 }
+            yookassa: { currency: 'RUB', amountMinor: 0 }
           }
         } as Plan,
         { urls, trial: false }

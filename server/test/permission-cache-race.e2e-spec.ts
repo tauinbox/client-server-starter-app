@@ -260,7 +260,6 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
         description: null,
         billingMode: 'fixed',
         interval: 'month',
-        meterKey: null,
         entitlements: [capability],
         limits: null,
         trialDays: 0,

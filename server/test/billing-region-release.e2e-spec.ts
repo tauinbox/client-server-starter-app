@@ -59,7 +59,6 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
         description: null,
         billingMode: 'fixed',
         interval: 'month',
-        meterKey: null,
         entitlements: [],
         limits: null,
         trialDays: 0,

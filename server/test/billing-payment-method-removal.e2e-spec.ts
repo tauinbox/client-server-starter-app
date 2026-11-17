@@ -67,7 +67,6 @@ runWithInfra('Removal of the saved card (e2e)', () => {
         description: null,
         billingMode: 'fixed',
         interval: 'month',
-        meterKey: null,
         entitlements: [],
         limits: null,
         trialDays: 0,

@@ -12,16 +12,7 @@ function makePlan(
     name: key.charAt(0).toUpperCase() + key.slice(1),
     billingMode,
     interval: 'month',
-    meterKey: billingMode === 'usage' ? 'api_calls' : null,
-    prices: {
-      yookassa: {
-        currency: 'RUB',
-        amountMinor,
-        ...(billingMode === 'usage'
-          ? { unitPriceMinor: 200, includedUnits: 0 }
-          : {})
-      }
-    }
+    prices: { yookassa: { currency: 'RUB', amountMinor } }
   });
 }
 

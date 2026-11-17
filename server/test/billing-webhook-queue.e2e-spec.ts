@@ -76,7 +76,6 @@ runWithRedis('billing webhook queue (real Redis)', () => {
         description: null,
         billingMode: 'fixed',
         interval: 'month',
-        meterKey: null,
         entitlements: [],
         limits: null,
         trialDays: 0,

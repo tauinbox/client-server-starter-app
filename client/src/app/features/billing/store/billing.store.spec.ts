@@ -50,7 +50,6 @@ const proPlan: PlanResponse = {
   description: 'For growing teams',
   billingMode: 'fixed',
   interval: 'month',
-  meterKey: null,
   entitlements: ['reports'],
   limits: null,
   trialDays: 0,

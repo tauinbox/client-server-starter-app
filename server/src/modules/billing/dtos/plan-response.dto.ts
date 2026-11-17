@@ -30,9 +30,6 @@ export class PlanResponseDto {
   @ApiProperty({ enum: ['month', 'year'], example: 'month' })
   interval: PlanInterval;
 
-  @ApiProperty({ example: null, nullable: true })
-  meterKey: string | null;
-
   @ApiProperty({ type: [String], example: ['reports', 'api-access'] })
   entitlements: string[];
 
