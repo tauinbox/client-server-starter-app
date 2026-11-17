@@ -502,7 +502,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     getState().billingSubscriptions.set(subscriptionId, {
       id: subscriptionId,
       customerId: ctx.values.$customerId!,
-      planKey: ctx.values.$meterKey!,
+      planKey: ctx.values.$fixedPlanKey!,
       provider: 'yookassa',
       billingMode: 'fixed',
       status: 'active',
@@ -568,7 +568,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
     return Promise.resolve();
   },
   'api-access-plan': (ctx) =>
-    addFixedPlan(ctx.values.$meterKey!, ['api-access']),
+    addFixedPlan(ctx.values.$fixedPlanKey!, ['api-access']),
   credits: async (ctx) => {
     if (!ctx.values.$customerId) await STATES.customer(ctx);
 
@@ -595,7 +595,7 @@ const STATES: Record<StateFixture, (ctx: Context) => Promise<void>> = {
 
     return Promise.resolve();
   },
-  'fixed-plan': (ctx) => addFixedPlan(ctx.values.$meterKey!),
+  'fixed-plan': (ctx) => addFixedPlan(ctx.values.$fixedPlanKey!),
   'other-plan': (ctx) => addFixedPlan(ctx.values.$planKey!),
   product: (ctx) => {
     const now = new Date().toISOString();
@@ -704,6 +704,7 @@ async function run(scenario: RequestScenario) {
   ctx.values.$roleName = `scenario-role-${sequence}`;
   ctx.values.$flagKey = `scenario-flag-${sequence}`;
   ctx.values.$meterKey = `scenario-meter-${sequence}`;
+  ctx.values.$fixedPlanKey = `scenario-fixed-plan-${sequence}`;
   ctx.values.$planKey = `scenario-plan-${sequence}`;
   ctx.values.$productKey = `scenario-product-${sequence}`;
   ctx.values.$permissionId = readRolePermissionId();

@@ -728,7 +728,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       const now = Date.now();
       const subscription = await dataSource.getRepository(Subscription).save({
         customerId: ctx.values.$customerId!,
-        planKey: ctx.values.$meterKey!,
+        planKey: ctx.values.$fixedPlanKey!,
         provider: 'yookassa',
         billingMode: 'fixed',
         status: 'active',
@@ -784,7 +784,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     },
     'api-access-plan': async (ctx) => {
       await dataSource.getRepository(Plan).save({
-        ...fixedPlan(ctx.values.$meterKey!),
+        ...fixedPlan(ctx.values.$fixedPlanKey!),
         entitlements: ['api-access']
       });
     },
@@ -809,7 +809,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     'fixed-plan': async (ctx) => {
       await dataSource
         .getRepository(Plan)
-        .save(fixedPlan(ctx.values.$meterKey!));
+        .save(fixedPlan(ctx.values.$fixedPlanKey!));
     },
     'other-plan': async (ctx) => {
       await dataSource
@@ -920,6 +920,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     ctx.values.$roleName = freshRoleName();
     ctx.values.$flagKey = freshFlagKey();
     ctx.values.$meterKey = freshKey('meter');
+    ctx.values.$fixedPlanKey = freshKey('fixed-plan');
     ctx.values.$planKey = freshKey('plan');
     ctx.values.$productKey = freshKey('product');
     ctx.values.$permissionId = permissionId;

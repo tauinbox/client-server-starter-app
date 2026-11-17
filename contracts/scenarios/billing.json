@@ -121,7 +121,7 @@
         "fixed-plan"
       ],
       "body": {
-        "planKey": "$meterKey"
+        "planKey": "$fixedPlanKey"
       },
       "expect": {
         "status": 200,
@@ -139,7 +139,7 @@
         "fixed-plan"
       ],
       "body": {
-        "planKey": "$meterKey"
+        "planKey": "$fixedPlanKey"
       },
       "expect": {
         "status": 409,
@@ -158,7 +158,7 @@
         "published-terms"
       ],
       "body": {
-        "planKey": "$meterKey"
+        "planKey": "$fixedPlanKey"
       },
       "expect": {
         "status": 422,
@@ -177,7 +177,7 @@
         "published-terms"
       ],
       "body": {
-        "planKey": "$meterKey",
+        "planKey": "$fixedPlanKey",
         "acceptedTermsVersion": "2030-01-01"
       },
       "expect": {
@@ -259,7 +259,7 @@
         "fixed-plan"
       ],
       "body": {
-        "planKey": "$meterKey"
+        "planKey": "$fixedPlanKey"
       },
       "expect": {
         "status": 409,

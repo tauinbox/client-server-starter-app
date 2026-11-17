@@ -80,13 +80,16 @@ export const STATE_FIXTURES = [
   /**
    * A billing customer of the actor, `$customerId`, with an active
    * subscription that the server renews, `$subscriptionId`. Its period
-   * started one day ago, and its plan key is `$meterKey`. It uses the
+   * started one day ago, and its plan key is `$fixedPlanKey`. It uses the
    * `customer` when the scenario has one.
    */
   'subscription',
   /** A default saved `yookassa` card of the `customer`. */
   'saved-card',
-  /** A fixed monthly plan `$meterKey` with a `yookassa` price of 10.00 RUB. */
+  /**
+   * A fixed monthly plan `$fixedPlanKey` with a `yookassa` price of 10.00
+   * RUB.
+   */
   'fixed-plan',
   /** A fixed monthly plan `$planKey` with a `yookassa` price of 10.00 RUB. */
   'other-plan',
@@ -102,8 +105,8 @@ export const STATE_FIXTURES = [
   /** A paid invoice of 1000 minor units of the `subscription`; `$invoiceId`. */
   'paid-invoice',
   /**
-   * A fixed monthly plan `$meterKey` with the capability `api-access`, which
-   * the `api_calls` meter measures.
+   * A fixed monthly plan `$fixedPlanKey` with the capability `api-access`,
+   * which the `api_calls` meter measures.
    */
   'api-access-plan',
   /** A credit balance of 10 units of the `customer`. */
@@ -192,10 +195,15 @@ export const SCENARIO_PLACEHOLDERS = [
   '$customerId',
   '$subscriptionId',
   '$invoiceId',
-  /** A meter key, and a plan key, that no plan has before the request. */
+  /** A meter key that is not in the meter catalog (`METERS`). */
   '$meterKey',
   '$webhookEventId',
   '$notificationId',
+  /**
+   * The key of the plan of the `fixed-plan`, `subscription` and
+   * `api-access-plan` states. No plan has it before the request.
+   */
+  '$fixedPlanKey',
   /** A plan key that no plan has before the request. */
   '$planKey',
   /** A product key that no product has before the request. */
