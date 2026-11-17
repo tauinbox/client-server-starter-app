@@ -174,6 +174,32 @@ describe('BillingAdminListComponent', () => {
     ).toBe(2);
   });
 
+  it.each([
+    ['table', false],
+    ['card', true]
+  ])(
+    'shows the trial end as the renewal day of a trial (%s)',
+    async (_view, handset) => {
+      layoutHandset.set(handset);
+      subscriptionsMock.subscriptions.set([
+        {
+          ...activeSub,
+          status: 'trialing',
+          trialEnd: '2026-06-15T00:00:00.000Z'
+        }
+      ]);
+      // The invoice period also ends on Jul 1.
+      invoicesMock.invoices.set([]);
+      const fixture = await setup();
+
+      fixture.detectChanges();
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+      expect(text).toContain('Jun 15, 2026');
+      expect(text).not.toContain('Jul 1, 2026');
+    }
+  );
+
   it('confirmCancel cancels with the chosen mode when confirmed', async () => {
     const fixture = await setup();
 

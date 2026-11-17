@@ -38,6 +38,7 @@ import type {
   SubscriptionResponse
 } from '@app/shared/types';
 import { isOpenStatus } from '@app/shared/constants';
+import { renewalAnchor } from '@app/shared/utils/billing-rules';
 import { LayoutService } from '@core/services/layout.service';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service';
@@ -197,6 +198,10 @@ export class BillingAdminListComponent implements OnInit {
   // CSS-safe status class (enum values like `past_due` → `status-past-due`).
   statusClass(status: string): string {
     return `status-${status.replaceAll('_', '-')}`;
+  }
+
+  renewsOn(subscription: SubscriptionResponse): string {
+    return renewalAnchor(subscription);
   }
 
   // A canceled subscription has no further lifecycle action.

@@ -36,9 +36,7 @@
                 <dd>{{ t('admin.billing.mode.' + sub.billingMode) }}</dd>
                 <dt>{{ t('admin.billing.colRenews') }}</dt>
                 <dd>
-                  {{
-                    sub.currentPeriodEnd | localizedDate: 'mediumDate' : 'UTC'
-                  }}
+                  {{ renewsOn(sub) | localizedDate: 'mediumDate' : 'UTC' }}
                 </dd>
               </dl>
               @if (hasCancelAccess() && canCancel(sub)) {
@@ -130,7 +128,7 @@
                 {{ t('admin.billing.colRenews') }}
               </th>
               <td mat-cell *matCellDef="let sub">
-                {{ sub.currentPeriodEnd | localizedDate: 'mediumDate' : 'UTC' }}
+                {{ renewsOn(sub) | localizedDate: 'mediumDate' : 'UTC' }}
               </td>
             </ng-container>
 

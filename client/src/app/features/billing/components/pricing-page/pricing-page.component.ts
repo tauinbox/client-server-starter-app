@@ -29,6 +29,7 @@ import type {
   PlanResponse,
   ProductResponse
 } from '@app/shared/types';
+import { renewalAnchor } from '@app/shared/utils/billing-rules';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
 import { AuthStore } from '@features/auth/store/auth.store';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
@@ -221,7 +222,7 @@ export class PricingPageComponent implements OnInit {
     const sub = this.store.subscription();
 
     return sub && this.store.hasActiveSubscription() && sub.cancelAtPeriodEnd
-      ? sub.currentPeriodEnd
+      ? renewalAnchor(sub)
       : null;
   });
 
