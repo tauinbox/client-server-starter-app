@@ -841,8 +841,9 @@ The answer is `{ recordId, debited, replayed, balanceAfter }`.
 **`CreditService`** is the single owner of the prepaid balance. Each change is an atomic upsert of
 `balance += delta`, and not a read, modify and write sequence. Each change also appends a
 `CreditLedger` entry with the reason `purchase`, `usage` or `refund`. Each mutator joins the
-transaction of the caller and returns the balance before and after the delta; `crossesZero` tells
-when the pay-as-you-go entitlements start or stop. `spentOnMetering` sums the metered debits of a
+transaction of the caller and returns the balance before and after the delta (`BalanceChange`);
+`crossesZero` (`shared/src/utils/billing-rules.ts`) tells when the pay-as-you-go entitlements start
+or stop. `spentOnMetering` sums the metered debits of a
 period for `GET /billing/usage`. Thus the exactly-once property rides on the winning `provider_event_id`
 insert.
 

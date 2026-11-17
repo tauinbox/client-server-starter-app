@@ -84,6 +84,60 @@ export function renewalAnchor<T extends Instant>(subscription: {
     : subscription.currentPeriodEnd;
 }
 
+/** The credit balance before and after one delta. */
+export interface BalanceChange {
+  before: number;
+  after: number;
+}
+
+/**
+ * The delta moved the balance across 0 (in either direction), so the
+ * pay-as-you-go entitlements start or stop.
+ */
+export function crossesZero({ before, after }: BalanceChange): boolean {
+  return before > 0 !== after > 0;
+}
+
+/** The calendar month in UTC that holds `now`: start inclusive, end exclusive. */
+export function calendarMonthUtc(now: Date): {
+  periodStart: Date;
+  periodEnd: Date;
+} {
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+
+  return {
+    periodStart: new Date(Date.UTC(year, month, 1)),
+    periodEnd: new Date(Date.UTC(year, month + 1, 1))
+  };
+}
+
+/** The fields of a metered use that its idempotency key replays. */
+export interface UsageBody {
+  meterKey: string;
+  units: number;
+  occurredAt: Instant;
+}
+
+/**
+ * A key replays one request. Another meter, quantity or `occurredAt` under the
+ * same key is a different use, and answering the first one would drop its
+ * units with no error. A retry that omits `occurredAt` is not compared on
+ * time, because the first call may have taken the default of now.
+ */
+export function isSameUsage(
+  stored: UsageBody,
+  request: Omit<UsageBody, 'occurredAt'> &
+    Partial<Pick<UsageBody, 'occurredAt'>>
+): boolean {
+  return (
+    stored.meterKey === request.meterKey &&
+    stored.units === request.units &&
+    (request.occurredAt === undefined ||
+      epochMs(request.occurredAt) === epochMs(stored.occurredAt))
+  );
+}
+
 /** The part of a plan that proration reads. */
 interface PricedPlan {
   prices: Partial<

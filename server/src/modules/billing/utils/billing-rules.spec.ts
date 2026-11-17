@@ -1,6 +1,9 @@
 import {
   billingGeo,
+  calendarMonthUtc,
+  crossesZero,
   geoDefault,
+  isSameUsage,
   geoFromLocale,
   overrideForRegion,
   prorationAmounts,
@@ -11,6 +14,76 @@ import {
 function utc(year: number, monthIndex: number, day: number): Date {
   return new Date(Date.UTC(year, monthIndex, day));
 }
+
+describe('crossesZero', () => {
+  it.each([
+    [{ before: 0, after: 500 }, true],
+    [{ before: 1, after: 0 }, true],
+    [{ before: 100, after: -400 }, true],
+    [{ before: -50, after: 450 }, true],
+    [{ before: 10, after: 5 }, false],
+    [{ before: -50, after: -10 }, false],
+    [{ before: 0, after: 0 }, false]
+  ])('%o crosses zero: %s', (change, expected) => {
+    expect(crossesZero(change)).toBe(expected);
+  });
+});
+
+describe('calendarMonthUtc', () => {
+  it('starts on the first day of the month and ends on the first day of the next', () => {
+    expect(calendarMonthUtc(new Date('2026-11-17T10:00:00Z'))).toEqual({
+      periodStart: utc(2026, 10, 1),
+      periodEnd: utc(2026, 11, 1)
+    });
+  });
+
+  it('ends December on 1 January of the next year', () => {
+    expect(calendarMonthUtc(new Date('2026-12-31T23:59:59.999Z'))).toEqual({
+      periodStart: utc(2026, 11, 1),
+      periodEnd: utc(2027, 0, 1)
+    });
+  });
+
+  it('reads the month in UTC, not in the local zone', () => {
+    expect(
+      calendarMonthUtc(new Date('2026-12-01T00:30:00+03:00')).periodStart
+    ).toEqual(utc(2026, 10, 1));
+  });
+});
+
+describe('isSameUsage', () => {
+  const stored = {
+    meterKey: 'reports.export',
+    units: 5,
+    occurredAt: new Date('2026-11-17T10:00:00Z')
+  };
+
+  it('accepts the same body, with the time as ISO text or as a Date', () => {
+    expect(
+      isSameUsage(stored, { ...stored, occurredAt: '2026-11-17T10:00:00.000Z' })
+    ).toBe(true);
+    expect(
+      isSameUsage(
+        { ...stored, occurredAt: '2026-11-17T10:00:00.000Z' },
+        { ...stored, occurredAt: new Date('2026-11-17T13:00:00+03:00') }
+      )
+    ).toBe(true);
+  });
+
+  it('does not compare the time when the request omits it', () => {
+    expect(isSameUsage(stored, { meterKey: 'reports.export', units: 5 })).toBe(
+      true
+    );
+  });
+
+  it.each([
+    ['another meter', { ...stored, meterKey: 'other.meter' }],
+    ['another quantity', { ...stored, units: 6 }],
+    ['another time', { ...stored, occurredAt: '2026-11-17T10:00:00.001Z' }]
+  ])('refuses %s', (_case, request) => {
+    expect(isSameUsage(stored, request)).toBe(false);
+  });
+});
 
 describe('geoFromLocale and geoDefault', () => {
   it('maps a Russian locale to RU, RUB and YooKassa', () => {

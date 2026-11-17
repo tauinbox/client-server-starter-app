@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
+import {
+  crossesZero,
+  isSameUsage,
+  type BalanceChange
+} from '@app/shared/utils/billing-rules';
 import { Money } from '@app/shared/utils/money';
 import {
   ErrorKeys,
@@ -20,11 +25,7 @@ import { EntitlementService } from '../../entitlements/entitlement.service';
 import { Customer } from '../entities/customer.entity';
 import { UsageRecord } from '../entities/usage-record.entity';
 import { CreditBalanceCrossedEvent } from '../events/billing.events';
-import {
-  CreditService,
-  crossesZero,
-  type BalanceChange
-} from './credit.service';
+import { CreditService } from './credit.service';
 
 export interface ConsumeInput {
   meterKey: string;
@@ -253,25 +254,14 @@ function checkInput(input: ConsumeInput): CheckedInput {
   };
 }
 
-/**
- * A key replays one request. Another meter, quantity or `occurredAt` under the
- * same key is a different use, and answering the first one would drop its
- * units with no error. A retry that omits `occurredAt` is not compared on
- * time, because the first call may have taken the default of now.
- */
 function assertSameBody(
   existing: UsageRecord,
   input: Pick<ConsumeInput, 'meterKey' | 'units' | 'occurredAt'>
 ): void {
   const { meterKey, quantity, occurredAt } = existing;
-  const sameTime =
-    input.occurredAt === undefined ||
-    new Date(input.occurredAt).getTime() === occurredAt.getTime();
 
   if (
-    meterKey !== input.meterKey ||
-    !quantity.equals(Money.fromMinor(input.units)) ||
-    !sameTime
+    !isSameUsage({ meterKey, units: quantity.toNumber(), occurredAt }, input)
   ) {
     throw new ApiError(
       ErrorKeys.BILLING.USAGE_KEY_REUSED,

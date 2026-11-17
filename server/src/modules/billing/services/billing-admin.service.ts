@@ -3,6 +3,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ApiError } from '../../../common/errors/api-error';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import {
+  crossesZero,
+  type BalanceChange
+} from '@app/shared/utils/billing-rules';
 import { Money } from '@app/shared/utils/money';
 import {
   ErrorKeys,
@@ -40,11 +44,7 @@ import type {
   SubscriptionCursorQueryDto
 } from '../dtos/billing-cursor-query.dto';
 import { BillingService } from '../billing.service';
-import {
-  CreditService,
-  crossesZero,
-  type BalanceChange
-} from './credit.service';
+import { CreditService } from './credit.service';
 
 const ZERO = Money.fromMinor(0);
 

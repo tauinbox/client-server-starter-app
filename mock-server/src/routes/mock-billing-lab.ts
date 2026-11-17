@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { BILLING_PROVIDER_FLAGS, FREE_PLAN_KEY } from '@app/shared/constants';
 import type { BillingProviderId } from '@app/shared/types';
 import { randomUUID } from 'crypto';
-import { geoDefault } from '@app/shared/utils/billing-rules';
+import { crossesZero, geoDefault } from '@app/shared/utils/billing-rules';
 import { getState, resetState } from '../state';
 import type { MockSubscription, MockUser } from '../types';
 import {
@@ -17,7 +17,6 @@ import {
 } from '../helpers/billing-metering.helpers';
 import {
   applyCreditDelta,
-  crossesZero,
   notifyEntitlementsChanged
 } from '../helpers/billing-settle.helpers';
 import {
