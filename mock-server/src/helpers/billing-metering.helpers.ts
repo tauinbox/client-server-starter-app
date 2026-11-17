@@ -80,11 +80,7 @@ export function consumeCredits(
   if (existing) {
     if (
       !isSameUsage(
-        {
-          meterKey: existing.meterKey,
-          units: existing.quantity,
-          occurredAt: existing.occurredAt
-        },
+        { ...existing, units: existing.quantity },
         { meterKey, units, occurredAt: requestedOccurredAt }
       )
     ) {
