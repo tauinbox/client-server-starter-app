@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { ERROR_STATUS, type ErrorKey } from '../constants/error-status';
 import type { LegalDocumentVersion } from '../constants/legal.constants';
+import { AuditAction } from '../enums/audit-action.enum';
 
 /**
  * Request scenarios: one request, its actor and its expected result, written
@@ -211,6 +213,12 @@ export const SCENARIO_PLACEHOLDERS = [
 ] as const;
 export type ScenarioPlaceholder = (typeof SCENARIO_PLACEHOLDERS)[number];
 
+/** The values of `auth`. `bearer` sends an access token of the actor. */
+export const SCENARIO_AUTH = ['bearer', 'none'] as const;
+
+/** The targets of an audit row. `actor`: the row names the actor. */
+export const AUDIT_ROW_TARGETS = ['actor', 'none'] as const;
+
 /** Passwords that `localPasswordRefusal` accepts for every fixture name. */
 export const SCENARIO_PASSWORD = 'Lantern-Orchard-47';
 export const SCENARIO_NEW_PASSWORD = 'Copper-Meadow-83';
@@ -230,8 +238,7 @@ export interface RequestScenario {
   path?: string;
   /** The account of the scenario. Absent when the request names none. */
   actor?: ActorFixture;
-  /** `bearer` sends an access token of the actor. */
-  auth: 'bearer' | 'none';
+  auth: (typeof SCENARIO_AUTH)[number];
   state?: StateFixture[];
   /** A second account; `$targetId` is its id. */
   target?: ActorFixture;
@@ -249,16 +256,15 @@ export interface RequestScenario {
      * the server writes some rows fire-and-forget. All entries of one
      * scenario have the same form.
      */
-    audit: string[] | ScenarioAuditRow[];
+    audit: AuditAction[] | ScenarioAuditRow[];
   };
 }
 
 /** An audit row: its action, its `details.reason` and its target. */
 export interface ScenarioAuditRow {
-  action: string;
+  action: AuditAction;
   reason: string | null;
-  /** `actor` when the row names the actor as its target. */
-  target: 'actor' | 'none';
+  target: (typeof AUDIT_ROW_TARGETS)[number];
 }
 
 /** An audit row as a runner reads it. */
@@ -268,7 +274,11 @@ export interface WrittenAuditRow {
   details: Record<string, unknown> | null;
 }
 
-function auditRowKey(row: ScenarioAuditRow): string {
+function auditRowKey(row: {
+  action: string;
+  reason: string | null;
+  target: string;
+}): string {
   return `${row.action} reason=${row.reason ?? '-'} target=${row.target}`;
 }
 
@@ -315,7 +325,8 @@ export function writtenAuditRows(
 
 export interface ScenarioAnswer {
   status: number;
-  errorKey: string | null;
+  /** The status must be the status of the key in `ERROR_STATUS`. */
+  errorKey: ErrorKey | null;
 }
 
 /** The expected answer of each request of a scenario, in order. */
@@ -339,20 +350,6 @@ const CONTRACTS_DIR = resolve(__dirname, '..', '..', '..', 'contracts');
 export const SCENARIOS_DIR = join(CONTRACTS_DIR, 'scenarios');
 export const ROUTES_DIR = join(CONTRACTS_DIR, 'routes');
 
-const SCENARIO_KEYS = new Set([
-  'name',
-  'route',
-  'path',
-  'actor',
-  'auth',
-  'state',
-  'target',
-  'headers',
-  'body',
-  'repeat',
-  'expect'
-]);
-
 function includes<T extends string>(list: readonly T[], value: unknown) {
   return (
     typeof value === 'string' && (list as readonly string[]).includes(value)
@@ -373,93 +370,177 @@ function placeholdersIn(value: unknown): string[] {
   return [];
 }
 
-function isAuditRow(value: unknown): value is ScenarioAuditRow {
-  if (value === null || typeof value !== 'object') return false;
+/*
+ * The schema of a scenario. Each field of each scenario type has one check in
+ * a `FieldChecks` table, so a new field with no check does not compile, and a
+ * JSON key with no check is an unknown key. A field that takes a value from a
+ * closed list uses `oneOf` with that list, never a check of the type alone.
+ */
 
-  const { action, reason, target, ...rest } = value as Record<string, unknown>;
+/** The problems of one field value, as text. */
+type FieldCheck = (value: unknown) => string[];
 
-  return (
-    Object.keys(rest).length === 0 &&
-    typeof action === 'string' &&
-    (reason === null || typeof reason === 'string') &&
-    (target === 'actor' || target === 'none')
-  );
+/** One check for each field of `T`, the optional fields included. */
+type FieldChecks<T> = { readonly [K in keyof Required<T>]: FieldCheck };
+
+const ERROR_KEYS = Object.keys(ERROR_STATUS);
+const AUDIT_ACTIONS = Object.values(AuditAction);
+
+function oneOf(label: string, values: readonly string[]): FieldCheck {
+  return (value) => {
+    if (value === undefined) return ['is missing'];
+
+    return includes(values, value)
+      ? []
+      : [`unknown ${label} ${JSON.stringify(value)}`];
+  };
 }
 
-function auditErrors(audit: unknown[]): string[] {
-  if (audit.every((entry) => typeof entry === 'string')) return [];
+function optional(check: FieldCheck): FieldCheck {
+  return (value) => (value === undefined ? [] : check(value));
+}
 
-  return audit.every(isAuditRow)
+function nullOr(check: FieldCheck): FieldCheck {
+  return (value) => (value === null ? [] : check(value));
+}
+
+function listOf(check: FieldCheck): FieldCheck {
+  return (value) =>
+    Array.isArray(value) ? value.flatMap(check) : ['is not a list'];
+}
+
+function objectOf<T>(checks: FieldChecks<T>): FieldCheck {
+  return (value) => {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return ['is not an object'];
+    }
+
+    const record = value as Record<string, unknown>;
+
+    return [
+      ...Object.keys(record)
+        .filter((key) => !Object.hasOwn(checks, key))
+        .map((key) => `unknown key "${key}"`),
+      ...Object.entries<FieldCheck>(checks).flatMap(([key, check]) =>
+        check(record[key]).map((problem) => `${key}: ${problem}`)
+      )
+    ];
+  };
+}
+
+const text: FieldCheck = (value) =>
+  typeof value === 'string' && value !== ''
     ? []
-    : ['audit holds actions only, or rows of { action, reason, target } only'];
+    : ['is not a non-empty string'];
+
+const httpStatus: FieldCheck = (value) =>
+  Number.isInteger(value) && Number(value) >= 100 && Number(value) <= 599
+    ? []
+    : ['is not an HTTP status'];
+
+const routeLine: FieldCheck = (value) =>
+  typeof value === 'string' && /^(POST|PUT|PATCH|DELETE|GET) \/\S+$/.test(value)
+    ? []
+    : [`${JSON.stringify(value)} is not "METHOD /path"`];
+
+const repeatCount: FieldCheck = (value) =>
+  Number.isInteger(value) && Number(value) > 1
+    ? []
+    : ['is not an integer above 1'];
+
+const placeholder = oneOf('placeholder', SCENARIO_PLACEHOLDERS);
+
+const placeholders: FieldCheck = (value) =>
+  placeholdersIn(value).flatMap(placeholder);
+
+const pathPlaceholders: FieldCheck = (value) =>
+  typeof value === 'string'
+    ? placeholders(value.split('/'))
+    : ['is not a string'];
+
+const actorFixture = oneOf('actor fixture', ACTOR_FIXTURES);
+const auditAction = oneOf('audit action', AUDIT_ACTIONS);
+const errorKey = nullOr(oneOf('error key', ERROR_KEYS));
+
+const AUDIT_ROW_FIELDS: FieldChecks<ScenarioAuditRow> = {
+  action: auditAction,
+  // Free text here: `check:scenarios` checks the reason of a refused sign-in
+  // against SIGN_IN_REFUSAL_REASONS, because the list depends on the route.
+  reason: nullOr(text),
+  target: oneOf('audit target', AUDIT_ROW_TARGETS)
+};
+
+const auditRow = objectOf(AUDIT_ROW_FIELDS);
+
+const auditList: FieldCheck = (value) => {
+  if (!Array.isArray(value)) return ['is not a list'];
+
+  if (value.every((entry) => typeof entry === 'string')) {
+    return value.flatMap(auditAction);
+  }
+
+  return value.some((entry) => typeof entry === 'string')
+    ? ['holds actions only, or rows of { action, reason, target } only']
+    : value.flatMap(auditRow);
+};
+
+const ANSWER_FIELDS: FieldChecks<ScenarioAnswer> = {
+  status: httpStatus,
+  errorKey
+};
+
+const EXPECT_FIELDS: FieldChecks<RequestScenario['expect']> = {
+  ...ANSWER_FIELDS,
+  earlier: optional(objectOf(ANSWER_FIELDS)),
+  audit: auditList
+};
+
+const SCENARIO_FIELDS: FieldChecks<RequestScenario> = {
+  name: text,
+  route: routeLine,
+  path: optional(pathPlaceholders),
+  actor: optional(actorFixture),
+  auth: oneOf('auth', SCENARIO_AUTH),
+  state: optional(listOf(oneOf('state fixture', STATE_FIXTURES))),
+  target: optional(actorFixture),
+  headers: optional(placeholders),
+  body: optional(placeholders),
+  repeat: optional(repeatCount),
+  expect: objectOf(EXPECT_FIELDS)
+};
+
+/** An answer with an error key has the status of that key. */
+function answerStatusErrors(answer: unknown, field: string): string[] {
+  if (answer === null || typeof answer !== 'object') return [];
+
+  const { status, errorKey: key } = answer as Partial<ScenarioAnswer>;
+
+  if (!key || !includes(ERROR_KEYS, key) || ERROR_STATUS[key] === status) {
+    return [];
+  }
+
+  return [
+    `${field}: the status of error key "${key}" is ${ERROR_STATUS[key]} in ERROR_STATUS, not ${status}`
+  ];
 }
 
 /** The problems of one scenario, as text. An empty list means it is valid. */
 export function scenarioErrors(scenario: RequestScenario): string[] {
-  const errors: string[] = [];
-
-  for (const key of Object.keys(scenario)) {
-    if (!SCENARIO_KEYS.has(key)) errors.push(`unknown key "${key}"`);
-  }
-
-  if (!/^(POST|PUT|PATCH|DELETE|GET) \/\S+$/.test(scenario.route ?? '')) {
-    errors.push(`route "${scenario.route}" is not "METHOD /path"`);
-  }
-
-  if (scenario.auth !== 'bearer' && scenario.auth !== 'none') {
-    errors.push('auth must be "bearer" or "none"');
-  }
+  const errors = objectOf(SCENARIO_FIELDS)(scenario);
+  const { expect } = scenario;
 
   if (scenario.auth === 'bearer' && !scenario.actor) {
     errors.push('auth "bearer" needs an actor');
   }
 
-  for (const fixture of [scenario.actor, scenario.target]) {
-    if (fixture !== undefined && !includes(ACTOR_FIXTURES, fixture)) {
-      errors.push(`unknown actor fixture "${fixture}"`);
-    }
-  }
-
-  for (const fixture of scenario.state ?? []) {
-    if (!includes(STATE_FIXTURES, fixture)) {
-      errors.push(`unknown state fixture "${fixture}"`);
-    }
-  }
-
-  const segments = (scenario.path ?? '').split('/');
-
-  for (const name of [
-    ...placeholdersIn(scenario.headers),
-    ...placeholdersIn(scenario.body),
-    ...placeholdersIn(segments)
-  ]) {
-    if (!includes(SCENARIO_PLACEHOLDERS, name)) {
-      errors.push(`unknown placeholder "${name}"`);
-    }
-  }
-
-  const { expect } = scenario;
-
-  if (
-    typeof expect?.status !== 'number' ||
-    !(expect.errorKey === null || typeof expect.errorKey === 'string') ||
-    !Array.isArray(expect.audit)
-  ) {
-    errors.push('expect needs status, errorKey (or null) and audit');
-  } else {
-    errors.push(...auditErrors(expect.audit));
-  }
-
-  if (
-    scenario.repeat !== undefined &&
-    !(Number.isInteger(scenario.repeat) && scenario.repeat > 1)
-  ) {
-    errors.push('repeat must be an integer above 1');
-  }
-
   if (expect?.earlier !== undefined && scenario.repeat === undefined) {
     errors.push('expect.earlier needs repeat');
   }
+
+  errors.push(
+    ...answerStatusErrors(expect, 'expect'),
+    ...answerStatusErrors(expect?.earlier, 'expect.earlier')
+  );
 
   return errors.map((e) => `${scenario.name}: ${e}`);
 }

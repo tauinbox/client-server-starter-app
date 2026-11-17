@@ -21,13 +21,19 @@
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SIGN_IN_REFUSAL_REASONS } from '@app/shared/constants';
+import {
+  ERROR_STATUS,
+  ErrorKeys,
+  SIGN_IN_REFUSAL_REASONS
+} from '@app/shared/constants';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   ACCOUNT_STATES,
   loadScenarioFiles,
   RequestScenario,
   ROUTES_DIR,
   ScenarioFile,
+  scenarioErrors,
   SIGN_IN_ROUTES,
   StateFixture
 } from '@app/shared/utils/request-scenarios';
@@ -290,7 +296,7 @@ function selfTest(): void {
     state: ['deactivated-actor'],
     expect: { status: 401, errorKey: null, audit }
   });
-  const failure = 'USER_LOGIN_FAILURE';
+  const failure = AuditAction.USER_LOGIN_FAILURE;
   const scenarioFiles: ScenarioFile[] = [
     {
       file: 'things.json',
@@ -367,7 +373,143 @@ function selfTest(): void {
     process.exit(1);
   }
 
-  console.log('check-scenarios self-test: all nine rules report');
+  const schemaFailures = schemaSelfTest();
+
+  if (schemaFailures.length > 0) {
+    console.error('check-scenarios self-test of the scenario schema failed:');
+    schemaFailures.forEach((f) => console.error(`  ${f}`));
+    process.exit(1);
+  }
+
+  console.log(
+    'check-scenarios self-test: all nine coverage rules and all schema rules report'
+  );
+}
+
+/**
+ * Each case breaks one field of a valid scenario. `scenarioErrors` must
+ * report exactly one problem that holds the expected text. Returns the
+ * failed cases, as text.
+ */
+function schemaSelfTest(): string[] {
+  const planNotFound = ErrorKeys.BILLING.PLAN_NOT_FOUND;
+  const valid = {
+    name: 'valid',
+    route: 'POST /api/v1/things',
+    actor: 'user',
+    auth: 'bearer',
+    state: ['customer'],
+    body: { planKey: '$planKey' },
+    repeat: 2,
+    expect: {
+      status: ERROR_STATUS[planNotFound],
+      errorKey: planNotFound,
+      earlier: { status: 200, errorKey: null },
+      audit: [
+        { action: AuditAction.USER_LOGIN_FAILURE, reason: null, target: 'none' }
+      ]
+    }
+  };
+  // The cast is the one that `loadScenarioFiles` makes on parsed JSON: the
+  // check under test receives data that the type does not describe.
+  const broken = (change: (s: typeof valid) => object): RequestScenario =>
+    change(structuredClone(valid)) as RequestScenario;
+  const cases: [string, RequestScenario][] = [
+    ['unknown key "expected"', broken((s) => ({ ...s, expected: {} }))],
+    ['auth: unknown auth "cookie"', broken((s) => ({ ...s, auth: 'cookie' }))],
+    [
+      'state: unknown state fixture "customers"',
+      broken((s) => ({ ...s, state: ['customers'] }))
+    ],
+    [
+      'body: unknown placeholder "$planKy"',
+      broken((s) => ({ ...s, body: { planKey: '$planKy' } }))
+    ],
+    [
+      'expect: unknown key "statusCode"',
+      broken((s) => ({ ...s, expect: { ...s.expect, statusCode: 422 } }))
+    ],
+    [
+      'expect: errorKey: is missing',
+      broken(({ expect: { errorKey: _, ...expect }, ...s }) => ({
+        ...s,
+        expect
+      }))
+    ],
+    [
+      'expect: errorKey: unknown error key "errors.billing.planNotFund"',
+      broken((s) => ({
+        ...s,
+        expect: { ...s.expect, errorKey: 'errors.billing.planNotFund' }
+      }))
+    ],
+    [
+      `expect: the status of error key "${planNotFound}" is ${ERROR_STATUS[planNotFound]} in ERROR_STATUS, not 404`,
+      broken((s) => ({ ...s, expect: { ...s.expect, status: 404 } }))
+    ],
+    [
+      'expect: earlier: errorKey: unknown error key "errors.nope"',
+      broken((s) => ({
+        ...s,
+        expect: {
+          ...s.expect,
+          earlier: { status: 200, errorKey: 'errors.nope' }
+        }
+      }))
+    ],
+    [
+      `expect.earlier: the status of error key "${planNotFound}" is`,
+      broken((s) => ({
+        ...s,
+        expect: {
+          ...s.expect,
+          earlier: { status: 200, errorKey: planNotFound }
+        }
+      }))
+    ],
+    [
+      'expect: audit: unknown audit action "USER_LOGIN_FAILED"',
+      broken((s) => ({
+        ...s,
+        expect: { ...s.expect, audit: ['USER_LOGIN_FAILED'] }
+      }))
+    ],
+    [
+      'expect: audit: action: unknown audit action "USER_LOGIN_FAILED"',
+      broken((s) => ({
+        ...s,
+        expect: {
+          ...s.expect,
+          audit: [{ action: 'USER_LOGIN_FAILED', reason: null, target: 'none' }]
+        }
+      }))
+    ],
+    [
+      'expect: audit: target: unknown audit target "other"',
+      broken((s) => ({
+        ...s,
+        expect: {
+          ...s.expect,
+          audit: [{ ...s.expect.audit[0], target: 'other' }]
+        }
+      }))
+    ]
+  ];
+  const failures = scenarioErrors(broken((s) => s)).map(
+    (p) => `the valid scenario reports: ${p}`
+  );
+
+  for (const [text, scenario] of cases) {
+    const problems = scenarioErrors(scenario);
+
+    if (problems.length !== 1 || !problems[0].includes(text)) {
+      failures.push(
+        `expected only "${text}", got: ${problems.join(' | ') || 'nothing'}`
+      );
+    }
+  }
+
+  return failures;
 }
 
 function main(): void {

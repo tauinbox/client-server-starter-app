@@ -115,6 +115,15 @@ expected status, `errorKey` and audit actions:
   runs them against the same states and the same vocabulary.
 - `expect.earlier` is the answer of each request before the last, when it is
   not the same as the last one.
+- The loader checks each scenario against one schema (`scenarioErrors` in
+  `shared/src/utils/request-scenarios.ts`) before a runner starts, and
+  `npm run check:scenarios` runs the same check. A key that the schema does
+  not know fails. A value from a closed list must be in its list: `actor`,
+  `target`, `state`, `auth`, each placeholder, `errorKey` (a key of
+  `ERROR_STATUS`), each audit action (`AuditAction`) and each audit `target`.
+  An answer with an `errorKey` has the status of that key in `ERROR_STATUS`,
+  in `expect` and in `expect.earlier`. A new field of the scenario types needs
+  its check in the schema, or `shared/` does not compile.
 
 Consumers:
 

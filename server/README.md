@@ -1433,8 +1433,11 @@ refresh, provider exchange, code, recovery code) with no scenario for one of the
 (deactivated, soft-deleted, revoked, locked, not verified, no password), and a refused sign-in whose
 audit reason is not in `SIGN_IN_REFUSAL_REASONS`. `test/sign-in-state-matrix.e2e-spec.ts` runs the
 provider callback, link and step-up, which the mock cannot run, against the same states.
-`npm run check:scenarios -- --self-test` proves each rule of the check. The format is in
-`contracts/README.md`.
+Before the coverage rules, the check validates each scenario against one schema: an unknown key, a
+value outside its closed list (a fixture, a placeholder, an error key of `ERROR_STATUS`, an
+`AuditAction`) and a status that is not the status of its `errorKey` in `ERROR_STATUS` fail.
+`npm run check:scenarios -- --self-test` proves each rule of the check and of the schema. The format
+is in `contracts/README.md`.
 
 **The `@Public()` decorator** marks an endpoint that a caller can reach with no authentication. The
 routes are the login, the register, the password reset, the OAuth init and callback, the health check
