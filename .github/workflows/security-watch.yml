@@ -1,0 +1,33 @@
+name: Security Watch
+
+# The dependency gates run only on a push or a pull request. This daily run
+# finds a new advisory, a fixed release or an expired accepted risk on master
+# when nobody pushes, and keeps one issue open while a gate fails.
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: security-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Dependency watch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      # npm audit reads the lockfiles, so no workspace is installed.
+      - run: node scripts/security-watch.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

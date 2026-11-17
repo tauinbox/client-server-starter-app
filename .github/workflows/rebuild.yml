@@ -103,6 +103,7 @@ jobs:
           format: table
           exit-code: 1
           severity: HIGH,CRITICAL
+          trivyignores: .trivyignore.yaml
 
       - name: Build client image
         uses: docker/build-push-action@v7
@@ -124,6 +125,7 @@ jobs:
           format: table
           exit-code: 1
           severity: HIGH,CRITICAL
+          trivyignores: .trivyignore.yaml
 
       # If any scan found HIGH/CRITICAL CVEs, hand off to the auto-patcher: it upgrades the
       # vulnerable Alpine packages (stable repos first, edge as fallback), rebuilds, re-scans,

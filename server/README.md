@@ -64,7 +64,8 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Generate CASL subjects | `npm run generate:subjects` scans the `@RegisterResource` decorators and writes `shared/src/generated/casl-subjects.ts`. Run it when you add a new resource |
 | Report grants against the grant-scope rule | `npm run check:grant-scope` is read-only. Refer to the description below the table |
 | Audit role-permission conditions | `npm run check:role-conditions` finds each `role_permissions.conditions.custom` row that holds an operator or a field that the SQL translator (`apply-ability.util.ts`) cannot handle. Run it against a staging dump before you deploy a change to the translator |
-| Audit dependencies | `npm run audit:ci` runs `npm audit --audit-level=high --omit=dev` through `scripts/audit-ci.mjs`. This is the same gate that CI applies. Refer to the description below the table |
+| Audit dependencies | `npm run audit:ci` runs `npm audit --json --omit=dev` through `scripts/audit-ci.mjs`. This is the same gate that CI applies. Refer to the description below the table |
+| Check the accepted dependency risks | `npm run check:accepted-risks` (`scripts/check-accepted-risks.mjs` at the repository root) validates `security/accepted-risks.json` and compares `.trivyignore.yaml` with it. `-- --write` writes `.trivyignore.yaml`. `-- --base origin/master` also refuses a pull request that adds or changes an entry and has no `accepted-risk` label. `--self-test` runs planted cases. CI applies both in the `Server - Checks` job |
 
 **`npm run check:grant-scope`.** The grant-scope rule applies to a write only. The server never
 validates a row that is already in `role_permissions` again, because a retro-validation of a live
@@ -82,6 +83,8 @@ The attribution depends on the audit trail, which the system prunes after
 is evidence to review and not proof. The command exits with 1 when it finds something.
 
 **`npm run audit:ci`.** The command fails on a high or critical advisory. A moderate finding passes.
+An advisory with no fixed release passes only through an entry of `security/accepted-risks.json` for
+this workspace, and only while the entry matches the report exactly and has not expired.
 
 Run it before each push. An advisory comes from the dependency tree, thus the command can fail with
 no change in the source.
