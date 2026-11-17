@@ -1409,7 +1409,7 @@ name that gets past the hook. It does this during the changelog generation, and 
 | RxJS | 7.8.2 |
 | Vitest | 5.0.3 |
 | Playwright | 1.63.0 |
-| ESLint | 10.14.0 |
+| ESLint | 10.15.0 |
 | Prettier | 3.9.10 |
 | Stylelint | 17.16.0 |
 | commitlint | 21.2.4 |
