@@ -10,45 +10,21 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+  CONTRACTS_DIR,
+  loadRouteContracts
+} from '@app/shared/utils/route-contracts';
 import { extractRoutes, findControllers } from './lib/controller-routes';
 
 // ─── config ──────────────────────────────────────────────────────────────────
 
-const CONTRACTS_ROOT = path.resolve(__dirname, '../../contracts');
-const ROUTES_INDEX = path.join(CONTRACTS_ROOT, 'routes.json');
-const ROUTES_DIR = path.join(CONTRACTS_ROOT, 'routes');
+const ROUTES_INDEX = path.join(CONTRACTS_DIR, 'routes.json');
 const SERVER_PKG = path.resolve(__dirname, '../package.json');
-
-// ─── types ───────────────────────────────────────────────────────────────────
-
-interface RouteEntry {
-  method: string;
-  path: string;
-}
 
 // ─── main ─────────────────────────────────────────────────────────────────────
 
-function routeKey(r: RouteEntry): string {
+function routeKey(r: { method: string; path: string }): string {
   return `${r.method} ${r.path}`;
-}
-
-/**
- * Loads all manifest routes by flattening every per-feature file under
- * contracts/routes/. Adding a new feature means dropping a new JSON file there —
- * no edit to routes.json or this loader is required.
- */
-function loadManifestRoutes(): RouteEntry[] {
-  return fs
-    .readdirSync(ROUTES_DIR)
-    .filter((f) => f.endsWith('.json'))
-    .toSorted()
-    .flatMap((f) => {
-      const { routes } = JSON.parse(
-        fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')
-      ) as { routes: RouteEntry[] };
-
-      return routes;
-    });
 }
 
 function main(): void {
@@ -59,7 +35,7 @@ function main(): void {
     version: (
       JSON.parse(fs.readFileSync(ROUTES_INDEX, 'utf-8')) as { version: string }
     ).version,
-    routes: loadManifestRoutes()
+    routes: loadRouteContracts()
   };
   const serverVersion = (
     JSON.parse(fs.readFileSync(SERVER_PKG, 'utf-8')) as { version: string }

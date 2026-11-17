@@ -6,35 +6,10 @@ import {
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import * as fs from 'fs';
-import * as path from 'path';
 import request from 'supertest';
 import { Server } from 'http';
+import { loadRouteContracts } from '@app/shared/utils/route-contracts';
 import { CoreModule } from '../src/modules/core/core.module';
-
-interface RouteEntry {
-  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' | 'HEAD';
-  path: string;
-  expectedStatus: number;
-}
-
-const ROUTES_DIR = path.resolve(__dirname, '..', '..', 'contracts', 'routes');
-
-// Flattens every per-feature file under contracts/routes/. New features add a
-// JSON file there, no edit to this loader is required.
-function loadManifestRoutes(): RouteEntry[] {
-  return fs
-    .readdirSync(ROUTES_DIR)
-    .filter((f) => f.endsWith('.json'))
-    .toSorted()
-    .flatMap((f) => {
-      const { routes } = JSON.parse(
-        fs.readFileSync(path.join(ROUTES_DIR, f), 'utf-8')
-      ) as { routes: RouteEntry[] };
-
-      return routes;
-    });
-}
 
 // Iterates over contracts/routes.json — for every route declared as
 // expectedStatus=401 (i.e. requires authentication), confirms the running
@@ -77,7 +52,7 @@ describe('Auth coverage — every protected route rejects unauthenticated access
     jest.restoreAllMocks();
   });
 
-  const protectedRoutes = loadManifestRoutes().filter(
+  const protectedRoutes = loadRouteContracts().filter(
     (r) => r.expectedStatus === 401
   );
 
