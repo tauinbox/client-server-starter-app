@@ -126,12 +126,6 @@ export class EntitlementService {
       : null;
   }
 
-  private async subscriptionPlan(
-    customerId: string
-  ): Promise<ResolvedEntitlements | null> {
-    return (await this.entitledSubscription(customerId))?.plan ?? null;
-  }
-
   /**
    * The base tier (an entitled subscription, else a positive credit balance as
    * pay as you go, else Free) unioned with active one-time purchase grants: a
@@ -144,7 +138,7 @@ export class EntitlementService {
     if (!customer) return this.freeEntitlements();
 
     const base =
-      (await this.subscriptionPlan(customer.id)) ??
+      (await this.entitledSubscription(customer.id))?.plan ??
       (await this.payAsYouGoPlan(customer.id)) ??
       (await this.freeEntitlements());
     const granted = await this.activeGrantEntitlements(customer.id);

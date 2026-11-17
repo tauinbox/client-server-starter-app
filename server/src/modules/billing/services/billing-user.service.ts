@@ -8,6 +8,7 @@ import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   billingGeo,
   calendarMonthUtc,
+  effectiveProviderId,
   geoDefault,
   geoFromLocale,
   overrideForRegion,
@@ -228,7 +229,7 @@ export class BillingUserService {
   async listProducts(userId: string): Promise<Product[]> {
     const customer = await this.customerFor(userId);
     const providerId = customer
-      ? this.billing.effectiveProviderId(customer)
+      ? effectiveProviderId(customer)
       : geoDefault(await this.detectCountry(userId));
 
     const products = await this.products.find({
@@ -780,7 +781,7 @@ export class BillingUserService {
       )
     );
 
-    const effectiveProvider = this.billing.effectiveProviderId(customer);
+    const effectiveProvider = effectiveProviderId(customer);
 
     return {
       region: regionForOverride(customer.providerOverride),

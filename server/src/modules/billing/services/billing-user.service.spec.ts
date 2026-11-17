@@ -63,12 +63,7 @@ async function build() {
   const billing = {
     resolveProvider: jest.fn(),
     isProviderAvailable: jest.fn().mockResolvedValue(true),
-    getProviderById: jest.fn(),
-    effectiveProviderId: jest.fn(
-      (c: { providerOverride: BillingProviderId | null; country: string }) =>
-        c.providerOverride ??
-        (c.country.toUpperCase() === 'RU' ? 'yookassa' : 'paddle')
-    )
+    getProviderById: jest.fn()
   };
 
   const consents = {

@@ -9,7 +9,6 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
-import type { BillingProviderId } from '@app/shared/types';
 import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
@@ -100,9 +99,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
           useValue: {
             getProviderById: () => provider,
             resolveProvider: () => Promise.resolve(provider),
-            isProviderAvailable: () => Promise.resolve(true),
-            effectiveProviderId: (c: Customer): BillingProviderId =>
-              c.providerOverride ?? 'yookassa'
+            isProviderAvailable: () => Promise.resolve(true)
           }
         },
         {
