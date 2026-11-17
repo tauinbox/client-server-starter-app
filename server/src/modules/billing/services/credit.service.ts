@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, type EntityManager } from 'typeorm';
+import type { BalanceChange } from '@app/shared/utils/billing-rules';
 import { Money } from '@app/shared/utils/money';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
@@ -24,12 +25,6 @@ export interface CreditInvoiceRef {
 export interface CreditUsageRef {
   customerId: string;
   usageRecordId: string;
-}
-
-/** The balance before and after one delta. */
-export interface BalanceChange {
-  before: number;
-  after: number;
 }
 
 @Injectable()
@@ -154,12 +149,4 @@ export class CreditService {
 
     return { before: after - delta, after };
   }
-}
-
-/**
- * True when a delta moved the balance across zero, in either direction: the
- * pay-as-you-go entitlements start or stop.
- */
-export function crossesZero({ before, after }: BalanceChange): boolean {
-  return before > 0 !== after > 0;
 }

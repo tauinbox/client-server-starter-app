@@ -4,7 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Money } from '@app/shared/utils/money';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
-import { CreditService, crossesZero } from './credit.service';
+import { CreditService } from './credit.service';
 
 type ManagerMock = {
   query: jest.Mock;
@@ -66,20 +66,6 @@ describe('CreditService', () => {
         });
       }
     );
-  });
-
-  describe('crossesZero', () => {
-    it.each([
-      [{ before: 0, after: 500 }, true],
-      [{ before: 1, after: 0 }, true],
-      [{ before: 100, after: -400 }, true],
-      [{ before: -50, after: 450 }, true],
-      [{ before: 10, after: 5 }, false],
-      [{ before: -50, after: -10 }, false],
-      [{ before: 0, after: 0 }, false]
-    ])('%o crosses zero: %s', (change, expected) => {
-      expect(crossesZero(change)).toBe(expected);
-    });
   });
 
   describe('mutations', () => {

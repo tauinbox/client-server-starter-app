@@ -7,12 +7,16 @@ import {
   type MeterKey
 } from '@app/shared/constants';
 import type { MeteringResponse } from '@app/shared/types';
+import {
+  calendarMonthUtc,
+  crossesZero,
+  isSameUsage
+} from '@app/shared/utils/billing-rules';
 import { getState } from '../state';
 import type { MockPlan, MockSubscription, MockUsageRecord } from '../types';
 import { noticeCreditBalanceCrossed } from './billing-notices.helpers';
 import {
   applyCreditDelta,
-  crossesZero,
   notifyEntitlementsChanged
 } from './billing-settle.helpers';
 
@@ -74,15 +78,11 @@ export function consumeCredits(
     );
 
   if (existing) {
-    const sameTime =
-      requestedOccurredAt === undefined ||
-      new Date(requestedOccurredAt).getTime() ===
-        new Date(existing.occurredAt).getTime();
-
     if (
-      existing.meterKey !== meterKey ||
-      existing.quantity !== units ||
-      !sameTime
+      !isSameUsage(
+        { ...existing, units: existing.quantity },
+        { meterKey, units, occurredAt: requestedOccurredAt }
+      )
     ) {
       return {
         refusal: {
@@ -168,13 +168,7 @@ export function unitsSpentThisMonth(customerId: string): {
   periodEnd: Date;
   unitsSpent: number;
 } {
-  const now = new Date();
-  const periodStart = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
-  );
-  const periodEnd = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
-  );
+  const { periodStart, periodEnd } = calendarMonthUtc(new Date());
   // The server sums the ledger; each record with no subscription is one debit
   // of its quantity, and a use that a plan covered writes no ledger row.
   const unitsSpent = getState()

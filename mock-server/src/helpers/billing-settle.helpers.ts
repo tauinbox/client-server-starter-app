@@ -1,6 +1,10 @@
 import { randomUUID } from 'crypto';
 import type { BillingProviderId } from '@app/shared/types';
-import { billingGeo, geoDefault } from '@app/shared/utils/billing-rules';
+import {
+  billingGeo,
+  geoDefault,
+  type BalanceChange
+} from '@app/shared/utils/billing-rules';
 import { getState } from '../state';
 import { pushToUser } from '../sse-hub';
 import {
@@ -64,17 +68,11 @@ export function ensureCustomer(user: MockUser): MockCustomer {
   return customer;
 }
 
-/** The balance before and after one delta, like `CreditService`. */
-export interface CreditBalanceChange {
-  before: number;
-  after: number;
-}
-
 /** Mirrors `CreditService.applyDelta`: an upsert of the balance by `delta`. */
 export function applyCreditDelta(
   customerId: string,
   delta: number
-): CreditBalanceChange {
+): BalanceChange {
   const state = getState();
   const nowIso = new Date().toISOString();
   const balance = state.billingCreditBalances.get(customerId);
@@ -92,14 +90,6 @@ export function applyCreditDelta(
   }
 
   return { before, after: before + delta };
-}
-
-/**
- * Mirrors the server's `crossesZero`: the delta moved the balance across 0,
- * so the pay-as-you-go entitlements start or stop.
- */
-export function crossesZero({ before, after }: CreditBalanceChange): boolean {
-  return before > 0 !== after > 0;
 }
 
 /**

@@ -7,6 +7,7 @@ import type { QueryDeepPartialEntity } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   billingGeo,
+  calendarMonthUtc,
   geoDefault,
   geoFromLocale,
   overrideForRegion,
@@ -185,13 +186,7 @@ export class BillingUserService {
 
     if (!customer) return null;
 
-    const now = new Date();
-    const periodStart = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
-    );
-    const periodEnd = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
-    );
+    const { periodStart, periodEnd } = calendarMonthUtc(new Date());
     const unitsSpent = await this.credits.spentOnMetering(customer.id, {
       from: periodStart,
       to: periodEnd
