@@ -115,6 +115,7 @@ jobs:
           format: table
           exit-code: '1'
           severity: CRITICAL
+          trivyignores: .trivyignore.yaml
 
       - name: Build client image
         uses: docker/build-push-action@v7
@@ -136,6 +137,7 @@ jobs:
           format: table
           exit-code: '1'
           severity: CRITICAL
+          trivyignores: .trivyignore.yaml
 
       # Push only after both scans pass
       - name: Push server image

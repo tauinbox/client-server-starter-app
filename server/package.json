@@ -40,6 +40,7 @@
     "check:duplicate-functions": "ts-node scripts/check-duplicate-functions.ts",
     "check:imports": "node ../scripts/check-imports.mjs",
     "check:versions": "node ../scripts/check-workspace-versions.mjs",
+    "check:accepted-risks": "node ../scripts/check-accepted-risks.mjs",
     "check:status-comments": "node ../scripts/check-status-comments.mjs",
     "check:role-conditions": "ts-node scripts/check-existing-role-conditions.ts",
     "check:grant-scope": "ts-node -r tsconfig-paths/register scripts/check-grant-scope.ts",

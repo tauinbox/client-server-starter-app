@@ -1510,7 +1510,7 @@ the deploy loudly, and it does not ship `admin`/`admin` silently.
 ### Deploy pipeline
 
 `.github/workflows/deploy.yml` starts manually (`workflow_dispatch`) or on a push to `master`. It
-builds the Docker images locally and scans them with Trivy for HIGH and CRITICAL findings. It pushes
+builds the Docker images locally and scans them with Trivy for CRITICAL findings. It pushes
 to GHCR only after the two scans pass. Then it deploys to the VPS with health checks and an automatic
 rollback.
 
@@ -2047,7 +2047,7 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3388 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3390 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 1002 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, and the Redis suites skip without `REDIS_URL`. With Postgres and a mail sink and no Redis (the main CI run), 980 pass and 22 skip. CI then runs the Redis suites and the mail suite with Redis: 35 pass and none skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1866 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 364 tests |
@@ -2088,8 +2088,14 @@ minutes) and `playwright install-deps` (4 minutes). The second step also uses `c
 adds font packages only, and their absence changes no assertion. Its duration depends on the Ubuntu
 mirror and not on this repository.
 
-The `audit (high)` step in the three jobs runs `npm run audit:ci`. That script wraps
-`npm audit --audit-level=high --omit=dev` in `scripts/audit-ci.mjs`.
+The `audit (high)` step in the three jobs runs `npm run audit:ci`. That script runs
+`npm audit --json --omit=dev` in `scripts/audit-ci.mjs` and fails on a high or critical advisory.
+An advisory with no fixed release can pass only through an entry of `security/accepted-risks.json`:
+one advisory, its exact set of affected packages, a guard test and at most 30 days. A new or changed
+entry needs the `accepted-risk` label on its pull request, which only a maintainer can set. The Trivy
+scans read `.trivyignore.yaml`, which is generated from the same file, and a daily workflow
+(`security-watch.yml`) opens an issue when a gate fails on `master`. `doc/architecture.md` describes
+the rules.
 
 The wrapper exists because `npm audit` sends a POST to the advisory endpoint of the registry, and the
 fetch layer below it never retries a POST. Thus one 5xx answer from the registry makes the job red

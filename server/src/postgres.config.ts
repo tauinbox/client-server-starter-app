@@ -1,4 +1,9 @@
+import { join } from 'node:path';
 import { DataSourceOptions, LoggerOptions } from 'typeorm';
+import { loadExportedClasses } from './load-exported-classes';
+
+const ENTITY_FILE = /\.entity\.(ts|js)$/;
+const MIGRATION_FILE = /^\d+-[\w-]+\.(ts|js)$/;
 
 type PostgresConnectionOptions = Extract<
   DataSourceOptions,
@@ -40,8 +45,11 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
     : undefined,
   migrationsRun: false, // automatically run migrations on startup
   synchronize: false, // always false — run 'npm run build && npm run migrations:run' manually
-  entities: [__dirname + '/modules/**/*.entity{.ts,.js}'],
-  migrations: [__dirname + '/migrations/*{ts,.js}'],
+  entities: loadExportedClasses(join(__dirname, 'modules'), ENTITY_FILE),
+  migrations: loadExportedClasses(
+    join(__dirname, 'migrations'),
+    MIGRATION_FILE
+  ),
   applicationName: 'Starter Project'
 });
 

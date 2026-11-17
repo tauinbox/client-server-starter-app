@@ -19,6 +19,9 @@ jobs:
   server-checks:
     name: Server – Checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     # Worst observed: ~1.2 min.
     timeout-minutes: 10
     defaults:
@@ -57,6 +60,14 @@ jobs:
       # PENDING_ROUTES instead of giving it a scenario.
       - run: git fetch --no-tags --depth=1 origin master
       - run: npm run check:scenarios -- --base origin/master
+      # An added or changed accepted risk needs the accepted-risk label on its
+      # pull request; the check reads the labels at run time, so a re-run after
+      # the label is set passes.
+      - run: node ../scripts/check-accepted-risks.mjs --self-test
+      - run: npm run check:accepted-risks -- --base origin/master
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
       - run: npm run check:enums
       - run: npm run check:controllers
       - run: npm run check:permissions

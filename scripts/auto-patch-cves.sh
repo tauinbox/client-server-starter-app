@@ -28,7 +28,7 @@ ANY_STUCK=false
 
 # Emit "name|installed|fixed" for each HIGH/CRITICAL Alpine OS finding.
 extract_pkgs() {
-  trivy image --format json --severity HIGH,CRITICAL --quiet "$1" |
+  trivy image --format json --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml --quiet "$1" |
     jq -r '
       .Results[]? | select(.Type == "alpine") | .Vulnerabilities[]?
       | select(.Severity == "HIGH" or .Severity == "CRITICAL")
@@ -47,7 +47,7 @@ rebuild() {
 }
 
 rescan_clean() {
-  trivy image --severity HIGH,CRITICAL --exit-code 1 --quiet "$1"
+  trivy image --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore.yaml --quiet "$1"
 }
 
 # Markdown report for an image the patcher could not fix, including the apk
