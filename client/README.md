@@ -828,7 +828,8 @@ first time the server sends a key before the client i18n file has it. This occur
 `features/auth`.
 
 A `no-restricted-syntax` selector in `eslint.config.mjs` bans each form of `translate(errorKey)`. It
-also bans an `errorKey` as a `NotifyService` message key. `http-error.utils.ts` holds the single
+also bans an `errorKey` as a `NotifyService` message key, also in its optional-chain form
+(`notify.error(err.error?.errorKey)`). `http-error.utils.ts` holds the single
 `eslint-disable-next-line` for the funnel itself. This is permitted, because the funnel compares the
 result with the key and continues when no translation was found.
 
