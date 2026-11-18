@@ -41,7 +41,7 @@ services:
       # Applies only on first init of an empty volume.
       POSTGRES_INITDB_ARGS: "--data-checksums"
     volumes:
-      # Migrated from the PG16 volume via scripts/pg-upgrade-16-to-18.sh.
+      # Migrated from the PG16 volume on 2026-06-01 by a logical dump and restore (PR #284).
       - postgres_data_18:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
