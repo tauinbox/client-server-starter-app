@@ -1194,12 +1194,14 @@ The fixtures in `e2e/fixtures/` are modular:
   `base.fixture` applies the `/api` redirect and the SSE stub to the fixture page. A Playwright route
   applies to one page, thus a test that opens a second tab must apply `routeApiToMockServer()` to
   that tab.
-- `pending-requests.ts` records each request that `routeApiToMockServer()` routes. When a test
-  fails, `base.fixture` attaches `pending-api-requests.json`: each routed request that got no
-  response, with `reachedMockServer` and `documentStartedAfterRouting`. A request with
-  `documentStartedAfterRouting: true` is a request of an older document that a navigation
-  cancelled. Playwright sends no `requestfailed` event for it, thus it shows status `-1` in the
-  trace and is not a stall.
+- `pending-requests.ts` records each `/api` request when the page sends it, and marks it when the
+  route handler of `routeApiToMockServer()` runs. When a test fails, `base.fixture` attaches
+  `pending-api-requests.json`: each `/api` request that got no response, with `routeHandlerRan`,
+  `routeDelayMs`, `reachedMockServer` and `documentStartedAfterRequest`. `routeHandlerRan: false`
+  means that the driver did not give the request to the route handler, or that a route of the test
+  took it and did not answer. A request with `documentStartedAfterRequest: true` is a request of an
+  older document that a navigation cancelled. Playwright sends no `requestfailed` event for it,
+  thus it shows status `-1` in the trace and is not a stall.
 
 **Wait for a dialog with `openedDialog(page)` before each keyboard operation.** Do not use
 `expect(getByRole('dialog')).toBeVisible()`. A dialog becomes visible approximately 150 ms before it
@@ -1264,7 +1266,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 365 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 367 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1859 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
