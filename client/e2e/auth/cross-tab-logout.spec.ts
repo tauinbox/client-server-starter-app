@@ -1,6 +1,6 @@
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   routeApiToMockServer,
   test
 } from '../fixtures/base.fixture';
@@ -14,7 +14,7 @@ test.describe('Cross-tab logout', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     const otherTab = await page.context().newPage();
 
@@ -40,7 +40,7 @@ test.describe('Cross-tab logout', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
     await expect(page).toHaveURL(/\/users\b/);
 

@@ -1,6 +1,6 @@
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   openedDialog,
   test
 } from '../fixtures/base.fixture';
@@ -11,7 +11,7 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-100'),
       email: 'chipsadmin@example.com',
       roles: ['admin']

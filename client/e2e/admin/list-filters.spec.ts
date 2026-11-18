@@ -2,7 +2,7 @@ import {
   chooseOption,
   expect,
   listResponse,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 
@@ -11,7 +11,7 @@ import {
 
 test.describe('Admin list search and filters', () => {
   test.beforeEach(async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
   });
 
   test('feature flags: search, status and environment narrow the list', async ({

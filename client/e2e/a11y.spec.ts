@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 import type { Result } from 'axe-core';
 import { mockId } from './fixtures/ids';
 
-import { expect, loginViaUi, test } from './fixtures/base.fixture';
+import { expect, loginViaApi, test } from './fixtures/base.fixture';
 
 /**
  * axe-core accessibility audit — runs against each major route and fails on
@@ -78,8 +78,8 @@ test.describe('Accessibility (axe-core)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
-    // loginViaUi already lands on /profile
+    await loginViaApi(page, _mockServer.url);
+    // loginViaApi already lands on /profile
 
     const { violations } = await buildAxeScanner(page).analyze();
 
@@ -93,7 +93,7 @@ test.describe('Accessibility (axe-core)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     const { promise: held, resolve: release } = Promise.withResolvers<void>();
 
@@ -128,7 +128,7 @@ test.describe('Accessibility (axe-core)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
     await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
 
@@ -141,7 +141,7 @@ test.describe('Accessibility (axe-core)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}`);
     await expect(
       page.getByRole('heading', { level: 2, name: 'Admin User' })
@@ -156,7 +156,7 @@ test.describe('Accessibility (axe-core)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}/edit`);
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
 
@@ -169,7 +169,7 @@ test.describe('Accessibility (axe-core)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/roles');
     await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
 
@@ -182,7 +182,7 @@ test.describe('Accessibility (axe-core)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
     await expect(page.locator('tr.mat-mdc-row').first()).toBeVisible();
 

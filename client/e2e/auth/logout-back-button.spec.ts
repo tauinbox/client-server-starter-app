@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 
 // Regression for the post-logout history-stack hazard. Browsers cache the
 // last rendered HTML, so a user who clicks Logout and then presses Back will
@@ -15,7 +15,7 @@ test.describe('Logout + browser Back navigation', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     // Visit a protected page so it lands in the back/forward cache.
     await page.goto('/users');

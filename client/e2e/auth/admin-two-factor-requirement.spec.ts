@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import { MOCK_TOTP_CODE } from '../../../mock-server/src/constants';
 
 const PASSWORD = 'Password1';
@@ -21,7 +21,7 @@ test.describe('two-factor requirement for an administrator', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     await expect(page).toHaveURL(/\/profile/);
     await expect(
@@ -63,7 +63,7 @@ test.describe('two-factor requirement for an administrator', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['user'] });
 
     await expect(
       page

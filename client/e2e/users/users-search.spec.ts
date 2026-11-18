@@ -3,7 +3,7 @@ import {
   chooseOption,
   expect,
   listResponse,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
@@ -23,7 +23,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await expect(page.getByLabel('Search')).toBeVisible();
@@ -40,7 +40,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await searchFor(page, 'example');
@@ -59,7 +59,7 @@ test.describe('Inline user search (User management page)', () => {
 
     // Before any navigation, so the page still loads on a running clock.
     await page.clock.install();
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.route(`**${SEARCH_PATH}*`, (route) => {
       searches.push(new URL(route.request().url()).searchParams.get('q') ?? '');
 
@@ -87,7 +87,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await searchFor(page, 'nonexistent@nowhere.com');
@@ -101,7 +101,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await searchFor(page, 'nonexistent@nowhere.com');
@@ -123,7 +123,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await searchFor(page, 'admin@example.com');
@@ -143,7 +143,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await searchFor(page, 'admin@example.com');
@@ -163,7 +163,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     const response = listResponse(page, SEARCH_PATH, { isActive: 'true' });
@@ -180,7 +180,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     // The seeded admin is far down the default order, so narrow to it first.
@@ -224,7 +224,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     const response = listResponse(page, SEARCH_PATH, { role: 'admin' });
@@ -245,7 +245,7 @@ test.describe('Inline user search (User management page)', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await searchFor(page, 'john@example.com');

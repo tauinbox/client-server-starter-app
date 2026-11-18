@@ -2,7 +2,7 @@ import {
   expect,
   expectAuthRedirect,
   expectNoSnackbar,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
@@ -17,7 +17,7 @@ test.describe('User Edit page', () => {
   });
 
   test('should populate form with user data', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await expect(page.getByLabel('Email')).toHaveValue('admin@example.com');
@@ -28,7 +28,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await expect(page.getByLabel('Active')).toBeVisible();
@@ -38,7 +38,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {});
+    await loginViaApi(page, _mockServer.url, {});
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await expect(page).toHaveURL(/.*\/forbidden$/);
@@ -49,7 +49,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     // Login as user id=100 (admin), edit user id=3 (another user)
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await expect(
@@ -63,7 +63,7 @@ test.describe('User Edit page', () => {
   }) => {
     const selfId = mockId('user-100');
 
-    await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
     await page.goto(`/users/${selfId}/edit`);
 
     // The form must render, or a not-found page would pass the check below.
@@ -81,7 +81,7 @@ test.describe('User Edit page', () => {
   }) => {
     const selfId = mockId('user-100');
 
-    await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
     await page.goto(`/users/${selfId}/edit`);
 
     await expect(page.getByLabel('Full name')).toHaveValue('John Doe');
@@ -115,7 +115,7 @@ test.describe('User Edit page', () => {
     });
     const ownId = mockId('user-owner');
 
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: ownId,
       email: 'owner@example.com',
       name: 'Olivia',
@@ -139,7 +139,7 @@ test.describe('User Edit page', () => {
       read: null,
       update: { fieldMatch: { name: ['John Smith'] } }
     });
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-scoped'),
       email: 'scoped@example.com',
       roles: ['smith-editor']
@@ -163,7 +163,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-owner'),
       email: 'owner@example.com'
     });
@@ -177,7 +177,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await page.getByLabel('Email').clear();
@@ -192,7 +192,7 @@ test.describe('User Edit page', () => {
   });
 
   test('should update user successfully', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
     await page.getByLabel('Full name').fill('Updated');
@@ -207,7 +207,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     // Intercept PATCH to return 500
     await page.route('**/api/v1/users/*', (route) => {
       if (route.request().method() === 'PATCH') {
@@ -236,7 +236,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     let failures = 1;
 
     await page.route(`**/api/v1/users/${mockId('user-3')}`, (route) => {
@@ -269,7 +269,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await page.getByLabel('Email').fill('renamed@example.com');
@@ -286,7 +286,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     let patchCalled = false;
 
@@ -317,7 +317,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await page.getByLabel('Email').fill('renamed@example.com');
@@ -338,7 +338,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await expect(page.getByLabel('Your current password')).toHaveCount(0);
@@ -366,7 +366,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await expect(
@@ -392,7 +392,7 @@ test.describe('User Edit page', () => {
   }) => {
     const selfId = mockId('user-100');
 
-    await loginViaUi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { id: selfId, roles: ['admin'] });
     await page.evaluate(() =>
       window.localStorage.setItem('preferred-language', 'ru')
     );
@@ -424,7 +424,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
@@ -437,7 +437,7 @@ test.describe('User Edit page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
@@ -455,7 +455,7 @@ test.describe('User Edit page', () => {
     page
   }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     await expect(

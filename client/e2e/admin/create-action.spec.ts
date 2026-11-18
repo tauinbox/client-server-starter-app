@@ -1,6 +1,6 @@
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   openedDialog,
   test
 } from '../fixtures/base.fixture';
@@ -25,7 +25,7 @@ test.describe('the create action of a list page', () => {
       _mockServer,
       page
     }) => {
-      await loginViaUi(page, _mockServer.url, {
+      await loginViaApi(page, _mockServer.url, {
         id: mockId('user-100'),
         email: 'createaction@example.com',
         roles: ['admin']

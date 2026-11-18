@@ -1,4 +1,9 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  loginViaApi,
+  loginViaUiKeepSse,
+  test
+} from '../fixtures/base.fixture';
 
 /**
  * Regression: the server used to return `user.roles` as `string[]` (role
@@ -15,9 +20,12 @@ test.describe('Post-login admin badge', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    // The login form, then an in-app link: the page shows the state that the
+    // login response gave, with no reload.
+    await loginViaUiKeepSse(page, _mockServer.url, { roles: ['admin'] });
+    await page.getByRole('link', { name: 'Profile' }).click();
+    await expect(page).toHaveURL(/\/profile$/);
 
-    // loginViaUi waits for /profile URL — no additional navigation or reload.
     const roleChip = page
       .locator('.profile-badges mat-chip')
       .filter({ hasText: 'admin' });
@@ -32,7 +40,7 @@ test.describe('Post-login admin badge', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     await page.goto('/users');
 
@@ -60,7 +68,7 @@ test.describe('Post-login admin badge', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaUiKeepSse(page, _mockServer.url, { roles: ['admin'] });
 
     const storedRoles = await page.evaluate(() => {
       const raw = localStorage.getItem('auth_user');

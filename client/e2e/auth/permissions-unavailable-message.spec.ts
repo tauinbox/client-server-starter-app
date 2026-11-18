@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 
 // On a page reload the permissions load runs in an app initializer, before
 // the root translation file arrives, so an early translate() answers with the
@@ -8,7 +8,7 @@ test.describe('Permissions load failure on a reload', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.route('**/api/v1/auth/permissions', (route) =>
       route.fulfill({

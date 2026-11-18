@@ -4,7 +4,7 @@ import {
   createValidJwt,
   defaultUser,
   expect,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 
@@ -88,7 +88,7 @@ test.describe('Session restoration with expired access token', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
     await page.evaluate(() => {
       const stored = JSON.parse(localStorage.getItem('auth_user') ?? '{}') as {
         name?: string;
@@ -106,7 +106,7 @@ test.describe('Session restoration with expired access token', () => {
     await expect(page).toHaveURL(/.*\/login/);
     await expect(page.getByRole('textbox', { name: 'Email' })).toBeVisible();
 
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
   });
 
   test('should redirect to login when refresh token is also invalid', async ({

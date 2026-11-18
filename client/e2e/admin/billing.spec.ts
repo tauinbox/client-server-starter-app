@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 
 // The admin billing console lists every customer's subscriptions and invoices
 // and exposes the two M1 mutations (cancel, refund). We seed an active
@@ -11,7 +11,7 @@ test.describe('Admin billing console', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: ADMIN_ID,
       email: 'billadmin@example.com',
       roles: ['admin']
@@ -69,7 +69,7 @@ test.describe('Admin billing console', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: ADMIN_ID,
       email: 'billadmin@example.com',
       roles: ['admin']

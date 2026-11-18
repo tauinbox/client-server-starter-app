@@ -1180,10 +1180,14 @@ The fixtures in `e2e/fixtures/` are modular:
   `createValidJwt`.
 - `mock-data.ts` holds the `MockUser` type, `defaultUser`, and the re-exported factories
   `createMockUser` and `createOAuthAccount`.
-- `helpers.ts` holds `loginViaUi()`, `loginViaUiKeepSse()`, `expectAuthRedirect()`,
+- `helpers.ts` holds `loginViaApi()`, `loginViaUiKeepSse()`, `expectAuthRedirect()`,
   `expectForbiddenRedirect()`, `openedDialog()` and `routeApiToMockServer()`.
-  `loginViaUi()` ends on `/profile` and waits until the profile heading is visible.
-  `loginViaUiKeepSse()` stays on the landing page and waits for the `/auth/permissions` response.
+  `loginViaApi()` signs in with `POST /auth/login` from the request context of the page, writes the
+  persisted user (`auth_user`) and opens `/profile` once. It waits until the profile heading is
+  visible. It does not fill the login form: one app bootstrap instead of two or three keeps a test
+  inside its budget on a loaded machine. A test of the login form fills the form itself.
+  `loginViaUiKeepSse()` fills the login form, stays on the landing page and waits for the
+  `/auth/permissions` response.
   Use it when a test keeps a true SSE stream open. No test waits for `networkidle`: an open request
   can keep that wait from settling, and ESLint refuses it in `e2e/`. Wait for page content with a web
   assertion.
@@ -1260,7 +1264,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 364 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 365 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1859 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an

@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 
 // The filter bar is a shared component: it translates the scoped keys that
 // the page gives it, but it does not load the scope itself. The first switch
@@ -7,7 +7,7 @@ import { expect, loginViaUi, test } from '../fixtures/base.fixture';
 
 test.describe('First language switch on a list page', () => {
   test.beforeEach(async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
   });
 
   test('the filter bar shows the scoped labels in the new language', async ({

@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from './fixtures/base.fixture';
+import { expect, loginViaApi, test } from './fixtures/base.fixture';
 import type { Page } from '@playwright/test';
 
 // BKL-032 regression: at handset widths (≤599px) no descendant of the
@@ -61,7 +61,7 @@ test.describe('Header — handset overflow regression (BKL-032)', () => {
       // Long names worst-case scenario: the user-menu button is the widest
       // element on the authenticated header. Pre-fix, "Admin User" alone
       // pushed scrollWidth to 336 at 320×568.
-      await loginViaUi(page, _mockServer.url, {
+      await loginViaApi(page, _mockServer.url, {
         name: 'Александр Тупавов'
       });
       await expect(page.locator('mat-toolbar')).toBeVisible();

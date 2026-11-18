@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   routeApiToMockServer,
   test
 } from '../fixtures/base.fixture';
@@ -22,7 +22,7 @@ test.describe('Idle timeout', () => {
   }) => {
     // Before any navigation, so the page still loads on a running clock.
     await page.clock.install();
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     expect((await _mockServer.getState()).refreshTokens).toBe(1);
 
     await page.clock.fastForward('29:00');
@@ -42,7 +42,7 @@ test.describe('Idle timeout', () => {
     page
   }) => {
     await page.clock.install();
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     const otherTab = await page.context().newPage();
 
@@ -71,7 +71,7 @@ test.describe('Idle timeout', () => {
     page
   }) => {
     await page.clock.install();
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     // A suspended tab: the time moves and no timer runs. The clock stays paused
     // until the logout is on the wire, so only the visibility check can be the

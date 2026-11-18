@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 
 // Regression: `logout()` used to POST /auth/logout with whatever access token
 // the tab held, so a stale one got a 401 and the refresh token kept minting
@@ -13,7 +13,7 @@ test.describe('Logout after the access token has gone stale', () => {
 
     const userId = '100';
 
-    await loginViaUi(page, _mockServer.url, { id: userId, roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { id: userId, roles: ['admin'] });
 
     const loggedIn = await _mockServer.getState();
 

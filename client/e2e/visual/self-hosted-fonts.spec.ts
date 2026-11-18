@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 
 // The fonts come from the bundle. A page that waits for a third-party font
 // host never reports `load` when that host does not answer, and its icons
@@ -18,7 +18,7 @@ test('fonts load from the bundle and icons render as glyphs', async ({
     }
   });
 
-  await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+  await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
   await page.goto('/users');
   await expect(page.locator('table')).toBeVisible();
 

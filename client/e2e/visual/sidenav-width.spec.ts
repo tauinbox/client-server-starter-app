@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import type { Page } from '@playwright/test';
 
 // An undeclared `--nav-width-*` custom property makes the service's
@@ -40,7 +40,7 @@ test.describe('Sidenav width tokens', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     await expect(page.locator('mat-sidenav')).toBeVisible();
 
@@ -56,7 +56,7 @@ test.describe('Sidenav width tokens', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     await page.getByRole('button', { name: 'Expand' }).click();
     await expect(page.getByRole('button', { name: 'Collapse' })).toBeVisible();

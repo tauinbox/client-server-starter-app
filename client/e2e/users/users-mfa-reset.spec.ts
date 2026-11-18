@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { mockId } from '../fixtures/ids';
 import type { Page } from '@playwright/test';
@@ -33,7 +33,7 @@ test.describe('Two-factor reset by an administrator', () => {
     page
   }) => {
     await _mockServer.seedUsers([enrolledTarget]);
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${TARGET_ID}/edit`);
 
     await expect(page.getByText('Two-factor on')).toBeVisible();
@@ -73,7 +73,7 @@ test.describe('Two-factor reset by an administrator', () => {
     page
   }) => {
     await _mockServer.seedUsers([enrolledTarget]);
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${TARGET_ID}/edit`);
 
     await page.getByRole('button', { name: 'Reset two-factor' }).click();
@@ -94,7 +94,7 @@ test.describe('Two-factor reset by an administrator', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${TARGET_ID}/edit`);
 
     await expect(page.getByLabel('Email')).toHaveValue(TARGET_EMAIL);

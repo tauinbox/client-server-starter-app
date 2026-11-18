@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 
 // The session teardown empties the feature-flag store and every provider
 // button is gated on a flag, so the login page it navigates to used to render
@@ -8,7 +8,7 @@ test.describe('OAuth buttons after logout', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['user'] });
 
     await page.getByRole('button', { name: /John Doe/i }).click();
     await page.getByRole('menuitem', { name: /Logout/i }).click();

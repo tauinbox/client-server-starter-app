@@ -2,7 +2,7 @@ import {
   expect,
   expectAuthRedirect,
   expectNoSnackbar,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
@@ -21,14 +21,14 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {});
+    await loginViaApi(page, _mockServer.url, {});
     await page.goto(`/users/${mockId('user-3')}`);
 
     await expect(page).toHaveURL(/.*\/forbidden$/);
   });
 
   test('should display user name and email', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}`);
 
     await expect(page.locator('h2', { hasText: 'Admin User' })).toBeVisible();
@@ -56,7 +56,7 @@ test.describe('User Detail page', () => {
         deletedAt: null
       })
     ]);
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-50')}`);
 
     await expect(page.locator('.chips').getByText('Active')).toBeVisible();
@@ -83,7 +83,7 @@ test.describe('User Detail page', () => {
         deletedAt: null
       })
     ]);
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-50')}`);
 
     await expect(page.locator('.chips').getByText('Inactive')).toBeVisible();
@@ -93,7 +93,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}`);
 
     const roleChip = page
@@ -110,7 +110,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}`);
 
     const roleChip = page
@@ -125,7 +125,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}`);
 
     await expect(page.getByText('User ID')).toBeVisible();
@@ -134,7 +134,7 @@ test.describe('User Detail page', () => {
   });
 
   test('should show "Edit" button', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}`);
 
     await expect(
@@ -146,7 +146,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}`);
 
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
@@ -160,7 +160,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}`);
 
     await expect(
@@ -174,7 +174,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {});
+    await loginViaApi(page, _mockServer.url, {});
     await page.goto(`/users/${mockId('user-3')}`);
 
     await expect(page).toHaveURL(/.*\/forbidden$/);
@@ -184,7 +184,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-999')}`);
 
     await expect(
@@ -199,7 +199,7 @@ test.describe('User Detail page', () => {
     await seedUserRole(_mockServer, 'smith-reader', {
       read: { fieldMatch: { name: ['John Smith'] } }
     });
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-scoped'),
       email: 'scoped@example.com',
       roles: ['smith-reader']
@@ -223,7 +223,7 @@ test.describe('User Detail page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     let failures = 1;
 
     await page.route(`**/api/v1/users/${mockId('user-3')}`, (route) => {

@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   routeApiToMockServer,
   test,
   type MockServerApi
@@ -15,7 +15,7 @@ test.describe('Profile password change', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
@@ -32,7 +32,7 @@ test.describe('Profile password change', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Current password').fill('WrongPass1');
@@ -55,7 +55,7 @@ test.describe('Profile password change', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     const otherTab = await page.context().newPage();
 
@@ -91,14 +91,14 @@ test.describe('Profile password change', () => {
       oauthAccounts: Record<string, { provider: string }[]>;
     };
 
-    // The id that loginViaUi gives the user it signs in.
+    // The id that loginViaApi gives the user it signs in.
     const userId = '100';
 
     async function signInWithGoogleLinked(
       page: Page,
       mockServer: MockServerApi
     ): Promise<void> {
-      await loginViaUi(page, mockServer.url);
+      await loginViaApi(page, mockServer.url);
       await mockServer.seedOAuthAccounts(userId, [
         {
           provider: 'google',
@@ -158,7 +158,7 @@ test.describe('Profile password change', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await expect(page.getByLabel('Current password')).not.toBeVisible();
 

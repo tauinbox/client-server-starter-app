@@ -1,6 +1,6 @@
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   openedDialog,
   test
 } from '../fixtures/base.fixture';
@@ -16,7 +16,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     // dt/dd pair instead of omitting the row entirely.
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-100'),
       email: 'mobileadmin@example.com',
       roles: ['admin']
@@ -37,7 +37,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-101'),
       email: 'rulesadmin@example.com',
       roles: ['admin']
@@ -96,7 +96,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-102'),
       email: 'flagvalueadmin@example.com',
       roles: ['admin']
@@ -133,7 +133,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-103'),
       email: 'flagpreflightadmin@example.com',
       roles: ['admin']
@@ -165,7 +165,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-104'),
       email: 'flagkeyadmin@example.com',
       roles: ['admin']
@@ -207,7 +207,7 @@ test.describe('Feature flags — admin UX fixes (FF-UX-007 / FF-UX-008)', () => 
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-104'),
       email: 'flagbucketadmin@example.com',
       roles: ['admin']

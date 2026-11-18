@@ -2,7 +2,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import {
   expect,
   expectNoSnackbar,
-  loginViaUi,
+  loginViaApi,
   openedDialog,
   test
 } from '../fixtures/base.fixture';
@@ -15,7 +15,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/feature-flags');
 
     await page
@@ -75,7 +75,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/feature-flags');
     const row = page.getByRole('row', { name: /new-dashboard/ });
 
@@ -145,7 +145,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/roles');
 
     await page.getByRole('button', { name: 'Edit role editor' }).click();
@@ -172,7 +172,7 @@ test.describe('Admin form dialogs keep the input when the save fails', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
 
     await page.getByRole('button', { name: 'Edit resource Users' }).click();

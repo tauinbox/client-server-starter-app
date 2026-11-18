@@ -1,7 +1,7 @@
 import {
   expect,
   expectNoSnackbar,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
@@ -19,7 +19,7 @@ test.describe('User effective permissions page', () => {
       if (pathname.startsWith('/api/v1/rbac/')) rbacRequests.push(pathname);
     });
 
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     expect(rbacRequests).toEqual([]);
 
     const catalog = page.waitForResponse(
@@ -41,7 +41,7 @@ test.describe('User effective permissions page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.route(
       `**/api/v1/users/${mockId('user-2')}/permissions`,
       (route) =>

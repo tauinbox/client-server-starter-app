@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 
 // A session has an absolute lifetime: rotation keeps the session id, so the
 // refresh window alone never ends a device that refreshes on schedule. Past the
@@ -11,7 +11,7 @@ test.describe('Absolute session lifetime', () => {
   }) => {
     const userId = '100';
 
-    await loginViaUi(page, _mockServer.url, { id: userId, roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { id: userId, roles: ['admin'] });
 
     const refreshStatuses: number[] = [];
 

@@ -1,6 +1,6 @@
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   openedDialog,
   test
 } from './fixtures/base.fixture';
@@ -79,7 +79,7 @@ test.describe('Keyboard navigation', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     // Focus the Admin panel link in the sidenav and activate it
     const adminLink = page.getByRole('link', { name: 'Admin panel' });
@@ -104,7 +104,7 @@ test.describe('Keyboard navigation', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-1')}/edit`);
 
     // Wait for form to load
@@ -131,7 +131,7 @@ test.describe('Keyboard navigation', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     // Open the delete confirmation dialog
