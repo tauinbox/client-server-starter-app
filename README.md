@@ -2094,7 +2094,8 @@ An advisory with no fixed release can pass only through an entry of `security/ac
 one advisory, its exact set of affected packages, a guard test and at most 30 days. A new or changed
 entry needs the `accepted-risk` label on its pull request, which only a maintainer can set. The Trivy
 scans read `.trivyignore.yaml`, which is generated from the same file, and a daily workflow
-(`security-watch.yml`) opens an issue when a gate fails on `master`. `doc/architecture.md` describes
+(`security-watch.yml`) opens an issue when a gate fails on `master`. When `npm audit` gives no usable
+output, the watch reports "could not read `npm audit`" for the dev tree. `doc/architecture.md` describes
 the rules.
 
 The wrapper exists because `npm audit` sends a POST to the advisory endpoint of the registry, and the
