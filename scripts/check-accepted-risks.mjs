@@ -2,7 +2,9 @@
  * Static check of the accepted dependency risks (security/accepted-risks.json).
  * Zero dependencies apart from git and, in a pull request, the gh CLI.
  *
- *   (no flag)     validate the registry and compare .trivyignore.yaml with it
+ *   (no flag)     validate the registry, compare .trivyignore.yaml with it and
+ *                 check that each reader of `npm audit` output uses
+ *                 readAuditReport
  *   --write       write .trivyignore.yaml from the registry
  *   --base <ref>  also refuse an added or changed entry in a pull request that
  *                 has no "accepted-risk" label. Only a maintainer can set a
@@ -27,6 +29,7 @@ import {
   changedRisks,
   judgeAudit,
   parseRegistry,
+  readAuditReport,
   readRegistry,
   todayUtc,
   trivyignoreYaml,
@@ -34,8 +37,31 @@ import {
 } from './accepted-risks.mjs';
 
 const APPROVAL_LABEL = 'accepted-risk';
+const AUDIT_READERS = ['scripts/audit-ci.mjs', 'scripts/security-watch.mjs'];
 
-function readGuard(file) {
+/** Each script that reads `npm audit` output reads it through readAuditReport. */
+function auditReaderProblems(readSource) {
+  const problems = [];
+
+  for (const file of AUDIT_READERS) {
+    const source = readSource(file);
+
+    if (source === undefined) {
+      problems.push(`${file} does not exist`);
+    } else if (
+      !source.includes('readAuditReport(') ||
+      /JSON\.parse\([^)]*stdout/.test(source)
+    ) {
+      problems.push(
+        `${file} must read \`npm audit\` output through readAuditReport, not JSON.parse`
+      );
+    }
+  }
+
+  return problems;
+}
+
+function readRepoFile(file) {
   const path = join(ROOT, file);
 
   return existsSync(path) ? readFileSync(path, 'utf8') : undefined;
@@ -96,7 +122,13 @@ function run(args) {
     console.log(`check-accepted-risks: wrote ${TRIVYIGNORE_FILE}.`);
   }
 
-  const problems = validateRegistry(registry, { today: todayUtc(), readGuard });
+  const problems = [
+    ...validateRegistry(registry, {
+      today: todayUtc(),
+      readGuard: readRepoFile
+    }),
+    ...auditReaderProblems(readRepoFile)
+  ];
   const yamlPath = join(ROOT, TRIVYIGNORE_FILE);
 
   if (
@@ -370,6 +402,52 @@ function selfTest() {
   expect(
     'fails closed on exit 1 with nothing counted',
     auditReportProblem(counted(0), 1) !== undefined
+  );
+  expect(
+    'reads a clean audit output as a report',
+    readAuditReport({ stdout: JSON.stringify(counted(0)), status: 0 }).report
+      ?.metadata.vulnerabilities.total === 0
+  );
+  expect(
+    'reads audit output that is not JSON as a problem',
+    readAuditReport({ stdout: 'npm ERR! network', status: 1 }).problem !==
+      undefined
+  );
+  expect(
+    'reads an npm error object as a problem',
+    readAuditReport({
+      stdout: JSON.stringify({
+        message: 'request to https://registry.npmjs.org failed',
+        error: { code: 'ENOTFOUND', summary: 'x' }
+      }),
+      status: 1
+    }).problem !== undefined
+  );
+  expect(
+    'reads exit 1 with nothing counted as a problem',
+    readAuditReport({ stdout: JSON.stringify(counted(0)), status: 1 })
+      .problem !== undefined
+  );
+  const readerSources = (source) => () => source;
+  expect(
+    'accepts audit readers that call readAuditReport',
+    auditReaderProblems(readerSources('readAuditReport(result)')).length === 0
+  );
+  expect(
+    'reports an audit reader that parses stdout itself',
+    auditReaderProblems(
+      readerSources('readAuditReport(x); JSON.parse(result.stdout)')
+    ).length === AUDIT_READERS.length
+  );
+  expect(
+    'reports an audit reader with no readAuditReport call',
+    auditReaderProblems(readerSources('collectAdvisories(report)')).length ===
+      AUDIT_READERS.length
+  );
+  expect(
+    'reports a missing audit reader',
+    auditReaderProblems(readerSources(undefined)).length ===
+      AUDIT_READERS.length
   );
 
   const yaml = trivyignoreYaml({ risks: [sampleRisk()] });

@@ -9,8 +9,8 @@ import { basename, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   WORKSPACES,
-  auditReportProblem,
   judgeAudit,
+  readAuditReport,
   readRegistry,
   todayUtc
 } from './accepted-risks.mjs';
@@ -47,15 +47,7 @@ async function runAudit() {
     const output = `${result.stdout}${result.stderr}`;
 
     if (!output.includes(ENDPOINT_ERROR)) {
-      let report;
-
-      try {
-        report = JSON.parse(result.stdout);
-      } catch {
-        report = undefined;
-      }
-
-      const problem = auditReportProblem(report, result.status);
+      const { report, problem } = readAuditReport(result);
 
       if (problem === undefined) return report;
 
