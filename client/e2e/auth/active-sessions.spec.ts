@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   routeApiToMockServer,
   test
 } from '../fixtures/base.fixture';
@@ -43,13 +43,13 @@ test.describe('Signed-in devices', () => {
     browser,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     const otherDevice = await browser.newContext();
     const otherPage = await otherDevice.newPage();
 
     await routeApiToMockServer(otherPage, _mockServer.url);
-    await loginViaUi(otherPage, _mockServer.url);
+    await loginViaApi(otherPage, _mockServer.url);
 
     await page.reload();
     const card = page.locator('nxs-active-sessions');
@@ -92,13 +92,13 @@ test.describe('Signed-in devices', () => {
     browser,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     const otherDevice = await browser.newContext();
     const otherPage = await otherDevice.newPage();
 
     await routeApiToMockServer(otherPage, _mockServer.url);
-    await loginViaUi(otherPage, _mockServer.url);
+    await loginViaApi(otherPage, _mockServer.url);
 
     await page.reload();
     const sessions = page.locator('nxs-active-sessions');

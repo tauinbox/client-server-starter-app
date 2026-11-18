@@ -1,6 +1,6 @@
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   openedDialog,
   test
 } from '../fixtures/base.fixture';
@@ -18,7 +18,7 @@ test.describe('Feature flag preview — unsaved editor state', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-100'),
       email: 'previewadmin@example.com',
       roles: ['admin']

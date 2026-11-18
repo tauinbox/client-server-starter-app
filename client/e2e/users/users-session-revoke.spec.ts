@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { mockId } from '../fixtures/ids';
 
@@ -52,7 +52,7 @@ test.describe('Sign out everywhere by an administrator', () => {
 
     expect(await profileStatus(_mockServer.url, token)).toBe(200);
 
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${TARGET_ID}/edit`);
     await page.getByRole('button', { name: 'Sign out everywhere' }).click();
 
@@ -75,7 +75,7 @@ test.describe('Sign out everywhere by an administrator', () => {
     await _mockServer.seedUsers([target]);
     const token = await signInTarget(_mockServer.url);
 
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${TARGET_ID}/edit`);
     await page.getByRole('button', { name: 'Sign out everywhere' }).click();
     await page

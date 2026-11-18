@@ -1,7 +1,7 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   routeApiToMockServer,
   test
 } from '../fixtures/base.fixture';
@@ -48,7 +48,7 @@ test.describe('Refresh-token reuse detection', () => {
     page,
     context
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['user'] });
     const original = await refreshCookieValue(context);
 
     // Using the successor first makes the replay the theft shape, not a lost
@@ -77,13 +77,13 @@ test.describe('Refresh-token reuse detection', () => {
     // Two UI sign-ins and a second context use most of the default budget
     // under a full parallel run.
     test.slow();
-    await loginViaUi(page, _mockServer.url, { roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['user'] });
 
     const otherDevice = await browser.newContext();
     const otherPage = await otherDevice.newPage();
 
     await routeApiToMockServer(otherPage, _mockServer.url);
-    await loginViaUi(otherPage, _mockServer.url, { roles: ['user'] });
+    await loginViaApi(otherPage, _mockServer.url, { roles: ['user'] });
 
     const before = await refreshCookieValue(context);
 

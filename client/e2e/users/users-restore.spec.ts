@@ -4,7 +4,7 @@ import { mockId } from '../fixtures/ids';
 import {
   expect,
   listResponse,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
@@ -79,7 +79,7 @@ const statusChip = (row: ReturnType<Page['getByRole']>) =>
 
 test.describe('Deleted users on the user list', () => {
   test.beforeEach(async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await _mockServer.seedUsers([deletedUser, liveUser]);
     await page.goto('/users');
     await expect(page.locator('table tbody tr').first()).toBeVisible();

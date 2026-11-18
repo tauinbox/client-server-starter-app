@@ -2,7 +2,7 @@ import {
   expect,
   expectAuthRedirect,
   expectForbiddenRedirect,
-  loginViaUi,
+  loginViaApi,
   openedDialog,
   test
 } from '../fixtures/base.fixture';
@@ -23,7 +23,7 @@ test.describe('Admin Resources page', () => {
   });
 
   test('should display "Resources" heading', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
 
     await expect(
@@ -35,7 +35,7 @@ test.describe('Admin Resources page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
 
     // Wait for table to render
@@ -56,7 +56,7 @@ test.describe('Admin Resources page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
 
     await expect(page.locator('table tbody tr').first()).toBeVisible();
@@ -78,7 +78,7 @@ test.describe('Admin Resources page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
 
     await expect(page.locator('table tbody tr').first()).toBeVisible();
@@ -99,7 +99,7 @@ test.describe('Admin Resources page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
     await expect(page.locator('table tbody tr').first()).toBeVisible();
 
@@ -126,7 +126,7 @@ test.describe('Admin Resources page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
     await expect(page.locator('table tbody tr').first()).toBeVisible();
 
@@ -145,7 +145,7 @@ test.describe('Admin Resources page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/admin/resources');
 
     await expect(page.locator('table tbody tr').first()).toBeVisible();

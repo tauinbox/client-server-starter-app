@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
 
 // Angular CDK BreakpointObserver's Breakpoints.Handset evaluates to a media
@@ -13,7 +13,7 @@ test.describe('User List page — handset layout', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     // Wait for data to load — any visible card is a good signal.
@@ -32,7 +32,7 @@ test.describe('User List page — handset layout', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.route('**/api/v1/users/cursor?*', (route) => {
       if (route.request().method() === 'GET') {
         return route.fulfill({
@@ -57,7 +57,7 @@ test.describe('User List page — handset layout', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
       id: mockId('user-1'),
@@ -112,7 +112,7 @@ test.describe('User List page — handset layout', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     // Names long enough to push the trigger out of the card and beyond the
     // viewport in pre-fix layout (Material's <mat-card-header> does not set
@@ -208,7 +208,7 @@ test.describe('User List page — handset layout', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
       id: mockId('user-3'),

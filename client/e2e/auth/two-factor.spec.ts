@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import {
   MOCK_RECOVERY_CODES,
   MOCK_REGENERATED_RECOVERY_CODES,
@@ -10,7 +10,7 @@ import type { Page } from '@playwright/test';
 
 const EMAIL = 'testlogin@example.com';
 const PASSWORD = 'Password1';
-/** The id `loginViaUi` seeds the account under. */
+/** The id `loginViaApi` seeds the account under. */
 const USER_ID = '100';
 
 /** Fails the run on a horizontal overflow, at every width and both schemes. */
@@ -51,7 +51,7 @@ test.describe('two-factor authentication', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     const card = page.locator('nxs-two-factor');
 
@@ -108,7 +108,7 @@ test.describe('two-factor authentication', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
     await page.getByRole('button', { name: 'Turn on' }).click();
     await page.getByLabel('Current password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Continue' }).click();
@@ -143,7 +143,7 @@ test.describe('two-factor authentication', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
     await page.getByRole('button', { name: 'Turn on' }).click();
     await page.getByLabel('Current password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Continue' }).click();
@@ -191,7 +191,7 @@ test.describe('two-factor authentication', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
     await page.getByRole('button', { name: 'Turn on' }).click();
     await page.getByLabel('Current password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Continue' }).click();
@@ -239,7 +239,7 @@ test.describe('two-factor authentication', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
     await page.getByRole('button', { name: 'Turn on' }).click();
     await page.getByLabel('Current password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Continue' }).click();
@@ -282,7 +282,7 @@ test.describe('two-factor authentication', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
     await page.getByRole('button', { name: 'Turn on' }).click();
     await page.getByLabel('Current password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Continue' }).click();

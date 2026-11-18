@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import type { Page } from '@playwright/test';
 import { mockId } from '../fixtures/ids';
 
@@ -72,7 +72,7 @@ for (const theme of ['light', 'dark'] as const) {
     }) => {
       await seedTheme(page, theme);
 
-      await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+      await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
       await page.goto(`/users/${mockId('user-3')}/edit`);
       await expect(
         page.getByRole('button', { name: 'Delete', exact: true })
@@ -100,7 +100,7 @@ for (const theme of ['light', 'dark'] as const) {
     }) => {
       await seedTheme(page, theme);
 
-      await loginViaUi(page, _mockServer.url, { roles: ['user'] });
+      await loginViaApi(page, _mockServer.url, { roles: ['user'] });
       await page.goto('/forbidden');
 
       // Defence-in-depth: lint:no-mat-color bans the source attribute, but

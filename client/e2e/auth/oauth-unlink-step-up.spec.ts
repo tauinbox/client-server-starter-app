@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import type { MockServerApi } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { STEP_UP_OPERATION } from '@app/shared/constants';
@@ -69,7 +69,7 @@ test.describe('Unlinking a provider demands a step-up', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: passwordUserId,
       email: passwordEmail,
       roles: ['user']
@@ -118,7 +118,7 @@ test.describe('Unlinking a provider demands a step-up', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: passwordUserId,
       email: passwordEmail,
       roles: ['user']
@@ -193,7 +193,7 @@ test.describe('Unlinking a provider demands a step-up', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: providerUserId,
       email: providerEmail,
       roles: ['user']
@@ -224,7 +224,7 @@ test.describe('Unlinking a provider demands a step-up', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: providerUserId,
       email: providerEmail,
       roles: ['user']
@@ -270,7 +270,7 @@ test.describe('Unlinking a provider demands a step-up', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: providerUserId,
       email: providerEmail,
       roles: ['user']

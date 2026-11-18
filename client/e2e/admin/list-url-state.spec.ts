@@ -2,7 +2,7 @@ import {
   chooseOption,
   expect,
   listResponse,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 
@@ -14,7 +14,7 @@ const ROLES_API = '/api/v1/roles/cursor';
 
 test.describe('List state in the URL', () => {
   test.beforeEach(async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
   });
 
   test('a filtered list survives a reload, and Back undoes one select', async ({

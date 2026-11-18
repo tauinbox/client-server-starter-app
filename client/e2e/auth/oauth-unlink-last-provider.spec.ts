@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { STEP_UP_OPERATION } from '@app/shared/constants';
 
@@ -14,7 +14,7 @@ test.describe('OAuth — unlink last provider safety', () => {
     const email = 'oauth-only@example.com';
 
     // Login normally with a password so we can complete the credential flow.
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: userId,
       email,
       roles: ['user']

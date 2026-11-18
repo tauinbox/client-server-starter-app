@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, loginViaUi } from '../fixtures/base.fixture';
+import { test, expect, loginViaApi } from '../fixtures/base.fixture';
 
 const USER_ID = '200';
 const PADDLE_SCRIPT_URL = 'https://cdn.paddle.com/paddle/v2/paddle.js';
@@ -61,7 +61,7 @@ test.describe('Paddle checkout', () => {
     _mockServer
   }) => {
     await _mockServer.setPaddleClientToken('test_e2e_token');
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await stubPaddleJs(page);
 
     await page.goto('/billing/success?_ptxn=txn_e2e01');
@@ -96,7 +96,7 @@ test.describe('Paddle checkout', () => {
     _mockServer
   }) => {
     await _mockServer.setPaddleClientToken('test_e2e_token');
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await stubPaddleJs(page);
 
     await page.goto('/billing/success?_ptxn=txn_e2e02');
@@ -113,7 +113,7 @@ test.describe('Paddle checkout', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     const script = await stubPaddleJs(page);
 
     await page.goto('/billing/success?_ptxn=txn_e2e03');
@@ -129,7 +129,7 @@ test.describe('Paddle checkout', () => {
     _mockServer
   }) => {
     await _mockServer.setPaddleClientToken('test_e2e_token');
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'

@@ -1,7 +1,7 @@
 import {
   chooseOption,
   expect,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 import { ErrorKeys } from '@app/shared/constants';
@@ -163,7 +163,7 @@ test.describe('Error translation: global error interceptor → snackbar', () => 
     // error themselves. The linked-accounts list on the profile page is not
     // silenced: it falls back to an empty list, so the snackbar from the
     // global error interceptor is its only error signal.
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.route('**/api/v1/auth/oauth/accounts', (route) =>
       route.fulfill({

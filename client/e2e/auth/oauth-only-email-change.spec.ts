@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { STEP_UP_OPERATION } from '@app/shared/constants';
 
@@ -49,7 +49,7 @@ test.describe('OAuth-only account changes its email', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: userId,
       email,
       roles: ['user']
@@ -76,7 +76,7 @@ test.describe('OAuth-only account changes its email', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: userId,
       email,
       roles: ['user']
@@ -158,7 +158,7 @@ test.describe('OAuth-only account changes its email', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: userId,
       email,
       roles: ['user']

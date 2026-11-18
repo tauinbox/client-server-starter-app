@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 
 // Regression for the reactive token-refresh path. Fixes the gap where a user
 // whose access token has just been invalidated (server-side revocation, near
@@ -19,7 +19,7 @@ test.describe('Reactive access-token refresh', () => {
   }) => {
     const userId = '100';
 
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: userId,
       roles: ['admin']
     });

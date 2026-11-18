@@ -1,7 +1,7 @@
 import {
   expect,
   expectNoSnackbar,
-  loginViaUi,
+  loginViaApi,
   markOAuthRoundTripStarted,
   test
 } from '../fixtures/base.fixture';
@@ -36,7 +36,7 @@ test.describe('A refused request shows one error message', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Current password').fill('WrongPass1');
@@ -54,7 +54,7 @@ test.describe('A refused request shows one error message', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto(`/users/${mockId('user-3')}/edit`);
 
     // The address belongs to another seeded user, so the mock answers 409.

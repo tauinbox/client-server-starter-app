@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import {
   test,
   expect,
-  loginViaUi,
+  loginViaApi,
   loginViaUiKeepSse
 } from '../fixtures/base.fixture';
 
@@ -17,7 +17,7 @@ test.describe('Billing notices', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'
@@ -50,7 +50,7 @@ test.describe('Billing notices', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro',

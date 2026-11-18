@@ -143,9 +143,10 @@ export async function routeApiToMockServer(
 }
 
 /**
- * Seed a test user in mock-server state and log in via the UI.
+ * Seed a test user in mock-server state, sign it in through the API and open
+ * `/profile`. A test of the login form fills the form itself.
  */
-export async function loginViaUi(
+export async function loginViaApi(
   page: Page,
   mockServerUrl: string,
   overrides: Partial<MockUser> = {}
@@ -176,21 +177,26 @@ export async function loginViaUi(
     body: JSON.stringify([user])
   });
 
-  await page.goto('/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Email').blur();
-  await page.getByLabel('Password', { exact: true }).fill(password);
-  await page.getByLabel('Password', { exact: true }).blur();
-  await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
-  // Post-login destination depends on permissions (admin → /admin/users via
-  // root redirect → defaultRoute(); user → /profile fallback).
-  await page.waitForURL((url) => !url.pathname.endsWith('/login'));
+  // The context request shares the cookie jar of the page, and a cookie
+  // ignores the port, so the refresh cookie reaches the app origin too.
+  const response = await page
+    .context()
+    .request.post(`${mockServerUrl}/api/v1/auth/login`, {
+      data: { email, password }
+    });
 
-  // Tests written before the dynamic landing page rely on /profile being the
-  // post-login URL; normalize so existing assertions keep working.
-  if (!page.url().endsWith('/profile')) {
-    await page.goto('/profile');
-  }
+  expect(response.status()).toBe(200);
+  const { user: signedIn } = (await response.json()) as { user: unknown };
+
+  // The app restores a session at bootstrap only when it finds the persisted
+  // user. A static file of the same origin gives access to its storage
+  // without a bootstrap of the app.
+  await page.goto('/assets/i18n/en.json');
+  await page.evaluate(
+    (value) => localStorage.setItem('auth_user', JSON.stringify(value)),
+    signedIn
+  );
+  await page.goto('/profile');
 
   await expect(
     page.getByRole('heading', { level: 2, name: user.name })
@@ -210,7 +216,7 @@ export async function expectForbiddenRedirect(
   mockServerUrl: string,
   url: string
 ): Promise<void> {
-  await loginViaUi(page, mockServerUrl, { roles: ['user'] });
+  await loginViaApi(page, mockServerUrl, { roles: ['user'] });
   await page.goto(url);
   await expect(page).toHaveURL(/.*\/forbidden/);
 }

@@ -306,7 +306,7 @@ export { defaultUser } from './mock-data';
 // Re-export helpers
 export {
   chooseOption,
-  loginViaUi,
+  loginViaApi,
   loginViaUiKeepSse,
   markOAuthRoundTripStarted,
   expectAuthRedirect,

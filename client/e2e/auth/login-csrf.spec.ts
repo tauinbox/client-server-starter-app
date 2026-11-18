@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures/base.fixture';
-import { loginViaUi } from '../fixtures/helpers';
+import { loginViaApi } from '../fixtures/helpers';
 
 // The attacker page must be a second page: a navigation through the fixture's
 // `/api` rewrite stores no Set-Cookie, so it would pass a vulnerable backend.
@@ -8,7 +8,7 @@ test.describe('Login CSRF through a cross-site form', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
     await expect(page.getByText('testlogin@example.com').first()).toBeVisible();
 
     const refreshCookie = async () =>

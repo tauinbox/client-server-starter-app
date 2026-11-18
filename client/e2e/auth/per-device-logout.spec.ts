@@ -1,6 +1,6 @@
 import {
   expect,
-  loginViaUi,
+  loginViaApi,
   routeApiToMockServer,
   test
 } from '../fixtures/base.fixture';
@@ -17,13 +17,13 @@ test.describe('Per-device logout', () => {
     // Two UI sign-ins and a second context use most of the default budget
     // under a full parallel run.
     test.slow();
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     const otherDevice = await browser.newContext();
     const otherPage = await otherDevice.newPage();
 
     await routeApiToMockServer(otherPage, _mockServer.url);
-    await loginViaUi(otherPage, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(otherPage, _mockServer.url, { roles: ['admin'] });
 
     const bothSignedIn = await _mockServer.getState();
 

@@ -1,7 +1,7 @@
 import {
   expect,
   expectAuthRedirect,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
@@ -18,7 +18,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await expect(page.getByRole('heading', { name: 'John Doe' })).toBeVisible();
     await expect(page.getByText('testlogin@example.com')).toBeVisible();
@@ -36,7 +36,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     const roleChip = page
       .locator('.profile-badges mat-chip')
@@ -50,7 +50,7 @@ test.describe('Profile page', () => {
 
   test('should display inactive status', async ({ _mockServer, page }) => {
     // Login as active user first, then intercept profile response as inactive
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     // Intercept GET /api/v1/auth/profile to return inactive status
     await page.route('**/api/v1/auth/profile', (route) => {
@@ -85,7 +85,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await expect(page.getByLabel('Full name')).toHaveValue('John Doe');
     await expect(page.getByLabel('New password (optional)')).toHaveValue('');
@@ -95,7 +95,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await expect(
       page.getByRole('button', { name: 'Save', exact: true })
@@ -106,7 +106,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('Full name').fill('Jane');
     await page.getByLabel('Full name').blur();
@@ -121,7 +121,7 @@ test.describe('Profile page', () => {
       _mockServer,
       page
     }) => {
-      await loginViaUi(page, _mockServer.url);
+      await loginViaApi(page, _mockServer.url);
 
       await page.getByLabel('Full name').fill(value);
 
@@ -135,7 +135,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('New password (optional)').fill('short');
 
@@ -148,7 +148,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
@@ -163,7 +163,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Confirm new password').fill('Quartz-Meadow-77');
@@ -177,7 +177,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('New password (optional)').fill('Quartz-Meadow-77');
     await page.getByLabel('Confirm new password').fill('different1');
@@ -190,7 +190,7 @@ test.describe('Profile page', () => {
   });
 
   test('should update profile successfully', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('Full name').fill('Jane Smith');
     await page.getByLabel('Full name').blur();
@@ -203,7 +203,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('Full name').fill('Jane Smith');
     await page.getByLabel('Full name').blur();
@@ -218,7 +218,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('Full name').fill('Jane');
     await page.getByLabel('Full name').blur();
@@ -234,7 +234,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('Full name').fill('Jane Roe');
     await page.getByLabel('Full name').blur();
@@ -253,7 +253,7 @@ test.describe('Profile page', () => {
   });
 
   test('should show error on update failure', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
     // Intercept PATCH profile to return 500
     await page.route('**/api/v1/auth/profile', (route) => {
       if (route.request().method() === 'PATCH') {
@@ -282,7 +282,7 @@ test.describe('Profile page', () => {
       _mockServer,
       page
     }) => {
-      await loginViaUi(page, _mockServer.url);
+      await loginViaApi(page, _mockServer.url);
 
       await page.getByLabel('Full name').fill(value);
       await page.getByLabel('Email').click();
@@ -295,7 +295,7 @@ test.describe('Profile page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url);
+    await loginViaApi(page, _mockServer.url);
 
     await page.getByLabel('New password (optional)').fill('short');
     await page.getByLabel('Full name').click();

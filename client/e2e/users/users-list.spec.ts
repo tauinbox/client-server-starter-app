@@ -2,7 +2,7 @@ import {
   expect,
   expectAuthRedirect,
   expectForbiddenRedirect,
-  loginViaUi,
+  loginViaApi,
   test
 } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
@@ -26,7 +26,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await expect(page.getByText('User management')).toBeVisible();
@@ -36,7 +36,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await expect(
@@ -63,7 +63,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     // Wait for table to load
@@ -79,7 +79,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     // Override the users endpoint to return empty paginated response
     await page.route('**/api/v1/users/cursor?*', (route) => {
       if (route.request().method() === 'GET') {
@@ -101,7 +101,7 @@ test.describe('User List page', () => {
   });
 
   test('should not display a paginator', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     await expect(page.locator('table tbody tr').first()).toBeVisible();
@@ -109,7 +109,7 @@ test.describe('User List page', () => {
   });
 
   test('should load more users on scroll', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     // Wait for initial batch
@@ -140,7 +140,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     // Override to return a known user on page 1
     const knownUser = {
@@ -190,7 +190,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
       id: mockId('user-1'),
@@ -239,7 +239,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
 
     const knownUser = {
       id: mockId('user-3'),
@@ -289,7 +289,7 @@ test.describe('User List page', () => {
   });
 
   test('should delete user after confirming', async ({ _mockServer, page }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     // Wait for table to load
@@ -320,7 +320,7 @@ test.describe('User List page', () => {
     _mockServer,
     page
   }) => {
-    await loginViaUi(page, _mockServer.url, { roles: ['admin'] });
+    await loginViaApi(page, _mockServer.url, { roles: ['admin'] });
     await page.goto('/users');
 
     // Wait for table to load

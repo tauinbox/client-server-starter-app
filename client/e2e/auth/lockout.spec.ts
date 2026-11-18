@@ -1,4 +1,4 @@
-import { expect, loginViaUi, test } from '../fixtures/base.fixture';
+import { expect, loginViaApi, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { mockId } from '../fixtures/ids';
 
@@ -97,7 +97,7 @@ test.describe('Account lockout', () => {
     ]);
 
     // Login as admin
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: mockId('user-1'),
       email: 'admin@example.com',
       roles: ['admin']

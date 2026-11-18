@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, loginViaUi } from '../fixtures/base.fixture';
+import { test, expect, loginViaApi } from '../fixtures/base.fixture';
 
 const USER_ID = '200';
 const MOCK_CHECKOUT_URL = /\/api\/__mock-checkout\//;
@@ -55,7 +55,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.goto('/billing');
 
     await page.getByRole('link', { name: 'Manage billing' }).click();
@@ -83,7 +83,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.goto('/billing');
 
     await expect(page.locator('.region-control')).toBeVisible();
@@ -98,7 +98,7 @@ test.describe('Billing', () => {
   }) => {
     await _mockServer.setBillingProviderEnabled('paddle', false);
     await _mockServer.setBillingProviderEnabled('yookassa', false);
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.goto('/billing');
 
     const notice = page.locator('.payments-unavailable');
@@ -119,7 +119,7 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     await _mockServer.setBillingProviderEnabled('paddle', false);
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.goto('/billing');
 
     const choosePro = page
@@ -150,7 +150,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'
@@ -177,7 +177,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'
@@ -215,7 +215,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.evaluate(() =>
       window.localStorage.setItem('preferred-language', 'ru')
     );
@@ -237,7 +237,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'
@@ -256,7 +256,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.goto('/billing');
 
     const region = page.locator('.region-control');
@@ -282,7 +282,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.goto('/billing/settings');
 
     const region = page.locator('.settings-header .region-control');
@@ -319,7 +319,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
 
     // Start checkout for Pro from the pricing page.
     await page.goto('/billing');
@@ -355,7 +355,7 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     await _mockServer.setTermsVersion('intl', '2030-01-01');
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
 
     await page.goto('/billing');
     const choosePro = page
@@ -394,7 +394,7 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     await _mockServer.setTermsVersion('intl', '2030-01-01');
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
 
     await page.goto('/billing');
     const checkbox = page.getByRole('checkbox', {
@@ -420,7 +420,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'
@@ -467,7 +467,7 @@ test.describe('Billing', () => {
   }) => {
     // A residence in Russia routes the user to YooKassa, whose checkout leaves
     // an `incomplete` subscription until the payment settles.
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: USER_ID,
       roles: ['user'],
       residenceCountry: 'RU'
@@ -505,7 +505,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: USER_ID,
       roles: ['user'],
       residenceCountry: 'RU'
@@ -546,7 +546,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'
@@ -581,7 +581,7 @@ test.describe('Billing', () => {
     _mockServer
   }) => {
     // A residence in Russia routes the user to YooKassa; the UI stays English.
-    await loginViaUi(page, _mockServer.url, {
+    await loginViaApi(page, _mockServer.url, {
       id: USER_ID,
       roles: ['user'],
       residenceCountry: 'RU'
@@ -611,7 +611,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'
@@ -634,7 +634,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await _mockServer.activateBillingSubscription({
       userId: USER_ID,
       planKey: 'pro'
@@ -673,7 +673,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
 
     // The one-time section renders the seeded catalog below the plans.
     await page.goto('/billing');
@@ -709,7 +709,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
 
     await page.goto('/billing');
     const donationCard = page.locator('nxs-donation-card');
@@ -745,7 +745,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
 
     await page.goto('/billing');
     const donationCard = page.locator('nxs-donation-card');
@@ -769,7 +769,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
 
     // Before any purchase the wallet shows the confident zero state.
     await page.goto('/billing/settings');
@@ -804,7 +804,7 @@ test.describe('Billing', () => {
     page,
     _mockServer
   }) => {
-    await loginViaUi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
     await page.goto('/billing');
 
     // The pay-as-you-go card sells no subscription: its action opens the packs.
