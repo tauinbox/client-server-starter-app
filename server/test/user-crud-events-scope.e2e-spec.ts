@@ -24,7 +24,7 @@ import { NotificationsService } from '../src/modules/notifications/notifications
 import { UsersController } from '../src/modules/users/controllers/users.controller';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
-import { eventually } from './eventually';
+import { eventually, waitUntil } from './eventually';
 
 // The user list applies the conditions of a `search:User` grant in SQL, so the
 // push of a user change must apply them too. Real roles, real ability
@@ -268,9 +268,8 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
   };
 
   const settle = async (count: number): Promise<void> => {
-    await eventually(
-      () => Promise.resolve(pushes.length >= count ? true : null),
-      5000
+    await waitUntil(`the service raises ${count} pushes`, () =>
+      Promise.resolve(pushes.length >= count ? true : null)
     );
     await Promise.all(pushes);
   };
