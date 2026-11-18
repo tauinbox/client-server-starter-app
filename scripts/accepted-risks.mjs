@@ -267,6 +267,25 @@ export function auditReportProblem(report, exitStatus) {
   return undefined;
 }
 
+/**
+ * Turns the output of `npm audit --json` into { report } or { problem }. Every
+ * reader of that output goes through it, so none reads an unusable report as
+ * "no advisory".
+ */
+export function readAuditReport({ stdout, status }) {
+  let report;
+
+  try {
+    report = JSON.parse(stdout);
+  } catch {
+    report = undefined;
+  }
+
+  const problem = auditReportProblem(report, status);
+
+  return problem === undefined ? { report } : { problem };
+}
+
 function fixIsAvailable(fixAvailable) {
   return (
     fixAvailable === true ||

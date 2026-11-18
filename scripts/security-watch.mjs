@@ -17,7 +17,8 @@ import {
   GATE_SEVERITIES,
   ROOT,
   WORKSPACES,
-  collectAdvisories
+  collectAdvisories,
+  readAuditReport
 } from './accepted-risks.mjs';
 
 const LABEL = 'security-watch';
@@ -41,17 +42,15 @@ function run(command, args, cwd = ROOT) {
 }
 
 function gateAdvisories(cwd, extraArgs) {
-  const { stdout } = run('npm', ['audit', '--json', ...extraArgs], cwd);
+  const { report, problem } = readAuditReport(
+    run('npm', ['audit', '--json', ...extraArgs], cwd)
+  );
 
-  try {
-    const advisories = [...collectAdvisories(JSON.parse(stdout)).values()];
+  if (problem !== undefined) return undefined;
 
-    return advisories.filter((advisory) =>
-      GATE_SEVERITIES.has(advisory.severity)
-    );
-  } catch {
-    return undefined;
-  }
+  return [...collectAdvisories(report).values()].filter((advisory) =>
+    GATE_SEVERITIES.has(advisory.severity)
+  );
 }
 
 function devOnlyReport(cwd) {
