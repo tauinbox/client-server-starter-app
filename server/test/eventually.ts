@@ -18,3 +18,22 @@ export async function eventually<T>(
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 }
+
+/**
+ * Like `eventually`, but throws when the time runs out. Use it when the test
+ * does not branch on the result: the error names the link that never came,
+ * where a later assertion on an empty value cannot.
+ */
+export async function waitUntil<T>(
+  link: string,
+  read: () => Promise<T | null>,
+  { timeoutMs = 5000, intervalMs = 50 } = {}
+): Promise<T> {
+  const value = await eventually(read, timeoutMs, intervalMs);
+
+  if (value === null) {
+    throw new Error(`Timed out after ${timeoutMs} ms: ${link}`);
+  }
+
+  return value;
+}

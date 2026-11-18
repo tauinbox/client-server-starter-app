@@ -17,7 +17,7 @@ import { NotificationsBus } from '../src/modules/notifications/notifications-bus
 import { RedisNotificationsBus } from '../src/modules/notifications/redis-notifications-bus';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
-import { eventually } from './eventually';
+import { waitUntil } from './eventually';
 
 const { REDIS_URL } = process.env;
 
@@ -122,14 +122,17 @@ runWithRedis('server pushes across instances (e2e)', () => {
     // Both instances listen before any push is raised.
     const channel = `${namespace}:push:${redis.options.db ?? 0}`;
 
-    await eventually(async () => {
-      const [, count] = (await redis.pubsub('NUMSUB', channel)) as [
-        string,
-        number
-      ];
+    await waitUntil(
+      'both instances subscribe to the push channel',
+      async () => {
+        const [, count] = (await redis.pubsub('NUMSUB', channel)) as [
+          string,
+          number
+        ];
 
-      return count === 2 ? true : null;
-    });
+        return count === 2 ? true : null;
+      }
+    );
   }, 60000);
 
   afterAll(async () => {
@@ -204,7 +207,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
   // sent before the sentinel has reached every stream once the sentinel has.
   const settle = async () => {
     first.get(NotificationsService).pushToAll(SENTINEL);
-    await eventually(() =>
+    await waitUntil('the sentinel reaches every stream', () =>
       Promise.resolve(sentinels.every((seen) => seen()) || null)
     );
   };
@@ -216,13 +219,16 @@ runWithRedis('server pushes across instances (e2e)', () => {
     const notifications = first.get(NotificationsService);
 
     // The first instance must see the users of the second in the registry.
-    await eventually(async () => {
-      const userIds = await first.get(NotificationsBus).connectedUserIds();
+    await waitUntil(
+      'the registry holds the users of the second instance',
+      async () => {
+        const userIds = await first.get(NotificationsBus).connectedUserIds();
 
-      return userIds?.includes(viewer.id) && userIds.includes(plain.id)
-        ? true
-        : null;
-    });
+        return userIds?.includes(viewer.id) && userIds.includes(plain.id)
+          ? true
+          : null;
+      }
+    );
 
     const direct = { type: 'session_invalidated' } as const;
     const broadcast = { type: 'feature_flags_updated' } as const;
@@ -250,11 +256,14 @@ runWithRedis('server pushes across instances (e2e)', () => {
   it('sends a role permission change to the connected holders only, in one message', async () => {
     const viewerOnSecond = await openStream(second, viewer);
 
-    await eventually(async () => {
-      const userIds = await first.get(NotificationsBus).connectedUserIds();
+    await waitUntil(
+      'the registry holds the viewer of the second instance',
+      async () => {
+        const userIds = await first.get(NotificationsBus).connectedUserIds();
 
-      return userIds?.includes(viewer.id) ? true : null;
-    });
+        return userIds?.includes(viewer.id) ? true : null;
+      }
+    );
     const listener = redis.duplicate();
     const messages: { userIds?: string[]; event: NotificationEvent }[] = [];
 
