@@ -82,6 +82,22 @@ test.describe('Login page', () => {
     ).toBeVisible();
   });
 
+  test('sends an admin to the admin panel after login', async ({
+    _mockServer,
+    page
+  }) => {
+    await page.goto('/login');
+
+    await page.getByLabel('Email').fill('admin@example.com');
+    await page.getByLabel('Email').blur();
+    await page.getByLabel('Password', { exact: true }).fill('Password1');
+    await page.getByLabel('Password', { exact: true }).blur();
+    await page.getByRole('main').getByRole('button', { name: 'Login' }).click();
+
+    await expect(page).toHaveURL(/\/admin\/users$/);
+    await expect(page.getByRole('link', { name: 'Admin panel' })).toBeVisible();
+  });
+
   test('should show error on invalid credentials', async ({
     _mockServer,
     page
