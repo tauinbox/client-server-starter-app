@@ -2,7 +2,11 @@ import type { Locator, Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 import type { MockUser } from './mock-data';
-import { trackRoutedRequest, untrackRequest } from './pending-requests';
+import {
+  trackRoutedRequest,
+  trackSentRequest,
+  untrackRequest
+} from './pending-requests';
 
 /**
  * Stores what a click on a provider button stores just before the browser
@@ -114,6 +118,11 @@ export async function routeApiToMockServer(
 ): Promise<void> {
   const { port } = new URL(mockServerUrl);
 
+  page.on('request', (request) => {
+    if (/\/api\//.test(request.url())) {
+      trackSentRequest(page, request);
+    }
+  });
   page.on('requestfinished', untrackRequest);
   page.on('requestfailed', untrackRequest);
   await page.route(/\/api\//, (route) => {
@@ -122,7 +131,7 @@ export async function routeApiToMockServer(
       .url()
       .replace(/localhost:\d+/, `localhost:${port}`);
 
-    trackRoutedRequest(page, route.request(), url);
+    trackRoutedRequest(page, route.request());
 
     return route.continue({ url });
   });
