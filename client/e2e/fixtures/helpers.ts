@@ -142,19 +142,14 @@ export async function routeApiToMockServer(
   );
 }
 
-/**
- * Seed a test user in mock-server state, sign it in through the API and open
- * `/profile`. A test of the login form fills the form itself.
- */
-export async function loginViaApi(
-  page: Page,
+type LoginCredentials = { email: string; password: string; name: string };
+
+async function seedLoginUser(
   mockServerUrl: string,
-  overrides: Partial<MockUser> = {}
-): Promise<void> {
+  overrides: Partial<MockUser>
+): Promise<LoginCredentials> {
   const email = overrides.email ?? 'testlogin@example.com';
   const password = 'Password1';
-
-  // Seed the user with desired properties via control API
   const user = {
     id: overrides.id ?? '100',
     email,
@@ -177,6 +172,23 @@ export async function loginViaApi(
     body: JSON.stringify([user])
   });
 
+  return { email, password, name: user.name };
+}
+
+/**
+ * Seed a test user in mock-server state, sign it in through the API and open
+ * `/profile`. A test of the login form fills the form itself.
+ */
+export async function loginViaApi(
+  page: Page,
+  mockServerUrl: string,
+  overrides: Partial<MockUser> = {}
+): Promise<void> {
+  const { email, password, name } = await seedLoginUser(
+    mockServerUrl,
+    overrides
+  );
+
   // The context request shares the cookie jar of the page, and a cookie
   // ignores the port, so the refresh cookie reaches the app origin too.
   const response = await page
@@ -198,9 +210,7 @@ export async function loginViaApi(
   );
   await page.goto('/profile');
 
-  await expect(
-    page.getByRole('heading', { level: 2, name: user.name })
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
 }
 
 export async function expectAuthRedirect(
@@ -233,30 +243,7 @@ export async function loginViaUiKeepSse(
   mockServerUrl: string,
   overrides: Partial<MockUser> = {}
 ): Promise<void> {
-  const email = overrides.email ?? 'testlogin@example.com';
-  const password = 'Password1';
-
-  const user = {
-    id: overrides.id ?? '100',
-    email,
-    name: overrides.name ?? 'John Doe',
-    password,
-    isActive: overrides.isActive ?? true,
-    roles: overrides.roles ?? ['user'],
-    isEmailVerified: overrides.isEmailVerified ?? true,
-    failedLoginAttempts: overrides.failedLoginAttempts ?? 0,
-    lockedUntil: overrides.lockedUntil ?? null,
-    locale: overrides.locale ?? 'en',
-    residenceCountry: overrides.residenceCountry,
-    createdAt: overrides.createdAt ?? '2025-01-01T00:00:00.000Z',
-    updatedAt: overrides.updatedAt ?? '2025-01-01T00:00:00.000Z'
-  };
-
-  await fetch(`${mockServerUrl}/__control/users`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify([user])
-  });
+  const { email, password } = await seedLoginUser(mockServerUrl, overrides);
 
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
