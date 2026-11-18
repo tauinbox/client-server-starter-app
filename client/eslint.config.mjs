@@ -11,10 +11,17 @@ import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 import baseRules, { errorKeyLiteralSyntax } from '../eslint.base.config.mjs';
 
 // The server renews or ends a trial at trialEnd, not at currentPeriodEnd.
-// The second selector reads the template AST of angular-eslint.
+// Each read form is a separate AST node: member, keyed and destructured
+// reads in TypeScript, and plain, safe and keyed reads in the template AST
+// of angular-eslint.
 const periodEndSyntax = [
   "MemberExpression[property.name='currentPeriodEnd']",
-  "PropertyRead[name='currentPeriodEnd']"
+  "MemberExpression[property.value='currentPeriodEnd']",
+  "ObjectPattern > Property[key.name='currentPeriodEnd']",
+  "PropertyRead[name='currentPeriodEnd']",
+  "SafePropertyRead[name='currentPeriodEnd']",
+  "KeyedRead[key.value='currentPeriodEnd']",
+  "SafeKeyedRead[key.value='currentPeriodEnd']"
 ].map((selector) => ({
   selector,
   message:
@@ -80,6 +87,13 @@ const restrictedSyntax = [
   {
     selector:
       "CallExpression[callee.property.name=/^(success|info|warn|error)$/][arguments.0.property.name='errorKey']",
+    message:
+      'Do not pass a server errorKey as a NotifyService message key. Pass the HttpErrorResponse itself and a client-owned fallback key.'
+  },
+  {
+    // An optional chain wraps the member read in a ChainExpression.
+    selector:
+      "CallExpression[callee.property.name=/^(success|info|warn|error)$/][arguments.0.expression.property.name='errorKey']",
     message:
       'Do not pass a server errorKey as a NotifyService message key. Pass the HttpErrorResponse itself and a client-owned fallback key.'
   },
