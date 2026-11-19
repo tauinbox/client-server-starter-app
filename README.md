@@ -1414,6 +1414,12 @@ with `provenance: file`:
 |---|---|---|---|
 | Dependency degraded | `min_over_time(dependency_up[15m]) < 1` | 10m | `KeepLast`. A missing series is a scrape gap, and the rule below owns a dead server |
 | Server unreachable | `up{job="nestjs-server"} < 1` | 5m | `Alerting` |
+| Redis memory near its cap | `max(redis_memory_used_ratio) > 0.8` | 5m | `OK`. The series exists only when Redis has a `maxmemory` |
+
+A full Redis still answers PING, so `dependency_up` stays `1`. Production Redis runs with
+`--maxmemory 72mb --maxmemory-policy noeviction`, and at the cap it refuses every write: step-up,
+MFA and OAuth sign-ins refuse, the rate limits stop and no mail is queued. The readiness probe reads
+`INFO memory` and exports `redis_memory_used_ratio` for the third rule.
 
 The window of 10 minutes is intentional. `SmtpHealthIndicator` keeps its verify result for 5 minutes.
 Thus a sample can be one TTL old, and a shorter window alerts on a dependency that already recovered.

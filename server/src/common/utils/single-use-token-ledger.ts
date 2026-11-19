@@ -22,9 +22,11 @@ import { redisClientOf, ThrottledFailureLog } from './redis-client';
  * fallback is per instance: a deployment that runs several instances without
  * Redis records the claim on one of them only.
  *
- * A ledger that cannot be reached fails open. It hardens credentials that are
- * already signed, bounded to seconds, and cleared from the browser on use, so a
- * cache outage must not take sign-in down with it.
+ * A ledger that cannot record the claim fails closed: the claim is refused.
+ * A full Redis under `noeviction` refuses writes, and an attacker can push
+ * Redis toward that state, so a failure that accepted the claim would reopen
+ * every spent value. The flow that presents the value stops until the ledger
+ * can write again.
  */
 export class SingleUseTokenLedger {
   readonly #cache: Cache;
@@ -40,7 +42,7 @@ export class SingleUseTokenLedger {
     this.#keyPrefix = keyPrefix;
     this.#failureLog = new ThrottledFailureLog(
       logger,
-      `Single-use ledger "${keyPrefix}" unavailable, a replay inside the token lifetime is not refused`
+      `Single-use ledger "${keyPrefix}" cannot record a claim, the claim is refused`
     );
   }
 
@@ -66,7 +68,7 @@ export class SingleUseTokenLedger {
       } catch (error: unknown) {
         this.#failureLog.log(error);
 
-        return true;
+        return false;
       }
     }
 
@@ -83,7 +85,7 @@ export class SingleUseTokenLedger {
     } catch (error: unknown) {
       this.#failureLog.log(error);
 
-      return true;
+      return false;
     } finally {
       // The cache holds the claim from here on, so the reservation is only
       // needed for the two awaits above.

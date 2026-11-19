@@ -4,13 +4,14 @@ import { redisClientOf, ThrottledFailureLog } from './redis-client';
 
 /** What a caller needs to decide whether the subject is barred, and for how long. */
 export interface AttemptWindow {
-  /** Failures recorded in the open window. 0 when no window is open. */
+  /**
+   * Failures recorded in the open window. 0 when no window is open, and
+   * infinite when the failure could not be recorded.
+   */
   count: number;
   /** Milliseconds left in the open window. 0 when no window is open. */
   remainingMs: number;
 }
-
-const NO_WINDOW: AttemptWindow = { count: 0, remainingMs: 0 };
 
 // Returns { count, pttl }. The expiry is set only on a key that has none, so
 // the window is never extended.
@@ -44,9 +45,11 @@ return { count, redis.call('PTTL', KEYS[1]) }
  * deployment that runs several instances without Redis counts on one of them
  * only, the same limit the single-use ledger carries.
  *
- * A counter that cannot be reached fails open. It hardens a gate that a caller
- * only reaches after passing an earlier one, so a cache outage must not take
- * that gate down with it.
+ * A counter that cannot record the failure fails closed: it reports a window
+ * with an infinite count, which every limit of a caller refuses. A full Redis
+ * under `noeviction` refuses writes, and the per-IP throttle fails open in
+ * that state, so an open counter would leave a code or a password with no
+ * limit at all.
  */
 export class FailedAttemptCounter {
   readonly #cache: Cache;
@@ -62,7 +65,7 @@ export class FailedAttemptCounter {
     this.#keyPrefix = keyPrefix;
     this.#failureLog = new ThrottledFailureLog(
       logger,
-      `Attempt counter "${keyPrefix}" unavailable, the per-subject limit is not enforced`
+      `Attempt counter "${keyPrefix}" cannot record a failure, the subject is barred`
     );
   }
 
@@ -88,7 +91,7 @@ export class FailedAttemptCounter {
       } catch (error: unknown) {
         this.#failureLog.log(error);
 
-        return NO_WINDOW;
+        return { count: Number.POSITIVE_INFINITY, remainingMs: windowMs };
       }
     }
 

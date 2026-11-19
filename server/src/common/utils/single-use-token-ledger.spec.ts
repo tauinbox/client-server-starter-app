@@ -60,9 +60,7 @@ describe('SingleUseTokenLedger', () => {
       );
     });
 
-    // A cache outage must not take sign-in down: the ledger hardens a signed,
-    // seconds-long credential, so it degrades to the pre-ledger behaviour.
-    it('fails open and warns when the cache throws', async () => {
+    it('refuses the claim and warns when the cache throws', async () => {
       const cache = createMockCache();
 
       jest
@@ -70,7 +68,7 @@ describe('SingleUseTokenLedger', () => {
         .mockRejectedValue(new Error('cache unreachable'));
       const ledger = new SingleUseTokenLedger(cache, 'p:', logger);
 
-      await expect(ledger.claim('id-1', 1000)).resolves.toBe(true);
+      await expect(ledger.claim('id-1', 1000)).resolves.toBe(false);
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining('cache unreachable')
       );
@@ -119,7 +117,9 @@ describe('SingleUseTokenLedger', () => {
       await expect(ledger.claim('id-1', 60_000)).resolves.toBe(false);
     });
 
-    it('fails open and warns when Redis throws', async () => {
+    // A full Redis refuses the write; accepting the claim then would reopen
+    // every spent value.
+    it('refuses the claim and warns when Redis throws', async () => {
       const set = jest.fn().mockRejectedValue(new Error('redis down'));
       const ledger = new SingleUseTokenLedger(
         cacheWithRedis(set),
@@ -127,7 +127,7 @@ describe('SingleUseTokenLedger', () => {
         logger
       );
 
-      await expect(ledger.claim('id-1', 60_000)).resolves.toBe(true);
+      await expect(ledger.claim('id-1', 60_000)).resolves.toBe(false);
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining('redis down')
       );

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { RedisThrottlerStorage } from './redis-throttler.storage';
@@ -95,6 +96,43 @@ describe('RedisThrottlerStorage', () => {
     it('should call redis.zpopmax with the key and count 1', async () => {
       await storage.decrement('throttle:key');
       expect(redisMock.zpopmax).toHaveBeenCalledWith('throttle:key', 1);
+    });
+  });
+
+  describe('a Redis that refuses the write', () => {
+    let warn: jest.SpyInstance;
+
+    beforeEach(() => {
+      warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    });
+
+    afterEach(() => {
+      warn.mockRestore();
+    });
+
+    // A full Redis aborts the MULTI; a throw here answered every throttled
+    // route with an internal error.
+    it('lets the request through and warns', async () => {
+      multiMock.exec.mockRejectedValue(
+        new Error('EXECABORT Transaction discarded because of previous errors.')
+      );
+
+      const result = await storage.increment('key', 60_000, 10, 5_000, 'login');
+
+      expect(result).toEqual({
+        totalHits: 0,
+        timeToExpire: 60,
+        isBlocked: false,
+        timeToBlockExpire: 0
+      });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('EXECABORT'));
+    });
+
+    it('does not throw on decrement', async () => {
+      redisMock.zpopmax.mockRejectedValue(new Error('OOM command not allowed'));
+
+      await expect(storage.decrement('key')).resolves.toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('OOM'));
     });
   });
 

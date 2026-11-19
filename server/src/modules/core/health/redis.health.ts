@@ -9,6 +9,11 @@ import {
   DEPENDENCY_HEALTH_REF,
   DependencyHealthRef
 } from '../metrics/dependency-up.gauge';
+import {
+  REDIS_MEMORY_REF,
+  RedisMemoryRef,
+  redisMemoryRatio
+} from '../metrics/redis-memory.gauge';
 
 const PING_TIMEOUT_MS = 2000;
 
@@ -20,7 +25,9 @@ export class RedisHealthIndicator implements OnModuleDestroy {
     private readonly config: ConfigService,
     private readonly healthIndicatorService: HealthIndicatorService,
     @Inject(DEPENDENCY_HEALTH_REF)
-    private readonly dependencyHealth: DependencyHealthRef
+    private readonly dependencyHealth: DependencyHealthRef,
+    @Inject(REDIS_MEMORY_REF)
+    private readonly redisMemory: RedisMemoryRef
   ) {}
 
   onModuleDestroy(): void {
@@ -47,7 +54,7 @@ export class RedisHealthIndicator implements OnModuleDestroy {
     }
 
     try {
-      await this.ping(redisUrl);
+      await this.probe(redisUrl);
       this.dependencyHealth.statuses.set(key, true);
 
       return indicator.up();
@@ -61,7 +68,7 @@ export class RedisHealthIndicator implements OnModuleDestroy {
     }
   }
 
-  private async ping(url: string): Promise<void> {
+  private async probe(url: string): Promise<void> {
     this.client ??= this.createClient(url);
     let timer: NodeJS.Timeout | undefined;
     const timeout = new Promise<never>((_, reject) => {
@@ -73,6 +80,10 @@ export class RedisHealthIndicator implements OnModuleDestroy {
 
     try {
       await Promise.race([this.client.ping(), timeout]);
+      // A full Redis still answers PING, so only the memory ratio shows it.
+      this.redisMemory.ratio = redisMemoryRatio(
+        await Promise.race([this.client.info('memory'), timeout])
+      );
     } finally {
       clearTimeout(timer);
     }

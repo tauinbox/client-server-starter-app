@@ -49,6 +49,20 @@ describe('RenewalProcessor', () => {
     );
   });
 
+  // A full Redis refuses the upsert; a throw here stopped the boot.
+  it('logs a failed upsert and lets the boot go on', async () => {
+    const error = new Error('OOM command not allowed');
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+    upsertJobScheduler.mockRejectedValue(error);
+
+    await expect(processor.onApplicationBootstrap()).resolves.toBeUndefined();
+    expect(logged).toHaveBeenCalledWith(
+      'Cannot register the renewal scan schedule',
+      error
+    );
+  });
+
   it('runs the due renewals, then the renewal notices, once for each scan job', async () => {
     await processor.process();
 

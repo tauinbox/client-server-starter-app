@@ -63,6 +63,51 @@ groups:
                     params:
                       - 1
 
+      # Redis runs with maxmemory and noeviction, and still answers PING when
+      # it is full, so the dependency rule stays Normal. At the cap it refuses
+      # every write: single-use proofs and attempt counters refuse, the rate
+      # limits stop, and no job is queued.
+      - uid: nexus-redis-memory-high
+        title: Redis memory near its cap
+        condition: B
+        for: 5m
+        annotations:
+          summary: 'Redis uses more than 80 % of its maxmemory'
+          description: 'Redis has used more than 80 % of its maxmemory for 5 minutes. At 100 % it refuses writes: step-up and OAuth sign-ins refuse, rate limits stop and no mail is queued. Find the key prefix that grows (redis-cli --bigkeys), then free it or raise maxmemory together with mem_limit.'
+        labels:
+          severity: warning
+        # The series exists only after a readiness probe has read a maxmemory.
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: max(redis_memory_used_ratio)
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0.8
+
       # Without this a dead server reports nothing: the dependency rule keeps
       # the state it last evaluated, which for a healthy stack is Normal.
       - uid: nexus-server-down

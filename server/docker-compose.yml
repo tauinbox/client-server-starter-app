@@ -49,6 +49,22 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # A small Redis that the e2e suite fills to its maxmemory, to test how the
+  # server answers when a full Redis refuses writes, as production does under
+  # noeviction. Set REDIS_FULL_URL=redis://localhost:6380 for that suite only.
+  redis-full:
+    container_name: redis_full_container
+    image: redis:7.4-alpine
+    command: ["redis-server", "--maxmemory", "8mb", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # SMTP sink — captures all outgoing email instead of delivering it. Set
   # SMTP_HOST=localhost / SMTP_PORT=1025 / SMTP_REGION=intl in server/.env to route mail here;
   # inspect captured messages at http://localhost:8025 (web UI + REST API).

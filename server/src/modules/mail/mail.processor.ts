@@ -1,9 +1,4 @@
-import {
-  InjectQueue,
-  OnWorkerEvent,
-  Processor,
-  WorkerHost
-} from '@nestjs/bullmq';
+import { InjectQueue, OnWorkerEvent, Processor } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { MailService } from './mail.service';
@@ -14,6 +9,7 @@ import {
 } from '../core/metrics/metrics.module';
 import { MetricsService } from '../core/metrics/metrics.service';
 import { maskEmail } from '../../common/utils/mask-email';
+import { LoggedWorkerHost } from '../../common/utils/logged-worker-host';
 
 /**
  * Delivers queued emails. Errors propagate so BullMQ applies the configured
@@ -22,7 +18,7 @@ import { maskEmail } from '../../common/utils/mask-email';
  * no-op whenever no queue exists.
  */
 @Processor(MAIL_QUEUE)
-export class MailProcessor extends WorkerHost {
+export class MailProcessor extends LoggedWorkerHost {
   private readonly logger = new Logger(MailProcessor.name);
 
   constructor(
