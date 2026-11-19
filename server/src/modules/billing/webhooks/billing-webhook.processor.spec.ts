@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { BillingWebhookProcessor } from './billing-webhook.processor';
 import { WebhookIngestionService } from './webhook-ingestion.service';
@@ -98,6 +99,21 @@ describe('BillingWebhookProcessor', () => {
       { every: WEBHOOK_RETENTION_INTERVAL_MS },
       { name: BILLING_WEBHOOK_RETENTION_JOB, data: {} }
     );
+  });
+
+  it('logs a failed upsert and lets the boot go on', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const error = new Error('OOM command not allowed');
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+    upsertJobScheduler.mockRejectedValue(error);
+
+    await expect(processor.onApplicationBootstrap()).resolves.toBeUndefined();
+    expect(logged).toHaveBeenCalledWith(
+      'Cannot register the webhook job schedules',
+      error
+    );
+    logged.mockRestore();
   });
 
   it('does not schedule under test (avoids polluting Redis)', async () => {

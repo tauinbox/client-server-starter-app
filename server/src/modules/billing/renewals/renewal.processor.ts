@@ -1,11 +1,7 @@
-import {
-  InjectQueue,
-  OnWorkerEvent,
-  Processor,
-  WorkerHost
-} from '@nestjs/bullmq';
+import { InjectQueue, OnWorkerEvent, Processor } from '@nestjs/bullmq';
 import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
+import { LoggedWorkerHost } from '../../../common/utils/logged-worker-host';
 import { RenewalService } from './renewal.service';
 import { RenewalNoticeService } from './renewal-notice.service';
 import {
@@ -25,7 +21,7 @@ import {
  */
 @Processor(BILLING_RENEWAL_QUEUE)
 export class RenewalProcessor
-  extends WorkerHost
+  extends LoggedWorkerHost
   implements OnApplicationBootstrap
 {
   private readonly logger = new Logger(RenewalProcessor.name);
@@ -38,12 +34,21 @@ export class RenewalProcessor
     super();
   }
 
+  /**
+   * A failed upsert is logged and the boot goes on: a full Redis refuses the
+   * write, and a throw here would stop the API and restart it in a loop. The
+   * schedule already in Redis keeps running, and the next boot upserts again.
+   */
   async onApplicationBootstrap(): Promise<void> {
-    await this.queue.upsertJobScheduler(
-      BILLING_RENEWAL_SCHEDULER_ID,
-      { every: RENEWAL_SCAN_INTERVAL_MS },
-      { name: BILLING_RENEWAL_SCAN_JOB, data: {} }
-    );
+    try {
+      await this.queue.upsertJobScheduler(
+        BILLING_RENEWAL_SCHEDULER_ID,
+        { every: RENEWAL_SCAN_INTERVAL_MS },
+        { name: BILLING_RENEWAL_SCAN_JOB, data: {} }
+      );
+    } catch (error: unknown) {
+      this.logger.error('Cannot register the renewal scan schedule', error);
+    }
   }
 
   /** The charges first, so that a notice never names a boundary that passed. */

@@ -10,6 +10,13 @@ name: nexus${CELL:+-${CELL}}
 services:
   redis:
     image: redis:7.4-alpine
+    # Redis does not read the container cap: with no maxmemory the kernel
+    # kills it at mem_limit and its state is lost. 72mb is 75 % of the cap; the
+    # rest is for the process and the client buffers. noeviction makes a full
+    # Redis refuse writes: an eviction would delete single-use ledger keys
+    # silently, and BullMQ requires noeviction. The server alerts at 80 %
+    # (redis_memory_used_ratio).
+    command: ["redis-server", "--maxmemory", "72mb", "--maxmemory-policy", "noeviction"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

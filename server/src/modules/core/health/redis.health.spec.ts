@@ -7,8 +7,14 @@ import {
   DependencyHealthRef,
   createDependencyHealthRef
 } from '../metrics/dependency-up.gauge';
+import {
+  REDIS_MEMORY_REF,
+  RedisMemoryRef,
+  createRedisMemoryRef
+} from '../metrics/redis-memory.gauge';
 
 const pingMock = jest.fn();
+const infoMock = jest.fn();
 const disconnectMock = jest.fn();
 const onMock = jest.fn();
 const redisCtorMock = jest.fn();
@@ -21,6 +27,7 @@ jest.mock('ioredis', () => ({
     }
 
     ping = pingMock;
+    info = infoMock;
     disconnect = disconnectMock;
     on = onMock;
   }
@@ -30,11 +37,14 @@ describe('RedisHealthIndicator', () => {
   let indicator: RedisHealthIndicator;
   let configValues: Record<string, string | undefined>;
   let dependencyHealth: DependencyHealthRef;
+  let redisMemory: RedisMemoryRef;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    infoMock.mockResolvedValue('used_memory:100\r\nmaxmemory:0\r\n');
     configValues = {};
     dependencyHealth = createDependencyHealthRef();
+    redisMemory = createRedisMemoryRef();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -44,7 +54,8 @@ describe('RedisHealthIndicator', () => {
           provide: ConfigService,
           useValue: { get: jest.fn((key: string) => configValues[key]) }
         },
-        { provide: DEPENDENCY_HEALTH_REF, useValue: dependencyHealth }
+        { provide: DEPENDENCY_HEALTH_REF, useValue: dependencyHealth },
+        { provide: REDIS_MEMORY_REF, useValue: redisMemory }
       ]
     }).compile();
 
@@ -93,6 +104,26 @@ describe('RedisHealthIndicator', () => {
       expect(result).toEqual({ redis: { status: 'up' } });
       expect(pingMock).toHaveBeenCalledTimes(1);
       expect(dependencyHealth.statuses.get('redis')).toBe(true);
+    });
+
+    it('records the memory ratio of a Redis with maxmemory', async () => {
+      pingMock.mockResolvedValue('PONG');
+      infoMock.mockResolvedValue(
+        '# Memory\r\nused_memory:75\r\nused_memory_human:75B\r\nmaxmemory:100\r\n'
+      );
+
+      await indicator.isHealthy('redis');
+
+      expect(infoMock).toHaveBeenCalledWith('memory');
+      expect(redisMemory.ratio).toBe(0.75);
+    });
+
+    it('records no memory ratio for a Redis with no maxmemory', async () => {
+      pingMock.mockResolvedValue('PONG');
+
+      await indicator.isHealthy('redis');
+
+      expect(redisMemory.ratio).toBeNull();
     });
 
     it('reports down when PING fails', async () => {

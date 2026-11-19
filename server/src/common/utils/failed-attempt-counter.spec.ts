@@ -120,7 +120,7 @@ describe('FailedAttemptCounter', () => {
       );
     });
 
-    it('fails open and warns when Redis throws', async () => {
+    it('bars the subject for the window and warns when Redis throws', async () => {
       const client = {
         eval: jest.fn().mockRejectedValue(new Error('redis down'))
       };
@@ -131,8 +131,8 @@ describe('FailedAttemptCounter', () => {
       );
 
       await expect(counter.record('id-1', 60_000)).resolves.toEqual({
-        count: 0,
-        remainingMs: 0
+        count: Number.POSITIVE_INFINITY,
+        remainingMs: 60_000
       });
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining('redis down')

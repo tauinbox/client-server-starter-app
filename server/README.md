@@ -16,7 +16,8 @@ npm run start:dev          # Dev server at http://localhost:3000
 ```
 
 `server/docker-compose.yml` is the local **dev** stack. It holds Postgres on `:5432`, Redis on
-`:6379`, and Mailpit with SMTP on `:1025` and a UI on `:8025`.
+`:6379`, and Mailpit with SMTP on `:1025` and a UI on `:8025`. `redis-full` on `:6380` is a Redis
+with an 8 MB `maxmemory` and `noeviction` for one e2e suite only (`REDIS_FULL_URL`).
 
 That file is different from the `docker-compose.yml` file in the root of the repository. The root
 file is the **production** deployment, and you must not run it locally.
@@ -144,6 +145,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `SMTP_FROM` | `noreply@example.com` | Sender email address |
 | `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting, a shared permission cache and SSE pushes across instances for a deployment with more than one instance |
 | `E2E_REDIS_DB` | `15` | For a test only. `npm run test:e2e` uses this logical Redis database, and it clears the database before each run. The value must not be `0`. Refer to [E2E Tests](#e2e-tests-jest) |
+| `REDIS_FULL_URL` | - | For a test only. `test/redis-full.e2e-spec.ts` fills this Redis to its `maxmemory` and clears it with `FLUSHALL`, so it must be a Redis of its own (`redis-full` of `server/docker-compose.yml`, `redis://localhost:6380`). The suite skips without it |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry before the nightly deletion |
 | `CAPTCHA_PROVIDER` | - | The CAPTCHA vendor of this cell: `turnstile`, or empty for no CAPTCHA. The boot is refused when a key of the selected vendor is empty, and when a key of a vendor that is not selected is set. Turnstile receives the IP of the caller, thus it runs only in an `intl` cell. Refer to [Enabling CAPTCHA in production](#enabling-captcha-in-production) |
 | `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile site key, which is public. Necessary when `CAPTCHA_PROVIDER` is `turnstile` |
@@ -232,7 +234,8 @@ presentation of the same value is refused. With Redis the claim is one condition
 cannot both proceed. The raw Redis client is used for the same reason the version counter uses it:
 Keyv gives no conditional write. Without Redis one process owns the ledger, and the claims in flight
 are also reserved synchronously, because the read and the write are two awaits. A ledger that cannot
-be reached fails open, because it hardens a credential that is already signed and short-lived.
+record the claim fails closed: the claim is refused. A full Redis under `noeviction` refuses writes,
+and accepting the claim then would reopen every spent value.
 There are three consumers. `POST /auth/oauth/exchange` claims the `jti` of the `oauth_data` cookie,
 and `POST /auth/oauth/signup` the `jti` of the `oauth_signup` cookie under `oauth-signup:spent:`,
 after the region check of the country, so a refused country leaves the cookie unspent.
@@ -314,7 +317,14 @@ concurrent write loses with a 409 and overwrites nothing.
 readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value or the
 environment is production.
 
-A dead Redis fails the readiness check, with a timeout of 2 s. A missing `REDIS_URL` in production
+A dead Redis fails the readiness check, with a timeout of 2 s. A full Redis still answers PING, so
+the check also reads `INFO memory` and exports `used_memory / maxmemory` as
+`redis_memory_used_ratio`; Grafana alerts above 0.8. Production Redis runs with `maxmemory` and
+`noeviction`, so at the cap it refuses writes: the single-use ledgers and the attempt counters
+refuse, the throttler keeps a block that Redis holds and counts new hits in the memory of the
+instance (`MemoryThrottlerStorage`) with a warning, and a job schedule that cannot be
+written at boot is logged and the boot goes on. The queue processors extend `LoggedWorkerHost`,
+which logs a failed worker loop once in 30 seconds instead of the raw stderr dump of BullMQ. A missing `REDIS_URL` in production
 degrades to a generic warning, and an SMTP failure does the same. The server logs the raw SMTP error
 and never returns it from the public endpoint.
 
@@ -1347,8 +1357,10 @@ The state is `FailedAttemptCounter` (`common/utils/failed-attempt-counter.ts`), 
 Redis it is one Lua script: `INCR`, then `PEXPIRE` when the key has no expiry. Redis runs a script
 atomically, so the key cannot expire between the two steps. Separate commands can leave a counter
 with no expiry, that is an account barred for ever. The script also repairs a key that already has
-no expiry. Without Redis one process map holds the window. It **fails open**
-on a cache outage, which returns the route to the throttle-only behaviour and never to a worse one.
+no expiry. Without Redis one process map holds the window. It **fails closed**: when Redis refuses
+or cannot take the write, it reports an infinite count, so the user is barred for the window. The
+per-IP throttle counts in each instance only in that state, so an open counter would leave the
+secret with a weaker limit.
 Each of the three counters takes the slot of an attempt before the secret is checked, and checks the
 secret only when that slot is inside the budget. A read of the count before the check let every
 request of a concurrent burst see the same open budget, so all of them were checked.
@@ -2449,6 +2461,7 @@ These are the counters and the histograms:
 | `db_pool_connections` | gauge | `state`, one of `total`, `idle`, `waiting` | The size of the PostgreSQL connection pool, by state. The metric reads the pg pool on the injected `DataSource` object. A `waiting` value above 0 for a long time means that the pool is exhausted and the requests are in a queue |
 | `cache_requests_total` | counter | `cache`, one of `permissions`, `roles`, `resources`, `feature_flags_all`, `entitlements`; and `outcome`, one of `hit` or `miss` | The lookups in each Redis-backed cache, by logical cache and by outcome. The hit ratio of a cache is `hit / (hit + miss)`. A ratio that stays low means that the invalidation is faster than the hits |
 | `dependency_up` | gauge | `dependency`, one of `smtp` or `redis` | The health of an external dependency, as `/health/ready` last observed it. `1` is healthy, and `0` is degraded or down. A series appears only after its indicator runs. Thus a deployment with no SMTP configuration never emits `dependency="smtp"`. This is the only machine-readable signal for a degradation that readiness intentionally reports as up. Refer to [Alerting](../README.md#alerting) |
+| `redis_memory_used_ratio` | gauge | `dependency`, always `redis` | `used_memory / maxmemory` of Redis, as `/health/ready` last read it from `INFO memory`. The series is absent until the first probe and while Redis has no `maxmemory`. At `1` Redis refuses writes (`noeviction`); Grafana alerts above `0.8` for 5 minutes |
 
 `prom-client` also supplies the default Node.js process metrics. Those cover the heap, the GC, the
 event-loop lag and the file descriptors.
@@ -2936,7 +2949,10 @@ To exercise the in-memory throttler instead, run with `REDIS_URL=` empty. The ma
 this. A second CI step, `E2E – Redis-backed paths`, starts `redis:7.4-alpine`, the image of
 production, and runs with `REDIS_URL` set. It runs each suite that uses `runWithRedis`, and
 `email-delivery`, whose mail then goes through the BullMQ queue. The step fails when one of its tests
-skips, because a skip there means that the suites did not see Redis.
+skips, because a skip there means that the suites did not see Redis. The step also sets
+`REDIS_FULL_URL` to a second Redis with an 8 MB `maxmemory` and `noeviction`, which
+`redis-full.e2e-spec.ts` fills to show how the server answers when Redis refuses writes. Locally,
+start `redis-full` of `server/docker-compose.yml` and set `REDIS_FULL_URL=redis://localhost:6380`.
 
 ## Shared Module
 

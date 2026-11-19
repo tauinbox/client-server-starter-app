@@ -162,7 +162,12 @@ jobs:
           docker run -d --name redis -p 6379:6379 \
             --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 5s --health-retries 30 \
             redis:7.4-alpine
-          for name in postgres redis; do
+          # A small Redis that test/redis-full.e2e-spec.ts fills to its
+          # maxmemory, with the eviction policy of production.
+          docker run -d --name redis-full -p 6380:6379 \
+            --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 5s --health-retries 30 \
+            redis:7.4-alpine redis-server --maxmemory 8mb --maxmemory-policy noeviction
+          for name in postgres redis redis-full; do
             for _ in $(seq 1 60); do
               status="$(docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' "$name")"
               case "$status" in
@@ -206,6 +211,7 @@ jobs:
       - name: E2E – Redis-backed paths
         env:
           REDIS_URL: redis://localhost:6379
+          REDIS_FULL_URL: redis://localhost:6380
         run: |
           suites="$(grep -l runWithRedis test/*.e2e-spec.ts | paste -sd '|')"
           if [ -z "$suites" ]; then

@@ -1,11 +1,7 @@
-import {
-  InjectQueue,
-  OnWorkerEvent,
-  Processor,
-  WorkerHost
-} from '@nestjs/bullmq';
+import { InjectQueue, OnWorkerEvent, Processor } from '@nestjs/bullmq';
 import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
+import { LoggedWorkerHost } from '../../../common/utils/logged-worker-host';
 import { WebhookIngestionService } from './webhook-ingestion.service';
 import { WebhookReconciliationService } from './webhook-reconciliation.service';
 import { WebhookRetentionService } from './webhook-retention.service';
@@ -33,7 +29,7 @@ import {
  */
 @Processor(BILLING_WEBHOOK_QUEUE)
 export class BillingWebhookProcessor
-  extends WorkerHost
+  extends LoggedWorkerHost
   implements OnApplicationBootstrap
 {
   private readonly logger = new Logger(BillingWebhookProcessor.name);
@@ -55,16 +51,21 @@ export class BillingWebhookProcessor
       return;
     }
 
-    await this.queue.upsertJobScheduler(
-      BILLING_WEBHOOK_RECONCILE_SCHEDULER_ID,
-      { every: WEBHOOK_RECONCILE_INTERVAL_MS },
-      { name: BILLING_WEBHOOK_RECONCILE_JOB, data: {} }
-    );
-    await this.queue.upsertJobScheduler(
-      BILLING_WEBHOOK_RETENTION_SCHEDULER_ID,
-      { every: WEBHOOK_RETENTION_INTERVAL_MS },
-      { name: BILLING_WEBHOOK_RETENTION_JOB, data: {} }
-    );
+    // A failed upsert is logged and the boot goes on, as in RenewalProcessor.
+    try {
+      await this.queue.upsertJobScheduler(
+        BILLING_WEBHOOK_RECONCILE_SCHEDULER_ID,
+        { every: WEBHOOK_RECONCILE_INTERVAL_MS },
+        { name: BILLING_WEBHOOK_RECONCILE_JOB, data: {} }
+      );
+      await this.queue.upsertJobScheduler(
+        BILLING_WEBHOOK_RETENTION_SCHEDULER_ID,
+        { every: WEBHOOK_RETENTION_INTERVAL_MS },
+        { name: BILLING_WEBHOOK_RETENTION_JOB, data: {} }
+      );
+    } catch (error: unknown) {
+      this.logger.error('Cannot register the webhook job schedules', error);
+    }
   }
 
   async process(job: Job<BillingWebhookJobData>): Promise<void> {

@@ -18,6 +18,13 @@ import {
   createDependencyHealthRef,
   createDependencyUpGauge
 } from './dependency-up.gauge';
+import {
+  REDIS_MEMORY_METRIC_NAME,
+  REDIS_MEMORY_REF,
+  RedisMemoryRef,
+  createRedisMemoryGauge,
+  createRedisMemoryRef
+} from './redis-memory.gauge';
 
 export interface SseConnectionsRef {
   getCount: () => number;
@@ -172,13 +179,24 @@ export const MAIL_QUEUE_REF = Symbol('MAIL_QUEUE_REF');
       useFactory: (ref: DependencyHealthRef): Gauge<string> =>
         createDependencyUpGauge(ref),
       inject: [DEPENDENCY_HEALTH_REF]
+    },
+    {
+      provide: REDIS_MEMORY_REF,
+      useFactory: createRedisMemoryRef
+    },
+    {
+      provide: getToken(REDIS_MEMORY_METRIC_NAME),
+      useFactory: (ref: RedisMemoryRef): Gauge<string> =>
+        createRedisMemoryGauge(ref),
+      inject: [REDIS_MEMORY_REF]
     }
   ],
   exports: [
     MetricsService,
     SSE_CONNECTIONS_REF,
     MAIL_QUEUE_REF,
-    DEPENDENCY_HEALTH_REF
+    DEPENDENCY_HEALTH_REF,
+    REDIS_MEMORY_REF
   ]
 })
 export class MetricsModule {}
