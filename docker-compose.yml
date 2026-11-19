@@ -228,8 +228,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SERVER_ROOT_URL: http://localhost:${GRAFANA_HOST_PORT:-3001}/
       # Grafana 13 preinstalls the Elasticsearch data source as a standalone
       # plugin and tries to auto-update it on every boot, which fails with
       # "permission denied" against the read-only bundled-plugin path and adds
@@ -246,8 +245,12 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      # Loopback only, opened through an SSH tunnel. Never route Grafana through
+      # the public proxy: on the origin of the SPA, a flaw in Grafana could read
+      # the session of the SPA. Each cell on one host needs its own port.
+      - "127.0.0.1:${GRAFANA_HOST_PORT:-3001}:3000"
     healthcheck:
-      # /api/health is served at the root even when serve_from_sub_path is on.
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
@@ -257,10 +260,9 @@ services:
       - prometheus
     networks:
       default:
-      # Caddyfile: `grafana:3000`. See the server service.
+      # The receiver of ALERT_WEBHOOK_URL can be on the proxy network. No proxy
+      # route points here, so the service has no alias.
       proxy:
-        aliases:
-          - nexus-${CELL:-intl}-grafana
     # Grafana 13's unified-storage/apiserver working set exceeds the old 256m
     # cap: it pegged memory.max (peak == cap, 1600+ cgroup "max" reclaim events),
     # and the resulting reclaim/swap stalls made its internal apiserver time out

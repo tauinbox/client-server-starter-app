@@ -1,25 +1,3 @@
 {
-  "risks": [
-    {
-      "id": "GHSA-fc5q-39xc-vjpf",
-      "aliases": ["CVE-2026-112366"],
-      "package": "picomatch",
-      "version": "4.0.7",
-      "workspaces": ["server"],
-      "affected": [
-        "@jorgebodega/typeorm-seeding",
-        "fdir",
-        "picomatch",
-        "tinyglobby",
-        "typeorm"
-      ],
-      "reachability": "No release fixes it (latest is 4.0.7). In the production tree only TypeORM reaches picomatch, through tinyglobby, when entities or migrations are glob strings. postgres.config.ts passes classes, so the server and the migration CLI never call the matcher, and no request value can become a pattern.",
-      "guard": {
-        "file": "server/src/postgres.config.spec.ts",
-        "test": "passes classes, not glob strings, to TypeORM"
-      },
-      "added": "2026-11-17",
-      "expires": "2026-12-17"
-    }
-  ]
+  "risks": []
 }
