@@ -6,18 +6,8 @@ import { RedisThrottlerStorage } from './redis-throttler.storage';
 let redisMock: {
   disconnect: jest.Mock;
   zpopmax: jest.Mock;
-  multi: jest.Mock;
-  set: jest.Mock;
+  eval: jest.Mock;
   get: jest.Mock;
-};
-
-let multiMock: {
-  zremrangebyscore: jest.Mock;
-  zadd: jest.Mock;
-  zcard: jest.Mock;
-  pexpire: jest.Mock;
-  get: jest.Mock;
-  exec: jest.Mock;
 };
 
 jest.mock('ioredis', () => ({
@@ -29,26 +19,10 @@ describe('RedisThrottlerStorage', () => {
   let storage: RedisThrottlerStorage;
 
   beforeEach(() => {
-    multiMock = {
-      zremrangebyscore: jest.fn().mockReturnThis(),
-      zadd: jest.fn().mockReturnThis(),
-      zcard: jest.fn().mockReturnThis(),
-      pexpire: jest.fn().mockReturnThis(),
-      get: jest.fn().mockReturnThis(),
-      exec: jest.fn().mockResolvedValue([
-        [null, 0],
-        [null, 1],
-        [null, 2],
-        [null, 1],
-        [null, null]
-      ])
-    };
-
     redisMock = {
       disconnect: jest.fn(),
       zpopmax: jest.fn().mockResolvedValue(null),
-      multi: jest.fn().mockReturnValue(multiMock),
-      set: jest.fn().mockResolvedValue('OK'),
+      eval: jest.fn().mockResolvedValue([1, 0, 0]),
       get: jest.fn().mockResolvedValue(null)
     };
 
@@ -113,10 +87,9 @@ describe('RedisThrottlerStorage', () => {
     });
 
     beforeEach(() => {
-      // A full Redis aborts the MULTI; a throw here answered every throttled
-      // route with an internal error.
-      multiMock.exec.mockRejectedValue(
-        new Error('EXECABORT Transaction discarded because of previous errors.')
+      // A throw here answered every throttled route with an internal error.
+      redisMock.eval.mockRejectedValue(
+        new Error("OOM command not allowed when used memory > 'maxmemory'.")
       );
     });
 
@@ -132,7 +105,7 @@ describe('RedisThrottlerStorage', () => {
         isBlocked: true,
         timeToBlockExpire: 5
       });
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('EXECABORT'));
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('OOM'));
     });
 
     it('keeps a block that Redis already holds', async () => {
@@ -157,65 +130,61 @@ describe('RedisThrottlerStorage', () => {
   });
 
   describe('increment', () => {
-    it('should return totalHits and isBlocked=false when under limit', async () => {
-      multiMock.exec.mockResolvedValue([
-        [null, 0],
-        [null, 1],
-        [null, 2], // totalHits = 2
-        [null, 1],
-        [null, null]
-      ]);
+    it('passes the hit key, the block key and the limits to one script', async () => {
+      await storage.increment('key', 60000, 10, 5000, 'default');
 
-      const result = await storage.increment('key', 60000, 10, 0, 'default');
+      const [
+        [, keyCount, key, blockKey, now, windowStart, , ttl, limit, block]
+      ] = redisMock.eval.mock.calls as [
+        [
+          string,
+          number,
+          string,
+          string,
+          number,
+          number,
+          string,
+          number,
+          number,
+          number
+        ]
+      ];
 
-      expect(result.totalHits).toBe(2);
-      expect(result.isBlocked).toBe(false);
+      expect({ keyCount, key, blockKey, ttl, limit, block }).toEqual({
+        keyCount: 2,
+        key: 'key',
+        blockKey: 'key:block',
+        ttl: 60000,
+        limit: 10,
+        block: 5000
+      });
+      expect(now - windowStart).toBe(60000);
     });
 
-    it('should set block key and return isBlocked=true when totalHits exceeds limit', async () => {
-      multiMock.exec.mockResolvedValue([
-        [null, 0],
-        [null, 1],
-        [null, 15], // totalHits = 15 > limit 10
-        [null, 1],
-        [null, null] // no existing block
-      ]);
+    it('reports the hits of the window when under the limit', async () => {
+      redisMock.eval.mockResolvedValue([2, 0, 0]);
 
-      const result = await storage.increment('key', 60000, 10, 5000, 'default');
-
-      expect(result.totalHits).toBe(15);
-      expect(result.isBlocked).toBe(true);
-      expect(result.timeToExpire).toBe(60);
-      expect(result.timeToBlockExpire).toBe(5);
-      expect(redisMock.set).toHaveBeenCalledWith(
-        'key:block',
-        expect.any(String),
-        'PX',
-        5000
-      );
+      await expect(
+        storage.increment('key', 60000, 10, 0, 'default')
+      ).resolves.toEqual({
+        totalHits: 2,
+        timeToExpire: 60,
+        isBlocked: false,
+        timeToBlockExpire: 0
+      });
     });
 
-    it('should respect existing block key and return isBlocked=true', async () => {
-      const blockExpiry = Date.now() + 10000;
+    it('reports a block and its time left in seconds', async () => {
+      redisMock.eval.mockResolvedValue([11, 1, 9500]);
 
-      multiMock.exec.mockResolvedValue([
-        [null, 0],
-        [null, 1],
-        [null, 1],
-        [null, 1],
-        [null, blockExpiry.toString()]
-      ]);
-
-      const result = await storage.increment('key', 60000, 10, 5000, 'default');
-
-      expect(result.isBlocked).toBe(true);
-      expect(result.timeToBlockExpire).toBe(10);
-    });
-
-    it('should return timeToBlockExpire=0 when not blocked and blockDuration=0', async () => {
-      const result = await storage.increment('key', 60000, 10, 0, 'default');
-
-      expect(result.timeToBlockExpire).toBe(0);
+      await expect(
+        storage.increment('key', 60000, 10, 10000, 'default')
+      ).resolves.toEqual({
+        totalHits: 11,
+        timeToExpire: 60,
+        isBlocked: true,
+        timeToBlockExpire: 10
+      });
     });
   });
 });

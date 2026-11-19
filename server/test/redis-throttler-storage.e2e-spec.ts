@@ -60,7 +60,9 @@ runWithRedis('Redis throttler storage (real Redis)', () => {
 
     const record = await storage.increment(KEY, 50, 1, 60_000, 'login');
 
-    expect(record).toMatchObject({ totalHits: 1, isBlocked: true });
+    expect(record).toMatchObject({ isBlocked: true });
+    // A call inside the block records no hit.
+    expect(await redis.zcard(KEY)).toBe(0);
   });
 
   it('starts a new count once the window elapses', async () => {
@@ -91,7 +93,44 @@ runWithRedis('Redis throttler storage (real Redis)', () => {
 
     const hits = records.map((r) => r.totalHits).toSorted((a, b) => a - b);
 
-    expect(hits).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
+    // The set keeps limit + 1 hits, so every count above that reads 11.
+    expect(hits).toEqual([
+      ...Array.from({ length: 10 }, (_, i) => i + 1),
+      ...Array.from({ length: 15 }, () => 11)
+    ]);
     expect(records.filter((r) => r.isBlocked)).toHaveLength(15);
+  });
+
+  it('records no hit while the key is blocked', async () => {
+    for (let i = 0; i < 200; i++) {
+      await storage.increment(KEY, 900_000, 5, 900_000, 'login');
+    }
+
+    expect(await redis.zcard(KEY)).toBe(6);
+  });
+
+  it('keeps the newest limit + 1 hits when no block is set', async () => {
+    const records = [];
+
+    for (let i = 0; i < 50; i++) {
+      records.push(await storage.increment(KEY, 60_000, 3, 0, 'login'));
+    }
+
+    expect(await redis.zcard(KEY)).toBe(4);
+    expect(records.filter((r) => r.isBlocked)).toHaveLength(47);
+    expect(await redis.exists(BLOCK_KEY)).toBe(0);
+  });
+
+  it('refunds the newest hit after the set was trimmed', async () => {
+    for (let i = 0; i < 10; i++) {
+      await storage.increment(KEY, 60_000, 3, 0, 'login');
+    }
+
+    await storage.decrement(KEY);
+
+    expect(await redis.zcard(KEY)).toBe(3);
+    await expect(
+      storage.increment(KEY, 60_000, 3, 0, 'login')
+    ).resolves.toMatchObject({ totalHits: 4, isBlocked: true });
   });
 });

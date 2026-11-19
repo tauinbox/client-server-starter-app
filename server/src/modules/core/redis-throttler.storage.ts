@@ -12,6 +12,31 @@ interface HitLimits {
   blockDuration: number;
 }
 
+// A blocked call records no hit and the set keeps limit + 1 hits. Without the
+// shebang, Redis above maxmemory lets every write through after a first write
+// that frees memory (ZREMRANGEBYSCORE).
+const RECORD_SCRIPT = `#!lua
+local now = tonumber(ARGV[1])
+local block = redis.call('GET', KEYS[2])
+if block and tonumber(block) > now then
+  return { redis.call('ZCARD', KEYS[1]), 1, tonumber(block) - now }
+end
+local limit = tonumber(ARGV[5])
+local blockDuration = tonumber(ARGV[6])
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])
+redis.call('ZADD', KEYS[1], ARGV[1], ARGV[3])
+redis.call('ZREMRANGEBYRANK', KEYS[1], 0, -(limit + 2))
+local total = redis.call('ZCARD', KEYS[1])
+redis.call('PEXPIRE', KEYS[1], ARGV[4])
+if total <= limit then
+  return { total, 0, 0 }
+end
+if blockDuration > 0 then
+  redis.call('SET', KEYS[2], ARGV[7], 'PX', blockDuration)
+end
+return { total, 1, blockDuration }
+`;
+
 /**
  * A storage that cannot record a hit in Redis keeps limiting in this process.
  * A full Redis under `noeviction` refuses the write of every hit; a throw
@@ -103,46 +128,27 @@ export class RedisThrottlerStorage
     { ttl, limit, blockDuration }: HitLimits
   ): Promise<ThrottlerStorageRecord> {
     const now = Date.now();
-    const windowStart = now - ttl;
-    const blockKey = `${key}:block`;
     const entryKey = `${now}-${Math.random().toString(36).slice(2)}`;
 
-    const results = await this.redis
-      .multi()
-      .zremrangebyscore(key, '-inf', windowStart.toString())
-      .zadd(key, now.toString(), entryKey)
-      .zcard(key)
-      .pexpire(key, ttl)
-      .get(blockKey)
-      .exec();
-
-    const totalHits = (results?.[2]?.[1] as number) ?? 1;
-    const rawBlock = results?.[4]?.[1] as string | null;
-    const blockExpiry = rawBlock ? parseInt(rawBlock, 10) : null;
-
-    const isBlocked =
-      blockExpiry != null ? blockExpiry > now : totalHits > limit;
-
-    if (totalHits > limit && blockExpiry == null && blockDuration > 0) {
-      await this.redis.set(
-        blockKey,
-        (now + blockDuration).toString(),
-        'PX',
-        blockDuration
-      );
-    }
+    const [totalHits, blocked, blockRemaining] = (await this.redis.eval(
+      RECORD_SCRIPT,
+      2,
+      key,
+      `${key}:block`,
+      now,
+      now - ttl,
+      entryKey,
+      ttl,
+      limit,
+      blockDuration,
+      now + blockDuration
+    )) as [number, number, number];
 
     return {
       totalHits,
       timeToExpire: msToSeconds(ttl),
-      isBlocked,
-      timeToBlockExpire: msToSeconds(
-        blockExpiry != null
-          ? Math.max(0, blockExpiry - now)
-          : isBlocked
-            ? blockDuration
-            : 0
-      )
+      isBlocked: blocked === 1,
+      timeToBlockExpire: msToSeconds(blockRemaining)
     };
   }
 }
