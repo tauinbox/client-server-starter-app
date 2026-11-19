@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -347,6 +348,7 @@ describe('EntitlementService', () => {
     let redis: {
       get: jest.Mock;
       incr: jest.Mock;
+      del: jest.Mock;
       on: jest.Mock;
       isOpen: boolean;
     };
@@ -367,6 +369,7 @@ describe('EntitlementService', () => {
 
           return Promise.resolve(next);
         }),
+        del: jest.fn().mockResolvedValue(1),
         on: jest.fn(),
         isOpen: true
       };
@@ -375,7 +378,7 @@ describe('EntitlementService', () => {
       // instanceof narrowing, but no connection is opened.
       const adapter = new KeyvRedis('redis://localhost:6379');
 
-      // @ts-expect-error stand-in for the node-redis client: only get/incr/on
+      // @ts-expect-error stand-in for the node-redis client: only get/incr/del/on
       // and isOpen are exercised, and widening the production type for a mock is banned.
       adapter.client = redis;
       const redisCache = { ...cache, stores: [{ store: adapter }] };
@@ -468,18 +471,32 @@ describe('EntitlementService', () => {
       expect(userCacheVersions()).toEqual(['1']);
     });
 
-    it('falls back to the cache-manager counter when Redis rejects', async () => {
+    // The cache-manager writes to the same Redis, so a fallback counter
+    // written there cannot land when Redis refuses the INCR.
+    it('deletes the entry of the current version when Redis refuses the INCR', async () => {
       const svc = await setupRedisBacked();
+
+      counters.set('entitlements:user-version:counter:user-1', 2);
+      redis.incr.mockRejectedValue(new Error('OOM command not allowed'));
+
+      await expect(svc.invalidateUser('user-1')).resolves.toBeUndefined();
+      expect(redis.del).toHaveBeenCalledWith(['entitlements:user:user-1:u2']);
+      expect(cache.set).not.toHaveBeenCalled();
+    });
+
+    it('resolves and logs when Redis refuses the INCR and the delete', async () => {
+      const svc = await setupRedisBacked();
+      const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation();
 
       redis.incr.mockRejectedValue(new Error('connection refused'));
       redis.get.mockRejectedValue(new Error('connection refused'));
 
       await expect(svc.invalidateUser('user-1')).resolves.toBeUndefined();
-      expect(cache.set).toHaveBeenCalledWith(
-        'entitlements:user-version:user-1',
-        expect.any(Number),
-        0
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining('cannot invalidate'),
+        expect.any(Error)
       );
+      logged.mockRestore();
     });
   });
 });

@@ -18,6 +18,14 @@ const ROLES_CACHE_PREFIX = 'roles:';
 const VERSION_KEY = 'permissions:user-version';
 const VERSION_COUNTER_KEY = 'permissions:user-version:counter';
 
+function permissionsCacheKey(userId: string, version: number): string {
+  return `${CACHE_PREFIX}${userId}:v${version}`;
+}
+
+function rolesCacheKey(userId: string, version: number): string {
+  return `${ROLES_CACHE_PREFIX}${userId}:v${version}`;
+}
+
 export interface RoleInfo {
   name: string;
   isSuper: boolean;
@@ -26,7 +34,7 @@ export interface RoleInfo {
 @Injectable()
 export class PermissionService {
   readonly #logger = new Logger(PermissionService.name);
-  readonly #version: CacheVersionCounter;
+  readonly #version: CacheVersionCounter<string>;
 
   constructor(
     @InjectRepository(User)
@@ -35,12 +43,15 @@ export class PermissionService {
     private readonly cacheManager: Cache,
     private readonly metrics: MetricsService
   ) {
-    this.#version = new CacheVersionCounter(
-      cacheManager,
-      VERSION_COUNTER_KEY,
-      VERSION_KEY,
-      this.#logger
-    );
+    this.#version = new CacheVersionCounter<string>(cacheManager, {
+      counterKey: VERSION_COUNTER_KEY,
+      fallbackKey: VERSION_KEY,
+      logger: this.#logger,
+      entryKeys: (version, userId) => [
+        permissionsCacheKey(userId, version),
+        rolesCacheKey(userId, version)
+      ]
+    });
   }
 
   async getPermissionsForUser(userId: string): Promise<ResolvedPermission[]> {
@@ -51,7 +62,7 @@ export class PermissionService {
     }
 
     const version = await this.#version.read(userId);
-    const cacheKey = `${CACHE_PREFIX}${userId}:v${version}`;
+    const cacheKey = permissionsCacheKey(userId, version);
     const cached = await this.cacheManager.get<ResolvedPermission[]>(cacheKey);
 
     this.metrics.recordCacheAccess('permissions', cached ? 'hit' : 'miss');
@@ -101,7 +112,7 @@ export class PermissionService {
     }
 
     const version = await this.#version.read(userId);
-    const cacheKey = `${ROLES_CACHE_PREFIX}${userId}:v${version}`;
+    const cacheKey = rolesCacheKey(userId, version);
     const cached = await this.cacheManager.get<RoleInfo[]>(cacheKey);
 
     this.metrics.recordCacheAccess('roles', cached ? 'hit' : 'miss');
