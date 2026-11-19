@@ -40,33 +40,34 @@ export class MemoryThrottlerStorage
       blockExpiresAt: null
     };
 
-    entry.hits = entry.hits.filter((at) => at > now - ttl);
-    entry.hits.push(now);
-    entry.expiresAt = now + ttl;
-
-    if (entry.blockExpiresAt !== null && entry.blockExpiresAt <= now) {
-      entry.blockExpiresAt = null;
+    if (entry.blockExpiresAt !== null && entry.blockExpiresAt > now) {
+      return Promise.resolve({
+        totalHits: entry.hits.length,
+        timeToExpire: msToSeconds(ttl),
+        isBlocked: true,
+        timeToBlockExpire: msToSeconds(entry.blockExpiresAt - now)
+      });
     }
 
+    entry.blockExpiresAt = null;
+    entry.hits = entry.hits.filter((at) => at > now - ttl);
+    entry.hits.push(now);
+    entry.hits.splice(0, entry.hits.length - (limit + 1));
+    entry.expiresAt = now + ttl;
     this.entries.set(key, entry);
 
     const totalHits = entry.hits.length;
-    const blockExpiry = entry.blockExpiresAt;
-    const isBlocked =
-      blockExpiry !== null ? blockExpiry > now : totalHits > limit;
+    const isBlocked = totalHits > limit;
 
-    if (totalHits > limit && blockExpiry === null && blockDuration > 0) {
+    if (isBlocked && blockDuration > 0) {
       entry.blockExpiresAt = now + blockDuration;
     }
-
-    const blockRemaining =
-      blockExpiry !== null ? blockExpiry - now : isBlocked ? blockDuration : 0;
 
     return Promise.resolve({
       totalHits,
       timeToExpire: msToSeconds(ttl),
       isBlocked,
-      timeToBlockExpire: msToSeconds(blockRemaining)
+      timeToBlockExpire: msToSeconds(isBlocked ? blockDuration : 0)
     });
   }
 

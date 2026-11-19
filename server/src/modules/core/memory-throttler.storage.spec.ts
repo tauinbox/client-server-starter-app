@@ -88,6 +88,56 @@ describe('MemoryThrottlerStorage', () => {
     });
   });
 
+  it('records no hit while the key is blocked', async () => {
+    const blockDuration = 50;
+    const results: { totalHits: number }[] = [];
+
+    for (let i = 0; i < LIMIT + 10; i++) {
+      results.push(
+        await storage.increment(KEY, 60000, LIMIT, blockDuration, THROTTLER)
+      );
+    }
+
+    expect(results.slice(LIMIT).map((r) => r.totalHits)).toEqual(
+      Array.from({ length: 10 }, () => LIMIT + 1)
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, blockDuration * 2));
+    await storage.decrement(KEY);
+    await storage.decrement(KEY);
+
+    await expect(
+      storage.increment(KEY, 60000, LIMIT, blockDuration, THROTTLER)
+    ).resolves.toMatchObject({ totalHits: LIMIT, isBlocked: false });
+  });
+
+  it('keeps at most limit + 1 hits when no block is set', async () => {
+    for (let i = 0; i < 100; i++) {
+      await hit();
+    }
+
+    await expect(hit()).resolves.toMatchObject({
+      totalHits: LIMIT + 1,
+      isBlocked: true
+    });
+
+    for (let i = 0; i < LIMIT + 1; i++) {
+      await storage.decrement(KEY);
+    }
+
+    await expect(hit()).resolves.toMatchObject({ totalHits: 1 });
+  });
+
+  it('keeps one hit for a limit of zero', async () => {
+    for (let i = 0; i < 5; i++) {
+      await storage.increment(KEY, 60000, 0, 0, THROTTLER);
+    }
+
+    await expect(
+      storage.increment(KEY, 60000, 0, 0, THROTTLER)
+    ).resolves.toMatchObject({ totalHits: 1, isBlocked: true });
+  });
+
   it('stays blocked until the block expires, even after a refund', async () => {
     const blockDuration = 50;
 

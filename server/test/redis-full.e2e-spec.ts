@@ -21,11 +21,12 @@ import type { RenewalNoticeService } from '../src/modules/billing/renewals/renew
 import { BILLING_RENEWAL_QUEUE } from '../src/modules/billing/renewals/renewal-queue.constants';
 
 const { REDIS_FULL_URL } = process.env;
-// Large values fill Redis fast. The query buffer of a large write counts as
-// used memory only while the write runs, so small writes still fit after the
-// first refusal; the small values close that gap.
+// Large values fill Redis fast. A filled Redis is only bytes above maxmemory,
+// and freed client buffers (about 62 KB, measured) let a small write fit
+// again, so the fill ends with a maxmemory below the usage.
 const FILL_VALUES = ['x'.repeat(64 * 1024), 'x'.repeat(64)];
 const MAX_FILL_WRITES = 5000;
+const PIN_MARGIN_BYTES = 256 * 1024;
 
 // Production Redis runs with maxmemory and noeviction, so a full Redis refuses
 // every write. This suite fills a small Redis to that state and checks the
@@ -66,6 +67,12 @@ async function fillToMaxmemory(redis: Redis): Promise<string> {
     refusal = await fillWith(redis, value);
   }
 
+  const used = Number(
+    /used_memory:(\d+)/.exec(await redis.info('memory'))?.[1]
+  );
+
+  await redis.config('SET', 'maxmemory', String(used - PIN_MARGIN_BYTES));
+
   return refusal;
 }
 
@@ -80,9 +87,14 @@ runWithRedis('a full Redis under noeviction (real Redis)', () => {
   let versions: CacheVersionCounter<string>;
   let queue: Queue;
   let fillError: string;
+  let maxmemory: string;
 
   beforeAll(async () => {
     redis = new Redis(url);
+    [, maxmemory] = (await redis.config('GET', 'maxmemory')) as [
+      string,
+      string
+    ];
     await redis.flushall();
 
     moduleRef = await Test.createTestingModule({
@@ -125,6 +137,7 @@ runWithRedis('a full Redis under noeviction (real Redis)', () => {
 
   afterAll(async () => {
     await redis.flushall();
+    await redis.config('SET', 'maxmemory', maxmemory);
     redis.disconnect();
     await queue.close();
     await app.close();
