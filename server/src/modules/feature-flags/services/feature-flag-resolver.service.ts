@@ -53,6 +53,10 @@ const ALL_FLAGS_TTL_MS = 300_000;
 const VERSION_KEY = 'featureflags:version';
 const VERSION_COUNTER_KEY = 'featureflags:version:counter';
 
+function allFlagsCacheKey(version: number): string {
+  return `${ALL_FLAGS_KEY}:v${version}`;
+}
+
 @Injectable()
 export class FeatureFlagResolverService {
   readonly #logger = new Logger(FeatureFlagResolverService.name);
@@ -75,12 +79,12 @@ export class FeatureFlagResolverService {
     private readonly usersService: UsersService,
     private readonly metrics: MetricsService
   ) {
-    this.#version = new CacheVersionCounter(
-      cacheManager,
-      VERSION_COUNTER_KEY,
-      VERSION_KEY,
-      this.#logger
-    );
+    this.#version = new CacheVersionCounter(cacheManager, {
+      counterKey: VERSION_COUNTER_KEY,
+      fallbackKey: VERSION_KEY,
+      logger: this.#logger,
+      entryKeys: (version) => [allFlagsCacheKey(version)]
+    });
   }
 
   /**
@@ -205,7 +209,7 @@ export class FeatureFlagResolverService {
 
   private async loadAllFlags(): Promise<CachedFlag[]> {
     const version = await this.#version.read();
-    const cacheKey = `${ALL_FLAGS_KEY}:v${version}`;
+    const cacheKey = allFlagsCacheKey(version);
     const cached = await this.cacheManager.get<CachedFlag[]>(cacheKey);
 
     this.metrics.recordCacheAccess(

@@ -13,6 +13,7 @@ import { buildThrottlerOptions } from '../src/modules/core/throttler-options';
 import { LoginThrottlerGuard } from '../src/modules/core/login-throttler.guard';
 import { SingleUseTokenLedger } from '../src/common/utils/single-use-token-ledger';
 import { FailedAttemptCounter } from '../src/common/utils/failed-attempt-counter';
+import { CacheVersionCounter } from '../src/common/utils/cache-version-counter';
 import { parseRedisConnection } from '../src/common/utils/parse-redis-connection';
 import { RenewalProcessor } from '../src/modules/billing/renewals/renewal.processor';
 import type { RenewalService } from '../src/modules/billing/renewals/renewal.service';
@@ -75,6 +76,8 @@ runWithRedis('a full Redis under noeviction (real Redis)', () => {
   let app: INestApplication<Server>;
   let ledger: SingleUseTokenLedger;
   let counter: FailedAttemptCounter;
+  let cache: Cache;
+  let versions: CacheVersionCounter<string>;
   let queue: Queue;
   let fillError: string;
 
@@ -95,9 +98,16 @@ runWithRedis('a full Redis under noeviction (real Redis)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    const cache = moduleRef.get<Cache>(CACHE_MANAGER);
+    cache = moduleRef.get<Cache>(CACHE_MANAGER);
 
     await cache.get('e2e-full:warmup');
+    versions = new CacheVersionCounter<string>(cache, {
+      counterKey: 'e2e-full:version:counter',
+      fallbackKey: 'e2e-full:version',
+      logger: new Logger(),
+      entryKeys: (version, userId) => [`e2e-full:perm:${userId}:v${version}`]
+    });
+    await cache.set('e2e-full:perm:u1:v0', ['admin'], 60_000);
     ledger = new SingleUseTokenLedger(cache, 'e2e-full:spent:', new Logger());
     counter = new FailedAttemptCounter(
       cache,
@@ -134,6 +144,21 @@ runWithRedis('a full Redis under noeviction (real Redis)', () => {
       count: Number.POSITIVE_INFINITY,
       remainingMs: 60_000
     });
+  });
+
+  it('does not serve an entry cached before an invalidation that Redis refused to count', async () => {
+    await expect(cache.get('e2e-full:perm:u1:v0')).resolves.toEqual(['admin']);
+
+    await versions.bump('u1');
+    const version = await versions.read('u1');
+
+    await expect(
+      cache.get(`e2e-full:perm:u1:v${version}`)
+    ).resolves.toBeUndefined();
+    // The DEL freed memory, so fill again for the cases that follow.
+    await expect(fillToMaxmemory(redis)).resolves.toContain(
+      'OOM command not allowed'
+    );
   });
 
   it('keeps a throttled route answering', async () => {

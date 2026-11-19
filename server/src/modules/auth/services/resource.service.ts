@@ -47,6 +47,10 @@ const SUBJECT_MAP_CACHE_TTL = 300_000; // 5 minutes
 const SUBJECT_MAP_VERSION_KEY = 'rbac:subject_map:version';
 const SUBJECT_MAP_VERSION_COUNTER_KEY = 'rbac:subject_map:version:counter';
 
+function subjectMapCacheKey(version: number): string {
+  return `${SUBJECT_MAP_CACHE_KEY}:v${version}`;
+}
+
 interface ResourceEdit {
   displayName?: string;
   description?: string | null;
@@ -75,12 +79,12 @@ export class ResourceService {
     private readonly accessRefusals: AccessRefusalService,
     private readonly eventEmitter: EventEmitter2
   ) {
-    this.#subjectMapVersion = new CacheVersionCounter(
-      cacheManager,
-      SUBJECT_MAP_VERSION_COUNTER_KEY,
-      SUBJECT_MAP_VERSION_KEY,
-      this.logger
-    );
+    this.#subjectMapVersion = new CacheVersionCounter(cacheManager, {
+      counterKey: SUBJECT_MAP_VERSION_COUNTER_KEY,
+      fallbackKey: SUBJECT_MAP_VERSION_KEY,
+      logger: this.logger,
+      entryKeys: (version) => [subjectMapCacheKey(version)]
+    });
   }
 
   /**
@@ -294,7 +298,7 @@ export class ResourceService {
 
   async getSubjectMaps(): Promise<SubjectMaps> {
     const version = await this.#subjectMapVersion.read();
-    const cacheKey = `${SUBJECT_MAP_CACHE_KEY}:v${version}`;
+    const cacheKey = subjectMapCacheKey(version);
     const cached = await this.cacheManager.get<SubjectMaps>(cacheKey);
 
     this.metrics.recordCacheAccess('resources', cached ? 'hit' : 'miss');

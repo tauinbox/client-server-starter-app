@@ -322,7 +322,8 @@ the check also reads `INFO memory` and exports `used_memory / maxmemory` as
 `redis_memory_used_ratio`; Grafana alerts above 0.8. Production Redis runs with `maxmemory` and
 `noeviction`, so at the cap it refuses writes: the single-use ledgers and the attempt counters
 refuse, the throttler keeps a block that Redis holds and counts new hits in the memory of the
-instance (`MemoryThrottlerStorage`) with a warning, and a job schedule that cannot be
+instance (`MemoryThrottlerStorage`) with a warning, a cache invalidation whose `INCR` is refused
+deletes the cached entries of the current version (a full Redis accepts a `DEL`), and a job schedule that cannot be
 written at boot is logged and the boot goes on. The queue processors extend `LoggedWorkerHost`,
 which logs a failed worker loop once in 30 seconds instead of the raw stderr dump of BullMQ. A missing `REDIS_URL` in production
 degrades to a generic warning, and an SMTP failure does the same. The server logs the raw SMTP error
@@ -2703,7 +2704,8 @@ The base URL is `/api/v1`.
 
 **Caching.** `featureflags:all:v<n>` holds the full set of flags and rules, with a TTL of 300 s.
 `<n>` is a version counter (`CacheVersionCounter`, Redis `INCR`), and an invalidation increments
-it. A reload reads the version before the database, so a load that an invalidation overlaps, in
+it. When Redis refuses the `INCR` (full under `noeviction`), the invalidation deletes the entry of
+the current version instead. A reload reads the version before the database, so a load that an invalidation overlaps, in
 this instance or in another one, writes under the old version, which no reader reads again. A
 reload is single-flight per version: two concurrent misses share one load from the database.
 

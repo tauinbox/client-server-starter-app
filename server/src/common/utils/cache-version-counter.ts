@@ -1,6 +1,17 @@
 import { Logger } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
+import type { RedisClientConnectionType } from '@keyv/redis';
 import { redisClientOf, ThrottledFailureLog } from './redis-client';
+
+export interface CacheVersionCounterOptions<Scope extends string | void> {
+  /** Raw Redis key holding the integer counter. */
+  counterKey: string;
+  /** Cache-manager key used when Redis is absent or a read of the counter fails. */
+  fallbackKey: string;
+  logger: Logger;
+  /** The cache keys that hold entries of `version`, for the delete of a failed `INCR`. */
+  entryKeys: (version: number, scope: Scope) => string[];
+}
 
 /**
  * A monotonic generation counter used to suffix per-user cache keys, so a
@@ -24,34 +35,43 @@ import { redisClientOf, ThrottledFailureLog } from './redis-client';
  * under it, so a read that started before an invalidation writes a key that
  * nobody reads again. A delete of the key cannot give this: the late write
  * puts the old value back.
+ *
+ * A full Redis under `noeviction` refuses the `INCR` but still serves the old
+ * counter to readers, and a fallback counter written through the cache cannot
+ * land either. So when the `INCR` fails, `bump` deletes the entries of the
+ * current version: Redis accepts a `DEL` when it is full, and the late write
+ * of a reader fails for the same reason the `INCR` did.
  */
-export class CacheVersionCounter {
+export class CacheVersionCounter<Scope extends string | void = void> {
   readonly #cache: Cache;
   readonly #counterKey: string;
   readonly #fallbackKey: string;
+  readonly #logger: Logger;
+  readonly #entryKeys: (version: number, scope: Scope) => string[];
   readonly #failureLog: ThrottledFailureLog;
   readonly #fallbackReads = new Map<string, Promise<number>>();
 
-  /**
-   * @param counterKey raw Redis key holding the integer counter
-   * @param fallbackKey cache-manager key used when Redis is absent or failing
-   */
   constructor(
     cache: Cache,
-    counterKey: string,
-    fallbackKey: string,
-    logger: Logger
+    {
+      counterKey,
+      fallbackKey,
+      logger,
+      entryKeys
+    }: CacheVersionCounterOptions<Scope>
   ) {
     this.#cache = cache;
     this.#counterKey = counterKey;
     this.#fallbackKey = fallbackKey;
+    this.#logger = logger;
+    this.#entryKeys = entryKeys;
     this.#failureLog = new ThrottledFailureLog(
       logger,
-      `Version counter "${counterKey}" unavailable, falling back to the cache-manager counter`
+      `Version counter "${counterKey}" refused by Redis`
     );
   }
 
-  async read(scope?: string): Promise<number> {
+  async read(scope: Scope): Promise<number> {
     const counterKey = this.#scoped(this.#counterKey, scope);
     const fallbackKey = this.#scoped(this.#fallbackKey, scope);
     const redis = await redisClientOf(this.#cache);
@@ -101,7 +121,7 @@ export class CacheVersionCounter {
     return read;
   }
 
-  async bump(scope?: string): Promise<void> {
+  async bump(scope: Scope): Promise<void> {
     const counterKey = this.#scoped(this.#counterKey, scope);
     const fallbackKey = this.#scoped(this.#fallbackKey, scope);
     const redis = await redisClientOf(this.#cache);
@@ -109,11 +129,12 @@ export class CacheVersionCounter {
     if (redis) {
       try {
         await redis.incr(counterKey);
-
-        return;
       } catch (error: unknown) {
         this.#failureLog.log(error);
+        await this.#deleteCurrentEntries(redis, { counterKey, scope });
       }
+
+      return;
     }
 
     // Date.now() has millisecond granularity, so two invalidations inside one
@@ -128,7 +149,25 @@ export class CacheVersionCounter {
     await this.#cache.set(fallbackKey, next, 0);
   }
 
-  #scoped(key: string, scope: string | undefined): string {
-    return scope === undefined ? key : `${key}:${scope}`;
+  async #deleteCurrentEntries(
+    redis: RedisClientConnectionType,
+    { counterKey, scope }: { counterKey: string; scope: Scope }
+  ): Promise<void> {
+    try {
+      const raw = await redis.get(counterKey);
+      const version = raw === null ? 0 : Number(raw);
+      const keys = this.#entryKeys(version, scope);
+
+      if (keys.length > 0) await redis.del(keys);
+    } catch (error: unknown) {
+      this.#logger.error(
+        `Version counter "${counterKey}" cannot invalidate: the cached entries stay until their TTL`,
+        error
+      );
+    }
+  }
+
+  #scoped(key: string, scope: Scope): string {
+    return typeof scope === 'string' ? `${key}:${scope}` : key;
   }
 }

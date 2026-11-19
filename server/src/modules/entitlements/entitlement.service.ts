@@ -26,10 +26,14 @@ const USER_VERSION_KEY = 'entitlements:user-version';
 const USER_VERSION_COUNTER_KEY = 'entitlements:user-version:counter';
 const USER_TTL_MS = 60_000;
 
+function userCacheKey(userId: string, version: number): string {
+  return `entitlements:user:${userId}:u${version}`;
+}
+
 @Injectable()
 export class EntitlementService {
   readonly #logger = new Logger(EntitlementService.name);
-  readonly #userVersion: CacheVersionCounter;
+  readonly #userVersion: CacheVersionCounter<string>;
 
   constructor(
     @InjectRepository(Customer)
@@ -45,12 +49,12 @@ export class EntitlementService {
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly metrics: MetricsService
   ) {
-    this.#userVersion = new CacheVersionCounter(
-      cache,
-      USER_VERSION_COUNTER_KEY,
-      USER_VERSION_KEY,
-      this.#logger
-    );
+    this.#userVersion = new CacheVersionCounter<string>(cache, {
+      counterKey: USER_VERSION_COUNTER_KEY,
+      fallbackKey: USER_VERSION_KEY,
+      logger: this.#logger,
+      entryKeys: (version, userId) => [userCacheKey(userId, version)]
+    });
   }
 
   /**
@@ -61,7 +65,7 @@ export class EntitlementService {
    */
   async capabilitiesFor(userId: string): Promise<ResolvedEntitlements> {
     const userVersion = await this.#userVersion.read(userId);
-    const cacheKey = `entitlements:user:${userId}:u${userVersion}`;
+    const cacheKey = userCacheKey(userId, userVersion);
     const cached = await this.cache.get<ResolvedEntitlements>(cacheKey);
 
     this.metrics.recordCacheAccess('entitlements', cached ? 'hit' : 'miss');
