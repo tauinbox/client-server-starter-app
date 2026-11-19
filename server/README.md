@@ -321,7 +321,8 @@ A dead Redis fails the readiness check, with a timeout of 2 s. A full Redis stil
 the check also reads `INFO memory` and exports `used_memory / maxmemory` as
 `redis_memory_used_ratio`; Grafana alerts above 0.8. Production Redis runs with `maxmemory` and
 `noeviction`, so at the cap it refuses writes: the single-use ledgers and the attempt counters
-refuse, the throttler lets requests through with a warning, and a job schedule that cannot be
+refuse, the throttler keeps a block that Redis holds and counts new hits in the memory of the
+instance (`MemoryThrottlerStorage`) with a warning, and a job schedule that cannot be
 written at boot is logged and the boot goes on. The queue processors extend `LoggedWorkerHost`,
 which logs a failed worker loop once in 30 seconds instead of the raw stderr dump of BullMQ. A missing `REDIS_URL` in production
 degrades to a generic warning, and an SMTP failure does the same. The server logs the raw SMTP error
@@ -1358,7 +1359,8 @@ atomically, so the key cannot expire between the two steps. Separate commands ca
 with no expiry, that is an account barred for ever. The script also repairs a key that already has
 no expiry. Without Redis one process map holds the window. It **fails closed**: when Redis refuses
 or cannot take the write, it reports an infinite count, so the user is barred for the window. The
-per-IP throttle fails open in that state, so an open counter would leave the secret with no limit.
+per-IP throttle counts in each instance only in that state, so an open counter would leave the
+secret with a weaker limit.
 Each of the three counters takes the slot of an attempt before the secret is checked, and checks the
 secret only when that slot is inside the budget. A read of the count before the check let every
 request of a concurrent burst see the same open budget, so all of them were checked.

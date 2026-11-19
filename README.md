@@ -1418,7 +1418,7 @@ with `provenance: file`:
 
 A full Redis still answers PING, so `dependency_up` stays `1`. Production Redis runs with
 `--maxmemory 72mb --maxmemory-policy noeviction`, and at the cap it refuses every write: step-up,
-MFA and OAuth sign-ins refuse, the rate limits stop and no mail is queued. The readiness probe reads
+MFA and OAuth sign-ins refuse, the rate limits count in each instance only and no mail is queued. The readiness probe reads
 `INFO memory` and exports `redis_memory_used_ratio` for the third rule.
 
 The window of 10 minutes is intentional. `SmtpHealthIndicator` keeps its verify result for 5 minutes.

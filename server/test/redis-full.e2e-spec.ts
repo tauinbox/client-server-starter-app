@@ -2,7 +2,7 @@ import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Controller, Get, INestApplication, Logger } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { Throttle, ThrottlerModule } from '@nestjs/throttler';
 import type { Cache } from 'cache-manager';
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
@@ -36,6 +36,12 @@ const runWithRedis = REDIS_FULL_URL ? describe : describe.skip;
 class ProbeController {
   @Get()
   reach() {
+    return { reached: true };
+  }
+
+  @Get('tight')
+  @Throttle({ default: { limit: 2, ttl: 60_000 } })
+  tight() {
     return { reached: true };
   }
 }
@@ -134,6 +140,17 @@ runWithRedis('a full Redis under noeviction (real Redis)', () => {
     await request(app.getHttpServer())
       .get('/redis-full')
       .expect(200, { reached: true });
+  });
+
+  it('still limits a route, in this process', async () => {
+    const server = app.getHttpServer();
+    const keysBefore = await redis.dbsize();
+
+    await request(server).get('/redis-full/tight').expect(200);
+    await request(server).get('/redis-full/tight').expect(200);
+    await request(server).get('/redis-full/tight').expect(429);
+    // No hit reached Redis, so the in-process storage gave the 429.
+    expect(await redis.dbsize()).toBe(keysBefore);
   });
 
   it('lets the boot go on when a job schedule cannot be written', async () => {

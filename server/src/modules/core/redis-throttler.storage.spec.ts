@@ -8,6 +8,7 @@ let redisMock: {
   zpopmax: jest.Mock;
   multi: jest.Mock;
   set: jest.Mock;
+  get: jest.Mock;
 };
 
 let multiMock: {
@@ -47,7 +48,8 @@ describe('RedisThrottlerStorage', () => {
       disconnect: jest.fn(),
       zpopmax: jest.fn().mockResolvedValue(null),
       multi: jest.fn().mockReturnValue(multiMock),
-      set: jest.fn().mockResolvedValue('OK')
+      set: jest.fn().mockResolvedValue('OK'),
+      get: jest.fn().mockResolvedValue(null)
     };
 
     storage = new RedisThrottlerStorage('redis://localhost:6379');
@@ -110,29 +112,47 @@ describe('RedisThrottlerStorage', () => {
       warn.mockRestore();
     });
 
-    // A full Redis aborts the MULTI; a throw here answered every throttled
-    // route with an internal error.
-    it('lets the request through and warns', async () => {
+    beforeEach(() => {
+      // A full Redis aborts the MULTI; a throw here answered every throttled
+      // route with an internal error.
       multiMock.exec.mockRejectedValue(
         new Error('EXECABORT Transaction discarded because of previous errors.')
       );
+    });
 
-      const result = await storage.increment('key', 60_000, 10, 5_000, 'login');
+    it('counts the hits in this process and blocks above the limit', async () => {
+      const first = await storage.increment('key', 60_000, 2, 5_000, 'login');
 
-      expect(result).toEqual({
-        totalHits: 0,
-        timeToExpire: 60,
-        isBlocked: false,
-        timeToBlockExpire: 0
+      await storage.increment('key', 60_000, 2, 5_000, 'login');
+      const third = await storage.increment('key', 60_000, 2, 5_000, 'login');
+
+      expect(first).toMatchObject({ totalHits: 1, isBlocked: false });
+      expect(third).toMatchObject({
+        totalHits: 3,
+        isBlocked: true,
+        timeToBlockExpire: 5
       });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('EXECABORT'));
     });
 
-    it('does not throw on decrement', async () => {
+    it('keeps a block that Redis already holds', async () => {
+      redisMock.get.mockResolvedValue(String(Date.now() + 30_000));
+
+      const result = await storage.increment('key', 60_000, 10, 5_000, 'login');
+
+      expect(redisMock.get).toHaveBeenCalledWith('key:block');
+      expect(result).toMatchObject({ isBlocked: true, timeToBlockExpire: 30 });
+    });
+
+    it('refunds a hit in this process when Redis refuses the refund', async () => {
       redisMock.zpopmax.mockRejectedValue(new Error('OOM command not allowed'));
+      await storage.increment('key', 60_000, 10, 0, 'login');
 
       await expect(storage.decrement('key')).resolves.toBeUndefined();
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('OOM'));
+      const next = await storage.increment('key', 60_000, 10, 0, 'login');
+
+      expect(next.totalHits).toBe(1);
+      expect(warn).toHaveBeenCalled();
     });
   });
 

@@ -47,9 +47,9 @@ return { count, redis.call('PTTL', KEYS[1]) }
  *
  * A counter that cannot record the failure fails closed: it reports a window
  * with an infinite count, which every limit of a caller refuses. A full Redis
- * under `noeviction` refuses writes, and the per-IP throttle fails open in
- * that state, so an open counter would leave a code or a password with no
- * limit at all.
+ * under `noeviction` refuses writes, and the per-IP throttle then counts in
+ * each instance only, so an open counter would leave a code or a password with
+ * only a per-address, per-instance limit.
  */
 export class FailedAttemptCounter {
   readonly #cache: Cache;
