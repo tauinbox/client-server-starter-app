@@ -1293,7 +1293,10 @@ Services:
 - **prometheus** is prom/prometheus:v3.12.0. It is on the internal network only and exposes no port.
   It scrapes `/metrics` each 15 s and keeps the data 30 days. Its configuration is
   `monitoring/prometheus.yml`.
-- **grafana** is grafana/grafana:13.0.1 on port 3001. The stack provisions the Prometheus datasource
+- **grafana** is grafana/grafana:13.0.1 on `127.0.0.1:3001` of the host only (`GRAFANA_HOST_PORT`).
+  No reverse proxy routes to it: a tool on the origin of the application could read the session of
+  the application. Open it through an SSH tunnel, see [Grafana access](#grafana-access). The stack
+  provisions the Prometheus datasource
   and the **App Metrics** dashboard.
 
   That dashboard shows the HTTP traffic, the p95 latency of each route, the authentication events, the
@@ -1326,8 +1329,9 @@ the region:
 | Database volume (external) | `nexus_postgres_data_18` | `nexus-ru_postgres_data_18` |
 | Other volumes | `nexus_uploads`, ... | `nexus-ru_uploads`, ... |
 | Proxy network (external) | `shared-network` | `nexus-ru-proxy` |
-| Proxy aliases | `nexus-intl-server`, `-client`, `-grafana` | `nexus-ru-server`, `-client`, `-grafana` |
+| Proxy aliases | `nexus-intl-server`, `-client` | `nexus-ru-server`, `-client` |
 | Client loopback port | 4200 | `CLIENT_HOST_PORT` |
+| Grafana loopback port | 3001 | `GRAFANA_HOST_PORT` |
 | `DATA_REGION` of the server | `intl` | `ru` |
 
 Never rename the volume of a running cell: a new name starts an empty database. The database volume
@@ -1501,11 +1505,21 @@ nothing when `ADMIN_EMAIL` is empty.
 
 Set `GRAFANA_ADMIN_PASSWORD` as a shell environment variable before you run `docker-compose up`. It
 controls the Grafana administrator password. The default is `admin`, and it is for local use only.
-Grafana is at http://your-host:3001.
 
 In production that default never applies. The `deploy.yml` and `rebuild.yml` workflows stop before
 they touch a container when the `GRAFANA_ADMIN_PASSWORD` secret is empty. Thus a cleared secret fails
 the deploy loudly, and it does not ship `admin`/`admin` silently.
+
+#### Grafana access
+
+Grafana listens on `127.0.0.1:3001` of the host (`GRAFANA_HOST_PORT` changes the port). On a local
+machine, open http://localhost:3001. On a server, open an SSH tunnel first:
+
+```bash
+ssh -L 3001:127.0.0.1:3001 <user>@<host>
+```
+
+Then open http://localhost:3001 on your machine. Do not add a reverse-proxy route to Grafana.
 
 ### Deploy pipeline
 
@@ -1657,7 +1671,7 @@ the script is the authoritative reference for the key list.
 | `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` | all VPS workflows | - (SSH auth) | How Actions reaches the VPS |
 | `VPS_HOST_KEY` | all VPS workflows | - (SSH host verification) | The public key of the VPS host, as one line in the `ssh-keyscan` output format. Each SSH job verifies the far side against it before it authenticates. Thus a redirected connection cannot collect the deploy key and the secrets with it. **An empty value fails the job by design**, because the SSH client skips the verification silently when it has no key to compare against. **The value must be the ECDSA key of the host.** The host answers with the host key that the client asks for. The Go client inside `drone-ssh` prefers `ecdsa-sha2-nistp256`. Thus an `ssh-ed25519` value fails each job with `host key fingerprint mismatch`. Local OpenSSH prefers ed25519 and verifies against such a value without an error, thus the incorrect key looks correct. Take the key again if a person reinstalls the host: run `ssh-keyscan -t ecdsa <host>` and compare it with `/etc/ssh/ssh_host_ecdsa_key.pub`, read on the host itself. A reboot or a resize keeps the same key. |
 | `GITHUB_TOKEN` | all | `GH_FETCH_TOKEN` on the VPS (deploy, rebuild, rollback) | Actions supplies it automatically. It logs the build jobs in to GHCR, and the three deploy jobs forward it to the host so the `git` fetch there is authenticated. Those jobs pin `permissions: contents: read`, so the forwarded copy is read-only and expires with the job. |
-| `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ROOT_URL` | deploy, rebuild | `docker-compose.yml` `${}` | Environment of the Grafana container. An empty `GRAFANA_ADMIN_PASSWORD` stops the deploy, thus production gets no silent `admin` default. |
+| `GRAFANA_ADMIN_PASSWORD` | deploy, rebuild | `docker-compose.yml` `${}` | Environment of the Grafana container. An empty `GRAFANA_ADMIN_PASSWORD` stops the deploy, thus production gets no silent `admin` default. |
 | `ALERT_WEBHOOK_URL` | deploy, rebuild | root `.env`, then `docker-compose.yml` `${}` | The address to which Grafana POSTs a firing alert. An empty value stops the deploy, because Grafana exits at startup when a provisioned webhook has no URL. Treat the URL as a capability: a person who can POST to it can inject false alerts. |
 | `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` | deploy, rebuild, rotate-keys | `server/.env` | The RS256 keypair, as base64 PEM |
 | `DB_PASSWORD` | deploy, rebuild | `server/.env` and root `.env` | It must be equal to the password of the postgres volume. Refer to the caution below |
