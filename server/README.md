@@ -2214,6 +2214,16 @@ from it on each `increment`, so a refund made outside the class is lost. `Memory
 uses the sliding window of `RedisThrottlerStorage` instead: one timestamp for each hit, and
 `decrement` removes the newest one. A timer removes idle keys once a minute.
 
+A call inside a block records no hit, and each key keeps only the newest `limit + 1` hits, which is
+all the limit decision reads. Without this, a blocked caller added one hit per request for the whole
+window, so one address could fill Redis. This is also the rule of the storage of the library. In
+Redis one Lua script reads the block, records the hit, trims the set and sets the block. The script
+has a `#!lua` shebang, so Redis above `maxmemory` refuses the whole script: without it, a first write
+that frees memory (`ZREMRANGEBYSCORE`) lets the later writes through. A refused script falls back to
+the memory storage as above. A caller who keeps sending requests through a block now gets a fresh
+window when the block ends, because the block length equals the window (`blockDuration` defaults to
+`ttl`) and no hit of the block period is kept.
+
 The two project storages implement `DecrementableThrottlerStorage`. `LoginThrottlerGuard` is typed
 against that interface. Thus a storage with no refund is a compile error, and not a refund that
 nobody applies.
