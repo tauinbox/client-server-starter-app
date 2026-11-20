@@ -38,6 +38,7 @@ const SOURCE_DIRS = [
 const SKIP = /\.spec\.ts$|\.d\.ts$/;
 const SOURCES = `^(${SOURCE_DIRS.join('|')})/`;
 const MIN_MODULES = 300;
+const SHARED_CONSUMERS = ['client/src', 'server/src', 'mock-server/src'];
 const WINDOWS_GRAPHVIZ = String.raw`C:\Program Files\Graphviz\bin`;
 
 const VIEWS = [
@@ -116,6 +117,25 @@ async function cruiseRepo() {
     process.exit(1);
   }
 
+  // A broken path alias drops every edge to shared/ and reports no error.
+  const unlinked = SHARED_CONSUMERS.filter(
+    (root) =>
+      !local.some(
+        ({ source, dependencies }) =>
+          source.startsWith(`${root}/`) &&
+          dependencies.some(({ resolved }) =>
+            resolved.startsWith('shared/src/')
+          )
+      )
+  );
+
+  if (unlinked.length > 0) {
+    console.error(
+      `graph: no import from ${unlinked.join(', ')} resolves into shared/src. Check the @app/shared alias of ${TS_CONFIG}.`
+    );
+    process.exit(1);
+  }
+
   return output;
 }
 
@@ -185,8 +205,8 @@ async function renderPage(result, { id, filters }) {
     );
   }
 
-  const used = result.summary.optionsUsed;
-  const saved = used.reporterOptions;
+  const { optionsUsed: used } = result.summary;
+  const { reporterOptions: saved } = used;
   used.reporterOptions = {
     ...saved,
     dot: { theme: { graph: { clusterrank: 'none' } } }
