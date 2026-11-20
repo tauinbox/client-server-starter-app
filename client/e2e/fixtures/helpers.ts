@@ -106,6 +106,16 @@ export async function chooseOption(
   await expect(panel).toHaveCount(0);
 }
 
+/** The URL of a browser `/api` request, moved to the worker's mock server. */
+export function mockServerUrlOf(
+  requestUrl: string,
+  mockServerUrl: string
+): string {
+  const { port } = new URL(mockServerUrl);
+
+  return requestUrl.replace(/localhost:\d+/, `localhost:${port}`);
+}
+
 /**
  * Point a page's `/api` traffic at the worker's mock server and stub the SSE
  * stream with an empty body. `base.fixture` applies this to the fixture `page`;
@@ -116,8 +126,6 @@ export async function routeApiToMockServer(
   page: Page,
   mockServerUrl: string
 ): Promise<void> {
-  const { port } = new URL(mockServerUrl);
-
   page.on('request', (request) => {
     if (/\/api\//.test(request.url())) {
       trackSentRequest(page, request);
@@ -126,14 +134,11 @@ export async function routeApiToMockServer(
   page.on('requestfinished', untrackRequest);
   page.on('requestfailed', untrackRequest);
   await page.route(/\/api\//, (route) => {
-    const url = route
-      .request()
-      .url()
-      .replace(/localhost:\d+/, `localhost:${port}`);
-
     trackRoutedRequest(page, route.request());
 
-    return route.continue({ url });
+    return route.continue({
+      url: mockServerUrlOf(route.request().url(), mockServerUrl)
+    });
   });
 
   // Most tests do not need live notifications, so the SSE stream gets an empty
