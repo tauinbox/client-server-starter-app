@@ -51,7 +51,9 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     await expect(dialog.getByRole('row', { name: 'qa-eu' })).toHaveCount(0);
     await envInput.fill('');
     // Its overlay sits over the rule row and would swallow the Type-select click.
-    await envInput.press('Escape');
+    // A click on the title closes it; Escape closes the whole dialog when the
+    // panel has already closed (1 of 20 CI runs).
+    await dialog.getByRole('heading', { level: 2 }).click();
     await expect(page.locator('.mat-mdc-autocomplete-panel')).toHaveCount(0);
 
     // Add a role rule

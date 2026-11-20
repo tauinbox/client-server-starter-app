@@ -33,7 +33,9 @@ const { status } = spawnSync(
     'test',
     ...changed,
     `--repeat-each=${REPEAT}`,
-    '--retries=0'
+    '--retries=0',
+    // The config records a CI trace on the first retry only, and here no retry runs.
+    '--trace=retain-on-failure'
   ],
   { cwd: CLIENT, stdio: 'inherit' }
 );
