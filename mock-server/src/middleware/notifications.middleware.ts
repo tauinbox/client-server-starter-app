@@ -108,7 +108,11 @@ router.get('/stream', authGuard, (req, res) => {
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  // The value that Nest writes for an SSE stream.
+  res.setHeader(
+    'Cache-Control',
+    'private, no-cache, no-store, must-revalidate, max-age=0, no-transform'
+  );
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();

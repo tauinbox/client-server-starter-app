@@ -21,6 +21,11 @@ export function createApp() {
   app.use(errorEnvelope);
   app.use(cors({ origin: true, credentials: true }));
   app.use(cookieParser());
+  // Mirrors NoStoreMiddleware: no browser or shared cache keeps an API answer.
+  app.use((_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   // JSON only, as the server: a cross-site form can post a urlencoded body with
   // no preflight, and a login sent that way plants the sender's session.
   app.use(express.json({ limit: '100kb' }));
