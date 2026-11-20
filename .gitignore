@@ -17,3 +17,6 @@
 
 # Local Playwright report of client/
 .playwright-report/
+
+# Interactive dependency graph pages (server: npm run graph -- --html)
+/architecture/html/

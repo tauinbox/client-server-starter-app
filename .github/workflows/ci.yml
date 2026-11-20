@@ -89,6 +89,10 @@ jobs:
       # detecting anything fails loudly instead of passing.
       - run: node ../scripts/check-imports.mjs --self-test
       - run: npm run check:imports
+      # architecture/dependency-graph.md matches the imports of the tracked
+      # files. It reads the other source roots as files and resolves only
+      # paths inside them, so the server install is enough.
+      - run: npm run graph:check
       # Repo-wide too: a package that two workspaces declare has the same range
       # and the same locked version. It reads only package files, so the server
       # install is enough.

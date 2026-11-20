@@ -7,8 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../*.mts\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../*.mts\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{ts,mjs}\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../*.mts\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{ts,mjs}\" \"*.ts\" \"../shared/src/**/*.ts\" \"../*.mjs\" \"../*.mts\" \"../scripts/*.mjs\" \"../.lintstagedrc.mjs\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -45,6 +45,8 @@
     "check:role-conditions": "ts-node scripts/check-existing-role-conditions.ts",
     "check:grant-scope": "ts-node -r tsconfig-paths/register scripts/check-grant-scope.ts",
     "generate:subjects": "ts-node scripts/generate-subjects.ts",
+    "graph": "node scripts/dependency-graph.mjs",
+    "graph:check": "node scripts/dependency-graph.mjs --check",
     "audit:ci": "node ../scripts/audit-ci.mjs"
   },
   "dependencies": {
@@ -127,6 +129,7 @@
     "@types/supertest": "^7.2.1",
     "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.72.1",
+    "dependency-cruiser": "^18.8.0",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.5",
