@@ -1155,7 +1155,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `JWT_SECRET` | - | HS256 secret, a minimum of 32 characters, that is the 256-bit key size RFC 7518 makes necessary for HS256. It is necessary when `JWT_ALGORITHM=HS256` |
 | `JWT_PRIVATE_KEY` | - | RSA private key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
 | `JWT_PUBLIC_KEY` | - | RSA public key PEM in base64. It is necessary when `JWT_ALGORITHM=RS256` |
-| `JWT_MIN_IAT` | - | A Unix timestamp. The server rejects a token that it issued before this value. Use it for key rotation |
+| `JWT_MIN_IAT` | - | A Unix timestamp. The server rejects a token that it issued before this value. Use it for key rotation. `scripts/cell.sh restore` sets it to the restore time |
 | `JWT_EXPIRATION` | `3600` | Access token lifetime in seconds. The minimum is `120` |
 | `JWT_REFRESH_EXPIRATION` | `604800` | Refresh token lifetime in seconds |
 | `SESSION_ABSOLUTE_MAX_MS` | `2592000000` | Absolute lifetime of one session in milliseconds, that is 30 days. A refresh does not extend it. Use `0` to disable the cap. The default rises to `JWT_REFRESH_EXPIRATION * 1000` when that window is longer |
@@ -1375,6 +1375,13 @@ data: keep it on a host in the jurisdiction of the cell.
 **Restore.** `scripts/cell.sh restore <region> <backup dir>` checks the checksums and the region of
 the backup, and refuses when the database volume or a container of the cell exists. It creates the
 containers, restores the uploads, starts the db only, restores the dump and compares the row counts.
+Then it ends every session of the dump: it deletes each `refresh_tokens` row, clears the pending
+password-reset and email-change links, and writes `JWT_MIN_IAT=<restore time>` into the server env
+file of the cell. A session that was revoked after the backup is a deleted row, so the dump would
+bring it back. Thus every user signs in again after a move or a recovery. The restore cannot undo
+the other changes after the backup: each password, second factor and email change made after it is
+reverted, and spent recovery codes are valid again. The script prints the backup time; after a
+recovery, tell the users who changed a credential after it to change it again.
 It never starts the application. If it fails, remove what it made
 (`scripts/cell.sh compose <region> down -v` and `docker volume rm nexus-<region>_postgres_data_18`)
 and run it again. On Windows Git Bash, export `MSYS_NO_PATHCONV=1` first.
@@ -2068,7 +2075,7 @@ activates the git hooks through the `prepare` script.
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3412 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 1012 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 980 pass and 32 skip. CI then runs the Redis suites and the mail suite with Redis: 45 pass and none skip |
+| Server E2E tests | Jest | A separate configuration in `test/` | 1013 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 981 pass and 32 skip. CI then runs the Redis suites and the mail suite with Redis: 45 pass and none skip |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1866 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 367 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1524 tests pass |

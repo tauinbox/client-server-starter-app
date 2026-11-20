@@ -24,7 +24,11 @@
 # restore works only on a host where the cell does not exist yet: it refuses
 # when the database volume or a container of the cell is present. It restores
 # the uploads, starts only the db, restores the dump and compares the row
-# counts. It does not start the application: start it after the counts match.
+# counts. Then it ends every session and every pending reset or email-change
+# link of the dump, and sets JWT_MIN_IAT in the server env file of the cell to
+# the restore time: a session revoked after the backup is a deleted row, and
+# the dump would bring it back. It does not start the application: start it
+# after the counts match.
 #
 set -euo pipefail
 
@@ -40,6 +44,19 @@ env_value() {
   [ -f "$file" ] || return 0
   sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*//p" "$file" \
     | tail -n 1 | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"
+}
+
+# set_env_value KEY VALUE FILE - replace each line of KEY in an env file with
+# one KEY=VALUE line, and keep every other line.
+set_env_value() {
+  local key="$1" value="$2" file="$3" tmp
+  tmp="$(mktemp "$file.XXXXXX")"
+  chmod 600 "$tmp"
+  {
+    grep -v "^[[:space:]]*${key}[[:space:]]*=" "$file" || true
+    printf '%s=%s\n' "$key" "$value"
+  } > "$tmp"
+  mv "$tmp" "$file"
 }
 
 # check_cell REGION ROOT - refuse an env layout that would compose the wrong
@@ -72,6 +89,10 @@ check_cell() {
 
 project_of() {
   if [ "$1" = intl ]; then echo nexus; else echo "nexus-$1"; fi
+}
+
+server_env_of() {
+  if [ "$1" = intl ]; then echo server/.env; else echo "cells/$1/server/.env"; fi
 }
 
 proxy_network_of() {
@@ -182,6 +203,7 @@ cmd_restore() {
     || die "volume $volume exists: restore runs only on a host without cell $region"
   [ -z "$(cell_compose "$region" ps -aq)" ] \
     || die "containers of cell $region exist: restore runs only on a host without them"
+  [ -f "$(server_env_of "$region")" ] || die "$(server_env_of "$region") not found"
 
   log "Creating the proxy network and the database volume"
   local network
@@ -217,7 +239,21 @@ cmd_restore() {
   fi
   rm -f "$after"
   echo "  OK: $(wc -l < "$dir/counts.txt") tables, every count matches"
+
+  log "Ending the sessions and the pending one-time links of the backup"
+  cell_compose "$region" exec -T db psql -U "$user" -d "$db" -v ON_ERROR_STOP=1 -At \
+    < scripts/restore-end-sessions.sql
+
+  # The purpose tokens minted before the restore carry no session row, and
+  # their single-use ledger was in the Redis of the old cell.
+  local server_env min_iat
+  server_env="$(server_env_of "$region")"
+  min_iat="$(date +%s)"
+  set_env_value JWT_MIN_IAT "$min_iat" "$server_env"
+  echo "  JWT_MIN_IAT=$min_iat in $server_env"
   echo
+  echo "Every user signs in again. A password, factor or email change made after"
+  echo "$(env_value created "$dir/manifest") (the backup time) is reverted."
   echo "Next: scripts/cell.sh compose $region up -d --wait, then check it before any DNS change."
 }
 
@@ -272,6 +308,16 @@ self_test() {
   good_ru
   rm "$root/cells/ru/server/.env"
   expect refuse "ru with no server env file" check_cell ru "$root"
+
+  local env_file="$root/server.env"
+  printf '%s\n' A=1 'JWT_MIN_IAT="5"' B=2 ' JWT_MIN_IAT = 6' > "$env_file"
+  set_env_value JWT_MIN_IAT 9 "$env_file"
+  expect pass "set_env_value replaces each line of the key" \
+    test "$(cat "$env_file")" = "$(printf '%s\n' A=1 B=2 JWT_MIN_IAT=9)"
+  printf 'A=1' > "$env_file"
+  set_env_value JWT_MIN_IAT 9 "$env_file"
+  expect pass "set_env_value appends to a file with no final newline" \
+    test "$(cat "$env_file")" = "$(printf '%s\n' A=1 JWT_MIN_IAT=9)"
 
   [ "$failures" -eq 0 ] || exit 1
   echo "cell: self-test OK"
