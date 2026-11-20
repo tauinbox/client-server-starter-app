@@ -240,17 +240,9 @@ cmd_restore() {
   rm -f "$after"
   echo "  OK: $(wc -l < "$dir/counts.txt") tables, every count matches"
 
-  # One statement, so the sessions and the links end together or not at all.
   log "Ending the sessions and the pending one-time links of the backup"
-  cell_compose "$region" exec -T db psql -U "$user" -d "$db" -v ON_ERROR_STOP=1 -At -c "
-    with sessions as (delete from refresh_tokens returning 1),
-    links as (
-      update users set password_reset_token = null, password_reset_expires_at = null,
-        pending_email = null, pending_email_token = null, pending_email_expires_at = null
-      where password_reset_token is not null or pending_email_token is not null
-      returning 1)
-    select format('  %s refresh tokens deleted, %s users lost a pending link',
-      (select count(*) from sessions), (select count(*) from links))"
+  cell_compose "$region" exec -T db psql -U "$user" -d "$db" -v ON_ERROR_STOP=1 -At \
+    < scripts/restore-end-sessions.sql
 
   # The purpose tokens minted before the restore carry no session row, and
   # their single-use ledger was in the Redis of the old cell.
