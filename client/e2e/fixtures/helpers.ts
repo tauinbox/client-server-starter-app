@@ -106,6 +106,55 @@ export async function chooseOption(
   await expect(panel).toHaveCount(0);
 }
 
+/** The URL of a browser `/api` request, moved to the worker's mock server. */
+export function mockServerUrlOf(
+  requestUrl: string,
+  mockServerUrl: string
+): string {
+  const { port } = new URL(mockServerUrl);
+
+  return requestUrl.replace(/localhost:\d+/, `localhost:${port}`);
+}
+
+export type RecordedApiCall<T> = {
+  method: string;
+  status: number;
+  requestBody: unknown;
+  body: T;
+};
+
+/**
+ * Records each browser `/api` call that matches `pattern`, with its JSON body.
+ * Use it instead of `(await page.waitForResponse(...)).json()`: Chromium can
+ * drop the body of a routed response before the test asks for it ("No data
+ * found for resource", 2 of 25 runs of `feature-flags.spec.ts`).
+ */
+export async function recordApiCalls<T>(
+  page: Page,
+  pattern: RegExp,
+  mockServerUrl: string
+): Promise<RecordedApiCall<T>[]> {
+  const calls: RecordedApiCall<T>[] = [];
+
+  await page.route(pattern, async (route) => {
+    const request = route.request();
+    const response = await route.fetch({
+      url: mockServerUrlOf(request.url(), mockServerUrl)
+    });
+    const body = await response.text();
+
+    calls.push({
+      method: request.method(),
+      status: response.status(),
+      requestBody: request.postDataJSON(),
+      body: JSON.parse(body) as T
+    });
+    await route.fulfill({ response, body });
+  });
+
+  return calls;
+}
+
 /**
  * Point a page's `/api` traffic at the worker's mock server and stub the SSE
  * stream with an empty body. `base.fixture` applies this to the fixture `page`;
@@ -116,8 +165,6 @@ export async function routeApiToMockServer(
   page: Page,
   mockServerUrl: string
 ): Promise<void> {
-  const { port } = new URL(mockServerUrl);
-
   page.on('request', (request) => {
     if (/\/api\//.test(request.url())) {
       trackSentRequest(page, request);
@@ -126,14 +173,11 @@ export async function routeApiToMockServer(
   page.on('requestfinished', untrackRequest);
   page.on('requestfailed', untrackRequest);
   await page.route(/\/api\//, (route) => {
-    const url = route
-      .request()
-      .url()
-      .replace(/localhost:\d+/, `localhost:${port}`);
-
     trackRoutedRequest(page, route.request());
 
-    return route.continue({ url });
+    return route.continue({
+      url: mockServerUrlOf(route.request().url(), mockServerUrl)
+    });
   });
 
   // Most tests do not need live notifications, so the SSE stream gets an empty

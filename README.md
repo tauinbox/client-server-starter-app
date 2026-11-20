@@ -2094,7 +2094,7 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 | **Server - Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
 | **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
-| **Client E2E** | mock-server | typecheck:e2e (after the mock-server install), ng build, then serve the static output, then Playwright Chromium | HTML report, test results |
+| **Client E2E** | mock-server | typecheck:e2e (after the mock-server install), ng build, then serve the static output, then Playwright Chromium; then each spec that the change adds or edits runs 10 times with no retry (`test:e2e:changed`) | HTML report, test results |
 | **Docker Images** | - | Build the server image and the client image as the Deploy workflow does, with no push | - |
 
 The `Docker Images` job exists because the Dockerfiles copy only some directories. A build input

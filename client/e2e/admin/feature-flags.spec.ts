@@ -1,4 +1,9 @@
-import { expect, loginViaUiKeepSse, test } from '../fixtures/base.fixture';
+import {
+  expect,
+  loginViaUiKeepSse,
+  recordApiCalls,
+  test
+} from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
 
 // When an admin toggles a flag in the admin panel, the server (or mock-server
@@ -41,12 +46,12 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
 
     await expect(toggleBtn).not.toBeChecked();
 
-    // Wait for the SSE-driven re-fetch that follows the toggle. The bootstrap
-    // call already happened; the next /feature-flags hit can only come from
-    // `featureFlagsStore.reload()` triggered by the SSE handler.
-    const reloadResponse = page.waitForResponse(
-      (r) => r.url().includes('/api/v1/feature-flags') && r.status() === 200,
-      { timeout: 15_000 }
+    // The bootstrap call already happened; the next /feature-flags hit can only
+    // come from `featureFlagsStore.reload()` triggered by the SSE handler.
+    const reloads = await recordApiCalls<{ flags: Record<string, boolean> }>(
+      page,
+      /\/api\/v1\/feature-flags$/,
+      _mockServer.url
     );
 
     await toggleBtn.click();
@@ -57,13 +62,11 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
       .getByRole('button', { name: 'Confirm' })
       .click({ timeout: 5_000 });
 
-    const response = await reloadResponse;
-    const body = (await response.json()) as {
-      flags: Record<string, boolean>;
-      evaluatedAt: string;
-    };
-
-    expect(body.flags['new-dashboard']).toBe(true);
+    await expect
+      .poll(() => reloads.at(-1)?.body.flags['new-dashboard'], {
+        timeout: 15_000
+      })
+      .toBe(true);
 
     // List itself reflects the change too — admin store has been updated by
     // the toggle response, so the row switch stays on.

@@ -314,5 +314,6 @@ export {
   expectNoSnackbar,
   listResponse,
   openedDialog,
+  recordApiCalls,
   routeApiToMockServer
 } from './helpers';
