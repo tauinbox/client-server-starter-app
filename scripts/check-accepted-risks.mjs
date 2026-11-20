@@ -103,6 +103,7 @@ function approvalProblems(base, next) {
     console.log(
       `check-accepted-risks: this change adds or changes ${ids}; its pull request needs the "${APPROVAL_LABEL}" label.`
     );
+
     return [];
   }
 
@@ -154,7 +155,9 @@ function run(args) {
 
   if (problems.length > 0) {
     console.error(`check-accepted-risks: ${problems.length} problem(s):`);
+
     for (const problem of problems) console.error(`  - ${problem}`);
+
     process.exit(1);
   }
 
@@ -316,6 +319,7 @@ function selfTest() {
     });
 
   const covered = judge(sampleAudit());
+
   expect(
     'covers the exact advisory',
     covered.blocking.length === 0 &&
@@ -373,6 +377,7 @@ function selfTest() {
     vulnerabilities: {},
     metadata: { vulnerabilities: { total } }
   });
+
   expect(
     'accepts a clean report',
     auditReportProblem(counted(0), 0) === undefined
@@ -429,6 +434,7 @@ function selfTest() {
       .problem !== undefined
   );
   const readerSources = (source) => () => source;
+
   expect(
     'accepts audit readers that call readAuditReport',
     auditReaderProblems(readerSources('readAuditReport(result)')).length === 0
@@ -451,6 +457,7 @@ function selfTest() {
   );
 
   const yaml = trivyignoreYaml({ risks: [sampleRisk()] });
+
   expect(
     'writes both identifiers to Trivy',
     yaml.includes('- id: GHSA-fc5q-39xc-vjpf') &&
@@ -500,7 +507,9 @@ function selfTest() {
     console.error(
       `check-accepted-risks: self-test FAILED, ${failures.length} rule(s) did not report:`
     );
+
     for (const failure of failures) console.error(`  - ${failure}`);
+
     process.exit(1);
   }
 

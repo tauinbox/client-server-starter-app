@@ -78,6 +78,7 @@ let failed = false;
 const registry = run('node', [join(ROOT, 'scripts/check-accepted-risks.mjs')]);
 
 if (registry.status !== 0) failed = true;
+
 sections.push(
   `## Accepted-risk registry: ${registry.status === 0 ? 'OK' : 'FAILED'}\n\n\`\`\`\n${registry.output}\n\`\`\``
 );
@@ -87,6 +88,7 @@ for (const workspace of WORKSPACES) {
   const gate = run('node', [join(ROOT, 'scripts/audit-ci.mjs')], cwd);
 
   if (gate.status !== 0) failed = true;
+
   sections.push(
     `## \`${workspace}\`: production gate ${gate.status === 0 ? 'passes' : 'FAILS'}\n\n\`\`\`\n${gate.output}\n\`\`\`\n\nHigh and critical advisories in the dev tree only (no gate blocks them):\n\n${devOnlyReport(cwd)}`
   );
@@ -136,8 +138,10 @@ if (failed) {
       ]);
 
   console.log(result.output);
+
   if (result.status !== 0)
     console.error('security-watch: could not write the issue.');
+
   process.exit(1);
 }
 

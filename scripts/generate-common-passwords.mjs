@@ -35,22 +35,30 @@ const rawUrl = (path) =>
 
 async function fetchLines(path) {
   const res = await fetch(rawUrl(path));
+
   if (!res.ok) {
     throw new Error(`GET ${rawUrl(path)} -> ${res.status}`);
   }
+
   return (await res.text()).split(/\r?\n/);
 }
 
 const entries = new Set();
+
 for (const source of SOURCES) {
   let taken = 0;
+
   for (const line of await fetchLines(source.path)) {
     if (taken >= source.limit) break;
+
     const entry = line.trim().toLowerCase();
+
     if (entry.length < MIN_LENGTH || entries.has(entry)) continue;
+
     entries.add(entry);
     taken++;
   }
+
   console.log(`${source.path}: ${taken} entries`);
 }
 
@@ -63,6 +71,7 @@ const header = [
 // MIT asks that the notice travel with any substantial portion of the lists,
 // so it is fetched from the same commit and embedded in the output.
 const licence = (await fetchLines('LICENSE')).join('\n').trimEnd();
+
 if (licence.includes('*/')) {
   throw new Error('LICENSE text would close the comment block');
 }
@@ -77,5 +86,6 @@ const target = join(
   dirname(fileURLToPath(import.meta.url)),
   '../shared/src/data/common-passwords.ts'
 );
+
 writeFileSync(target, out);
 console.log(`Wrote ${entries.size} entries to ${target}`);

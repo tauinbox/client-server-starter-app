@@ -119,7 +119,9 @@ for (const line of covered) console.log(`accepted: ${line}`);
 
 if (blocking.length > 0 || unused.length > 0) {
   for (const line of blocking) console.error(`blocking: ${line}`);
+
   for (const line of unused) console.error(`unused: ${line}`);
+
   console.error(
     `\naudit-ci: ${blocking.length} blocking advisory(ies), ${unused.length} unused accepted risk(s) in the ${workspace} production tree.`
   );

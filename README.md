@@ -1862,12 +1862,15 @@ npm run typecheck          # tsc --noEmit incl. test/ and specs (excluded from b
 npm run lint               # Lint check
 npm run lint:fix           # Lint and auto-fix
 npm run lint:shared        # Lint shared/src (base rules)
+npm run lint:scripts       # Lint the root scripts/*.mjs with the server config
 npm run typecheck:shared   # Typecheck shared/src: browser config (no Node types) + Node-only files
 npm run format:check       # Prettier check
 npm run format             # Prettier format
 npm test                   # Unit tests (Jest)
 npm run test:cov           # Test coverage
 npm run check:imports      # Repo-wide cycle + barrel check (all four source roots)
+npm run graph              # Write architecture/dependency-graph.md (--html: interactive pages, needs Graphviz)
+npm run graph:check        # Fail when architecture/dependency-graph.md is out of date
 npm run test:e2e           # E2E tests (pinned to Redis DB E2E_REDIS_DB, default 15, wiped per run)
 npm run migrations:run     # Run migrations (build first)
 npm run migrations:gen -- ./src/migrations/<kebab-name>  # Generate migration (build first)
@@ -1984,6 +1987,7 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
 | Commitlint | Conventional Commits enforcement | `client/commitlint.config.mjs` |
 | commit-and-tag-version | Automated versioning and CHANGELOG | `client/.versionrc.json` |
 | check-imports | Repo-wide cycles and barrel rules (all four source roots) | `scripts/check-imports.mjs` |
+| dependency-cruiser | `npm run graph` from `server/`. Draws the import graph of the workspaces and modules into `architecture/dependency-graph.md`; `--html` writes interactive pages into the gitignored `architecture/html/` (needs Graphviz). CI runs `graph:check` | `server/scripts/dependency-graph.mjs` |
 | check-workspace-versions | `npm run check:versions` from any workspace. A package that two or more workspaces declare has the same range and the same locked version. A workspace that uses a package declares it, because the check does not see a transitive copy | `scripts/check-workspace-versions.mjs` |
 
 ### Import hygiene and barrels
@@ -2086,7 +2090,7 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server - Checks** | - | audit (high), lint, lint:shared, typecheck:shared, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:duplicate-functions, check:imports, check:versions | - |
+| **Server - Checks** | - | audit (high), lint, lint:shared, lint:scripts, typecheck:shared, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:duplicate-functions, check:imports, graph:check, check:versions | - |
 | **Server - Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
 | **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
@@ -2097,7 +2101,9 @@ The `Docker Images` job exists because the Dockerfiles copy only some directorie
 outside them is present in the other jobs and absent in the image, so only an image build finds it.
 
 In the `Server - Checks` job, `check:i18n` validates that each `ErrorKeys` value exists in each client
-i18n JSON file. `check:imports` runs repo-wide, after its own `--self-test`.
+i18n JSON file. `check:imports` runs repo-wide, after its own `--self-test`. `graph:check` fails when
+`architecture/dependency-graph.md` differs from the import graph of the tree: run `npm run graph`
+from `server/` and commit the file.
 
 Concurrency groups cancel a stale run when the pushes are rapid. The tests need no database and no
 `.env` file, because each test runs against a mock.

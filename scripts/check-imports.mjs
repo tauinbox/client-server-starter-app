@@ -104,17 +104,20 @@ const REEXPORT =
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
+
     if (entry.isDirectory()) {
       if (!SKIP_DIRS.has(entry.name)) walk(full, out);
     } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) {
       out.push(normalize(full));
     }
   }
+
   return out;
 }
 
 function specifiers(src) {
   const found = [];
+
   for (const [re, typeIdx, specIdx] of [
     [FROM, 1, 2],
     [BARE, null, 1],
@@ -122,6 +125,7 @@ function specifiers(src) {
   ]) {
     re.lastIndex = 0;
     let m;
+
     while ((m = re.exec(src))) {
       found.push({
         spec: m[specIdx],
@@ -129,18 +133,23 @@ function specifiers(src) {
       });
     }
   }
+
   return found;
 }
 
 function resolveSpec(spec, fromFile, alias) {
   let base = null;
+
   for (const [prefix, target] of Object.entries(alias)) {
     if (spec.startsWith(prefix)) base = join(target, spec.slice(prefix.length));
   }
+
   if (!base && (spec.startsWith('./') || spec.startsWith('../'))) {
     base = resolve(dirname(fromFile), spec.replace(/\.js$/, ''));
   }
+
   if (!base) return null;
+
   for (const candidate of [`${base}.ts`, base, join(base, 'index.ts')]) {
     try {
       if (statSync(candidate).isFile()) return normalize(candidate);
@@ -148,6 +157,7 @@ function resolveSpec(spec, fromFile, alias) {
       // Not this candidate — try the next shape.
     }
   }
+
   return null;
 }
 
@@ -161,12 +171,17 @@ function analyse({ base, roots, allowed, packageApiRoots = [] }) {
   };
 
   const barrels = new Set();
+
   for (const { dir } of roots) {
     for (const file of walk(dir)) {
       if (!file.endsWith(`${sep}index.ts`)) continue;
+
       REEXPORT.lastIndex = 0;
+
       if (!REEXPORT.test(readFileSync(file, 'utf8'))) continue; // wiring, not a barrel
+
       barrels.add(file);
+
       if (!allowed.includes(rel(file))) violations.newBarrel.push(rel(file));
     }
   }
@@ -175,40 +190,52 @@ function analyse({ base, roots, allowed, packageApiRoots = [] }) {
   // over an outer one instead of both claiming the same target.
   const barrelOwning = (file) => {
     let owner = null;
+
     for (const barrel of barrels) {
       const inside = `${dirname(barrel)}${sep}`;
+
       if (!file.startsWith(inside)) continue;
+
       if (!owner || inside.length > `${dirname(owner)}${sep}`.length) {
         owner = barrel;
       }
     }
+
     return owner;
   };
 
   const graph = new Map();
   const typeOnly = new Set();
+
   for (const { dir, alias } of roots) {
     for (const file of walk(dir)) {
       const deps = [];
+
       for (const { spec, typeOnly: isType } of specifiers(
         readFileSync(file, 'utf8')
       )) {
         const target = resolveSpec(spec, file, alias);
+
         if (!target) continue;
+
         deps.push(target);
+
         if (isType) typeOnly.add(`${file}|${target}`);
+
         if (
           barrels.has(target) &&
           file.startsWith(`${dirname(target)}${sep}`)
         ) {
           violations.selfBarrel.push(`${rel(file)} -> ${spec}`);
         }
+
         const owner = barrelOwning(target);
         const internalToPackage = packageApiRoots.some(
           (root) =>
             file.startsWith(`${root}${sep}`) &&
             owner?.startsWith(`${root}${sep}`)
         );
+
         if (
           owner &&
           target !== owner &&
@@ -220,6 +247,7 @@ function analyse({ base, roots, allowed, packageApiRoots = [] }) {
           );
         }
       }
+
       // Specs are checked for import hygiene but kept out of the graph: a spec
       // is a leaf nothing imports, so it cannot participate in a runtime cycle.
       if (!SPEC.test(file)) graph.set(file, deps);
@@ -232,16 +260,22 @@ function analyse({ base, roots, allowed, packageApiRoots = [] }) {
   const visit = (node) => {
     state.set(node, 1);
     stack.push(node);
+
     for (const dep of graph.get(node) ?? []) {
       if (!graph.has(dep)) continue;
+
       const s = state.get(dep) ?? 0;
+
       if (s === 1) {
         const cycle = stack.slice(stack.indexOf(dep)).concat([dep]);
         const erased = cycle
           .slice(0, -1)
           .every((f, i) => typeOnly.has(`${f}|${cycle[i + 1]}`));
+
         if (cycle.some((f) => ENTITY.test(f)) || erased) continue;
-        const key = [...cycle].slice(0, -1).sort().join('>');
+
+        const key = cycle.slice(0, -1).toSorted().join('>');
+
         if (!seen.has(key)) {
           seen.add(key);
           violations.cycles.push(cycle.map(rel));
@@ -250,9 +284,11 @@ function analyse({ base, roots, allowed, packageApiRoots = [] }) {
         visit(dep);
       }
     }
+
     stack.pop();
     state.set(node, 2);
   };
+
   for (const node of graph.keys()) if (!state.get(node)) visit(node);
 
   return { violations, moduleCount: graph.size, barrelCount: barrels.size };
@@ -266,6 +302,7 @@ function report({ violations }) {
     console.error(
       `ERROR: ${violations.cycles.length} dependency cycle(s) found.\n`
     );
+
     for (const cycle of violations.cycles)
       console.error(`  ${cycle.join('\n    -> ')}\n`);
   }
@@ -277,8 +314,10 @@ function report({ violations }) {
         'Import the sibling module directly — a barrel that re-exports the\n' +
         'importer closes a cycle through itself.\n'
     );
+
     for (const v of [...new Set(violations.selfBarrel)])
       console.error(`  ${v}`);
+
     console.error('');
   }
 
@@ -290,7 +329,9 @@ function report({ violations }) {
         'exemption, add it to ALLOWED_BARRELS in scripts/check-imports.mjs and\n' +
         'say why in the PR.\n'
     );
+
     for (const v of violations.newBarrel) console.error(`  ${v}`);
+
     console.error('');
   }
 
@@ -301,8 +342,10 @@ function report({ violations }) {
         'Import the directory itself — the barrel is its public face. If the\n' +
         'symbol is missing from the barrel, add the re-export there.\n'
     );
+
     for (const v of [...new Set(violations.deepImport)])
       console.error(`  ${v}`);
+
     console.error('');
   }
 
@@ -418,6 +461,7 @@ function selfTest() {
       roots: [{ dir: join(dir, 'src', 'pkg'), alias: {} }],
       allowed: ['src/pkg/index.ts']
     });
+
     expect(
       'allowlist did not suppress an allowed barrel',
       clean.violations.newBarrel.length === 0
@@ -430,9 +474,12 @@ function selfTest() {
     console.error(
       'ERROR: check-imports self-test failed — the check is not detecting:\n'
     );
+
     for (const f of failures) console.error(`  ${f}`);
+
     process.exit(1);
   }
+
   console.log(`check-imports: self-test OK — all detectors fire.`);
 }
 
@@ -445,7 +492,9 @@ if (process.argv.includes('--self-test')) {
     allowed: ALLOWED_BARRELS,
     packageApiRoots: PACKAGE_API_ROOTS
   });
+
   if (report(result)) process.exit(1);
+
   console.log(
     `check-imports: OK — ${result.moduleCount} modules, ${result.barrelCount} allowed barrel(s), no cycles.`
   );

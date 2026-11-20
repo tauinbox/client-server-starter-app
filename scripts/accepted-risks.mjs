@@ -111,7 +111,9 @@ export function validateRegistry(registry, { today, readGuard }) {
     }
 
     if (!GHSA_ID.test(risk.id ?? '')) fail('"id" is not a GHSA identifier');
+
     if (seen.has(risk.id)) fail('"id" is listed twice');
+
     seen.add(risk.id);
 
     if (
@@ -181,9 +183,11 @@ export function validateRegistry(registry, { today, readGuard }) {
       const lifetime = daysBetween(risk.added, risk.expires);
 
       if (lifetime < 0) fail('"expires" is before "added"');
+
       if (lifetime > MAX_LIFETIME_DAYS) {
         fail(`lives ${lifetime} days; the limit is ${MAX_LIFETIME_DAYS}`);
       }
+
       if (risk.expires < today) fail(`expired on ${risk.expires}`);
     }
   }
@@ -248,8 +252,10 @@ export function collectAdvisories(audit) {
 export function auditReportProblem(report, exitStatus) {
   if (!report || typeof report !== 'object')
     return 'the output is not a JSON object';
+
   if (report.error)
     return `npm reported an error: ${report.message ?? JSON.stringify(report.error)}`;
+
   if (
     typeof report.vulnerabilities !== 'object' ||
     report.vulnerabilities === null
@@ -261,6 +267,7 @@ export function auditReportProblem(report, exitStatus) {
 
   if (!Number.isInteger(total))
     return 'the report has no "metadata.vulnerabilities.total" count';
+
   if (exitStatus !== 0 && total === 0)
     return `npm exited ${exitStatus} with no advisory counted`;
 

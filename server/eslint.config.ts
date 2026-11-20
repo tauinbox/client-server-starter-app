@@ -6,6 +6,7 @@ import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescrip
 import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
 import stylistic from '@stylistic/eslint-plugin';
+import globals from 'globals';
 import baseRules, { errorKeyLiteralSyntax } from '../eslint.base.config.mjs';
 
 type RestrictedSyntax = { selector: string; message: string };
@@ -90,10 +91,6 @@ export default defineConfig(
     }
   },
   {
-    files: ['**/*.js', '**/*.mjs'],
-    extends: [tseslint.configs.disableTypeChecked]
-  },
-  {
     files: ['**/*.spec.ts', 'test/**/*.ts'],
     // The Express mock helpers return `Response & T`, so a mocked member carries
     // both the jest.Mock property and the original method declaration, and
@@ -130,6 +127,13 @@ export default defineConfig(
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/no-misused-promises': 'error'
     }
+  },
+  // After the block above, which turns on three type-aware rules for every
+  // file: a script in JavaScript has no type information.
+  {
+    files: ['**/*.js', '**/*.mjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: globals.node }
   },
   // `basePath` keeps `src/**` relative to this workspace. The pre-commit hook
   // runs ESLint from the repository root, where `src/**` matches nothing; the
