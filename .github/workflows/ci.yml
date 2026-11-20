@@ -379,6 +379,12 @@ jobs:
       # `pretest:e2e` builds the client, so the suite never runs against a stale bundle.
       - run: npm run test:e2e
 
+      # Each spec that the change adds or edits runs 10 times with no retry, on
+      # the build of the step above: a spec that fails in a few percent of its
+      # runs passes one run of the suite.
+      - run: git fetch --no-tags --depth=1 origin master
+      - run: npm run test:e2e:changed
+
       - uses: actions/upload-artifact@v7
         if: always()
         with:

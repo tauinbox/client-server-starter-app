@@ -31,6 +31,7 @@
     "audit:ci": "node ../scripts/audit-ci.mjs",
     "pretest:e2e": "npm run build",
     "test:e2e": "playwright test",
+    "test:e2e:changed": "node scripts/e2e-repeat-changed.mjs",
     "pretest:e2e:auth": "npm run build",
     "test:e2e:auth": "playwright test e2e/auth",
     "pretest:e2e:users": "npm run build",
