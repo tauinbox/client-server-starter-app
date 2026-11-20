@@ -116,6 +116,45 @@ export function mockServerUrlOf(
   return requestUrl.replace(/localhost:\d+/, `localhost:${port}`);
 }
 
+export type RecordedApiCall<T> = {
+  method: string;
+  status: number;
+  requestBody: unknown;
+  body: T;
+};
+
+/**
+ * Records each browser `/api` call that matches `pattern`, with its JSON body.
+ * Use it instead of `(await page.waitForResponse(...)).json()`: Chromium can
+ * drop the body of a routed response before the test asks for it ("No data
+ * found for resource", 2 of 25 runs of `feature-flags.spec.ts`).
+ */
+export async function recordApiCalls<T>(
+  page: Page,
+  pattern: RegExp,
+  mockServerUrl: string
+): Promise<RecordedApiCall<T>[]> {
+  const calls: RecordedApiCall<T>[] = [];
+
+  await page.route(pattern, async (route) => {
+    const request = route.request();
+    const response = await route.fetch({
+      url: mockServerUrlOf(request.url(), mockServerUrl)
+    });
+    const body = await response.text();
+
+    calls.push({
+      method: request.method(),
+      status: response.status(),
+      requestBody: request.postDataJSON(),
+      body: JSON.parse(body) as T
+    });
+    await route.fulfill({ response, body });
+  });
+
+  return calls;
+}
+
 /**
  * Point a page's `/api` traffic at the worker's mock server and stub the SSE
  * stream with an empty body. `base.fixture` applies this to the fixture `page`;

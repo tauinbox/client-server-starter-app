@@ -1,7 +1,7 @@
 import {
   expect,
   loginViaUiKeepSse,
-  mockServerUrlOf,
+  recordApiCalls,
   test
 } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
@@ -47,21 +47,12 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
     await expect(toggleBtn).not.toBeChecked();
 
     // The bootstrap call already happened; the next /feature-flags hit can only
-    // come from `featureFlagsStore.reload()` triggered by the SSE handler. The
-    // body is read here: Chromium can drop the body of a routed response before
-    // `response.json()` asks for it (2 of 25 runs, "No data found for resource").
-    const reloadedFlags: Record<string, boolean>[] = [];
-
-    await page.route(/\/api\/v1\/feature-flags$/, async (route) => {
-      const response = await route.fetch({
-        url: mockServerUrlOf(route.request().url(), _mockServer.url)
-      });
-      const body = await response.text();
-      const { flags } = JSON.parse(body) as { flags: Record<string, boolean> };
-
-      reloadedFlags.push(flags);
-      await route.fulfill({ response, body });
-    });
+    // come from `featureFlagsStore.reload()` triggered by the SSE handler.
+    const reloads = await recordApiCalls<{ flags: Record<string, boolean> }>(
+      page,
+      /\/api\/v1\/feature-flags$/,
+      _mockServer.url
+    );
 
     await toggleBtn.click();
 
@@ -72,7 +63,9 @@ test.describe('Feature flags — SSE-driven reload after admin toggle', () => {
       .click({ timeout: 5_000 });
 
     await expect
-      .poll(() => reloadedFlags.at(-1)?.['new-dashboard'], { timeout: 15_000 })
+      .poll(() => reloads.at(-1)?.body.flags['new-dashboard'], {
+        timeout: 15_000
+      })
       .toBe(true);
 
     // List itself reflects the change too — admin store has been updated by

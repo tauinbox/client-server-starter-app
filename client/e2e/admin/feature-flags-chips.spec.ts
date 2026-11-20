@@ -2,6 +2,7 @@ import {
   expect,
   loginViaApi,
   openedDialog,
+  recordApiCalls,
   test
 } from '../fixtures/base.fixture';
 import { mockId } from '../fixtures/ids';
@@ -80,26 +81,23 @@ test.describe('Feature flag form — chip+autocomplete inputs (FF-UX-001)', () =
     await keyInput.fill('chips-rollout');
     await expect(keyInput).toHaveValue('chips-rollout');
 
-    const createResp = page.waitForResponse(
-      (r) =>
-        /\/api\/v1\/admin\/feature-flags$/.test(r.url()) &&
-        r.request().method() === 'POST' &&
-        r.status() === 201
-    );
-
-    await dialog.getByRole('button', { name: /^Create$/ }).click();
-
-    const response = await createResp;
-    const created = (await response.json()) as {
+    const creates = await recordApiCalls<{
       environments: string[];
       key: string;
       rules: { payload: { type: string; roleNames?: string[] } }[];
-    };
+    }>(page, /\/api\/v1\/admin\/feature-flags$/, _mockServer.url);
 
+    await dialog.getByRole('button', { name: /^Create$/ }).click();
+
+    await expect.poll(() => creates.length).toBe(1);
+    const [{ method, status, body: created, requestBody }] = creates;
+
+    expect(method).toBe('POST');
+    expect(status).toBe(201);
     expect(created.key).toBe('chips-rollout');
     expect(created.environments.toSorted()).toEqual(['production', 'staging']);
 
-    const createBody = response.request().postDataJSON() as {
+    const createBody = requestBody as {
       rules: {
         effect: string;
         payload: { type: string; roleNames?: string[] };
