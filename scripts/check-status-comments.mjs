@@ -49,15 +49,18 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', '__tests__']);
 function readStatuses(file) {
   const text = readFileSync(file, 'utf8');
   const statuses = [...text.matchAll(/^\s*(\d{3}):\s*'/gm)].map((m) => m[1]);
+
   if (statuses.length === 0) {
     console.error(`ERROR: check-status-comments found no status in ${file}.`);
     process.exit(1);
   }
+
   return statuses;
 }
 
 function commentPattern(statuses) {
   const numbers = `\\b(${statuses.join('|')})\\b`;
+
   // A line that is a comment, or a trailing `// ` comment after code.
   return new RegExp(
     `^\\s*(\\/\\/|\\/\\*|\\*).*${numbers}|\\s\\/\\/\\s.*${numbers}`
@@ -67,12 +70,14 @@ function commentPattern(statuses) {
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
+
     if (entry.isDirectory()) {
       if (!SKIP_DIRS.has(entry.name)) walk(full, out);
     } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts')) {
       out.push(full);
     }
   }
+
   return out;
 }
 
@@ -82,24 +87,31 @@ function toRepoPath(base, file) {
 
 function scan(base, roots, pattern) {
   const violations = [];
+
   for (const root of roots) {
     for (const file of walk(join(base, root))) {
       const repoPath = toRepoPath(base, file);
+
       if (TRANSPORT_FILES.has(repoPath)) continue;
+
       const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+
       lines.forEach((line, index) => {
         if (line.includes('eslint-disable')) return;
+
         if (pattern.test(line)) {
           violations.push(`${repoPath}:${index + 1}: ${line.trim()}`);
         }
       });
     }
   }
+
   return violations;
 }
 
 function selfTest(pattern) {
   const base = mkdtempSync(join(tmpdir(), 'check-status-comments-'));
+
   try {
     mkdirSync(join(base, 'src'));
     writeFileSync(
@@ -118,6 +130,7 @@ function selfTest(pattern) {
     writeFileSync(join(base, 'src', 'planted.spec.ts'), '// answers 404\n');
     const found = scan(base, ['src'], pattern).map((v) => v.split(':')[1]);
     const expected = ['1', '3', '5'];
+
     if (found.join(',') !== expected.join(',')) {
       console.error(
         `ERROR: check-status-comments self-test failed: expected lines ${expected.join(', ')}, got ${found.join(', ') || 'none'}.`
@@ -127,6 +140,7 @@ function selfTest(pattern) {
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
+
   console.log('check-status-comments: self-test OK.');
 }
 
@@ -136,6 +150,7 @@ if (process.argv.includes('--self-test')) {
   selfTest(pattern);
 } else {
   const violations = scan(ROOT, SCAN_ROOTS, pattern);
+
   if (violations.length > 0) {
     console.error(
       'ERROR: a comment names an HTTP status. Name the error key, or describe the answer in words; the status lives in ERROR_STATUS:\n' +
@@ -143,5 +158,6 @@ if (process.argv.includes('--self-test')) {
     );
     process.exit(1);
   }
+
   console.log('check-status-comments: no HTTP status in a comment.');
 }

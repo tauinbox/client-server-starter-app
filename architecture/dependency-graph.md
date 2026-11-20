@@ -35,7 +35,7 @@ end
 
 ## Server modules
 
-`core.module.ts` is the composition root and has its own node. The other files of `core/` are shared infrastructure.
+Each folder of `server/src/modules` is one node, so an arrow is any import between two folders: an entity relation, a decorator, a service. `core.module.ts` is the composition root and has its own node. The other files of `core/` are shared infrastructure. The Nest module graph is the next view.
 
 ```mermaid
 flowchart LR
@@ -193,6 +193,104 @@ U-->O
 U-->T
 U-->P
 U-->Q
+```
+
+## Server Nest modules
+
+Each `*.module.ts` file is one node, and an arrow is an import between two module files. Two folders can import each other while their Nest modules do not: for example `AuthModule` imports `UsersModule`, and `UsersApiModule` imports `AuthModule`.
+
+```mermaid
+flowchart LR
+
+subgraph 0["server"]
+subgraph 1["src"]
+subgraph 2["common"]
+subgraph 3["crypto"]
+4["crypto.module.ts"]
+end
+end
+subgraph 5["modules"]
+subgraph 6["core"]
+7["core.module.ts"]
+subgraph C["region"]
+D["region.module.ts"]
+end
+subgraph U["metrics"]
+V["metrics.module.ts"]
+end
+subgraph Z["health"]
+10["health.module.ts"]
+end
+end
+subgraph 8["audit"]
+9["audit.module.ts"]
+end
+subgraph A["auth"]
+B["auth.module.ts"]
+subgraph I["breached-password"]
+J["breached-password.module.ts"]
+end
+subgraph K["captcha"]
+L["captcha.module.ts"]
+end
+subgraph M["casl"]
+N["casl.module.ts"]
+end
+end
+subgraph E["entitlements"]
+F["entitlements.module.ts"]
+end
+subgraph G["users"]
+H["users.module.ts"]
+Y["users-api.module.ts"]
+end
+subgraph O["billing"]
+P["billing.module.ts"]
+end
+subgraph Q["feature-flags"]
+R["feature-flags.module.ts"]
+end
+subgraph S["notifications"]
+T["notifications.module.ts"]
+end
+subgraph W["mail"]
+X["mail.module.ts"]
+end
+end
+end
+end
+7-->9
+7-->B
+7-->P
+7-->R
+7-->X
+7-->T
+7-->Y
+7-->H
+7-->10
+7-->V
+7-->D
+B-->4
+B-->D
+B-->F
+B-->H
+B-->J
+B-->L
+B-->N
+H-->J
+N-->4
+P-->B
+P-->F
+P-->R
+P-->T
+R-->B
+R-->T
+R-->H
+T-->B
+T-->N
+T-->H
+Y-->B
+Y-->H
 ```
 
 ## Client modules

@@ -52,10 +52,16 @@ const VIEWS = [
   {
     id: 'server-modules',
     title: 'Server modules',
-    text: '`core.module.ts` is the composition root and has its own node. The other files of `core/` are shared infrastructure.',
+    text: 'Each folder of `server/src/modules` is one node, so an arrow is any import between two folders: an entity relation, a decorator, a service. `core.module.ts` is the composition root and has its own node. The other files of `core/` are shared infrastructure. The Nest module graph is the next view.',
     includeOnly: '^(server/src|shared/src)/',
     collapse:
       '^(server/src/modules/core/core[.]module[.]ts|server/src/modules/[^/]+|server/src/[^/]+|shared/src/[^/]+)'
+  },
+  {
+    id: 'server-nest-modules',
+    title: 'Server Nest modules',
+    text: 'Each `*.module.ts` file is one node, and an arrow is an import between two module files. Two folders can import each other while their Nest modules do not: for example `AuthModule` imports `UsersModule`, and `UsersApiModule` imports `AuthModule`.',
+    includeOnly: '^server/src/.*[.]module[.]ts$'
   },
   {
     id: 'client-modules',
@@ -145,6 +151,10 @@ async function render(result, options) {
   return output.replaceAll('\r\n', '\n').trimEnd();
 }
 
+function splitView({ id, title, text, ...filters }) {
+  return { id, title, text, filters };
+}
+
 async function markdown(result) {
   const parts = [
     '# Dependency graph',
@@ -156,22 +166,10 @@ async function markdown(result) {
     'For an interactive file-level view, run `npm run graph -- --html` (needs Graphviz) and open the pages in `architecture/html/`.'
   ];
 
-  for (const view of VIEWS) {
-    const graph = await render(result, {
-      outputType: 'mermaid',
-      includeOnly: view.includeOnly,
-      collapse: view.collapse
-    });
-    parts.push(
-      '',
-      `## ${view.title}`,
-      '',
-      view.text,
-      '',
-      '```mermaid',
-      graph,
-      '```'
-    );
+  for (const { title, text, filters } of VIEWS.map(splitView)) {
+    const graph = await render(result, { outputType: 'mermaid', ...filters });
+
+    parts.push('', `## ${title}`, '', text, '', '```mermaid', graph, '```');
   }
 
   return `${parts.join('\n')}\n`;
@@ -182,6 +180,7 @@ function ensureDot() {
 
   if (existsSync(join(WINDOWS_GRAPHVIZ, 'dot.exe'))) {
     process.env.PATH = `${WINDOWS_GRAPHVIZ}${delimiter}${process.env.PATH}`;
+
     return;
   }
 
@@ -207,6 +206,7 @@ async function renderPage(result, { id, filters }) {
 
   const { optionsUsed: used } = result.summary;
   const { reporterOptions: saved } = used;
+
   used.reporterOptions = {
     ...saved,
     dot: { theme: { graph: { clusterrank: 'none' } } }
@@ -229,11 +229,7 @@ async function writeHtml(result, focus) {
       .filter(Boolean)
   );
   const pages = [
-    ...VIEWS.map(({ id, includeOnly, collapse }) => ({
-      id,
-      includeOnly,
-      collapse
-    })),
+    ...VIEWS.map(splitView).map(({ id, filters }) => ({ id, ...filters })),
     ...[...moduleDirs].toSorted().map((dir) => ({
       id: `module--${dir.replaceAll('/', '--')}`,
       includeOnly: SOURCES,
@@ -246,6 +242,7 @@ async function writeHtml(result, focus) {
 
   for (const { id, ...filters } of pages) {
     const html = await renderPage(result, { id, filters });
+
     writeFileSync(join(ROOT, OUT_HTML, `${id}.html`), `${html}\n`);
     console.log(`graph: wrote ${OUT_HTML}/${id}.html`);
   }

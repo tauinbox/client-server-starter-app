@@ -49,6 +49,8 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run lint:shared
+      # No workspace lint reaches the root scripts/ folder.
+      - run: npm run lint:scripts
       - run: npm run typecheck:shared
       - run: npm run format:check
       - run: npm run typecheck
