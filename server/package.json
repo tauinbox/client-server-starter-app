@@ -21,6 +21,7 @@
     "typecheck:shared": "tsc -p ../shared/tsconfig.browser.json && tsc -p ../shared/tsconfig.node.json",
     "test": "node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",
     "test:watch": "npm test -- --watch",
+    "pretest:cov": "node -e \"require('node:fs').rmSync('coverage', { recursive: true, force: true })\"",
     "test:cov": "npm test -- --coverage",
     "test:debug": "node --inspect-brk --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --runInBand",
     "test:e2e": "npm test -- --config ./test/jest-e2e.json",

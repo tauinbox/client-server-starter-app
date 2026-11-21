@@ -50,7 +50,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Unit tests | `npm test`. It starts Jest with `--experimental-vm-modules`, because Jest can `require()` the ESM-only NestJS 12 packages only with that flag. Do not start `jest` directly |
 | Single test | `npm test -- --testPathPatterns=<pattern>` |
 | Test watch | `npm run test:watch` |
-| Test coverage | `npm run test:cov` |
+| Test coverage | `npm run test:cov` (`pretest:cov` deletes `coverage/` first, so the report holds only the current sources) |
 | E2E tests | `npm run test:e2e` |
 | Run migrations | `npm run migrations:run` (build first) |
 | Generate migration | `npm run migrations:gen -- ./src/migrations/<kebab-name>` (build first) |
@@ -2144,10 +2144,12 @@ data.
 A seeder does not touch a row that an administrator edited. A seeder writes the rules of a feature
 flag only beside a flag that it just made. Thus it does not restore a rule that a person deleted.
 
-The RBAC seeder gives the `admin` role every permission, and it gives the `user` role three grants:
-`read` and `update` on `profile`, plus `update` on `users` under
-`{ ownership: { userField: 'id' } }`. That last row is the only conditional grant the product seeds,
-and `mock-server/src/seed.ts` mirrors it, so an end-to-end test can reach an ownership-scoped rule.
+The RBAC seeder gives the `admin` role every permission, and it gives the `user` role two grants:
+`update` on `profile`, plus `update` on `users` under `{ ownership: { userField: 'id' } }`. That
+last row is the only conditional grant the product seeds, and `mock-server/src/seed.ts` mirrors it,
+so an end-to-end test can reach an ownership-scoped rule. These two grants are also the ceiling of
+the `user` role (`USER_ROLE_PERMISSION_CEILING`): the role routes refuse another allow for it with
+`errors.roles.grantOutsideUserRole`, and the ability ignores one that the database holds.
 
 ## Deployment behind a reverse proxy
 

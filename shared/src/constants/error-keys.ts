@@ -85,6 +85,7 @@ export const ErrorKeys = {
     CONDITION_NOT_SUPPORTED: 'errors.roles.conditionNotSupported',
     CONDITION_FIELD_UNKNOWN: 'errors.roles.conditionFieldUnknown',
     ACTION_NOT_GRANTABLE: 'errors.roles.actionNotGrantable',
+    GRANT_OUTSIDE_USER_ROLE: 'errors.roles.grantOutsideUserRole',
     CONDITION_BROADER_THAN_CALLER: 'errors.roles.conditionBroaderThanCaller',
     CONDITION_UNRESOLVABLE: 'errors.roles.conditionUnresolvable',
     SUPER_ROLE_ASSIGN_FORBIDDEN: 'errors.roles.superRoleAssignForbidden',

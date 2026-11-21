@@ -4,7 +4,8 @@ import {
   ErrorKeys,
   type ErrorKey,
   ROLE_LIST_QUERY,
-  ROLE_NAME_MAX_LENGTH
+  ROLE_NAME_MAX_LENGTH,
+  SYSTEM_ROLES
 } from '@app/shared/constants';
 import {
   listPage,
@@ -40,7 +41,10 @@ import {
   permissionGuard
 } from '../helpers/auth.helpers';
 import type { AuthenticatedRequest } from '../types';
-import { sameConditions } from '@app/shared/utils/grant-scope';
+import {
+  isWithinUserRoleCeiling,
+  sameConditions
+} from '@app/shared/utils/grant-scope';
 import { assertGrantScope, denyRowsOf } from '../helpers/grant-scope.helpers';
 import { pushToUser } from '../sse-hub';
 import {
@@ -260,8 +264,8 @@ function setPermissionsErrors(body: Record<string, unknown>): string[] {
 // would enforce nothing is rejected on write instead of being stored. Unknown
 // permission ids fall through to `UNKNOWN_PERMISSION`, as on the server.
 function findGrantError(
-  permissionId: string,
-  conditions: unknown
+  role: { name: string },
+  { permissionId, conditions }: { permissionId: string; conditions?: unknown }
 ): { message: string; errorKey: ErrorKey } | null {
   const state = getState();
   const permission = state.permissions.get(permissionId);
@@ -313,6 +317,20 @@ function findGrantError(
     return {
       message: `Cannot grant ${label} - ${fieldError}`,
       errorKey: ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN
+    };
+  }
+
+  if (
+    role.name === SYSTEM_ROLES.USER &&
+    !isWithinUserRoleCeiling({
+      resource: resource.name,
+      action: action.name,
+      conditions: conditions as PermissionCondition | null | undefined
+    })
+  ) {
+    return {
+      message: `Cannot grant ${label} to the ${SYSTEM_ROLES.USER} role - it holds only the self-service permissions`,
+      errorKey: ErrorKeys.ROLES.GRANT_OUTSIDE_USER_ROLE
     };
   }
 
@@ -822,7 +840,7 @@ router.put(
     }
 
     for (const item of items) {
-      const error = findGrantError(item.permissionId, item.conditions);
+      const error = findGrantError(role, item);
 
       if (error) {
         sendError(res, error.errorKey, error.message);
@@ -962,7 +980,7 @@ router.post(
     }
 
     for (const permissionId of permissionIds as string[]) {
-      const error = findGrantError(permissionId, conditions);
+      const error = findGrantError(role, { permissionId, conditions });
 
       if (error) {
         sendError(res, error.errorKey, error.message);

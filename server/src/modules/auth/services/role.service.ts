@@ -22,12 +22,17 @@ import { userNotFound } from '../../users/utils/user-not-found';
 import { PermissionService } from './permission.service';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
 import { PermissionCondition } from '@app/shared/types';
-import { ErrorKeys, ROLE_LIST_QUERY } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  ROLE_LIST_QUERY,
+  SYSTEM_ROLES
+} from '@app/shared/constants';
 import { SYSTEM_ABILITY } from '../casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../casl/app-ability';
 import { withChanges } from '@app/shared/utils/changed-fields';
 import {
   isDenyCondition,
+  isWithinUserRoleCeiling,
   sameConditions,
   type GrantRefusal,
   type GrantScopeItem
@@ -272,10 +277,15 @@ export class RoleService {
    *   the type-level route check as a full grant;
    * - an identity-bound branch on a `create` grant denies every create;
    * - a condition on a field outside `CONDITION_FIELDS` is vetoed at run
-   *   time.
+   *   time;
+   * - an allow of the `user` role outside `USER_ROLE_PERMISSION_CEILING` is
+   *   dropped when the ability is built.
    * Unknown permission ids are left to the grant check, which reports them.
    */
-  private async assertGrantsApplicable(items: GrantItem[]): Promise<void> {
+  private async assertGrantsApplicable(
+    role: Role,
+    items: GrantItem[]
+  ): Promise<void> {
     if (items.length === 0) return;
 
     const permissions = await this.permissionRepository.find({
@@ -335,6 +345,20 @@ export class RoleService {
         throw new ApiError(
           ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN,
           `Cannot grant ${label} - ${fieldError}`
+        );
+      }
+
+      if (
+        role.name === SYSTEM_ROLES.USER &&
+        !isWithinUserRoleCeiling({
+          resource: resource.name,
+          action: action.name,
+          conditions: item.conditions
+        })
+      ) {
+        throw new ApiError(
+          ErrorKeys.ROLES.GRANT_OUTSIDE_USER_ROLE,
+          `Cannot grant ${label} to the ${SYSTEM_ROLES.USER} role - it holds only the self-service permissions`
         );
       }
     }
@@ -934,9 +958,11 @@ export class RoleService {
     const check = (role: Role) =>
       this.assertCanChangeGrants(ability, role, actorId);
 
+    const role = await this.loadRole(roleId);
+
     // Checked here to answer early, and again on the locked row.
-    check(await this.loadRole(roleId));
-    await this.assertGrantsApplicable(items);
+    check(role);
+    await this.assertGrantsApplicable(role, items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     await this.writeAudited(
       this.rolePermissionRepository.manager,
@@ -989,14 +1015,16 @@ export class RoleService {
     const check = (role: Role) =>
       this.assertCanChangeGrants(ability, role, actorId);
 
+    const role = await this.loadRole(roleId);
+
     // Checked here to answer early, and again on the locked row.
-    check(await this.loadRole(roleId));
+    check(role);
     const items = permissionIds.map((permissionId) => ({
       permissionId,
       conditions: conditions ?? null
     }));
 
-    await this.assertGrantsApplicable(items);
+    await this.assertGrantsApplicable(role, items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
     const rolePermissions = permissionIds.map((permissionId) =>
       this.rolePermissionRepository.create({

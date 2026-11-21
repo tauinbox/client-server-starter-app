@@ -46,6 +46,8 @@ import {
   type GrantRow
 } from '@app/shared/utils/ability-rules';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
+import { isWithinUserRoleCeiling } from '@app/shared/utils/grant-scope';
+import { SYSTEM_ROLES } from '@app/shared/constants';
 import type {
   KnownActions,
   KnownSubjects
@@ -679,11 +681,19 @@ export function getResolvedPermissionsForUser(
 
       if (!resource || !action) continue;
 
-      grants.push({
+      const grant = {
         resource: resource.name,
         action: action.name,
         conditions: rp.conditions
-      });
+      };
+
+      // Mirrors PermissionService: the universal role keeps only the grants
+      // of its ceiling, whatever the store holds.
+      if (role.name === SYSTEM_ROLES.USER && !isWithinUserRoleCeiling(grant)) {
+        continue;
+      }
+
+      grants.push(grant);
     }
   }
 
