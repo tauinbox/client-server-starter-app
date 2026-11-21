@@ -122,7 +122,8 @@ export class PermissionService {
   }): boolean {
     if (isWithinUserRoleCeiling(grant)) return true;
 
-    const label = `${grant.action}:${grant.resource}`;
+    const { action, resource } = grant;
+    const label = `${action}:${resource}`;
 
     if (!this.#droppedCeilingGrants.has(label)) {
       this.#droppedCeilingGrants.add(label);
