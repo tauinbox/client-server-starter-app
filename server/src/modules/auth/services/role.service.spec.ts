@@ -1482,6 +1482,80 @@ describe('RoleService', () => {
 
       expect(mockRolePermissionRepo.save).toHaveBeenCalled();
     });
+
+    describe('the ceiling of the user role', () => {
+      const userRole: Role = {
+        ...customRole,
+        id: 'role-user',
+        name: 'user',
+        isSystem: true
+      };
+      const permUsersUpdate = {
+        ...permUpdateUser,
+        resource: { ...permUpdateUser.resource, name: 'users' }
+      };
+
+      it.each([
+        ['an unconditional allow', null],
+        ['an allow with another condition', { fieldMatch: { name: ['x'] } }]
+      ])('refuses %s of a pair inside the ceiling', async (_, conditions) => {
+        mockRoleRepo.findOne.mockResolvedValue(userRole);
+        mockPermissionRepo.find.mockResolvedValue([permUsersUpdate]);
+
+        await expect(
+          service.setPermissionsForRole(
+            'role-user',
+            [{ permissionId: 'perm-update-user', conditions }],
+            { ability: superAbility, actorId: 'actor-1' }
+          )
+        ).rejects.toMatchObject({
+          status: 422,
+          response: { errorKey: ErrorKeys.ROLES.GRANT_OUTSIDE_USER_ROLE }
+        });
+        expect(
+          mockRolePermissionRepo.manager.transaction
+        ).not.toHaveBeenCalled();
+      });
+
+      it('accepts the ownership allow of the ceiling and a deny', async () => {
+        mockRoleRepo.findOne.mockResolvedValue(userRole);
+        mockPermissionRepo.find.mockResolvedValue([permUsersUpdate]);
+        mockRolePermissionRepo.save.mockResolvedValue([]);
+
+        await service.assignPermissionsToRole(
+          'role-user',
+          {
+            permissionIds: ['perm-update-user'],
+            conditions: { ownership: { userField: 'id' } }
+          },
+          { ability: superAbility, actorId: 'actor-1' }
+        );
+        await service.assignPermissionsToRole(
+          'role-user',
+          {
+            permissionIds: ['perm-update-user'],
+            conditions: { effect: 'deny' }
+          },
+          { ability: superAbility, actorId: 'actor-1' }
+        );
+
+        expect(mockRolePermissionRepo.save).toHaveBeenCalledTimes(2);
+      });
+
+      it('applies no ceiling to another role', async () => {
+        mockRoleRepo.findOne.mockResolvedValue(customRole);
+        mockPermissionRepo.find.mockResolvedValue([permUsersUpdate]);
+        mockRolePermissionRepo.save.mockResolvedValue([]);
+
+        await service.assignPermissionsToRole(
+          'role-2',
+          { permissionIds: ['perm-update-user'] },
+          { ability: superAbility, actorId: 'actor-1' }
+        );
+
+        expect(mockRolePermissionRepo.save).toHaveBeenCalled();
+      });
+    });
   });
 
   // ── RBAC-SEC-1: grant-escalation block ────────────────────────────

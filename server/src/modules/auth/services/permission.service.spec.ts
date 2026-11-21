@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -298,6 +299,65 @@ describe('PermissionService', () => {
           conditions: deny
         }
       ]);
+    });
+
+    it('drops a grant of the user role outside its ceiling and keeps the rest', async () => {
+      const rp = (
+        id: string,
+        action: string,
+        conditions: Record<string, unknown> | null
+      ) => ({
+        id,
+        conditions,
+        permission: {
+          ...mockPermission,
+          action: { ...mockAction, name: action }
+        }
+      });
+      const ownership = { ownership: { userField: 'id' } };
+      const deny = { effect: 'deny', fieldMatch: { isActive: [false] } };
+
+      mockUserRepository.findOne.mockResolvedValue({
+        id: 'user-1',
+        roles: [
+          {
+            id: 'role-user',
+            name: 'user',
+            isSuper: false,
+            rolePermissions: [
+              rp('rp-own', 'update', ownership),
+              rp('rp-any', 'update', null),
+              rp('rp-search', 'search', null),
+              rp('rp-deny', 'delete', deny)
+            ]
+          },
+          {
+            id: 'role-reader',
+            name: 'reader',
+            isSuper: false,
+            rolePermissions: [rp('rp-reader', 'search', null)]
+          }
+        ]
+      });
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      const result = await service.getPermissionsForUser('user-1');
+
+      expect(
+        result.map(({ action, conditions }) => [action, conditions])
+      ).toEqual([
+        ['update', ownership],
+        ['delete', deny],
+        ['search', null]
+      ]);
+      expect(warn).toHaveBeenCalledTimes(2);
+
+      await service.getPermissionsForUser('user-1');
+
+      expect(warn).toHaveBeenCalledTimes(2);
+      warn.mockRestore();
     });
   });
 

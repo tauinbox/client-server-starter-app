@@ -1,9 +1,31 @@
+import type { PermissionCondition } from '../types/role.types';
+
 export const SYSTEM_ROLES = {
   ADMIN: 'admin',
   USER: 'user'
 } as const;
 
 export type SystemRole = (typeof SYSTEM_ROLES)[keyof typeof SYSTEM_ROLES];
+
+/**
+ * The only allow grants that the universal `user` role can carry: the
+ * self-service permissions. The role reaches every account, so an allow
+ * outside this list would open that permission to every user. The ability
+ * drops such a row whatever the database holds, and the role routes refuse to
+ * write one. A deny is always kept, because it only narrows access.
+ */
+export const USER_ROLE_PERMISSION_CEILING: readonly {
+  resource: string;
+  action: string;
+  conditions: PermissionCondition | null;
+}[] = [
+  { resource: 'profile', action: 'update', conditions: null },
+  {
+    resource: 'users',
+    action: 'update',
+    conditions: { ownership: { userField: 'id' } }
+  }
+];
 
 export const ROLE_NAME_MAX_LENGTH = 100;
 

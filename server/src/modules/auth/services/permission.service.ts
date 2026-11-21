@@ -4,8 +4,13 @@ import { Brackets, Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
-import { ResolvedPermission } from '@app/shared/types';
+import { SYSTEM_ROLES } from '@app/shared/constants';
+import type {
+  PermissionCondition,
+  ResolvedPermission
+} from '@app/shared/types';
 import { dedupPermissions } from '@app/shared/utils/ability-rules';
+import { isWithinUserRoleCeiling } from '@app/shared/utils/grant-scope';
 import { CacheVersionCounter } from '../../../common/utils/cache-version-counter';
 import { MetricsService } from '../../core/metrics/metrics.service';
 
@@ -35,6 +40,7 @@ export interface RoleInfo {
 export class PermissionService {
   readonly #logger = new Logger(PermissionService.name);
   readonly #version: CacheVersionCounter<string>;
+  readonly #droppedCeilingGrants = new Set<string>();
 
   constructor(
     @InjectRepository(User)
@@ -91,17 +97,41 @@ export class PermissionService {
 
     const permissions = dedupPermissions(
       user.roles.flatMap((role) =>
-        role.rolePermissions.map((rp) => ({
-          resource: rp.permission.resource.name,
-          action: rp.permission.action.name,
-          conditions: rp.conditions
-        }))
+        role.rolePermissions
+          .map((rp) => ({
+            resource: rp.permission.resource.name,
+            action: rp.permission.action.name,
+            conditions: rp.conditions
+          }))
+          .filter(
+            (grant) =>
+              role.name !== SYSTEM_ROLES.USER || this.#keepUserRoleGrant(grant)
+          )
       )
     );
 
     await this.cacheManager.set(cacheKey, permissions, CACHE_TTL);
 
     return permissions;
+  }
+
+  #keepUserRoleGrant(grant: {
+    resource: string;
+    action: string;
+    conditions: PermissionCondition | null;
+  }): boolean {
+    if (isWithinUserRoleCeiling(grant)) return true;
+
+    const label = `${grant.action}:${grant.resource}`;
+
+    if (!this.#droppedCeilingGrants.has(label)) {
+      this.#droppedCeilingGrants.add(label);
+      this.#logger.warn(
+        `The ${SYSTEM_ROLES.USER} role holds ${label} outside its ceiling; the grant is ignored`
+      );
+    }
+
+    return false;
   }
 
   async getRolesForUser(userId: string): Promise<RoleInfo[]> {

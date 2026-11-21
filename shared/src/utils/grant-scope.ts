@@ -1,5 +1,6 @@
 import { ErrorKeys } from '../constants/error-keys';
 import type { ErrorKey } from '../constants/error-status';
+import { USER_ROLE_PERMISSION_CEILING } from '../constants/permission.constants';
 import type { PermissionCondition } from '../types/role.types';
 import { isJsonScalar, type JsonScalar } from './mongo-query-safety';
 import { resolveConditions, type ResolverLogger } from './resolve-conditions';
@@ -180,6 +181,31 @@ export function sameConditions(
     JSON.parse(JSON.stringify(value ?? null)) as unknown;
 
   return deepEquals(normalise(a), normalise(b));
+}
+
+/**
+ * True when a grant of the `user` role is inside its ceiling: a deny, or an
+ * allow that matches one entry of `USER_ROLE_PERMISSION_CEILING` with the
+ * same conditions. A narrower condition is refused too, because whether one
+ * condition is narrower than another is not decidable in general.
+ */
+export function isWithinUserRoleCeiling({
+  resource,
+  action,
+  conditions
+}: {
+  resource: string;
+  action: string;
+  conditions: PermissionCondition | null | undefined;
+}): boolean {
+  if (isDenyCondition(conditions)) return true;
+
+  return USER_ROLE_PERMISSION_CEILING.some(
+    (entry) =>
+      entry.resource === resource &&
+      entry.action === action &&
+      sameConditions(entry.conditions, conditions)
+  );
 }
 
 function refusal(
