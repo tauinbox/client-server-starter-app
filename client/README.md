@@ -497,7 +497,7 @@ src/app/
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |
-| `/residence` | ResidenceComponent | residenceGuard (signed in; an account with a country goes on to its `returnUrl`). `ensureAuthenticated`, which every guard of a signed-in page calls, sends an account with `residenceCountry: null` here first |
+| `/residence` | ResidenceComponent | residenceGuard (signed in; an account with a country goes on to its `returnUrl`). `ensureAuthenticated`, which every guard of a signed-in page calls, sends an account with `residenceCountry: null` here first. Staff is not sent here: `AuthStore.mustDeclareResidence` is false when the ability grants one of `ADMIN_PANEL_CHECKS` (`features/auth/casl/admin-panel-checks.ts`), the list that `canAccessAdminPanel` reads too |
 | `/legal/:jurisdiction/:kind` | LegalDocumentComponent | legalDocumentGuard (canMatch; public; a draft only outside a production build) |
 | `/forbidden` | ForbiddenComponent | - |
 | `/**` | PageNotFoundComponent | - |
