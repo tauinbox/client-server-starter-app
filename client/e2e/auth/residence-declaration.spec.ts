@@ -12,7 +12,11 @@ const PASSWORD = 'Password1';
  * any other page, at its next sign-in.
  */
 async function signInWithNoCountry(
-  { page, mockServer }: { page: Page; mockServer: MockServerApi },
+  {
+    page,
+    mockServer,
+    roles
+  }: { page: Page; mockServer: MockServerApi; roles?: string[] },
   target: string
 ): Promise<string> {
   const email = `no-country-${Date.now()}@example.com`;
@@ -22,7 +26,8 @@ async function signInWithNoCountry(
       email,
       name: 'Undeclared Owner',
       password: PASSWORD,
-      residenceCountry: null
+      residenceCountry: null,
+      roles
     })
   ]);
 
@@ -93,6 +98,23 @@ test.describe('Country of residence declaration at sign-in', () => {
     // Every other signed-in page still sends the account back here.
     await page.goto('/profile');
     await expect(page).toHaveURL(/\/residence\?returnUrl=%2Fprofile$/);
+  });
+
+  test('an administrator with no country opens the admin panel', async ({
+    _mockServer,
+    page
+  }) => {
+    await signInWithNoCountry(
+      { page, mockServer: _mockServer, roles: ['admin'] },
+      '/admin'
+    );
+
+    await expect(page).toHaveURL(/\/admin\/users$/);
+    await expect(page.locator('nxs-admin-panel')).toBeVisible();
+
+    await page.reload();
+    await expect(page).toHaveURL(/\/admin\/users$/);
+    await expect(page.locator('nxs-admin-panel')).toBeVisible();
   });
 
   test('signs out from the page', async ({ _mockServer, page }) => {

@@ -319,6 +319,40 @@ describe('AuthStore', () => {
       expect(store.mustDeclareResidence()).toBe(true);
     });
 
+    it.each([
+      [{ action: 'search', subject: 'User' }],
+      [{ action: 'search', subject: 'Billing' }]
+    ] as const)(
+      'is false for staff with no country (%o opens the admin panel)',
+      (rule) => {
+        const store = createStore({
+          ...createMockUser(),
+          residenceCountry: null
+        });
+
+        store.setRules(packRules(createMongoAbility<AppAbility>([rule]).rules));
+
+        expect(store.mustDeclareResidence()).toBe(false);
+      }
+    );
+
+    it('stays true for a user ability with no admin panel grant', () => {
+      const store = createStore({
+        ...createMockUser(),
+        residenceCountry: null
+      });
+
+      store.setRules(
+        packRules(
+          createMongoAbility<AppAbility>([
+            { action: 'read', subject: 'User', conditions: { id: '1' } }
+          ]).rules
+        )
+      );
+
+      expect(store.mustDeclareResidence()).toBe(true);
+    });
+
     it('is false once the account has a country', () => {
       expect(createStore(createMockUser()).mustDeclareResidence()).toBe(false);
     });

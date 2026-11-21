@@ -1,4 +1,5 @@
 import type { PermissionCheck } from '@features/auth/casl/app-ability';
+import { ADMIN_PANEL_CHECKS } from '@features/auth/casl/admin-panel-checks';
 
 type AuthStoreLike = {
   hasPermissions: (check: PermissionCheck | PermissionCheck[]) => boolean;
@@ -12,11 +13,5 @@ export function canAccessAdminPanel(authStore: AuthStoreLike): boolean {
     return false;
   }
 
-  return (
-    authStore.hasPermissions({ action: 'search', subject: 'User' }) ||
-    authStore.hasPermissions({ action: 'read', subject: 'Role' }) ||
-    authStore.hasPermissions({ action: 'read', subject: 'Permission' }) ||
-    authStore.hasPermissions({ action: 'search', subject: 'FeatureFlag' }) ||
-    authStore.hasPermissions({ action: 'search', subject: 'Billing' })
-  );
+  return ADMIN_PANEL_CHECKS.some((check) => authStore.hasPermissions(check));
 }
