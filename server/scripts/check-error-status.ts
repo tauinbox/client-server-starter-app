@@ -146,6 +146,7 @@ const UNPATTERNED: Readonly<Record<string, string>> = {
   'ROLES.CONDITION_FIELD_UNKNOWN':
     'a condition in the body fails a check (422)',
   'ROLES.ACTION_NOT_GRANTABLE': 'a grant in the body fails a check (422)',
+  'ROLES.GRANT_OUTSIDE_USER_ROLE': 'a grant in the body fails a check (422)',
   'ROLES.CONDITION_BROADER_THAN_CALLER': 'refused: the caller holds less (403)',
   'ROLES.CONDITION_UNRESOLVABLE': 'refused: the caller cannot grant it (403)',
   'RESOURCES.CANNOT_RESTORE':

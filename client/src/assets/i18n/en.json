@@ -184,6 +184,7 @@
       "conditionNotSupported": "This permission cannot carry a condition: no check of this action reads the record, so the condition would restrict nothing",
       "conditionFieldUnknown": "The condition names a field that this resource does not allow",
       "actionNotGrantable": "This action is not offered for the resource, so it cannot be granted",
+      "grantOutsideUserRole": "The user role reaches every account, so it can hold only the self-service permissions",
       "conditionBroaderThanCaller": "You cannot grant a permission with a condition broader than the one you hold yourself",
       "conditionUnresolvable": "This condition cannot be applied as written, so it would not restrict the permission",
       "superRoleAssignForbidden": "A super role cannot be assigned",
