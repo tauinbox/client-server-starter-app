@@ -50,7 +50,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Unit tests | `npm test`. It starts Jest with `--experimental-vm-modules`, because Jest can `require()` the ESM-only NestJS 12 packages only with that flag. Do not start `jest` directly |
 | Single test | `npm test -- --testPathPatterns=<pattern>` |
 | Test watch | `npm run test:watch` |
-| Test coverage | `npm run test:cov` |
+| Test coverage | `npm run test:cov` (`pretest:cov` deletes `coverage/` first, so the report holds only the current sources) |
 | E2E tests | `npm run test:e2e` |
 | Run migrations | `npm run migrations:run` (build first) |
 | Generate migration | `npm run migrations:gen -- ./src/migrations/<kebab-name>` (build first) |
