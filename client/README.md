@@ -62,7 +62,8 @@ src/app/
 │   │                       # components/oauth-residence asks the country of residence on
 │   │                       # the OAuth callback page before a provider sign-up creates
 │   │                       # the account; components/residence asks it once of an
-│   │                       # account that has none, before any other signed-in page;
+│   │                       # account that has none (not staff), before any other
+│   │                       # signed-in page;
 │   │                       # components/residence-card shows it on the profile page and
 │   │                       # changes it with a step-up; components/residence-country-field
 │   │                       # is the country select that they and the register form share)
@@ -497,7 +498,7 @@ src/app/
 | `/forgot-password` | ForgotPasswordComponent | guestGuard |
 | `/reset-password` | ResetPasswordComponent | guestGuard |
 | `/oauth/callback` | OAuthCallbackComponent | - |
-| `/residence` | ResidenceComponent | residenceGuard (signed in; an account with a country goes on to its `returnUrl`). `ensureAuthenticated`, which every guard of a signed-in page calls, sends an account with `residenceCountry: null` here first |
+| `/residence` | ResidenceComponent | residenceGuard (signed in; an account with a country goes on to its `returnUrl`). `ensureAuthenticated`, which every guard of a signed-in page calls, sends an account with `residenceCountry: null` here first. Staff is not sent here: `AuthStore.mustDeclareResidence` is false when the ability grants one of `ADMIN_PANEL_CHECKS` (`features/auth/casl/admin-panel-checks.ts`), the list that `canAccessAdminPanel` reads too |
 | `/legal/:jurisdiction/:kind` | LegalDocumentComponent | legalDocumentGuard (canMatch; public; a draft only outside a production build) |
 | `/forbidden` | ForbiddenComponent | - |
 | `/**` | PageNotFoundComponent | - |
@@ -1267,7 +1268,7 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 367 Playwright tests. They cover auth, users, admin, billing, a11y,
+**Coverage.** The suite has 368 Playwright tests. They cover auth, users, admin, billing, a11y,
 keyboard and visual. There are also 1859 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an

@@ -18,6 +18,7 @@ import type {
 } from '@app/shared/types';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
 import type { AppAbility, PermissionCheck } from '../casl/app-ability';
+import { ADMIN_PANEL_CHECKS } from '../casl/admin-panel-checks';
 import { LocalStorageService } from '@core/services/local-storage.service';
 import { isPersistedUser } from './storage-guards';
 
@@ -63,12 +64,21 @@ export const AuthStore = signalStore(
       () => store.mfaMandatory() && store.user()?.mfaEnabled === false
     ),
     /**
-     * True while the account has no declared country of residence. The guards
-     * send such a session to the residence page before any other page.
+     * True while a user of the service has no declared country of residence.
+     * The guards send such a session to the residence page before any other
+     * page. Staff (an account that can open the admin panel) works in every
+     * region, so the declaration does not apply to it.
      */
-    mustDeclareResidence: computed(
-      () => store.user()?.residenceCountry === null
-    )
+    mustDeclareResidence: computed(() => {
+      if (store.user()?.residenceCountry !== null) return false;
+
+      const ability = store.ability();
+
+      return !ADMIN_PANEL_CHECKS.some(
+        ({ action, subject: subjectName }) =>
+          ability?.can(action, subjectName) === true
+      );
+    })
   })),
   withMethods((store) => {
     const storage = inject(LocalStorageService);
