@@ -1,9 +1,5 @@
-import { type ChildProcess, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
-import { existsSync } from 'fs';
 import { get, type IncomingMessage } from 'http';
-import { createServer, type AddressInfo } from 'net';
-import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import Redis from 'ioredis';
@@ -27,9 +23,14 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { cookieName } from '../src/common/utils/host-cookie';
 import { waitUntil } from './eventually';
+import {
+  LISTENING,
+  type ServerProcess,
+  spawnServer,
+  stopServer
+} from './server-process';
 
 const { REDIS_URL } = process.env;
-const MAIN = join(__dirname, '..', 'dist', 'server', 'src', 'main.js');
 
 // Two processes of the built server on one Postgres and one Redis, as two nodes
 // of one pool. A request on node A and the next one on node B is the worst case
@@ -37,72 +38,27 @@ const MAIN = join(__dirname, '..', 'dist', 'server', 'src', 'main.js');
 const runWithRedis =
   REDIS_URL && process.env['DB_HOST'] ? describe : describe.skip;
 
-interface Node {
-  name: string;
-  port: number;
-  process: ChildProcess;
-  output: () => string;
-}
-
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address() as AddressInfo;
-
-      server.close(() => resolve(port));
-    });
-  });
-}
+type Node = ServerProcess;
 
 async function startNode(name: string): Promise<Node> {
-  const port = await freePort();
-  // NODE_ENV=test selects the in-process SSE bus; a node needs the Redis one.
-  const { NODE_ENV: _nodeEnv, ...env } = process.env;
-  const child = spawn(process.execPath, [MAIN], {
-    cwd: join(__dirname, '..'),
-    env: {
-      ...env,
-      ENVIRONMENT: 'production',
-      APPLICATION_PORT: String(port),
-      // Each test sends its own client address, so its rate limits are its own.
-      TRUSTED_PROXIES: 'loopback'
-    },
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-  let output = '';
-
-  child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()));
-  child.stderr.on('data', (chunk: Buffer) => (output += chunk.toString()));
+  // Each test sends its own client address, so its rate limits are its own.
+  const node = await spawnServer({ TRUSTED_PROXIES: 'loopback' });
 
   await waitUntil(
-    `node ${name} listens on port ${port}`,
+    `node ${name} listens on port ${node.port}`,
     () => {
-      if (child.exitCode !== null) {
+      if (node.process.exitCode !== null) {
         throw new Error(
-          `node ${name} exited with ${child.exitCode}:\n${output}`
+          `node ${name} exited with ${node.process.exitCode}:\n${node.output()}`
         );
       }
 
-      return Promise.resolve(
-        output.includes('Server started listening') || null
-      );
+      return Promise.resolve(node.output().includes(LISTENING) || null);
     },
     { timeoutMs: 60000, intervalMs: 100 }
   );
 
-  return { name, port, process: child, output: () => output };
-}
-
-function stopNode(node: Node | undefined): Promise<void> {
-  if (!node || node.process.exitCode !== null) return Promise.resolve();
-
-  return new Promise((resolve) => {
-    node.process.once('exit', () => resolve());
-    node.process.kill();
-  });
+  return node;
 }
 
 runWithRedis('two nodes of one pool (e2e)', () => {
@@ -122,10 +78,6 @@ runWithRedis('two nodes of one pool (e2e)', () => {
   const streams: { destroy: () => void }[] = [];
 
   beforeAll(async () => {
-    if (!existsSync(MAIN)) {
-      throw new Error(`${MAIN} does not exist: run npm run build first`);
-    }
-
     const moduleRef = await Test.createTestingModule({
       imports: [CoreModule.forRoot()]
     }).compile();
@@ -187,7 +139,7 @@ runWithRedis('two nodes of one pool (e2e)', () => {
   afterAll(async () => {
     for (const stream of streams) stream.destroy();
 
-    await Promise.all([stopNode(nodeA), stopNode(nodeB)]);
+    await Promise.all([stopServer(nodeA), stopServer(nodeB)]);
 
     if (context) {
       const dataSource = context.get(DataSource);
