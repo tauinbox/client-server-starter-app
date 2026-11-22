@@ -3,8 +3,9 @@
  *
  * `npm run graph` writes `architecture/dependency-graph.md`: Mermaid views of
  * the workspaces and of the modules of the server, the client and the mock
- * server. `npm run graph:check` (CI, `Repo - Checks`) fails when that file
- * differs from the graph of the current tree.
+ * server, and `architecture/docker-graph.md`: the Docker layout drawn by
+ * `docker-graph.mjs`. `npm run graph:check` (CI, `Repo - Checks`) fails when
+ * either file differs from what the current tree gives.
  *
  * `npm run graph -- --html` also writes an interactive page for each view, and
  * a page for each module (its files, and the modules that it imports or that
@@ -23,6 +24,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import {
+  DOCKER_GRAPH_FILE,
+  dockerGraphMarkdown,
+  dockerGraphSelfTest
+} from './docker-graph.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT_MD = 'architecture/dependency-graph.md';
@@ -256,27 +263,50 @@ function argValue(name) {
 
 process.chdir(ROOT);
 
+const selfTestFailures = dockerGraphSelfTest();
+
+if (selfTestFailures.length > 0) {
+  console.error(
+    `graph: the Docker graph parsers fail their self-test: ${JSON.stringify(selfTestFailures)}`
+  );
+  process.exit(1);
+}
+
 const result = await cruiseRepo();
-const expected = await markdown(result);
-const target = join(ROOT, OUT_MD);
+const outputs = [
+  { file: OUT_MD, content: await markdown(result) },
+  { file: DOCKER_GRAPH_FILE, content: dockerGraphMarkdown(ROOT) }
+];
 
 if (process.argv.includes('--check')) {
-  const actual = existsSync(target)
-    ? readFileSync(target, 'utf8').replaceAll('\r\n', '\n')
-    : '';
+  const stale = outputs.filter(({ file, content }) => {
+    const target = join(ROOT, file);
+    const actual = existsSync(target)
+      ? readFileSync(target, 'utf8').replaceAll('\r\n', '\n')
+      : '';
 
-  if (actual !== expected) {
+    return actual !== content;
+  });
+
+  for (const { file } of stale) {
     console.error(
-      `graph: ${OUT_MD} is out of date. Run \`npm run graph\` from server/ and commit the file.`
+      `graph: ${file} is out of date. Run \`npm run graph\` from server/ and commit the file.`
     );
-    process.exit(1);
   }
 
-  console.log(`graph: ${OUT_MD} is up to date.`);
+  if (stale.length > 0) process.exit(1);
+
+  console.log(
+    `graph: ${outputs.map(({ file }) => file).join(' and ')} are up to date.`
+  );
 } else {
-  mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, expected);
-  console.log(`graph: wrote ${OUT_MD}`);
+  for (const { file, content } of outputs) {
+    const target = join(ROOT, file);
+
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content);
+    console.log(`graph: wrote ${file}`);
+  }
 
   if (process.argv.includes('--html') || argValue('--focus')) {
     await writeHtml(result, argValue('--focus'));
