@@ -25,7 +25,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { DOCKER_GRAPH_FILE, dockerGraphMarkdown } from './docker-graph.mjs';
+import {
+  DOCKER_GRAPH_FILE,
+  dockerGraphMarkdown,
+  dockerGraphSelfTest
+} from './docker-graph.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT_MD = 'architecture/dependency-graph.md';
@@ -258,6 +262,15 @@ function argValue(name) {
 }
 
 process.chdir(ROOT);
+
+const selfTestFailures = dockerGraphSelfTest();
+
+if (selfTestFailures.length > 0) {
+  console.error(
+    `graph: the Docker graph parsers fail their self-test: ${JSON.stringify(selfTestFailures)}`
+  );
+  process.exit(1);
+}
 
 const result = await cruiseRepo();
 const outputs = [

@@ -1311,6 +1311,59 @@ function devAndCi() {
   return mermaid(lines);
 }
 
+// --- self-test --------------------------------------------------------------
+
+/**
+ * Planted cases for the parsers whose mistakes the generated file cannot
+ * show: a wrong interpolation gives a plausible but wrong cell name, and
+ * `graph:check` only compares the file with the same wrong output.
+ */
+export function dockerGraphSelfTest() {
+  const cases = [
+    ['nexus${CELL:+-${CELL}}', { CELL: undefined }, 'nexus'],
+    ['nexus${CELL:+-${CELL}}', { CELL: 'ru' }, 'nexus-ru'],
+    [
+      '${CELL:+nexus-}${CELL:-shared-network}${CELL:+-proxy}',
+      { CELL: undefined },
+      'shared-network'
+    ],
+    [
+      '${CELL:+nexus-}${CELL:-shared-network}${CELL:+-proxy}',
+      { CELL: 'ru' },
+      'nexus-ru-proxy'
+    ],
+    [
+      '${CELL:+cells/${CELL}/}server/.env',
+      { CELL: 'ru' },
+      'cells/ru/server/.env'
+    ],
+    ['${A-x}', { A: '' }, ''],
+    ['${A:-x}', { A: '' }, 'x'],
+    ['${A+y}', { A: '' }, 'y'],
+    ['${A:+y}', { A: '' }, ''],
+    ['${OTHER:-kept}', {}, '${OTHER:-kept}']
+  ];
+  const failures = cases
+    .map(([input, env, expected]) => ({
+      input,
+      env,
+      expected,
+      actual: interpolate(input, env)
+    }))
+    .filter(({ expected, actual }) => expected !== actual);
+  const port = splitOutside('127.0.0.1:${PORT:-4200}:8080', ':');
+
+  if (port.join('|') !== '127.0.0.1|${PORT:-4200}|8080') {
+    failures.push({
+      input: 'port split',
+      expected: '3 parts',
+      actual: port.join('|')
+    });
+  }
+
+  return failures;
+}
+
 // --- document ---------------------------------------------------------------
 
 export function dockerGraphMarkdown(root) {
