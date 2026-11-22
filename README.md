@@ -1666,7 +1666,7 @@ things:
 3. **It escapes each `$` as `$$`.** Docker Compose interpolates both `server/.env` (an `env_file`)
    and the root `.env`, so an unescaped `$` starts a variable reference and the container gets the
    value cut at that point. Compose reads `$$` back as one `$`. `--self-test` checks this rule, and
-   the `Server – Checks` CI job runs it.
+   the `Repo – Checks` CI job runs it.
 4. **It writes atomically.** It builds a temporary file and moves it over the target. Thus a crash in
    the middle of a write cannot leave a half-written env file.
 
@@ -2090,8 +2090,8 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 
 | Job | Depends on | Steps | Artifacts |
 |-----|-----------|-------|-----------|
-| **Server - Checks** | - | audit (high), lint, lint:shared, lint:scripts, typecheck:shared, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:duplicate-functions, check:imports, graph:check, check:versions | - |
-| **Server - Tests & Build** | server-checks | test:cov, build, migrations:run, E2E | Coverage report |
+| **Repo - Checks** | - | audit (high), lint, lint:shared, lint:scripts, typecheck:shared, format:check, typecheck, check:routes, check:route-policy, check:scenarios, check:enums, check:controllers, check:permissions, check:i18n, check:error-status, check:race, check:regex-modifiers, check:status-comments, check:duplicate-functions, check:imports, graph:check, check:versions | - |
+| **Server - Tests & Build** | repo-checks | test:cov, build, migrations:run, E2E | Coverage report |
 | **Mock Server** | - | audit (high), lint, format:check, typecheck, test | - |
 | **Client** | - | audit (high), lint, format:check, typecheck, test:cov, build | Coverage report |
 | **Client E2E** | mock-server | typecheck:e2e (after the mock-server install), ng build, then serve the static output, then Playwright Chromium; then each spec that the change adds or edits runs 10 times with no retry (`test:e2e:changed`) | HTML report, test results |
@@ -2100,7 +2100,7 @@ GitHub Actions runs on each push to `master` and on each pull request into `mast
 The `Docker Images` job exists because the Dockerfiles copy only some directories. A build input
 outside them is present in the other jobs and absent in the image, so only an image build finds it.
 
-In the `Server - Checks` job, `check:i18n` validates that each `ErrorKeys` value exists in each client
+In the `Repo - Checks` job, `check:i18n` validates that each `ErrorKeys` value exists in each client
 i18n JSON file. `check:imports` runs repo-wide, after its own `--self-test`. `graph:check` fails when
 `architecture/dependency-graph.md` differs from the import graph of the tree: run `npm run graph`
 from `server/` and commit the file.
