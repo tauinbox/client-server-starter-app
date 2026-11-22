@@ -3,7 +3,7 @@
  *
  * `npm run graph` writes `architecture/dependency-graph.md`: Mermaid views of
  * the workspaces and of the modules of the server, the client and the mock
- * server. `npm run graph:check` (CI, `Server - Checks`) fails when that file
+ * server. `npm run graph:check` (CI, `Repo - Checks`) fails when that file
  * differs from the graph of the current tree.
  *
  * `npm run graph -- --html` also writes an interactive page for each view, and
