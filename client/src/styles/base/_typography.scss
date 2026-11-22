@@ -97,16 +97,16 @@ p {
 
 // Links — underline by default for WCAG link-in-text-block compliance
 // (3:1 contrast between link color and body text is not guaranteed by M3 primary)
-a {
+// :where() keeps specificity at zero: a plain `a:hover` outranks the class of
+// a matButton on an <a> host and paints its label in its own background colour.
+:where(a) {
   color: var(--mat-sys-primary);
   text-decoration: underline;
   transition: color vars.$transition-fast ease-in-out;
+}
 
-  &:hover,
-  &:focus {
-    color: var(--mat-sys-primary);
-    text-decoration: none;
-  }
+:where(a:hover, a:focus) {
+  text-decoration: none;
 }
 
 // Lists
