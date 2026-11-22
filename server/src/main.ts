@@ -13,6 +13,7 @@ import cookieParser from 'cookie-parser';
 import { ConfigService } from '@nestjs/config';
 import { corsOptions } from './cors-options';
 import { applyTrustProxy } from './modules/core/trust-proxy.util';
+import { assertProductionRedis } from './modules/core/assert-production-redis';
 import {
   applyBodyParsers,
   HTTP_BODY_APP_OPTIONS
@@ -38,17 +39,12 @@ async function bootstrap() {
       .log(`trust proxy enabled: ${String(trustProxy)}`, 'Bootstrap');
   }
 
-  if (
-    process.env['ENVIRONMENT'] === 'production' &&
-    !process.env['REDIS_URL']
-  ) {
-    app
-      .get(Logger)
-      .warn(
-        'REDIS_URL is not set — rate limiting, cache invalidation and SSE pushes are per-instance only',
-        'Bootstrap'
-      );
-  }
+  // ConfigService gives the validated ENVIRONMENT, so an unset value reads as
+  // its default, production.
+  assertProductionRedis({
+    environment: app.get(ConfigService).get<string>('ENVIRONMENT'),
+    redisUrl: process.env['REDIS_URL']
+  });
 
   /*
    Example: getting instances to pass as dependencies into class constructors (when needed)
