@@ -1171,7 +1171,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
-| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting, a shared permission cache and SSE pushes across instances for a deployment with more than one instance |
+| `REDIS_URL` | - | Redis connection URL. Necessary in production: `main.ts` refuses to start a production process without it, because each node keeps its single-use ledgers, attempt counters, rate limits, cache versions and SSE registry in Redis. Optional in the other environments, where the server keeps that state in the memory of the process |
 | `TRUSTED_PROXIES` | - (local), `loopback,uniquelocal` (docker-compose) | The Express `trust proxy` setting. It is necessary behind nginx, Caddy, a K8s ingress or Cloudflare, thus `req.ip` gives the true client IP. The throttlers and the audit-log IP record use that value. It accepts `loopback`, `linklocal`, `uniquelocal`, an IP-CIDR list, a hop count, or `true`. The application has no built-in default. `docker-compose.yml` gives `loopback,uniquelocal` for a production deployment. Refer to "Deployment behind a reverse proxy" in `server/README.md` |
 | `SWAGGER_ENABLED` | - | Set it to `true` to enable the Swagger UI in staging or in production. It is always on in `local` and `development` |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry |
@@ -1407,9 +1407,8 @@ Russian user (152-FZ Art. 18 p. 5).
 
 ### Alerting
 
-`/health/ready` intentionally stays `ok` when a non-fatal dependency degrades. Two examples are a
-failed SMTP verify and a production instance with no `REDIS_URL`. Thus neither the container
-healthcheck nor the deploy gate sees the condition.
+`/health/ready` intentionally stays `ok` when a non-fatal dependency degrades. An example is a
+failed SMTP verify. Thus neither the container healthcheck nor the deploy gate sees the condition.
 
 The `dependency_up` gauge is the signal that does see it. Each readiness indicator writes its result
 onto the gauge: `1` is healthy, and `0` is degraded or down. There is one series for each dependency.
@@ -2080,7 +2079,7 @@ activates the git hooks through the `prepare` script.
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
 | Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3418 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 1020 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 988 pass and 32 skip. CI then runs the Redis suites and the mail suite with Redis: 45 pass and none skip |
+| Server E2E tests | Jest | A separate configuration in `test/` | 1024 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 989 pass and 35 skip. CI then runs the Redis suites and the mail suite with Redis: 48 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1869 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 369 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1531 tests pass |

@@ -39,18 +39,9 @@ export class RedisHealthIndicator implements OnModuleDestroy {
     const redisUrl = this.config.get<string>('REDIS_URL');
 
     if (!redisUrl) {
-      // Unconfigured Redis in production is a silent degradation, not an
-      // outage, so it stays out of readiness and is only visible on the gauge.
-      const degraded = this.config.get('ENVIRONMENT') === 'production';
+      this.dependencyHealth.statuses.set(key, true);
 
-      this.dependencyHealth.statuses.set(key, !degraded);
-
-      return degraded
-        ? indicator.up({
-            warning:
-              'REDIS_URL not set — rate limiting, cache invalidation and SSE pushes are per-instance only'
-          })
-        : indicator.up();
+      return indicator.up();
     }
 
     try {

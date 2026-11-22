@@ -63,31 +63,12 @@ describe('RedisHealthIndicator', () => {
   });
 
   describe('without REDIS_URL', () => {
-    it('reports up without warning outside production and opens no connection', async () => {
-      configValues['ENVIRONMENT'] = 'local';
-
+    it('reports up and opens no connection', async () => {
       const result = await indicator.isHealthy('redis');
 
       expect(result).toEqual({ redis: { status: 'up' } });
       expect(redisCtorMock).not.toHaveBeenCalled();
       expect(dependencyHealth.statuses.get('redis')).toBe(true);
-    });
-
-    it('reports up with a warning in production', async () => {
-      configValues['ENVIRONMENT'] = 'production';
-
-      const result = await indicator.isHealthy('redis');
-
-      expect(result['redis'].status).toBe('up');
-      expect(result['redis']['warning']).toContain('REDIS_URL not set');
-    });
-
-    it('marks the dependency degraded in production so the warning is alertable', async () => {
-      configValues['ENVIRONMENT'] = 'production';
-
-      await indicator.isHealthy('redis');
-
-      expect(dependencyHealth.statuses.get('redis')).toBe(false);
     });
   });
 

@@ -22,7 +22,8 @@ with an 8 MB `maxmemory` and `noeviction` for one e2e suite only (`REDIS_FULL_UR
 That file is different from the `docker-compose.yml` file in the root of the repository. The root
 file is the **production** deployment, and you must not run it locally.
 
-Redis and Mailpit are optional. Set `REDIS_URL` to enable the queue and the cache. Set `SMTP_HOST`
+Redis and Mailpit are optional for local development. Set `REDIS_URL` to enable the queue and the
+cache. A production process (`ENVIRONMENT=production`) refuses to start without `REDIS_URL`. Set `SMTP_HOST`
 and `SMTP_PORT` to capture mail in Mailpit. Refer to [Email](#email-mailmodule).
 
 **An alternative for development.** Use the mock-server. It needs no database:
@@ -143,7 +144,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `SMTP_USER` | - | SMTP username |
 | `SMTP_PASS` | - | SMTP password |
 | `SMTP_FROM` | `noreply@example.com` | Sender email address |
-| `REDIS_URL` | - | Redis connection URL. It is optional. It enables distributed rate limiting, a shared permission cache and SSE pushes across instances for a deployment with more than one instance |
+| `REDIS_URL` | - | Redis connection URL. Necessary in production: `main.ts` refuses to start a production process without it (`assertProductionRedis`), because each node keeps its single-use ledgers, attempt counters, rate limits, cache versions and SSE registry in Redis. Optional in the other environments, where the server keeps that state in the memory of the process |
 | `E2E_REDIS_DB` | `15` | For a test only. `npm run test:e2e` uses this logical Redis database, and it clears the database before each run. The value must not be `0`. Refer to [E2E Tests](#e2e-tests-jest) |
 | `REDIS_FULL_URL` | - | For a test only. `test/redis-full.e2e-spec.ts` fills this Redis to its `maxmemory` and clears it with `FLUSHALL`, so it must be a Redis of its own (`redis-full` of `server/docker-compose.yml`, `redis://localhost:6380`). The suite skips without it |
 | `AUDIT_LOG_RETENTION_DAYS` | `90` | Days to keep an audit log entry before the nightly deletion |
@@ -314,8 +315,7 @@ owner. `UsersService.declareResidence` keys both writes on the country that the 
 concurrent write loses with a 409 and overwrites nothing.
 
 `health/` holds `HealthModule`, with `GET /api/health/live` and `GET /api/health/ready`. The
-readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value or the
-environment is production.
+readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value.
 
 A dead Redis fails the readiness check, with a timeout of 2 s. A full Redis still answers PING, so
 the check also reads `INFO memory` and exports `used_memory / maxmemory` as
@@ -325,8 +325,8 @@ refuse, the throttler keeps a block that Redis holds and counts new hits in the 
 instance (`MemoryThrottlerStorage`) with a warning, a cache invalidation whose `INCR` is refused
 deletes the cached entries of the current version (a full Redis accepts a `DEL`), and a job schedule that cannot be
 written at boot is logged and the boot goes on. The queue processors extend `LoggedWorkerHost`,
-which logs a failed worker loop once in 30 seconds instead of the raw stderr dump of BullMQ. A missing `REDIS_URL` in production
-degrades to a generic warning, and an SMTP failure does the same. The server logs the raw SMTP error
+which logs a failed worker loop once in 30 seconds instead of the raw stderr dump of BullMQ. An SMTP failure degrades to a generic
+warning. The server logs the raw SMTP error
 and never returns it from the public endpoint.
 
 The server keeps the SMTP verify result for 5 minutes behind an in-flight guard. Thus a probe does

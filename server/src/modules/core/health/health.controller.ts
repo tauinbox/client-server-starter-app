@@ -47,13 +47,9 @@ export class HealthController {
       () => this.db.pingCheck('database')
     ];
 
-    // Production always reports on Redis (missing REDIS_URL degrades to a
-    // warning inside the indicator); elsewhere only a configured Redis is
-    // probed so local no-Redis runs stay silent.
-    if (
-      this.config.get('ENVIRONMENT') === 'production' ||
-      this.config.get<string>('REDIS_URL')
-    ) {
+    // A production node does not start without REDIS_URL (main.ts), so only
+    // a run with no Redis at all skips the probe.
+    if (this.config.get<string>('REDIS_URL')) {
       checks.push(() => this.redis.isHealthy('redis'));
     }
 
