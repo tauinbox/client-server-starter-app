@@ -12,6 +12,16 @@ function bell(page: Page) {
   return page.locator('nxs-header a.notices-link');
 }
 
+// Waits for the colour transition of the link, then reads the icon colour.
+function bellIconColor(page: Page) {
+  return bell(page).evaluate(async (link) => {
+    await Promise.all(link.getAnimations().map(({ finished }) => finished));
+    const icon = link.querySelector('mat-icon');
+
+    return icon ? getComputedStyle(icon).color : '';
+  });
+}
+
 test.describe('Billing notices', () => {
   test('a paid invoice shows in the bell and on the notices page, and reading it clears the count', async ({
     page,
@@ -44,6 +54,29 @@ test.describe('Billing notices', () => {
       notice.getByRole('button', { name: 'Mark as read' })
     ).toHaveCount(0);
     await expect(bell(page)).toHaveAccessibleName('Notifications');
+  });
+
+  test('the bell icon keeps its toolbar colour on hover and on focus', async ({
+    page,
+    _mockServer
+  }) => {
+    await loginViaApi(page, _mockServer.url, { id: USER_ID, roles: ['user'] });
+    await page.goto('/');
+    await expect(bell(page)).toBeVisible();
+
+    const toolbarBackground = await page
+      .locator('nxs-header mat-toolbar')
+      .evaluate((toolbar) => getComputedStyle(toolbar).backgroundColor);
+    const restColor = await bellIconColor(page);
+
+    expect(restColor).not.toBe(toolbarBackground);
+
+    await bell(page).hover();
+    expect(await bellIconColor(page)).toBe(restColor);
+
+    await page.mouse.move(0, 0);
+    await bell(page).focus();
+    expect(await bellIconColor(page)).toBe(restColor);
   });
 
   test('a self-managed renewal shows its date and amount once for each period', async ({

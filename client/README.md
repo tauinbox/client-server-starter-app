@@ -1038,6 +1038,10 @@ The state and the HTTP calls are in `features/admin/{store,services}`:
 - **Stylelint** rejects a `--mat-dialog-*` token outside `styles/components/_dialogs.scss`
   (`property-disallowed-list`). A dialog that needs other tokens gets an opt-in panelClass there,
   for example `app-dialog-tall` or `app-dialog-flush-content`.
+- **Stylelint** rejects a state or attribute selector on a bare `a` or `button` (`a:hover`,
+  `button[disabled]`) in `src/styles/**` outside `:where()` (`nxs/element-state-in-where`,
+  `scripts/stylelint-element-state-in-where.mjs`). Such a selector outranks the class that colours a
+  Material button on an `<a>` or `<button>` host.
 
 ```
 src/styles/

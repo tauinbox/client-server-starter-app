@@ -3,6 +3,7 @@
     "stylelint-config-standard-scss",
     "stylelint-config-recess-order"
   ],
+  "plugins": ["./scripts/stylelint-element-state-in-where.mjs"],
   "rules": {
     "scss/at-rule-no-unknown": true,
     "no-empty-source": null,
@@ -34,5 +35,13 @@
       "rules",
       "at-rules"
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/styles/**/*.scss"],
+      "rules": {
+        "nxs/element-state-in-where": true
+      }
+    }
+  ]
 }
