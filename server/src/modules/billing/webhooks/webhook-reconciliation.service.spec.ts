@@ -4,7 +4,6 @@ import { WebhookEvent } from '../entities/webhook-event.entity';
 import { WebhookReconciliationService } from './webhook-reconciliation.service';
 import { WebhookIngestionService } from './webhook-ingestion.service';
 import {
-  BILLING_WEBHOOK_JOB_FORMAT,
   WEBHOOK_MAX_REPLAY_ATTEMPTS,
   WEBHOOK_RECEIVED_STUCK_THRESHOLD_MS
 } from './billing-webhook-queue.constants';
@@ -106,7 +105,8 @@ describe('WebhookReconciliationService', () => {
         payload: {
           type: 'invoice.paid',
           providerEventId: 'evt_1',
-          format: BILLING_WEBHOOK_JOB_FORMAT + 1
+          // A format that no build knows.
+          format: Number.MAX_SAFE_INTEGER
         }
       })
     ]);
@@ -117,12 +117,13 @@ describe('WebhookReconciliationService', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it('replays a row of the known payload format', async () => {
+  // Every build reads the first format, so a row of it is always replayed.
+  it('replays a row of the first payload format', async () => {
     const known = row({
       payload: {
         type: 'invoice.paid',
         providerEventId: 'evt_1',
-        format: BILLING_WEBHOOK_JOB_FORMAT
+        format: 1
       }
     });
 

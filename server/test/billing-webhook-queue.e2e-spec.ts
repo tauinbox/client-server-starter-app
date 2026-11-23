@@ -26,7 +26,6 @@ import { CreditService } from '../src/modules/billing/services/credit.service';
 import { BillingEventReducer } from '../src/modules/billing/webhooks/billing-event-reducer.service';
 import { BillingWebhookProcessor } from '../src/modules/billing/webhooks/billing-webhook.processor';
 import {
-  BILLING_WEBHOOK_JOB_FORMAT,
   BILLING_WEBHOOK_QUEUE,
   BILLING_WEBHOOK_RECONCILE_JOB,
   BILLING_WEBHOOK_REDUCE_JOB,
@@ -275,7 +274,8 @@ runWithRedis('billing webhook queue (real Redis)', () => {
     const job = await queue.add(
       BILLING_WEBHOOK_REDUCE_JOB,
       {
-        format: BILLING_WEBHOOK_JOB_FORMAT + 1,
+        // A format that no build knows.
+        format: Number.MAX_SAFE_INTEGER,
         webhookEventId: 'newer-format',
         event: {
           provider: 'paddle',
