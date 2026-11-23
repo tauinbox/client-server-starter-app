@@ -367,7 +367,9 @@ self-service action, a refusal, a billing administrator route). The action took 
 its row. Each `AuditAction` value starts at 0, and the Grafana rule "Audit rows lost" alerts on any
 increase in 15 minutes.
 
-`schedule/` uses `@nestjs/schedule` for the cron jobs.
+`schedule/` uses `@nestjs/schedule` for the cron jobs. Each node of a pool fires each cron job, and
+`runOncePerPool` (`common/utils/pool-lock.util.ts`) lets one node run it: the node that gets the
+Postgres advisory lock of the job runs it, and the others skip that fire.
 
 #### auth
 
@@ -386,6 +388,8 @@ creates a missing `actions` row for a declared action, and creates a `permission
 declared pair only. It never creates an action named `manage` or `all`. The admin narrowing
 `allowed_action_names` survives a sync. A second `@RegisterResource` with a `name` that the sync
 already read is skipped with an `error` log line, and `npm run check:permissions` fails on it.
+The nodes of a pool run the sync one at a time (`runSerializedInPool`): a second node waits for
+the first, then runs its own sync, which fills its in-memory resource registry.
 
 `utils/auth-cookies.ts` holds `AuthCookies`, the one owner of the auth cookies: the `Secure`
 decision, the refresh cookie (`SameSite=strict`) and its lifetime, and the short-lived cookies
@@ -2602,17 +2606,23 @@ The `Dockerfile` has more than one stage, for a production build.
 
 **`docker-entrypoint.sh`** runs at the start of the container:
 ```sh
-typeorm migration:run      # Apply pending migrations
-node dist/server/src/seed-admin.js   # Create admin user if ADMIN_EMAIL set
-exec node dist/server/src/main       # Start NestJS
+node dist/server/src/run-boot-steps.js   # Apply pending migrations, then create the admin user if ADMIN_EMAIL set
+exec node dist/server/src/main           # Start NestJS
 ```
+
+`src/run-boot-steps.ts` runs the two boot steps on one data source, under a Postgres advisory
+lock (`runSerializedInPool`, `src/common/utils/pool-lock.util.ts`). When several nodes of a pool
+start at the same time, they run the steps one at a time: a node that starts second waits, then
+finds no pending migration and an existing administrator. It does not skip the steps, because a
+node must not serve on an old schema.
 
 The administrator seeder (`src/seed-admin.ts`) reads `ADMIN_EMAIL`, `ADMIN_PASSWORD` and
 `ADMIN_NAME` from the environment. It is idempotent: it skips the work
 when the user exists, and when `ADMIN_EMAIL` has no value.
 
-**The seeder must never exit non-zero, and `seed-admin.spec.ts` pins that.** The entrypoint runs it
-under `set -e`, so any non-zero exit aborts the entrypoint and the API never starts. It checks the
+**The seeder must never fail on a weak password, and `seed-admin.spec.ts` pins that.** The
+entrypoint runs the boot steps under `set -e`, so any non-zero exit aborts the entrypoint and the
+API never starts. It checks the
 breached-password blocklist and the local common-password check on the branch that creates the
 user, and a listed `ADMIN_PASSWORD` (or one that contains the admin name, email or the product
 name) produces a WARNING in the deploy log, not a refusal. Trading the whole API for a weak seed password
@@ -2886,8 +2896,8 @@ repository.
 
   A `no-restricted-syntax` ESLint rule bans an `as unknown as T` double cast.
 
-  The `no-console` ESLint rule applies to `src/`, except the spec files and the CLI entry point
-  that runs outside Nest (`seed-admin.ts`). Runtime code uses the logger.
+  The `no-console` ESLint rule applies to `src/`, except the spec files and the boot steps that
+  run outside Nest (`run-boot-steps.ts`, `seed-admin.ts`). Runtime code uses the logger.
 
   The reusable fakes for a context, a configuration and an Express object are in
   `src/common/testing/`. A test that needs a real `ConfigService` builds it with
