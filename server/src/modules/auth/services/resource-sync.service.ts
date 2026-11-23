@@ -1,7 +1,11 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { DiscoveryService, Reflector } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import {
+  POOL_LOCK_KEYS,
+  runSerializedInPool
+} from '../../../common/utils/pool-lock.util';
 import {
   RESOURCE_METADATA_KEY,
   ResourceMetadata
@@ -27,12 +31,19 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     @InjectRepository(Permission)
     private readonly permissionRepository: Repository<Permission>,
     @InjectRepository(Action)
-    private readonly actionRepository: Repository<Action>
+    private readonly actionRepository: Repository<Action>,
+    private readonly dataSource: DataSource
   ) {}
 
+  // Serialized, not skipped: a node that skipped would serve with an empty
+  // registry, and two concurrent syncs insert the same new action twice.
   async onApplicationBootstrap(): Promise<void> {
     try {
-      await this.syncResources();
+      await runSerializedInPool(
+        this.dataSource,
+        POOL_LOCK_KEYS.resourceSync,
+        () => this.syncResources()
+      );
     } catch (error) {
       this.logger.warn(
         'Resource sync skipped — tables may not exist yet. Run migrations first.',

@@ -6,8 +6,8 @@ jest.mock('./postgres.config', () => ({
 }));
 
 /**
- * The TypeORM CLI (`migrations:*`, and `server/docker-entrypoint.sh` on every
- * deploy) and the seeding CLI call initialize() on this data source.
+ * The TypeORM CLI (`migrations:*`) and the seeding CLI call initialize() on
+ * this data source.
  * TypeORM 1 refuses a second call with CannotConnectAlreadyConnectedError, so
  * the module must not call it when it is loaded.
  */

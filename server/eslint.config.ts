@@ -214,8 +214,8 @@ export default defineConfig(
   {
     basePath: __dirname,
     files: ['src/**/*.ts'],
-    // A CLI entry point that runs outside Nest, so no logger exists there.
-    ignores: ['**/*.spec.ts', 'src/seed-admin.ts'],
+    // The boot steps run outside Nest, so no logger exists there.
+    ignores: ['**/*.spec.ts', 'src/seed-admin.ts', 'src/run-boot-steps.ts'],
     rules: { 'no-console': 'error' }
   },
   prettierConfig
