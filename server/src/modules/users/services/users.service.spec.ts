@@ -497,7 +497,7 @@ describe('UsersService', () => {
       );
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(21);
       expect(result.data).toEqual([mockUser]);
-      const [[manager, listed]] = jest.mocked(attachRoles).mock.calls;
+      const [manager, listed] = jest.mocked(attachRoles).mock.lastCall ?? [];
 
       expect(manager).toBe(mockRepository.manager);
       expect(listed).toEqual([mockUser]);
