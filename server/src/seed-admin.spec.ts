@@ -1,28 +1,20 @@
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { lookupBreachedPassword } from './modules/auth/breached-password/pwned-range-lookup';
 import { seedAdmin } from './seed-admin';
 import { User } from './modules/users/entities/user.entity';
 
-jest.mock('typeorm', () => {
-  const actual = jest.requireActual<typeof import('typeorm')>('typeorm');
-
-  return { ...actual, DataSource: jest.fn() };
-});
-jest.mock('./postgres.config', () => ({ postgresConfig: () => ({}) }));
 jest.mock('./modules/auth/breached-password/pwned-range-lookup', () => ({
   lookupBreachedPassword: jest.fn()
 }));
 
-const mockedDataSource = jest.mocked(DataSource);
 const mockedLookup = jest.mocked(lookupBreachedPassword);
 
 /**
- * The container entrypoint (`server/docker-entrypoint.sh`) runs
- * `node dist/server/src/seed-admin.js` under `set -e`, so a non-zero exit here
- * aborts the entrypoint and the API never starts. Production went down that way
- * on 2026-09-02: a breached `ADMIN_PASSWORD` called `process.exit(1)` and the
- * container entered a restart loop. These tests pin the contract that made it
- * possible.
+ * The container entrypoint (`server/docker-entrypoint.sh`) runs the boot steps
+ * under `set -e`, so an error here aborts the entrypoint and the API never
+ * starts. Production went down that way on 2026-09-02: a breached
+ * `ADMIN_PASSWORD` called `process.exit(1)` and the container entered a restart
+ * loop. These tests pin the contract that made it possible.
  */
 describe('seedAdmin', () => {
   const ENV = process.env;
@@ -33,6 +25,8 @@ describe('seedAdmin', () => {
     save: jest.Mock;
   };
   let roleRepo: { findOne: jest.Mock };
+  let getRepository: jest.Mock;
+  let dataSource: DataSource;
   let exitSpy: jest.SpyInstance;
   let warnSpy: jest.SpyInstance;
 
@@ -53,17 +47,13 @@ describe('seedAdmin', () => {
       findOne: jest.fn().mockResolvedValue({ id: 'role-1', name: 'admin' })
     };
 
-    // A partial stub on purpose: the seeder touches exactly these three members,
-    // and a full DataSource would be noise with no coverage value.
-    mockedDataSource.mockImplementation(
-      // @ts-expect-error - partial DataSource stub, see the comment above
-      () => ({
-        initialize: jest.fn().mockResolvedValue(undefined),
-        destroy: jest.fn().mockResolvedValue(undefined),
-        getRepository: (entity: unknown) =>
-          entity === User ? userRepo : roleRepo
-      })
+    getRepository = jest.fn((entity: unknown) =>
+      entity === User ? userRepo : roleRepo
     );
+    // A partial stub on purpose: the seeder touches only getRepository, and a
+    // full DataSource would be noise with no coverage value.
+    // @ts-expect-error - partial DataSource stub, see the comment above
+    dataSource = { getRepository };
 
     mockedLookup.mockResolvedValue('clean');
 
@@ -81,7 +71,7 @@ describe('seedAdmin', () => {
   });
 
   it('creates the admin and never exits when the password is clean', async () => {
-    await seedAdmin();
+    await seedAdmin(dataSource);
 
     expect(userRepo.save).toHaveBeenCalledTimes(1);
     expect(exitSpy).not.toHaveBeenCalled();
@@ -90,7 +80,7 @@ describe('seedAdmin', () => {
   it('warns and still creates the admin when the password is breached', async () => {
     mockedLookup.mockResolvedValue('breached');
 
-    await seedAdmin();
+    await seedAdmin(dataSource);
 
     expect(exitSpy).not.toHaveBeenCalled();
     expect(userRepo.save).toHaveBeenCalledTimes(1);
@@ -102,7 +92,7 @@ describe('seedAdmin', () => {
   it('warns and still creates the admin when the password contains the admin name', async () => {
     process.env['ADMIN_PASSWORD'] = 'Admin-Kettle-Sunrise-19';
 
-    await seedAdmin();
+    await seedAdmin(dataSource);
 
     expect(exitSpy).not.toHaveBeenCalled();
     expect(userRepo.save).toHaveBeenCalledTimes(1);
@@ -114,7 +104,7 @@ describe('seedAdmin', () => {
   it('never exits when the blocklist is unreachable', async () => {
     mockedLookup.mockResolvedValue('unavailable');
 
-    await seedAdmin();
+    await seedAdmin(dataSource);
 
     expect(exitSpy).not.toHaveBeenCalled();
     expect(userRepo.save).toHaveBeenCalledTimes(1);
@@ -126,19 +116,19 @@ describe('seedAdmin', () => {
       roles: [{ name: 'admin' }]
     });
 
-    await seedAdmin();
+    await seedAdmin(dataSource);
 
     expect(mockedLookup).not.toHaveBeenCalled();
     expect(userRepo.save).not.toHaveBeenCalled();
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
-  it('spends no lookup and opens no connection without ADMIN_PASSWORD', async () => {
+  it('spends no lookup and reads nothing without ADMIN_PASSWORD', async () => {
     delete process.env['ADMIN_PASSWORD'];
 
-    await seedAdmin();
+    await seedAdmin(dataSource);
 
-    expect(mockedDataSource).not.toHaveBeenCalled();
+    expect(getRepository).not.toHaveBeenCalled();
     expect(mockedLookup).not.toHaveBeenCalled();
     expect(exitSpy).not.toHaveBeenCalled();
   });

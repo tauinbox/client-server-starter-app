@@ -1,20 +1,16 @@
-import * as dotenv from 'dotenv';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { localPasswordRefusal } from '@app/shared/utils/password-policy';
-import { postgresConfig } from './postgres.config';
 import { hashPassword } from './common/utils/password-hash';
 import { lookupBreachedPassword } from './modules/auth/breached-password/pwned-range-lookup';
 import { User } from './modules/users/entities/user.entity';
 import { Role } from './modules/auth/entities/role.entity';
 
-dotenv.config();
-
 /**
- * Exported so a spec can drive it. The container entrypoint runs this file
- * under `set -e`, so anything that exits non-zero here stops the API from
- * starting; that contract is what `seed-admin.spec.ts` pins.
+ * A boot step of `run-boot-steps.ts`. The container entrypoint runs that file
+ * under `set -e`, so an error here stops the API from starting; that contract
+ * is what `seed-admin.spec.ts` pins.
  */
-export async function seedAdmin(): Promise<void> {
+export async function seedAdmin(dataSource: DataSource): Promise<void> {
   const email = process.env['ADMIN_EMAIL'];
   const password = process.env['ADMIN_PASSWORD'];
   const name = process.env['ADMIN_NAME']?.trim() || 'Admin';
@@ -25,97 +21,79 @@ export async function seedAdmin(): Promise<void> {
     return;
   }
 
-  const dataSource = new DataSource(postgresConfig());
+  const userRepo = dataSource.getRepository(User);
+  const roleRepo = dataSource.getRepository(Role);
 
-  await dataSource.initialize();
+  const existing = await userRepo.findOne({
+    where: { email },
+    relations: { roles: true }
+  });
 
-  try {
-    const userRepo = dataSource.getRepository(User);
-    const roleRepo = dataSource.getRepository(Role);
-
-    const existing = await userRepo.findOne({
-      where: { email },
-      relations: { roles: true }
-    });
-
-    if (existing) {
-      if (existing.roles.some((r) => r.name === 'admin')) {
-        console.log(
-          `Admin user ${email} already exists with admin role, skipping`
-        );
-
-        return;
-      }
-
-      const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
-
-      if (adminRole) {
-        existing.roles = [...existing.roles, adminRole];
-        await userRepo.save(existing);
-        console.log(`Admin role assigned to existing user ${email}`);
-      }
+  if (existing) {
+    if (existing.roles.some((r) => r.name === 'admin')) {
+      console.log(
+        `Admin user ${email} already exists with admin role, skipping`
+      );
 
       return;
     }
 
     const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
 
-    if (!adminRole) {
-      console.error('Admin role not found — ensure migrations have run first');
-      process.exit(1);
+    if (adminRole) {
+      existing.roles = [...existing.roles, adminRole];
+      await userRepo.save(existing);
+      console.log(`Admin role assigned to existing user ${email}`);
     }
 
-    // The same blocklist the set-password routes apply, and only on the branch
-    // that actually sets a password. It WARNS and continues: this script runs
-    // from the container entrypoint under `set -e`, so a non-zero exit here
-    // stops the API from starting at all. A weak seed password is a problem to
-    // fix at leisure; refusing to boot over it is an outage.
-    const breachOutcome = await lookupBreachedPassword(password, {
-      rangeUrl: process.env['PWNED_PASSWORDS_RANGE_URL'],
-      onUnavailable: (reason) =>
-        console.warn(
-          `Breached-password lookup ${reason} - ADMIN_PASSWORD seeded unchecked`
-        )
-    });
-
-    if (breachOutcome === 'breached') {
-      console.warn(
-        'WARNING: ADMIN_PASSWORD appears in a public data breach. The admin ' +
-          'user is being created with it - change the password after the ' +
-          'first sign-in and rotate the ADMIN_PASSWORD secret.'
-      );
-    }
-
-    if (localPasswordRefusal(password, { email, name })) {
-      console.warn(
-        'WARNING: ADMIN_PASSWORD is a common password, or it contains the ' +
-          'admin name, email or the product name. The admin user is being ' +
-          'created with it - change the password after the first sign-in ' +
-          'and rotate the ADMIN_PASSWORD secret.'
-      );
-    }
-
-    const { hash, version } = await hashPassword(password);
-    const admin = userRepo.create({
-      email,
-      password: hash,
-      passwordHashVersion: version,
-      name,
-      isActive: true,
-      isEmailVerified: true,
-      roles: [adminRole]
-    });
-
-    await userRepo.save(admin);
-    console.log(`Admin user ${email} created with admin role`);
-  } finally {
-    await dataSource.destroy();
+    return;
   }
-}
 
-if (require.main === module) {
-  seedAdmin().catch((err: unknown) => {
-    console.error('Failed to seed admin:', err);
-    process.exit(1);
+  const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
+
+  if (!adminRole) {
+    throw new Error('Admin role not found - ensure migrations have run first');
+  }
+
+  // The blocklist of the set-password routes. It warns and continues: an error
+  // here stops the API from starting, and a weak seed password is a problem to
+  // fix at leisure, while refusing to boot over it is an outage.
+  const breachOutcome = await lookupBreachedPassword(password, {
+    rangeUrl: process.env['PWNED_PASSWORDS_RANGE_URL'],
+    onUnavailable: (reason) =>
+      console.warn(
+        `Breached-password lookup ${reason} - ADMIN_PASSWORD seeded unchecked`
+      )
   });
+
+  if (breachOutcome === 'breached') {
+    console.warn(
+      'WARNING: ADMIN_PASSWORD appears in a public data breach. The admin ' +
+        'user is being created with it - change the password after the ' +
+        'first sign-in and rotate the ADMIN_PASSWORD secret.'
+    );
+  }
+
+  if (localPasswordRefusal(password, { email, name })) {
+    console.warn(
+      'WARNING: ADMIN_PASSWORD is a common password, or it contains the ' +
+        'admin name, email or the product name. The admin user is being ' +
+        'created with it - change the password after the first sign-in ' +
+        'and rotate the ADMIN_PASSWORD secret.'
+    );
+  }
+
+  const { hash, version } = await hashPassword(password);
+  const admin = userRepo.create({
+    email,
+    password: hash,
+    passwordHashVersion: version,
+    name,
+    isActive: true,
+    isEmailVerified: true,
+    roles: [adminRole]
+  });
+
+  await userRepo.save(admin);
+  console.log(`Admin user ${email} created with admin role`);
 }
