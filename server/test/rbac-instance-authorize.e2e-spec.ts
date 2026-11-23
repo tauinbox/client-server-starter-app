@@ -93,8 +93,14 @@ function repositoryOf(rows: Rows, write: jest.Mock) {
       Promise.resolve(rows.get(where.id) ?? null)
     ),
     manager: {
+      findOne: (_target: unknown, { where }: { where: { id: string } }) =>
+        Promise.resolve(rows.get(where.id) ?? null),
+      // The roles of a user are read in a second query; the rows of this
+      // suite hold none.
+      find: (): Promise<never[]> => Promise.resolve([]),
       transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
         work({
+          find: (): Promise<never[]> => Promise.resolve([]),
           save: (...args: unknown[]): unknown => write(args.at(-1)),
           // A keyed update is recorded as the row key with the written columns.
           update: (
