@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
+import { poolLockDataSource } from '../../../common/testing/pool-lock.mock';
 import { TokenCleanupService } from './token-cleanup.service';
 import { RefreshTokenService } from './refresh-token.service';
 
@@ -19,7 +21,8 @@ describe('TokenCleanupService', () => {
         {
           provide: RefreshTokenService,
           useValue: refreshTokenService
-        }
+        },
+        { provide: DataSource, useValue: poolLockDataSource() }
       ]
     }).compile();
 

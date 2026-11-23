@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { poolLockDataSource } from '../../common/testing/pool-lock.mock';
 import { AuditCleanupService } from './audit-cleanup.service';
 import { AuditLog } from './entities/audit-log.entity';
 
@@ -28,7 +30,8 @@ describe('AuditCleanupService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService
-        }
+        },
+        { provide: DataSource, useValue: poolLockDataSource() }
       ]
     }).compile();
 
