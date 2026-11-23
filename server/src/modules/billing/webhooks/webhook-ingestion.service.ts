@@ -19,6 +19,7 @@ import {
 } from '../providers/payment-provider.interface';
 import { BillingEventReducer } from './billing-event-reducer.service';
 import {
+  BILLING_WEBHOOK_JOB_FORMAT,
   BILLING_WEBHOOK_QUEUE,
   BILLING_WEBHOOK_REDUCE_JOB,
   type BillingWebhookJobData
@@ -94,7 +95,7 @@ export class WebhookIngestionService {
         provider: providerId,
         providerEventId: event.providerEventId,
         type: event.type,
-        payload: event,
+        payload: { ...event, format: BILLING_WEBHOOK_JOB_FORMAT },
         status: 'received',
         processedAt: null
       })
@@ -148,9 +149,16 @@ export class WebhookIngestionService {
     await this.dispatch({ webhookEventId: existing.id, event });
   }
 
-  private async dispatch(data: BillingWebhookJobData): Promise<void> {
+  private async dispatch(
+    data: Omit<BillingWebhookJobData, 'format'>
+  ): Promise<void> {
     if (this.queue) {
-      await this.queue.add(BILLING_WEBHOOK_REDUCE_JOB, data, {
+      const job: BillingWebhookJobData = {
+        ...data,
+        format: BILLING_WEBHOOK_JOB_FORMAT
+      };
+
+      await this.queue.add(BILLING_WEBHOOK_REDUCE_JOB, job, {
         attempts: 5,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: true,
@@ -169,7 +177,9 @@ export class WebhookIngestionService {
    * processor can call it; errors propagate (the row stays `received`) so the
    * worker — or the next delivery — retries.
    */
-  async processEvent(data: BillingWebhookJobData): Promise<void> {
+  async processEvent(
+    data: Omit<BillingWebhookJobData, 'format'>
+  ): Promise<void> {
     await this.reducer.reduce(data.event);
     await this.webhookEvents.update(
       { id: data.webhookEventId },

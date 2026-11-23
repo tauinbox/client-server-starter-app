@@ -6,6 +6,7 @@ import { WebhookIngestionService } from './webhook-ingestion.service';
 import { WebhookReconciliationService } from './webhook-reconciliation.service';
 import { WebhookRetentionService } from './webhook-retention.service';
 import {
+  BILLING_WEBHOOK_JOB_FORMAT,
   BILLING_WEBHOOK_QUEUE,
   BILLING_WEBHOOK_RECONCILE_JOB,
   BILLING_WEBHOOK_RECONCILE_SCHEDULER_ID,
@@ -68,7 +69,10 @@ export class BillingWebhookProcessor
     }
   }
 
-  async process(job: Job<BillingWebhookJobData>): Promise<void> {
+  async process(
+    job: Job<BillingWebhookJobData>,
+    token?: string
+  ): Promise<void> {
     if (job.name === BILLING_WEBHOOK_RECONCILE_JOB) {
       await this.reconciliation.sweep();
 
@@ -81,6 +85,7 @@ export class BillingWebhookProcessor
       return;
     }
 
+    await this.deferNewerFormat(job, token, BILLING_WEBHOOK_JOB_FORMAT);
     await this.ingestion.processEvent(job.data);
   }
 

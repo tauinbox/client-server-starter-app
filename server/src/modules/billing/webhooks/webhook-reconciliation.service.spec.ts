@@ -97,6 +97,46 @@ describe('WebhookReconciliationService', () => {
     expect(processEvent).not.toHaveBeenCalled();
   });
 
+  // A node of the old build must not count failures on a row it cannot read:
+  // enough of them would move the row to `dead_letter`.
+  it('leaves a row of a newer payload format for a newer build', async () => {
+    find.mockResolvedValue([
+      row({
+        payload: {
+          type: 'invoice.paid',
+          providerEventId: 'evt_1',
+          // A format that no build knows.
+          format: Number.MAX_SAFE_INTEGER
+        }
+      })
+    ]);
+
+    await service.sweep();
+
+    expect(processEvent).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  // Every build reads the first format, so a row of it is always replayed.
+  it('replays a row of the first payload format', async () => {
+    const known = row({
+      payload: {
+        type: 'invoice.paid',
+        providerEventId: 'evt_1',
+        format: 1
+      }
+    });
+
+    find.mockResolvedValue([known]);
+
+    await service.sweep();
+
+    expect(processEvent).toHaveBeenCalledWith({
+      webhookEventId: 'wh-1',
+      event: known.payload
+    });
+  });
+
   it('continues replaying after one row fails', async () => {
     processEvent
       .mockRejectedValueOnce(new Error('still failing'))

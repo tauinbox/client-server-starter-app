@@ -325,7 +325,9 @@ refuse, the throttler keeps a block that Redis holds and counts new hits in the 
 instance (`MemoryThrottlerStorage`) with a warning, a cache invalidation whose `INCR` is refused
 deletes the cached entries of the current version (a full Redis accepts a `DEL`), and a job schedule that cannot be
 written at boot is logged and the boot goes on. The queue processors extend `LoggedWorkerHost`,
-which logs a failed worker loop once in 30 seconds instead of the raw stderr dump of BullMQ. An SMTP failure degrades to a generic
+which logs a failed worker loop once in 30 seconds instead of the raw stderr dump of BullMQ.
+During a rolling deploy a worker of the old build gives back a mail or webhook job that carries a
+newer `format` number: the job goes back to delayed and spends no attempt. An SMTP failure degrades to a generic
 warning. The server logs the raw SMTP error
 and never returns it from the public endpoint.
 

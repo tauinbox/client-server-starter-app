@@ -28,6 +28,7 @@ import { BillingWebhookProcessor } from '../src/modules/billing/webhooks/billing
 import {
   BILLING_WEBHOOK_QUEUE,
   BILLING_WEBHOOK_RECONCILE_JOB,
+  BILLING_WEBHOOK_REDUCE_JOB,
   BILLING_WEBHOOK_RECONCILE_SCHEDULER_ID,
   BILLING_WEBHOOK_RETENTION_JOB,
   BILLING_WEBHOOK_RETENTION_SCHEDULER_ID,
@@ -38,7 +39,7 @@ import { WebhookIngestionService } from '../src/modules/billing/webhooks/webhook
 import { WebhookReconciliationService } from '../src/modules/billing/webhooks/webhook-reconciliation.service';
 import { WebhookRetentionService } from '../src/modules/billing/webhooks/webhook-retention.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
-import { eventually } from './eventually';
+import { eventually, waitUntil } from './eventually';
 
 const { REDIS_URL } = process.env;
 
@@ -265,6 +266,38 @@ runWithRedis('billing webhook queue (real Redis)', () => {
         .findOneByOrFail({ providerSubscriptionId: `sub_${customerId}` })
     ).resolves.toMatchObject({ status: 'active' });
   }, 30000);
+
+  // During a rolling deploy this worker is the old build and a newer build
+  // wrote the job. BullMQ gives the job to it anyway (no routing by build).
+  it('gives back a job of a newer format with no attempt spent', async () => {
+    const reduce = jest.spyOn(reducer, 'reduce');
+    const job = await queue.add(
+      BILLING_WEBHOOK_REDUCE_JOB,
+      {
+        // A format that no build knows.
+        format: Number.MAX_SAFE_INTEGER,
+        webhookEventId: 'newer-format',
+        event: {
+          provider: 'paddle',
+          providerEventId: `${EVENT_PREFIX}newer`,
+          type: 'subscription.activated',
+          payload: {}
+        }
+      },
+      { attempts: 5 }
+    );
+
+    // A job added with no delay is delayed only by the worker that took it.
+    await waitUntil('the worker delays the job', async () =>
+      (await job.getState()) === 'delayed' ? true : null
+    );
+
+    const stored = await queue.getJob(job.id as string);
+
+    expect(stored?.attemptsMade).toBe(0);
+    expect(reduce).not.toHaveBeenCalled();
+    await stored?.remove();
+  });
 
   it('creates the reconcile and retention schedulers on bootstrap', async () => {
     const processor = module.get(BillingWebhookProcessor);

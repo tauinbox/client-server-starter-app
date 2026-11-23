@@ -2,7 +2,11 @@ import { InjectQueue, OnWorkerEvent, Processor } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { MailService } from './mail.service';
-import { MAIL_QUEUE, MailJobData } from './mail-queue.constants';
+import {
+  MAIL_JOB_FORMAT,
+  MAIL_QUEUE,
+  MailJobData
+} from './mail-queue.constants';
 import {
   MAIL_QUEUE_REF,
   type MailQueueRef
@@ -38,7 +42,8 @@ export class MailProcessor extends LoggedWorkerHost {
       );
   }
 
-  async process(job: Job<MailJobData>): Promise<void> {
+  async process(job: Job<MailJobData>, token?: string): Promise<void> {
+    await this.deferNewerFormat(job, token, MAIL_JOB_FORMAT);
     await this.mailService.deliver(job.data);
   }
 

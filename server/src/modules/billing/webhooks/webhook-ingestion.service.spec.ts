@@ -13,6 +13,7 @@ import type { NormalizedEvent } from '../providers/payment-provider.interface';
 import { BillingEventReducer } from './billing-event-reducer.service';
 import { WebhookIngestionService } from './webhook-ingestion.service';
 import {
+  BILLING_WEBHOOK_JOB_FORMAT,
   BILLING_WEBHOOK_QUEUE,
   BILLING_WEBHOOK_REDUCE_JOB
 } from './billing-webhook-queue.constants';
@@ -139,8 +140,9 @@ describe('WebhookIngestionService', () => {
     expect(values).toHaveBeenCalledWith(
       expect.objectContaining({
         // The verified event is persisted so the reconciliation sweep can
-        // replay a stuck delivery without the provider.
-        payload: event,
+        // replay a stuck delivery without the provider. The format lets a
+        // node of an older build leave a newer row alone.
+        payload: { ...event, format: BILLING_WEBHOOK_JOB_FORMAT },
         status: 'received'
       })
     );
@@ -242,7 +244,7 @@ describe('WebhookIngestionService', () => {
 
     expect(add).toHaveBeenCalledWith(
       BILLING_WEBHOOK_REDUCE_JOB,
-      { webhookEventId: 'wh-1', event },
+      { webhookEventId: 'wh-1', event, format: BILLING_WEBHOOK_JOB_FORMAT },
       expect.objectContaining({ attempts: expect.any(Number) })
     );
     // With a queue the reduction is deferred to the worker, not run inline.

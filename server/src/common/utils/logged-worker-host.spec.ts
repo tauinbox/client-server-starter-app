@@ -1,10 +1,30 @@
 import { Logger } from '@nestjs/common';
-import { LoggedWorkerHost } from './logged-worker-host';
+import { DelayedError, type Job } from 'bullmq';
+import {
+  LoggedWorkerHost,
+  NEWER_FORMAT_RETRY_DELAY_MS
+} from './logged-worker-host';
 
 class ProbeWorkerHost extends LoggedWorkerHost {
-  async process(): Promise<void> {
-    // The worker loop is under test, not a job.
+  async process(job: Job<object>, token?: string): Promise<void> {
+    await this.deferNewerFormat(job, token, 1);
   }
+}
+
+function probeJob(data: object): {
+  job: Job<object>;
+  moveToDelayed: jest.Mock;
+} {
+  const moveToDelayed = jest.fn().mockResolvedValue(undefined);
+  const stub: Pick<Job<object>, 'data' | 'moveToDelayed'> = {
+    data,
+    moveToDelayed
+  };
+
+  // @ts-expect-error minimal Job stub: deferNewerFormat reads only these two
+  const job: Job<object> = stub;
+
+  return { job, moveToDelayed };
 }
 
 describe('LoggedWorkerHost', () => {
@@ -40,5 +60,32 @@ describe('LoggedWorkerHost', () => {
     expect(warn).toHaveBeenCalledWith(
       'Queue worker loop failed, no job is taken: OOM command not allowed'
     );
+  });
+
+  describe('deferNewerFormat', () => {
+    it('delays a job of a newer format with the lock token and throws DelayedError', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      const { job, moveToDelayed } = probeJob({ format: 2 });
+
+      await expect(
+        new ProbeWorkerHost().process(job, 'lock-1')
+      ).rejects.toBeInstanceOf(DelayedError);
+      expect(moveToDelayed).toHaveBeenCalledWith(
+        1_000_000 + NEWER_FORMAT_RETRY_DELAY_MS,
+        'lock-1'
+      );
+    });
+
+    it.each([
+      ['a job with no format (queued before the formats)', {}],
+      ['a job of the known format', { format: 1 }]
+    ])('runs %s', async (_title, data) => {
+      const { job, moveToDelayed } = probeJob(data);
+
+      await expect(
+        new ProbeWorkerHost().process(job, 'lock-1')
+      ).resolves.toBeUndefined();
+      expect(moveToDelayed).not.toHaveBeenCalled();
+    });
   });
 });
