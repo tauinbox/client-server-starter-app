@@ -20,6 +20,15 @@ import { RoleRenamedEvent } from '../events/role-renamed.event';
 import { RoleDeletedEvent } from '../events/role-deleted.event';
 import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
+import { addUserRole } from '../../users/utils/user-roles';
+
+jest.mock('../../users/utils/user-roles', () =>
+  jest
+    .requireActual<{
+      userRolesDouble: () => object;
+    }>('../../users/testing/user-roles.double')
+    .userRolesDouble()
+);
 
 // Every action offered and evaluated, so a fixture tests the grant rules alone.
 const OFFERS_ALL = {
@@ -67,9 +76,6 @@ describe('RoleService', () => {
   let mockMetricsService: { recordPermissionDenied: jest.Mock };
   let mockEventEmitter: { emit: jest.Mock; emitAsync: jest.Mock };
   let mockRelationQueryBuilder: {
-    relation: jest.Mock;
-    of: jest.Mock;
-    add: jest.Mock;
     delete: jest.Mock;
     from: jest.Mock;
     where: jest.Mock;
@@ -78,6 +84,7 @@ describe('RoleService', () => {
   let mockUserQueryBuilder: {
     select: jest.Mock;
     innerJoin: jest.Mock;
+    where: jest.Mock;
     getMany: jest.Mock;
   };
 
@@ -88,7 +95,6 @@ describe('RoleService', () => {
     isSystem: true,
     isSuper: true,
     rolePermissions: [],
-    users: [],
     createdAt: new Date(),
     updatedAt: new Date()
   };
@@ -100,7 +106,6 @@ describe('RoleService', () => {
     isSystem: false,
     isSuper: false,
     rolePermissions: [],
-    users: [],
     createdAt: new Date(),
     updatedAt: new Date()
   };
@@ -112,10 +117,9 @@ describe('RoleService', () => {
       getMany: jest.fn().mockResolvedValue([])
     };
 
+    jest.mocked(addUserRole).mockClear();
+
     mockRelationQueryBuilder = {
-      relation: jest.fn().mockReturnThis(),
-      of: jest.fn().mockReturnThis(),
-      add: jest.fn().mockResolvedValue(undefined),
       delete: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
@@ -125,6 +129,7 @@ describe('RoleService', () => {
     mockUserQueryBuilder = {
       select: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue([])
     };
 
@@ -419,7 +424,7 @@ describe('RoleService', () => {
     it('should save a rename and emit RoleRenamedEvent in one transaction, then invalidate the holders', async () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockRoleRepo.findOne.mockResolvedValueOnce(null);
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
       let committedInside: boolean | undefined;
 
       mockEventEmitter.emitAsync.mockImplementation(
@@ -461,7 +466,7 @@ describe('RoleService', () => {
     it('should fail the rename and skip the invalidation when a listener fails', async () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockRoleRepo.findOne.mockResolvedValueOnce(null);
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
       mockEventEmitter.emitAsync.mockRejectedValueOnce(new Error('db down'));
 
       await expect(
@@ -512,7 +517,7 @@ describe('RoleService', () => {
     it('should not emit or invalidate when the name stays the same', async () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
 
       await service.update(
         'role-2',
@@ -588,7 +593,7 @@ describe('RoleService', () => {
 
     it('a failed row fails the delete and invalidates no holder', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
       mockAuditService.log.mockRejectedValue(new Error('audit down'));
 
       await expect(
@@ -608,7 +613,10 @@ describe('RoleService', () => {
         actorId: 'a',
         audit
       });
-      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
+      expect(addUserRole).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ roleId: 'role-2' })
+      );
       expect(mockAuditService.log).toHaveBeenCalledWith(
         audit,
         expect.anything()
@@ -673,8 +681,8 @@ describe('RoleService', () => {
     it('should delete a custom role and invalidate cache for its members', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockUserQueryBuilder.getMany.mockResolvedValue([
-        { id: 'u-1' },
-        { id: 'u-2' }
+        { userId: 'u-1' },
+        { userId: 'u-2' }
       ]);
       await service.delete('role-2', { ability: SYSTEM_ABILITY });
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
@@ -688,7 +696,7 @@ describe('RoleService', () => {
 
     it('should read the members before the delete and invalidate after it', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
       await service.delete('role-2', { ability: SYSTEM_ABILITY });
       const [read] = mockUserQueryBuilder.getMany.mock.invocationCallOrder;
       const [remove] = mockRoleRepo.delete.mock.invocationCallOrder;
@@ -708,7 +716,7 @@ describe('RoleService', () => {
 
     it('answers ROLES.NOT_FOUND with no event and no invalidation when a concurrent delete won', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
       mockRolePermissionRepo.lockRole.mockResolvedValue(null);
 
       await expect(
@@ -737,7 +745,7 @@ describe('RoleService', () => {
 
     it('should fail the delete and skip the invalidation when a listener fails', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
       mockEventEmitter.emitAsync.mockRejectedValueOnce(new Error('db down'));
 
       await expect(
@@ -752,8 +760,8 @@ describe('RoleService', () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.save.mockResolvedValue([]);
       mockUserQueryBuilder.getMany.mockResolvedValue([
-        { id: 'u-1' },
-        { id: 'u-2' }
+        { userId: 'u-1' },
+        { userId: 'u-2' }
       ]);
 
       await service.assignPermissionsToRole(
@@ -789,7 +797,7 @@ describe('RoleService', () => {
     it('answers 404 with no audit row and no cache invalidation when the role does not hold the permission', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 0 });
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
       const audit = { action: AuditAction.PERMISSION_UNASSIGN, actorId: 'a' };
 
       await expect(
@@ -809,7 +817,7 @@ describe('RoleService', () => {
     it('should remove permission and invalidate cache for all role members', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
       mockRolePermissionRepo.delete.mockResolvedValue({ affected: 1 });
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
 
       await service.removePermissionFromRole('role-2', 'perm-1', {
         ability: SYSTEM_ABILITY
@@ -859,7 +867,7 @@ describe('RoleService', () => {
           actorId: 'actor-1'
         })
       ).rejects.toThrow(ApiError);
-      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(addUserRole).not.toHaveBeenCalled();
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({
           actorId: 'actor-1',
@@ -881,7 +889,10 @@ describe('RoleService', () => {
         ability: assignAbility('editor')
       });
 
-      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
+      expect(addUserRole).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ roleId: 'role-2' })
+      );
     });
 
     it('answers 422 for a role id in the body that names no role', async () => {
@@ -895,7 +906,7 @@ describe('RoleService', () => {
         status: 422,
         response: { errorKey: ErrorKeys.ROLES.UNKNOWN_ROLE }
       });
-      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(addUserRole).not.toHaveBeenCalled();
     });
 
     it('should assign role and invalidate cache', async () => {
@@ -904,7 +915,10 @@ describe('RoleService', () => {
         ability: SYSTEM_ABILITY
       });
 
-      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
+      expect(addUserRole).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ roleId: 'role-2' })
+      );
       expect(mockPermissionService.invalidateUserCache).toHaveBeenCalledWith(
         'user-1'
       );
@@ -966,7 +980,10 @@ describe('RoleService', () => {
       await service.assignRoleToUser('user-1', 'role-2', { ability });
 
       expect(canSpy).toHaveBeenCalledWith('update', targetUser);
-      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
+      expect(addUserRole).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ roleId: 'role-2' })
+      );
     });
 
     it('should throw 404 without writing membership when the target user is unknown or soft-deleted', async () => {
@@ -986,10 +1003,9 @@ describe('RoleService', () => {
       // The lookup must stay scoped to live rows so a soft-deleted account
       // cannot be modified without being restored first.
       expect(mockRoleRepo.manager.findOne).toHaveBeenCalledWith(User, {
-        where: { id: 'user-99' },
-        relations: { roles: true }
+        where: { id: 'user-99' }
       });
-      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(addUserRole).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
   });
@@ -1153,8 +1169,7 @@ describe('RoleService', () => {
       });
 
       expect(mockRoleRepo.manager.findOne).toHaveBeenCalledWith(User, {
-        where: { id: 'user-99' },
-        relations: { roles: true }
+        where: { id: 'user-99' }
       });
       expect(mockRelationQueryBuilder.execute).not.toHaveBeenCalled();
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
@@ -1304,7 +1319,7 @@ describe('RoleService', () => {
 
     it('should invalidate cache for all role members after setting permissions', async () => {
       mockRoleRepo.findOne.mockResolvedValue(customRole);
-      mockUserQueryBuilder.getMany.mockResolvedValue([{ id: 'u-1' }]);
+      mockUserQueryBuilder.getMany.mockResolvedValue([{ userId: 'u-1' }]);
 
       await service.setPermissionsForRole(
         'role-2',
@@ -1847,7 +1862,7 @@ describe('RoleService', () => {
         })
       ).rejects.toMatchObject({ status: 403 });
 
-      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(addUserRole).not.toHaveBeenCalled();
       expect(mockAuditService.logFireAndForget).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'PERMISSION_GRANT_DENIED' })
       );
@@ -2281,8 +2296,8 @@ describe('RoleService', () => {
 
     beforeEach(() => {
       mockUserQueryBuilder.getMany.mockResolvedValue([
-        { id: 'u-1' },
-        { id: 'u-2' }
+        { userId: 'u-1' },
+        { userId: 'u-2' }
       ]);
     });
 
@@ -2396,7 +2411,7 @@ describe('RoleService', () => {
         'update',
         'User'
       );
-      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(addUserRole).not.toHaveBeenCalled();
       expect(mockRelationQueryBuilder.execute).not.toHaveBeenCalled();
     }
 
@@ -2436,7 +2451,10 @@ describe('RoleService', () => {
         actorId: 'actor-1'
       });
 
-      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-2');
+      expect(addUserRole).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ roleId: 'role-2' })
+      );
     });
   });
 
@@ -2646,7 +2664,7 @@ describe('RoleService', () => {
       expect(mockRoleRepo.save).not.toHaveBeenCalled();
       expect(mockRoleRepo.delete).not.toHaveBeenCalled();
       expect(mockRolePermissionRepo.manager.transaction).not.toHaveBeenCalled();
-      expect(mockRelationQueryBuilder.add).not.toHaveBeenCalled();
+      expect(addUserRole).not.toHaveBeenCalled();
       expect(mockRelationQueryBuilder.execute).not.toHaveBeenCalled();
     });
 
@@ -2657,7 +2675,10 @@ describe('RoleService', () => {
         ability: SYSTEM_ABILITY
       });
 
-      expect(mockRelationQueryBuilder.add).toHaveBeenCalledWith('role-1');
+      expect(addUserRole).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ roleId: 'role-1' })
+      );
     });
   });
 });

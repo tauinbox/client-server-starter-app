@@ -17,7 +17,9 @@ import { ROLE_LIST_COLUMNS } from '../utils/rbac-sort-columns.util';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
+import { UserRole } from '../../users/entities/user-role.entity';
 import { lockUserWithRoles } from '../../users/utils/lock-user';
+import { addUserRole, findUserWithRoles } from '../../users/utils/user-roles';
 import { userNotFound } from '../../users/utils/user-not-found';
 import { PermissionService } from './permission.service';
 import { grantableActionNames } from '@app/shared/utils/grantable-actions';
@@ -784,9 +786,8 @@ export class RoleService {
    * UsersService.update) - restore the account first.
    */
   private async loadRoleAssignmentTarget(userId: string): Promise<User> {
-    const targetUser = await this.roleRepository.manager.findOne(User, {
-      where: { id: userId },
-      relations: { roles: true }
+    const targetUser = await findUserWithRoles(this.roleRepository.manager, {
+      where: { id: userId }
     });
 
     if (!targetUser) throw userNotFound(userId);
@@ -877,11 +878,7 @@ export class RoleService {
           role: locked,
           actorId
         });
-        await em
-          .createQueryBuilder()
-          .relation(User, 'roles')
-          .of(userId)
-          .add(roleId);
+        await addUserRole(em, { userId, roleId });
       },
       audit
     );
@@ -1118,13 +1115,18 @@ export class RoleService {
     em: EntityManager,
     roleId: string
   ): Promise<string[]> {
-    const users = await em
-      .createQueryBuilder(User, 'user')
-      .select('user.id')
-      .innerJoin('user.roles', 'role', 'role.id = :roleId', { roleId })
+    const links = await em
+      .createQueryBuilder(UserRole, 'link')
+      .select('link.userId')
+      .innerJoin(
+        User,
+        'user',
+        'user.id = link.userId AND user.deletedAt IS NULL'
+      )
+      .where('link.roleId = :roleId', { roleId })
       .getMany();
 
-    return users.map((u) => u.id);
+    return links.map(({ userId }) => userId);
   }
 
   private async invalidateHolders(userIds: string[]): Promise<void> {

@@ -83,20 +83,30 @@ function matchOne(row: User, where: WhereClause): boolean {
 }
 
 function makeUserRepoMock(store: UserStore) {
-  return {
-    findOne: jest.fn(
-      (opts: { where: WhereClause | WhereClause[] }): Promise<User | null> => {
-        const clauses = Array.isArray(opts.where) ? opts.where : [opts.where];
+  const findOne = jest.fn(
+    (opts: { where: WhereClause | WhereClause[] }): Promise<User | null> => {
+      const clauses = Array.isArray(opts.where) ? opts.where : [opts.where];
 
-        for (const row of store.rows.values()) {
-          for (const where of clauses) {
-            if (matchOne(row, where)) return Promise.resolve(row);
-          }
+      for (const row of store.rows.values()) {
+        for (const where of clauses) {
+          if (matchOne(row, where)) return Promise.resolve(row);
         }
-
-        return Promise.resolve(null);
       }
-    )
+
+      return Promise.resolve(null);
+    }
+  );
+
+  return {
+    findOne,
+    // The roles are read in a second query; no user of this suite holds one.
+    manager: {
+      findOne: (
+        _target: unknown,
+        opts: { where: WhereClause | WhereClause[] }
+      ): Promise<User | null> => findOne(opts),
+      find: (): Promise<never[]> => Promise.resolve([])
+    }
   };
 }
 
@@ -121,7 +131,9 @@ function transactionOver(store: UserStore) {
       const row = store.rows.get(options.where.id);
 
       return row ? Promise.resolve(row) : Promise.reject(new Error('no row'));
-    }
+    },
+    // The roles are read in a second query; no user of this suite holds one.
+    find: (): Promise<never[]> => Promise.resolve([])
   };
 
   return {

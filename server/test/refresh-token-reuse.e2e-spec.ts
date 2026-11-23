@@ -209,7 +209,6 @@ describe('Refresh token reuse detection (e2e)', () => {
         isSystem: true,
         isSuper: false,
         rolePermissions: [],
-        users: [],
         createdAt: new Date(),
         updatedAt: new Date()
       }

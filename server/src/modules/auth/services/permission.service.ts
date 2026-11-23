@@ -4,6 +4,9 @@ import { Brackets, Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
+import { UserRole } from '../../users/entities/user-role.entity';
+import { attachRoles, findUserWithRoles } from '../../users/utils/user-roles';
+import { Role } from '../entities/role.entity';
 import { SYSTEM_ROLES } from '@app/shared/constants';
 import type {
   PermissionCondition,
@@ -77,23 +80,15 @@ export class PermissionService {
       return cached;
     }
 
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: {
-        roles: {
-          rolePermissions: {
-            permission: {
-              resource: true,
-              action: true
-            }
-          }
-        }
-      }
-    });
+    const user = await this.userRepository.findOne({ where: { id: userId } });
 
     if (!user) {
       return [];
     }
+
+    await attachRoles(this.userRepository.manager, [user], {
+      rolePermissions: { permission: { resource: true, action: true } }
+    });
 
     const permissions = dedupPermissions(
       user.roles.flatMap((role) =>
@@ -152,9 +147,8 @@ export class PermissionService {
       return cached;
     }
 
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: { roles: true }
+    const user = await findUserWithRoles(this.userRepository.manager, {
+      where: { id: userId }
     });
 
     const roles: RoleInfo[] =
@@ -186,18 +180,36 @@ export class PermissionService {
       return [];
     }
 
-    const rows = await this.userRepository
-      .createQueryBuilder('user')
-      .select('user.id', 'id')
+    const { manager } = this.userRepository;
+    // Two reads, no join: the memberships are personal data and the roles are
+    // settings. One array parameter: a spread list stops at the 65535
+    // parameters of the Postgres protocol.
+    const links = await manager
+      .createQueryBuilder(UserRole, 'link')
+      .select(['link.userId', 'link.roleId'])
+      .innerJoin(
+        User,
+        'user',
+        'user.id = link.userId AND user.deletedAt IS NULL'
+      )
+      .where('link.userId = ANY(CAST(:userIds AS uuid[]))', { userIds })
+      .getMany();
+
+    if (links.length === 0) {
+      return [];
+    }
+
+    const allowing = await manager
+      .createQueryBuilder(Role, 'role')
+      .select('role.id', 'id')
       .distinct(true)
-      .innerJoin('user.roles', 'role')
       .leftJoin('role.rolePermissions', 'rp')
       .leftJoin('rp.permission', 'permission')
       .leftJoin('permission.action', 'action')
       .leftJoin('permission.resource', 'resource')
-      // One array parameter: a spread list stops at the 65535 parameters of
-      // the Postgres protocol.
-      .where('user.id = ANY(CAST(:userIds AS uuid[]))', { userIds })
+      .where('role.id = ANY(CAST(:roleIds AS uuid[]))', {
+        roleIds: [...new Set(links.map(({ roleId }) => roleId))]
+      })
       .andWhere(
         new Brackets((qb) =>
           qb.where('role.isSuper = true').orWhere(
@@ -208,8 +220,15 @@ export class PermissionService {
         )
       )
       .getRawMany<{ id: string }>();
+    const allowingIds = new Set(allowing.map(({ id }) => id));
 
-    return rows.map((row) => row.id);
+    return [
+      ...new Set(
+        links
+          .filter(({ roleId }) => allowingIds.has(roleId))
+          .map(({ userId }) => userId)
+      )
+    ];
   }
 
   async invalidateUserCache(userId: string): Promise<void> {

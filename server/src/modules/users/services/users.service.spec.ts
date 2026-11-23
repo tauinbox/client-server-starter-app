@@ -23,6 +23,15 @@ import {
   type AppAbility
 } from '../../auth/casl/app-ability';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
+import { attachRoles } from '../utils/user-roles';
+
+jest.mock('../utils/user-roles', () =>
+  jest
+    .requireActual<{
+      userRolesDouble: () => object;
+    }>('../testing/user-roles.double')
+    .userRolesDouble()
+);
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -37,6 +46,10 @@ describe('UsersService', () => {
     createQueryBuilder: jest.Mock;
     increment: jest.Mock;
     update: jest.Mock;
+    manager: {
+      findOne: (entity: unknown, options: unknown) => unknown;
+      findOneOrFail: (entity: unknown, options: unknown) => unknown;
+    };
   };
   let mockDataSource: { transaction: jest.Mock };
   let mockMailService: { sendEmailVerification: jest.Mock };
@@ -93,7 +106,13 @@ describe('UsersService', () => {
       findOneOrFail: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
       increment: jest.fn().mockResolvedValue(undefined),
-      update: jest.fn().mockResolvedValue({ affected: 1 })
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      manager: {
+        findOne: (_entity, options) =>
+          mockRepository.findOne(options) as unknown,
+        findOneOrFail: (_entity, options) =>
+          mockRepository.findOneOrFail(options) as unknown
+      }
     };
 
     // The manager writes through the repository mock, so a write in the
@@ -380,8 +399,7 @@ describe('UsersService', () => {
       const result = await service.findOne('user-1', SYSTEM_ABILITY);
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 'user-1' },
-        relations: { roles: true }
+        where: { id: 'user-1' }
       });
       expect(result).toEqual(mockUser);
     });
@@ -441,8 +459,7 @@ describe('UsersService', () => {
       const result = await service.findByEmail('test@example.com');
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { email: 'test@example.com' },
-        relations: { roles: true }
+        where: { email: 'test@example.com' }
       });
       expect(result).toEqual(mockUser);
     });
@@ -480,6 +497,10 @@ describe('UsersService', () => {
       );
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(21);
       expect(result.data).toEqual([mockUser]);
+      const [manager, listed] = jest.mocked(attachRoles).mock.lastCall ?? [];
+
+      expect(manager).toBe(mockRepository.manager);
+      expect(listed).toEqual([mockUser]);
       expect(result.meta.hasMore).toBe(false);
       expect(result.meta.nextCursor).toBeNull();
       expect(result.meta.limit).toBe(20);
@@ -506,6 +527,37 @@ describe('UsersService', () => {
       expect(result.data).toHaveLength(2);
       expect(result.meta.hasMore).toBe(true);
       expect(result.meta.nextCursor).not.toBeNull();
+    });
+
+    it('filters by role through the membership rows of the role id', async () => {
+      mockRepository.findOne.mockResolvedValue({ id: 'role-admin' });
+
+      await service.findCursorPaginated(
+        { limit: 20, sortBy: 'createdAt', sortOrder: 'desc', role: 'admin' },
+        SYSTEM_ABILITY
+      );
+
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { name: 'admin' }
+      });
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('FROM user_roles ur'),
+        { roleFilterIds: ['role-admin'] }
+      );
+    });
+
+    it('a role name that no role has matches no user', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+
+      await service.findCursorPaginated(
+        { limit: 20, sortBy: 'createdAt', sortOrder: 'desc', role: 'ghost' },
+        SYSTEM_ABILITY
+      );
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('FROM user_roles ur'),
+        { roleFilterIds: [] }
+      );
     });
 
     it('should apply filters', async () => {
@@ -1216,8 +1268,7 @@ describe('UsersService', () => {
       await service.remove('user-1', { ability: SYSTEM_ABILITY });
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 'user-1' },
-        relations: { roles: true }
+        where: { id: 'user-1' }
       });
       expect(manager.softDelete).toHaveBeenCalledWith(User, live);
     });
@@ -1356,7 +1407,6 @@ describe('UsersService', () => {
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        relations: { roles: true },
         withDeleted: true
       });
       expect(mockRepository.restore).toHaveBeenCalledWith({

@@ -26,6 +26,12 @@ import { withChanges } from '@app/shared/utils/changed-fields';
 import { User } from '../entities/user.entity';
 import { addressTakenWhere, emailExistsConflict } from '../utils/email-taken';
 import { lockUserWithRoles } from '../utils/lock-user';
+import {
+  attachRoles,
+  findUserWithRoles,
+  findUserWithRolesOrFail
+} from '../utils/user-roles';
+import { Role } from '../../auth/entities/role.entity';
 import { userNotFound } from '../utils/user-not-found';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -190,9 +196,8 @@ export class UsersService {
     query: SearchUsersCursorQueryDto,
     ability: AbilityOrSystem
   ): Promise<CursorPaginatedResponseDto<User>> {
-    const qb = this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.roles', 'role');
+    const { manager } = this.userRepository;
+    const qb = this.userRepository.createQueryBuilder('user');
 
     if (query.includeDeleted) {
       qb.withDeleted();
@@ -203,18 +208,27 @@ export class UsersService {
     }
 
     if (query.role) {
-      // Separate inner join (not AndSelect) so the filter narrows the user set
-      // without trimming the roles loaded for display via leftJoinAndSelect.
-      qb.innerJoin('user.roles', 'roleFilter', 'roleFilter.name = :role', {
-        role: query.role
+      // The role is a settings row: resolve its id first, then filter the
+      // membership rows. An unknown name matches no user.
+      const role = await manager.findOne(Role, {
+        where: { name: query.role }
       });
+
+      qb.andWhere(
+        'EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = user.id AND ur.role_id = ANY(CAST(:roleFilterIds AS uuid[])))',
+        { roleFilterIds: role ? [role.id] : [] }
+      );
     }
 
-    return applyList(
+    const page = await applyList(
       qb,
       { spec: USER_LIST_QUERY, columns: USER_LIST_COLUMNS },
       query
     );
+
+    await attachRoles(manager, page.data);
+
+    return page;
   }
 
   async findOne(
@@ -244,9 +258,8 @@ export class UsersService {
       throw new ApiError(ErrorKeys.USERS.NOT_FOUND, 'User id is required');
     }
 
-    const user = await this.userRepository.findOne({
-      where: { id },
-      relations: { roles: true }
+    const user = await findUserWithRoles(this.userRepository.manager, {
+      where: { id }
     });
 
     if (!user) throw userNotFound(id);
@@ -263,10 +276,7 @@ export class UsersService {
   async findById(id: string): Promise<User | null> {
     if (!id) return null;
 
-    return this.userRepository.findOne({
-      where: { id },
-      relations: { roles: true }
-    });
+    return findUserWithRoles(this.userRepository.manager, { where: { id } });
   }
 
   /** `findById` that also returns a soft-deleted account. */
@@ -277,10 +287,7 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: { email },
-      relations: { roles: true }
-    });
+    return findUserWithRoles(this.userRepository.manager, { where: { email } });
   }
 
   /**
@@ -444,9 +451,8 @@ export class UsersService {
           throw userNotFound(id);
         }
 
-        const written = await manager.findOneOrFail(User, {
-          where: { id: user.id },
-          relations: { roles: true }
+        const written = await findUserWithRolesOrFail(manager, {
+          where: { id: user.id }
         });
 
         await this.writeAudit(manager, audit, written);
@@ -506,10 +512,7 @@ export class UsersService {
         throw userNotFound(id);
       }
 
-      const written = await manager.findOneOrFail(User, {
-        where: { id },
-        relations: { roles: true }
-      });
+      const written = await findUserWithRolesOrFail(manager, { where: { id } });
 
       await this.writeAudit(manager, audit, written);
 
@@ -730,9 +733,8 @@ export class UsersService {
     id: string,
     { ability, actorId, audit }: UserWriteOptions
   ): Promise<User> {
-    const user = await this.userRepository.findOne({
+    const user = await findUserWithRoles(this.userRepository.manager, {
       where: { id },
-      relations: { roles: true },
       withDeleted: true
     });
 

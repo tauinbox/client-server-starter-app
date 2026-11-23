@@ -1940,13 +1940,16 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
   verification data (`isEmailVerified`, the token and `expiresAt`), the preferred `locale` for the
   email language with the default `en`, the account lockout data (`failedLoginAttempts` and
   `lockedUntil`), the password reset data (the token and `expiresAt`), and the soft delete column
-  (`deleted_at TIMESTAMPTZ NULL`). It has a ManyToMany relation to the roles through `user_roles`.
+  (`deleted_at TIMESTAMPTZ NULL`). Its roles are the `user_roles` rows, read in a second query and
+  not through a relation.
+- **user_roles** holds one row for each role that a user holds (`user_id`, `role_id`), with a
+  CASCADE delete from the user and from the role.
 - **oauth_accounts** links to a user with a CASCADE delete. It holds the provider, the unique
   provider_id and the timestamps. A user holds at most one row of each provider.
 - **refresh_tokens** links to a user with a CASCADE delete. It holds the token string as a SHA-256
   hash, the expiry and the revoked flag.
 - **roles** has a UUID primary key, a unique name, a description, an `isSystem` flag and an `isSuper`
-  flag. It has a ManyToMany relation to the users.
+  flag. Its holders are the `user_roles` rows.
 - **resources** has a UUID primary key, a unique name, a `displayName`, a description and an
   `isSystem` flag. The `is_orphaned` boolean is true when a person removed the controller. The
   permissions of an orphaned resource then give nothing, and a deny rule continues to apply until a
@@ -2078,11 +2081,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3431 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 1029 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 993 pass and 36 skip. CI then runs the Redis suites and the mail suite with Redis: 49 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3434 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 1035 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 999 pass and 36 skip. CI then runs the Redis suites and the mail suite with Redis: 49 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1869 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 369 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1531 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1532 tests pass |
 
 ## CI/CD
 

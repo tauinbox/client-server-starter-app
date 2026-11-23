@@ -1232,7 +1232,7 @@ that billing owns and pushes through `NotificationsService`.
 
 `services/` holds `UsersService`.
 
-`entities/` holds the `User` entity, with a ManyToMany relation to `Role` through `user_roles`.
+`entities/` holds the `User` entity and the `UserRole` entity (`user_roles`, one row for each role that a user holds). `User.roles` is not a relation: `utils/user-roles.ts` reads the membership rows, then the roles, in two queries with no join, because the roles are settings and the memberships are personal data.
 
 `dto/` holds `CreateUserDto`, `UpdateUserDto` and `UserResponseDto`. `UserResponseDto` is the public
 form, and its `roles` field is a `RoleResponse[]` array. `AdminUserResponseDto` extends
@@ -2096,7 +2096,7 @@ before the row that gave it, and pages then drop or repeat rows silently.
 
 | Table | Description |
 |-------|-------------|
-| `users` | UUID PK. `email` is unique. The functional unique index `UQ_users_email_lower` on `lower(email)` stops two accounts that differ only by case. The row holds the name and the bcrypt password, which is nullable for a user with OAuth only. It holds `isActive`, `isEmailVerified` and `locale`, the email language, with the default `en`. It holds `failedLoginAttempts` and `lockedUntil`. It holds the verification and reset token fields. `deleted_at TIMESTAMPTZ NULL` is the soft delete. The row has a ManyToMany relation to the roles through `user_roles` |
+| `users` | UUID PK. `email` is unique. The functional unique index `UQ_users_email_lower` on `lower(email)` stops two accounts that differ only by case. The row holds the name and the bcrypt password, which is nullable for a user with OAuth only. It holds `isActive`, `isEmailVerified` and `locale`, the email language, with the default `en`. It holds `failedLoginAttempts` and `lockedUntil`. It holds the verification and reset token fields. `deleted_at TIMESTAMPTZ NULL` is the soft delete. The roles of the row are the `user_roles` rows (`UserRole`), read in a second query, not through a relation |
 | `oauth_accounts` | UUID PK. `provider` and `provider_id` are unique together, and so are `user_id` and `provider`. The FK to `users` uses CASCADE and has an index |
 | `refresh_tokens` | UUID PK. `token` is a unique SHA-256 hash, and `@Exclude` keeps it off the wire. The FK to `users` uses CASCADE. The row also holds `expires_at` and `revoked` |
 | `roles` | UUID PK, unique `name`, description, `isSystem` flag, `isSuper` flag |

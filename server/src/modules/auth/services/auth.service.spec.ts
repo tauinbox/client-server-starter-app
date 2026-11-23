@@ -50,6 +50,15 @@ import { RegionService } from '../../core/region/region.service';
 import { isolatedConfig } from '../../../common/testing/isolated-config';
 import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import type { RegisterDto } from '../dtos/register.dto';
+import { addUserRole } from '../../users/utils/user-roles';
+
+jest.mock('../../users/utils/user-roles', () =>
+  jest
+    .requireActual<{
+      userRolesDouble: () => object;
+    }>('../../users/testing/user-roles.double')
+    .userRolesDouble()
+);
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -1002,6 +1011,11 @@ describe('AuthService', () => {
       const result = await service.register(registerDto);
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
+      const [roleManager, membership] =
+        jest.mocked(addUserRole).mock.lastCall ?? [];
+
+      expect(roleManager).toBe(mockManager);
+      expect(membership).toEqual({ userId: 'new-user-1', roleId: 'role-uuid' });
       // User should be saved with verification token fields included
       expect(mockManager.save).toHaveBeenCalledWith(
         expect.anything(), // User entity class

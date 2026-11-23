@@ -1,5 +1,6 @@
 import type { EntityManager } from 'typeorm';
 import { User } from '../entities/user.entity';
+import { findUserWithRoles } from './user-roles';
 
 /**
  * Reads the user row FOR UPDATE in the transaction of `manager`, then its
@@ -19,9 +20,5 @@ export async function lockUserWithRoles(
 
   if (!locked) return null;
 
-  return manager.findOne(User, {
-    where: { id },
-    relations: { roles: true },
-    withDeleted
-  });
+  return findUserWithRoles(manager, { where: { id }, withDeleted });
 }

@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { User } from '../../users/entities/user.entity';
+import { addUserRole } from '../../users/utils/user-roles';
 import { UserCreatedEvent } from '../../users/events/user-created.event';
 import {
   addressTakenWhere,
@@ -256,11 +257,7 @@ export class OAuthService {
           SYSTEM_ROLES.USER
         );
 
-        await manager
-          .createQueryBuilder()
-          .relation(User, 'roles')
-          .of(newUser.id)
-          .add(userRole.id);
+        await addUserRole(manager, { userId: newUser.id, roleId: userRole.id });
 
         return newUser.id;
       }

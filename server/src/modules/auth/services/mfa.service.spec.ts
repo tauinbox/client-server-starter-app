@@ -25,6 +25,14 @@ import { hashToken } from '../../../common/utils/hash-token';
 import { createMockConfigService } from '../../../common/testing/config-service.mock';
 import { createMockCache } from '../../../common/testing/cache.mock';
 
+jest.mock('../../users/utils/user-roles', () =>
+  jest
+    .requireActual<{
+      userRolesDouble: () => object;
+    }>('../../users/testing/user-roles.double')
+    .userRolesDouble()
+);
+
 // Under Jest one QR image costs about half a second of CPU, and a CPU-starved
 // full run timed a test that encoded one out at 5 s. No unit test encodes an
 // image: test/mfa-setup-qr-image.e2e-spec.ts reads a real one.
@@ -135,6 +143,10 @@ describe('MfaService', () => {
           provide: DataSource,
           useValue: {
             getRepository: () => repository,
+            manager: {
+              findOne: (_entity: unknown, options: unknown): unknown =>
+                repository.findOne(options)
+            },
             // The recovery path reads and writes under one lock, so its manager
             // resolves through the same repository mock the rest of the suite
             // asserts against.

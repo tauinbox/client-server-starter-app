@@ -27,7 +27,7 @@ import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { OAuthAccount } from '../src/modules/auth/entities/oauth-account.entity';
-import { User } from '../src/modules/users/entities/user.entity';
+import { findUserWithRoles } from '../src/modules/users/utils/user-roles';
 import type { OAuthUserProfile } from '../src/modules/auth/types/oauth-profile';
 import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
 
@@ -88,10 +88,7 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
           // `roles` hydrated exactly as the real service returns it.
           useValue: {
             findById: (id: string) =>
-              ds.getRepository(User).findOne({
-                where: { id },
-                relations: { roles: true }
-              })
+              findUserWithRoles(ds.manager, { where: { id } })
           }
         },
         {

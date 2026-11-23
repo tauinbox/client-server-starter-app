@@ -5,10 +5,22 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { PermissionService } from './permission.service';
 import { User } from '../../users/entities/user.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
+import { attachRoles } from '../../users/utils/user-roles';
+
+jest.mock('../../users/utils/user-roles', () =>
+  jest
+    .requireActual<{
+      userRolesDouble: () => object;
+    }>('../../users/testing/user-roles.double')
+    .userRolesDouble()
+);
 
 describe('PermissionService', () => {
   let service: PermissionService;
-  let mockUserRepository: { findOne: jest.Mock };
+  let mockUserRepository: {
+    findOne: jest.Mock;
+    manager: { findOne: (entity: unknown, options: unknown) => unknown };
+  };
   let mockCacheManager: {
     get: jest.Mock;
     set: jest.Mock;
@@ -46,8 +58,14 @@ describe('PermissionService', () => {
   };
 
   beforeEach(async () => {
+    const findOne = jest.fn();
+
     mockUserRepository = {
-      findOne: jest.fn()
+      findOne,
+      manager: {
+        findOne: (_entity: unknown, options: unknown): unknown =>
+          findOne(options)
+      }
     };
 
     mockCacheManager = {
@@ -130,6 +148,11 @@ describe('PermissionService', () => {
           conditions: null
         }
       ]);
+      expect(attachRoles).toHaveBeenCalledWith(
+        mockUserRepository.manager,
+        [mockUser],
+        { rolePermissions: { permission: { resource: true, action: true } } }
+      );
       expect(mockCacheManager.set).toHaveBeenCalledWith(
         'permissions:v2:user-1:v7',
         result,

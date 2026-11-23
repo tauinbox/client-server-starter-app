@@ -182,6 +182,7 @@ describe('Grant scope over the HTTP path', () => {
               createQueryBuilder: jest.fn(() => ({
                 select: jest.fn().mockReturnThis(),
                 innerJoin: jest.fn().mockReturnThis(),
+                where: jest.fn().mockReturnThis(),
                 getMany: jest.fn().mockResolvedValue([])
               }))
             }

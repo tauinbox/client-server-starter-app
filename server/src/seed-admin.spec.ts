@@ -2,10 +2,18 @@ import type { DataSource } from 'typeorm';
 import { lookupBreachedPassword } from './modules/auth/breached-password/pwned-range-lookup';
 import { seedAdmin } from './seed-admin';
 import { User } from './modules/users/entities/user.entity';
+import { addUserRole } from './modules/users/utils/user-roles';
 
 jest.mock('./modules/auth/breached-password/pwned-range-lookup', () => ({
   lookupBreachedPassword: jest.fn()
 }));
+jest.mock('./modules/users/utils/user-roles', () =>
+  jest
+    .requireActual<{
+      userRolesDouble: () => object;
+    }>('./modules/users/testing/user-roles.double')
+    .userRolesDouble()
+);
 
 const mockedLookup = jest.mocked(lookupBreachedPassword);
 
@@ -41,7 +49,9 @@ describe('seedAdmin', () => {
     userRepo = {
       findOne: jest.fn().mockResolvedValue(null),
       create: jest.fn((row: Partial<User>) => row),
-      save: jest.fn().mockResolvedValue(undefined)
+      save: jest.fn((row: Partial<User>) =>
+        Promise.resolve({ ...row, id: 'user-new' })
+      )
     };
     roleRepo = {
       findOne: jest.fn().mockResolvedValue({ id: 'role-1', name: 'admin' })
@@ -50,10 +60,25 @@ describe('seedAdmin', () => {
     getRepository = jest.fn((entity: unknown) =>
       entity === User ? userRepo : roleRepo
     );
-    // A partial stub on purpose: the seeder touches only getRepository, and a
-    // full DataSource would be noise with no coverage value.
-    // @ts-expect-error - partial DataSource stub, see the comment above
-    dataSource = { getRepository };
+    const manager = {
+      findOne: (_entity: unknown, options: unknown): unknown =>
+        userRepo.findOne(options),
+      create: (_entity: unknown, row: Partial<User>): unknown =>
+        userRepo.create(row),
+      save: (row: Partial<User>): unknown => userRepo.save(row)
+    };
+
+    // A partial stub on purpose: the seeder touches only getRepository, the
+    // manager and a transaction, and a full DataSource would be noise with no
+    // coverage value.
+    dataSource = {
+      getRepository,
+      // @ts-expect-error - partial EntityManager stub, see the comment above
+      manager,
+      // @ts-expect-error - partial EntityManager stub, see the comment above
+      transaction: (run: (m: typeof manager) => Promise<unknown>) =>
+        run(manager)
+    };
 
     mockedLookup.mockResolvedValue('clean');
 
@@ -74,7 +99,23 @@ describe('seedAdmin', () => {
     await seedAdmin(dataSource);
 
     expect(userRepo.save).toHaveBeenCalledTimes(1);
+    expect(addUserRole).toHaveBeenCalledWith(expect.anything(), {
+      userId: 'user-new',
+      roleId: 'role-1'
+    });
     expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  it('adds the admin role to an existing user that lacks it', async () => {
+    userRepo.findOne.mockResolvedValue({ id: 'user-1', roles: [] });
+
+    await seedAdmin(dataSource);
+
+    expect(addUserRole).toHaveBeenCalledWith(expect.anything(), {
+      userId: 'user-1',
+      roleId: 'role-1'
+    });
+    expect(userRepo.save).not.toHaveBeenCalled();
   });
 
   it('warns and still creates the admin when the password is breached', async () => {

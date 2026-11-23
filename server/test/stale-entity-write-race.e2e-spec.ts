@@ -33,6 +33,7 @@ import {
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { User } from '../src/modules/users/entities/user.entity';
+import { findUserWithRolesOrFail } from '../src/modules/users/utils/user-roles';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
@@ -493,9 +494,8 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       expect(await assign).toBe(
         `403 ${ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS}`
       );
-      const after = await dataSource.getRepository(User).findOneOrFail({
-        where: { id: user.id },
-        relations: { roles: true }
+      const after = await findUserWithRolesOrFail(dataSource.manager, {
+        where: { id: user.id }
       });
 
       expect(after.roles.map((r) => r.id)).not.toContain(role.id);

@@ -31,27 +31,33 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 const DAY_MS = 86_400_000;
 
 /**
- * Makes the next call of `method` resolve its real result only after
- * `release()`. `reached` resolves when the real query has returned.
+ * Makes the next call of `method` whose arguments pass `when` resolve its real
+ * result only after `release()`. `reached` resolves when the real query has
+ * returned.
  */
 function holdNextCall<T extends object>(
   target: T,
-  method: keyof T & string
+  method: keyof T & string,
+  when: (...args: unknown[]) => boolean = () => true
 ): { reached: Promise<void>; release: () => void; restore: () => void } {
   const { promise: reached, resolve: onReached } =
     Promise.withResolvers<void>();
   const { promise: gate, resolve: release } = Promise.withResolvers<void>();
   const original = target[method] as (...args: unknown[]) => Promise<unknown>;
-  const spy = jest
-    .spyOn(target, method as never)
-    .mockImplementationOnce((async (...args: unknown[]) => {
-      const result = await original.apply(target, args);
+  let armed = true;
+  const spy = jest.spyOn(target, method as never).mockImplementation((async (
+    ...args: unknown[]
+  ) => {
+    const result = await original.apply(target, args);
 
-      onReached();
-      await gate;
+    if (!armed || !when(...args)) return result;
 
-      return result;
-    }) as never);
+    armed = false;
+    onReached();
+    await gate;
+
+    return result;
+  }) as never);
 
   return { reached, release, restore: () => spy.mockRestore() };
 }
@@ -167,9 +173,13 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
   it('keeps a revoked permission out of the cache', async () => {
     const role = await grantDeleteRole();
-    const users = app.get<Repository<User>>(getRepositoryToken(User));
 
-    held = holdNextCall(users, 'findOne');
+    // The roles and their grants are the last read of the user's permissions.
+    held = holdNextCall(
+      dataSource.manager,
+      'find',
+      (entity) => entity === Role
+    );
 
     const reader = permissionService.getPermissionsForUser(holder.id);
 
@@ -191,9 +201,12 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
   it('keeps a removed role out of the cache', async () => {
     const role = await grantDeleteRole();
-    const users = app.get<Repository<User>>(getRepositoryToken(User));
 
-    held = holdNextCall(users, 'findOne');
+    held = holdNextCall(
+      dataSource.manager,
+      'find',
+      (entity) => entity === Role
+    );
 
     const reader = permissionService.getRolesForUser(holder.id);
 
