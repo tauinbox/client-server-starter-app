@@ -3,15 +3,13 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
-  JoinTable,
-  ManyToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
 import { Exclude, Expose } from 'class-transformer';
 import { DEFAULT_LOCALE, type CountryCode } from '@app/shared/constants';
 import { bigintNumberTransformer } from '../../../common/utils/bigint-number.transformer';
-import { Role } from '../../auth/entities/role.entity';
+import type { Role } from '../../auth/entities/role.entity';
 
 @Entity('users')
 export class User {
@@ -36,12 +34,11 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
-  @ManyToMany(() => Role, (role) => role.users)
-  @JoinTable({
-    name: 'user_roles',
-    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' }
-  })
+  /**
+   * Not a relation: the roles are settings rows, read in a second query from
+   * the `user_roles` rows (`attachRoles` in `users/utils/user-roles.ts`). It is
+   * set only on a user that a caller loaded with its roles.
+   */
   roles: Role[];
 
   @Column({ name: 'failed_login_attempts', default: 0 })

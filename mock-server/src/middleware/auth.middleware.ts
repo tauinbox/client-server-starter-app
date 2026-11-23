@@ -929,7 +929,7 @@ router.get('/permissions', authGuard, (req, res) => {
   const rules = getPackedRulesForUser(user);
 
   res.json({
-    roles: user.roles,
+    roles: user.roles.toSorted(),
     rules,
     mfaMandatory: isMfaMandatoryFor(user)
   });

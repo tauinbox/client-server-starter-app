@@ -1940,13 +1940,16 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
   verification data (`isEmailVerified`, the token and `expiresAt`), the preferred `locale` for the
   email language with the default `en`, the account lockout data (`failedLoginAttempts` and
   `lockedUntil`), the password reset data (the token and `expiresAt`), and the soft delete column
-  (`deleted_at TIMESTAMPTZ NULL`). It has a ManyToMany relation to the roles through `user_roles`.
+  (`deleted_at TIMESTAMPTZ NULL`). Its roles are the `user_roles` rows, read in a second query and
+  not through a relation.
+- **user_roles** holds one row for each role that a user holds (`user_id`, `role_id`), with a
+  CASCADE delete from the user and from the role.
 - **oauth_accounts** links to a user with a CASCADE delete. It holds the provider, the unique
   provider_id and the timestamps. A user holds at most one row of each provider.
 - **refresh_tokens** links to a user with a CASCADE delete. It holds the token string as a SHA-256
   hash, the expiry and the revoked flag.
 - **roles** has a UUID primary key, a unique name, a description, an `isSystem` flag and an `isSuper`
-  flag. It has a ManyToMany relation to the users.
+  flag. Its holders are the `user_roles` rows.
 - **resources** has a UUID primary key, a unique name, a `displayName`, a description and an
   `isSystem` flag. The `is_orphaned` boolean is true when a person removed the controller. The
   permissions of an orphaned resource then give nothing, and a deny rule continues to apply until a

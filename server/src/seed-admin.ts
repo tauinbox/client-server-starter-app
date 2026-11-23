@@ -4,6 +4,10 @@ import { hashPassword } from './common/utils/password-hash';
 import { lookupBreachedPassword } from './modules/auth/breached-password/pwned-range-lookup';
 import { User } from './modules/users/entities/user.entity';
 import { Role } from './modules/auth/entities/role.entity';
+import {
+  addUserRole,
+  findUserWithRoles
+} from './modules/users/utils/user-roles';
 
 /**
  * A boot step of `run-boot-steps.ts`. The container entrypoint runs that file
@@ -21,12 +25,10 @@ export async function seedAdmin(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  const userRepo = dataSource.getRepository(User);
   const roleRepo = dataSource.getRepository(Role);
 
-  const existing = await userRepo.findOne({
-    where: { email },
-    relations: { roles: true }
+  const existing = await findUserWithRoles(dataSource.manager, {
+    where: { email }
   });
 
   if (existing) {
@@ -41,8 +43,10 @@ export async function seedAdmin(dataSource: DataSource): Promise<void> {
     const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
 
     if (adminRole) {
-      existing.roles = [...existing.roles, adminRole];
-      await userRepo.save(existing);
+      await addUserRole(dataSource.manager, {
+        userId: existing.id,
+        roleId: adminRole.id
+      });
       console.log(`Admin role assigned to existing user ${email}`);
     }
 
@@ -84,16 +88,20 @@ export async function seedAdmin(dataSource: DataSource): Promise<void> {
   }
 
   const { hash, version } = await hashPassword(password);
-  const admin = userRepo.create({
-    email,
-    password: hash,
-    passwordHashVersion: version,
-    name,
-    isActive: true,
-    isEmailVerified: true,
-    roles: [adminRole]
-  });
 
-  await userRepo.save(admin);
+  await dataSource.transaction(async (manager) => {
+    const admin = await manager.save(
+      manager.create(User, {
+        email,
+        password: hash,
+        passwordHashVersion: version,
+        name,
+        isActive: true,
+        isEmailVerified: true
+      })
+    );
+
+    await addUserRole(manager, { userId: admin.id, roleId: adminRole.id });
+  });
   console.log(`Admin user ${email} created with admin role`);
 }

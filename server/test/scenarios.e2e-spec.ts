@@ -59,6 +59,7 @@ import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
+import { addUserRole } from '../src/modules/users/utils/user-roles';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { RolePermission } from '../src/modules/auth/entities/role-permission.entity';
@@ -457,6 +458,14 @@ runWithInfra('Request scenarios (e2e)', () => {
     ACTORS[fixture](draft);
     const user = await users.save(users.create(draft));
 
+    // `roles` is not a relation: a save writes no membership row.
+    for (const role of draft.roles ?? []) {
+      await addUserRole(dataSource.manager, {
+        userId: user.id,
+        roleId: role.id
+      });
+    }
+
     if (fixture === 'oauth-only') {
       await dataSource.getRepository(OAuthAccount).save({
         userId: user.id,
@@ -654,11 +663,10 @@ runWithInfra('Request scenarios (e2e)', () => {
       });
     },
     'target-role': async (ctx) => {
-      await dataSource
-        .createQueryBuilder()
-        .relation(User, 'roles')
-        .of(ctx.target!.user.id)
-        .add(ctx.values.$roleId!);
+      await addUserRole(dataSource.manager, {
+        userId: ctx.target!.user.id,
+        roleId: ctx.values.$roleId!
+      });
     },
     resource: async (ctx) => {
       sequence += 1;

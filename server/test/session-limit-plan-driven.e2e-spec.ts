@@ -126,7 +126,6 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
         isSystem: true,
         isSuper: false,
         rolePermissions: [],
-        users: [],
         createdAt: new Date(),
         updatedAt: new Date()
       }

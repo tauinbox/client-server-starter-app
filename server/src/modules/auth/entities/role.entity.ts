@@ -2,14 +2,12 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  ManyToMany,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
 import { Expose } from 'class-transformer';
 import { RolePermission } from './role-permission.entity';
-import { User } from '../../users/entities/user.entity';
 
 @Entity('roles')
 export class Role {
@@ -32,9 +30,6 @@ export class Role {
 
   @OneToMany(() => RolePermission, (rp) => rp.role)
   rolePermissions: RolePermission[];
-
-  @ManyToMany(() => User, (user) => user.roles)
-  users: User[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz', precision: 3 })
   createdAt: Date;

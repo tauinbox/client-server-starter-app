@@ -516,7 +516,8 @@ export function toUserResponse(user: MockUser): UserResponse {
     roles: roleNames,
     ...rest
   } = user;
-  const roles = roleNames.flatMap((name) => {
+  // Sorted by name as the server sorts them (attachRoles).
+  const roles = roleNames.toSorted().flatMap((name) => {
     const role = state.roles.values().find((r) => r.name === name);
 
     return role ? [toRolePublicResponse(role)] : [];
@@ -545,7 +546,8 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
     roles: roleNames,
     ...rest
   } = user;
-  const roles = roleNames.flatMap((name) => {
+  // Sorted by name as the server sorts them (attachRoles).
+  const roles = roleNames.toSorted().flatMap((name) => {
     const role = state.roles.values().find((r) => r.name === name);
 
     return role ? [toRoleAdminResponse(role)] : [];

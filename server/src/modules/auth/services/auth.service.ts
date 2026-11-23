@@ -8,6 +8,7 @@ import { DataSource, IsNull } from 'typeorm';
 import { UsersService } from '../../users/services/users.service';
 import { RegisterDto } from '../dtos/register.dto';
 import { User } from '../../users/entities/user.entity';
+import { addUserRole } from '../../users/utils/user-roles';
 import { UserCreatedEvent } from '../../users/events/user-created.event';
 import { UserUpdatedEvent } from '../../users/events/user-updated.event';
 import {
@@ -398,11 +399,7 @@ export class AuthService {
           SYSTEM_ROLES.USER
         );
 
-        await manager
-          .createQueryBuilder()
-          .relation(User, 'roles')
-          .of(newUser.id)
-          .add(userRole.id);
+        await addUserRole(manager, { userId: newUser.id, roleId: userRole.id });
 
         return newUser;
       });

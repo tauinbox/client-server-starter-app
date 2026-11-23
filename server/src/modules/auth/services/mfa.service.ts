@@ -34,6 +34,7 @@ import { normalizeOtpCode } from '@app/shared/utils/otp-code';
 import { signedTokenAccount } from '@app/shared/utils/token-revocation';
 import { User } from '../../users/entities/user.entity';
 import { lockUserWithRoles } from '../../users/utils/lock-user';
+import { findUserWithRoles } from '../../users/utils/user-roles';
 import { userNotFound } from '../../users/utils/user-not-found';
 import { AuditContext, AuditService } from '../../audit/audit.service';
 import { MailService } from '../../mail/mail.service';
@@ -605,9 +606,8 @@ export class MfaService {
         : undefined;
     const refused = { userId: sub, provider, context };
 
-    const found = await this.dataSource.getRepository(User).findOne({
-      where: { id: sub },
-      relations: { roles: true }
+    const found = await findUserWithRoles(this.dataSource.manager, {
+      where: { id: sub }
     });
 
     // Anything that ended the account's sessions since the password check
