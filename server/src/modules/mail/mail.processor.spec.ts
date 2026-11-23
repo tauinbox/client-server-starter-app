@@ -1,10 +1,14 @@
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
+import { DelayedError, Job } from 'bullmq';
 import { MailProcessor } from './mail.processor';
 import { MailService } from './mail.service';
-import { MAIL_QUEUE, MailJobData } from './mail-queue.constants';
+import {
+  MAIL_JOB_FORMAT,
+  MAIL_QUEUE,
+  MailJobData
+} from './mail-queue.constants';
 import {
   MAIL_QUEUE_REF,
   type MailQueueRef
@@ -50,6 +54,7 @@ describe('MailProcessor', () => {
     const { processor, deliver } = await createProcessor();
 
     const data: MailJobData = {
+      format: MAIL_JOB_FORMAT,
       to: 'user@example.com',
       subject: 'Hi',
       html: '<p>hello</p>'
@@ -62,13 +67,41 @@ describe('MailProcessor', () => {
     expect(deliver).toHaveBeenCalledWith(data);
   });
 
+  // During a rolling deploy a node of the old build takes the jobs of the new one.
+  it('gives back a job of a newer format and does not deliver it', async () => {
+    const { processor, deliver } = await createProcessor();
+    const moveToDelayed = jest.fn().mockResolvedValue(undefined);
+
+    // @ts-expect-error minimal Job stub: process() reads `data` and defers
+    const job: Job<MailJobData> = {
+      data: {
+        format: MAIL_JOB_FORMAT + 1,
+        to: 'user@example.com',
+        subject: 'Hi',
+        html: '<p>x</p>'
+      },
+      moveToDelayed
+    };
+
+    await expect(processor.process(job, 'lock-1')).rejects.toBeInstanceOf(
+      DelayedError
+    );
+    expect(moveToDelayed).toHaveBeenCalledWith(expect.any(Number), 'lock-1');
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
   it('propagates delivery errors so BullMQ can retry', async () => {
     const deliver = jest.fn().mockRejectedValue(new Error('smtp down'));
     const { processor } = await createProcessor(deliver);
 
     // @ts-expect-error minimal Job stub — process() only reads `data`
     const job: Job<MailJobData> = {
-      data: { to: 'user@example.com', subject: 'Hi', html: '<p>x</p>' }
+      data: {
+        format: MAIL_JOB_FORMAT,
+        to: 'user@example.com',
+        subject: 'Hi',
+        html: '<p>x</p>'
+      }
     };
 
     await expect(processor.process(job)).rejects.toThrow('smtp down');
@@ -104,7 +137,12 @@ describe('MailProcessor', () => {
     const job: Job<MailJobData> = {
       id: '1',
       attemptsMade: 3,
-      data: { to: 'user@example.com', subject: 'Hi', html: '<p>x</p>' }
+      data: {
+        format: MAIL_JOB_FORMAT,
+        to: 'user@example.com',
+        subject: 'Hi',
+        html: '<p>x</p>'
+      }
     };
 
     processor.onFailed(job, new Error('smtp down'));
@@ -122,7 +160,12 @@ describe('MailProcessor', () => {
     const job: Job<MailJobData> = {
       id: 'j1',
       attemptsMade: 1,
-      data: { to: 'alice.private@example.com', subject: 'Hi', html: '<p>x</p>' }
+      data: {
+        format: MAIL_JOB_FORMAT,
+        to: 'alice.private@example.com',
+        subject: 'Hi',
+        html: '<p>x</p>'
+      }
     };
 
     processor.onFailed(job, new Error('smtp down'));

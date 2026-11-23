@@ -4,7 +4,9 @@ import { LessThan, Repository } from 'typeorm';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import type { NormalizedEvent } from '../providers/payment-provider.interface';
 import { WebhookIngestionService } from './webhook-ingestion.service';
+import { formatOf } from '../../../common/utils/job-format';
 import {
+  BILLING_WEBHOOK_JOB_FORMAT,
   WEBHOOK_MAX_REPLAY_ATTEMPTS,
   WEBHOOK_RECEIVED_STUCK_THRESHOLD_MS
 } from './billing-webhook-queue.constants';
@@ -56,6 +58,15 @@ export class WebhookReconciliationService {
         // without the provider; leave them for manual handling.
         this.logger.error(
           `Cannot replay webhook ${row.id} (${row.provider} ${row.providerEventId}): no stored payload`
+        );
+        continue;
+      }
+
+      if (formatOf(row.payload) > BILLING_WEBHOOK_JOB_FORMAT) {
+        // A newer build stored this row. A failure count here could move it
+        // to `dead_letter`, so the row waits for a node of that build.
+        this.logger.debug(
+          `Webhook ${row.id} has a payload format of a newer build; not replayed`
         );
         continue;
       }

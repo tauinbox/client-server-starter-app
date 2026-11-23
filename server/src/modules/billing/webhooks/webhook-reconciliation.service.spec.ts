@@ -4,6 +4,7 @@ import { WebhookEvent } from '../entities/webhook-event.entity';
 import { WebhookReconciliationService } from './webhook-reconciliation.service';
 import { WebhookIngestionService } from './webhook-ingestion.service';
 import {
+  BILLING_WEBHOOK_JOB_FORMAT,
   WEBHOOK_MAX_REPLAY_ATTEMPTS,
   WEBHOOK_RECEIVED_STUCK_THRESHOLD_MS
 } from './billing-webhook-queue.constants';
@@ -95,6 +96,44 @@ describe('WebhookReconciliationService', () => {
     await service.sweep();
 
     expect(processEvent).not.toHaveBeenCalled();
+  });
+
+  // A node of the old build must not count failures on a row it cannot read:
+  // enough of them would move the row to `dead_letter`.
+  it('leaves a row of a newer payload format for a newer build', async () => {
+    find.mockResolvedValue([
+      row({
+        payload: {
+          type: 'invoice.paid',
+          providerEventId: 'evt_1',
+          format: BILLING_WEBHOOK_JOB_FORMAT + 1
+        }
+      })
+    ]);
+
+    await service.sweep();
+
+    expect(processEvent).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('replays a row of the known payload format', async () => {
+    const known = row({
+      payload: {
+        type: 'invoice.paid',
+        providerEventId: 'evt_1',
+        format: BILLING_WEBHOOK_JOB_FORMAT
+      }
+    });
+
+    find.mockResolvedValue([known]);
+
+    await service.sweep();
+
+    expect(processEvent).toHaveBeenCalledWith({
+      webhookEventId: 'wh-1',
+      event: known.payload
+    });
   });
 
   it('continues replaying after one row fails', async () => {

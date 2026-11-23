@@ -70,11 +70,19 @@ export const WEBHOOK_RECEIVED_STUCK_THRESHOLD_MS = 10 * 60 * 1000;
 export const WEBHOOK_MAX_REPLAY_ATTEMPTS = 5;
 
 /**
+ * The format of `BillingWebhookJobData` and of the stored ledger `payload` that
+ * this build writes and reads. A change of either shape increases it, and keeps
+ * the reader of the old format for one release.
+ */
+export const BILLING_WEBHOOK_JOB_FORMAT = 1;
+
+/**
  * Enqueued after a webhook is verified and its idempotency row is inserted.
  * Carries the persisted ledger row id (to mark it processed) and the
  * provider-agnostic event the reducer applies to Subscription/Invoice.
  */
 export interface BillingWebhookJobData {
+  format: number;
   webhookEventId: string;
   event: NormalizedEvent;
 }

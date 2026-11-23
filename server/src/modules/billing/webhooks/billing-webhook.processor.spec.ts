@@ -1,10 +1,11 @@
 import { Logger } from '@nestjs/common';
-import { Job, Queue } from 'bullmq';
+import { DelayedError, Job, Queue } from 'bullmq';
 import { BillingWebhookProcessor } from './billing-webhook.processor';
 import { WebhookIngestionService } from './webhook-ingestion.service';
 import { WebhookReconciliationService } from './webhook-reconciliation.service';
 import { WebhookRetentionService } from './webhook-retention.service';
 import {
+  BILLING_WEBHOOK_JOB_FORMAT,
   BILLING_WEBHOOK_RECONCILE_JOB,
   BILLING_WEBHOOK_RECONCILE_SCHEDULER_ID,
   BILLING_WEBHOOK_REDUCE_JOB,
@@ -67,6 +68,22 @@ describe('BillingWebhookProcessor', () => {
 
     expect(processEvent).toHaveBeenCalledWith(data);
     expect(sweep).not.toHaveBeenCalled();
+  });
+
+  it('gives back a reduce job of a newer format and does not reduce it', async () => {
+    const moveToDelayed = jest.fn().mockResolvedValue(undefined);
+    const job = makeJob(BILLING_WEBHOOK_REDUCE_JOB, {
+      webhookEventId: 'wh-1',
+      format: BILLING_WEBHOOK_JOB_FORMAT + 1
+    });
+
+    job.moveToDelayed = moveToDelayed;
+
+    await expect(processor.process(job, 'lock-1')).rejects.toBeInstanceOf(
+      DelayedError
+    );
+    expect(moveToDelayed).toHaveBeenCalledWith(expect.any(Number), 'lock-1');
+    expect(processEvent).not.toHaveBeenCalled();
   });
 
   it('runs the reconciliation sweep for the reconcile job', async () => {

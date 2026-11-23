@@ -4,7 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { getQueueToken } from '@nestjs/bullmq';
 import * as nodemailer from 'nodemailer';
 import { MailService } from './mail.service';
-import { MAIL_QUEUE, MAIL_SEND_JOB, MailJobData } from './mail-queue.constants';
+import {
+  MAIL_JOB_FORMAT,
+  MAIL_QUEUE,
+  MAIL_SEND_JOB,
+  MailJobData
+} from './mail-queue.constants';
 
 describe('MailService', () => {
   let service: MailService;
@@ -343,6 +348,7 @@ describe('MailService', () => {
       const [jobName, data] = add.mock.calls[0] as [string, MailJobData];
 
       expect(jobName).toBe(MAIL_SEND_JOB);
+      expect(data.format).toBe(MAIL_JOB_FORMAT);
       expect(data.to).toBe('user@example.com');
       expect(data.subject).toBe('Verify your email address');
       expect(data.html).toContain('tok-123');

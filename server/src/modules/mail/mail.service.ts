@@ -5,7 +5,12 @@ import { Queue } from 'bullmq';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 import * as Handlebars from 'handlebars';
-import { MAIL_QUEUE, MAIL_SEND_JOB, MailJobData } from './mail-queue.constants';
+import {
+  MAIL_JOB_FORMAT,
+  MAIL_QUEUE,
+  MAIL_SEND_JOB,
+  MailJobData
+} from './mail-queue.constants';
 import { DEFAULT_LOCALE, normalizeLocale } from '@app/shared/constants';
 import type { SupportedLocale } from '@app/shared/constants';
 import type { UserNotificationContent } from '@app/shared/types';
@@ -345,6 +350,7 @@ export class MailService {
     }
 
     const data: MailJobData = {
+      format: MAIL_JOB_FORMAT,
       to,
       subject: message.subject,
       html: this.renderHtml(message, locale)
