@@ -18,6 +18,7 @@ import { RedisNotificationsBus } from '../src/modules/notifications/redis-notifi
 import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { waitUntil } from './eventually';
+import { stopSettingsPoll } from './settings-poll';
 
 const { REDIS_URL } = process.env;
 
@@ -47,6 +48,15 @@ runWithRedis('server pushes across instances (e2e)', () => {
   let searchUser: Permission;
   const requests: { destroy: () => void }[] = [];
   const SENTINEL = { type: 'entitlements_updated' } as const;
+  // The instances share the settings change log with every suite of the
+  // Redis run: an apply of a write of another suite pushes these on their own.
+  const SETTINGS_PUSHES: ReadonlySet<string> = new Set([
+    'feature_flags_updated',
+    'user_list_stale',
+    'permissions_updated'
+  ]);
+  const ownEvents = (events: NotificationEvent[]) =>
+    events.filter(({ type }) => !SETTINGS_PUSHES.has(type));
   /** For each stream of the test: true once its body holds the sentinel. */
   const sentinels: (() => boolean)[] = [];
 
@@ -68,6 +78,7 @@ runWithRedis('server pushes across instances (e2e)', () => {
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.listen(0);
+    stopSettingsPoll(app);
 
     return app;
   };
@@ -231,7 +242,8 @@ runWithRedis('server pushes across instances (e2e)', () => {
     );
 
     const direct = { type: 'session_invalidated' } as const;
-    const broadcast = { type: 'feature_flags_updated' } as const;
+    // A type that no apply of the settings change log sends.
+    const broadcast = { type: 'notification_created' } as const;
     const authorized = {
       type: 'user_crud_events',
       action: 'created',
@@ -247,10 +259,10 @@ runWithRedis('server pushes across instances (e2e)', () => {
     );
 
     await settle();
-    expect(viewerOnSecond()).toEqual([broadcast, authorized]);
-    expect(plainOnSecond()).toEqual([direct, broadcast]);
+    expect(ownEvents(viewerOnSecond())).toEqual([broadcast, authorized]);
+    expect(ownEvents(plainOnSecond())).toEqual([direct, broadcast]);
     // The sending instance delivers once, not again from its own message.
-    expect(viewerOnFirst()).toEqual([broadcast, authorized]);
+    expect(ownEvents(viewerOnFirst())).toEqual([broadcast, authorized]);
   });
 
   it('sends a role permission change to the connected holders only, in one message', async () => {
@@ -282,9 +294,11 @@ runWithRedis('server pushes across instances (e2e)', () => {
         });
 
       await settle();
-      expect(viewerOnSecond()).toEqual([{ type: 'permissions_updated' }]);
+      expect(viewerOnSecond()).toContainEqual({ type: 'permissions_updated' });
+      // One message names the holder, and only the holder. A broadcast of an
+      // apply of another suite names nobody, so it is not counted here.
       expect(
-        messages.filter(({ event }) => event.type !== SENTINEL.type)
+        messages.filter(({ userIds }) => userIds?.includes(viewer.id))
       ).toEqual([
         expect.objectContaining({
           userIds: [viewer.id],

@@ -24,6 +24,7 @@ import { UsersService } from '../src/modules/users/services/users.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { SSE_HEARTBEAT_INTERVAL_MS } from '../src/modules/notifications/notifications.constants';
 import { eventually } from './eventually';
+import { stopSettingsPoll } from './settings-poll';
 
 // The stream is authenticated once, when it opens. Each test ends the session
 // of an open stream on a real path and reads the real response until the
@@ -65,6 +66,9 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.listen(0);
+    // The poll would apply the settings writes of parallel suites, and their
+    // broadcasts would reach the streams that these tests read frame by frame.
+    stopSettingsPoll(app);
     port = ((app.getHttpServer() as Server).address() as AddressInfo).port;
 
     dataSource = app.get(DataSource);
@@ -257,10 +261,13 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
     );
 
     await expectInvalidatedAndEnded(stream);
+    // The role create above pushes the flag broadcast 500 ms after its apply
+    // (FLAGS_BROADCAST_COALESCE_MS); it is not a push of the session end.
     const frames = stream
       .body()
       .split('\n')
-      .filter((line) => line.startsWith('data: {'));
+      .filter((line) => line.startsWith('data: {'))
+      .filter((line) => !line.includes('"feature_flags_updated"'));
 
     expect(frames).toEqual([
       `data: ${JSON.stringify({ type: 'session_invalidated' })}`
