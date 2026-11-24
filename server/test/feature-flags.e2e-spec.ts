@@ -70,12 +70,18 @@ function settingsChangeLogOfFlags() {
     provide: SettingsChangeLogService,
     inject: [FeatureFlagChangedListener],
     useFactory: (listener: FeatureFlagChangedListener) => ({
-      applyPending: () =>
-        listener.handleSettingsChanged(
-          settingsChangedEvent({ tables: ['feature_flags'] })
-        )
+      applyPending: () => listener.handleSettingsChanged(flagsChanged())
     })
   };
+}
+
+/** A change of the flag rows; the apply manager runs only the orphan delete. */
+function flagsChanged() {
+  return settingsChangedEvent(
+    { tables: ['feature_flags'] },
+    // @ts-expect-error - partial manager: the listener calls only `query`
+    { manager: { query: () => Promise.resolve([]) } }
+  );
 }
 
 /** The If-Match condition of one strong version tag. */
@@ -263,7 +269,10 @@ function makeRuleRepoMock(stores: Stores) {
 
         return Promise.resolve(list);
       }
-    )
+    ),
+    // No member rows: the payload keeps the ids of a user rule, and the read
+    // keeps them. The rows are covered in feature-flag-rule-users.e2e-spec.ts.
+    manager: { find: () => Promise.resolve([]) }
   };
 }
 
@@ -274,8 +283,14 @@ function makeDataSourceMock(
   flagRepo: ReturnType<typeof makeFlagRepoMock>
 ): DataSource {
   const em = {
-    // The settings log lock.
-    query: (): Promise<never[]> => Promise.resolve([]),
+    // The settings log lock, and the member insert of a user rule: every id
+    // is a user in this stand-in.
+    query: (sql: string, params?: unknown[]): Promise<unknown[]> =>
+      Promise.resolve(
+        sql.includes('feature_flag_rule_users')
+          ? (params?.[1] as string[]).map((id) => ({ user_id: id }))
+          : []
+      ),
     delete(
       _entity: unknown,
       where: { flagId: string }
@@ -584,9 +599,7 @@ describe('Feature flags end-to-end', () => {
 
     expect(cache.store.has(flagsKey())).toBe(true);
 
-    await listener.handleSettingsChanged(
-      settingsChangedEvent({ tables: ['feature_flags'] })
-    );
+    await listener.handleSettingsChanged(flagsChanged());
 
     expect(cache.store.has(flagsKey())).toBe(false);
     // The broadcast is coalesced: nothing is pushed until the window elapses.
