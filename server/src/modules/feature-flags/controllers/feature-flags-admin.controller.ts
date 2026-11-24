@@ -28,7 +28,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ErrorKeys } from '@app/shared/constants';
 import {
   parseIfMatch,
@@ -52,7 +51,6 @@ import { UpdateFeatureFlagDto } from '../dtos/update-feature-flag.dto';
 import { FeatureFlagResponseDto } from '../dtos/feature-flag-response.dto';
 import { PreviewFlagContextDto } from '../dtos/preview-flag-context.dto';
 import { PreviewFlagResponseDto } from '../dtos/preview-flag-response.dto';
-import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
 import type { FeatureFlagAttributeKeysResponse } from '@app/shared/types';
 
 @ApiTags('Feature Flags Admin API')
@@ -69,10 +67,7 @@ import type { FeatureFlagAttributeKeysResponse } from '@app/shared/types';
   conditionalActions: ['create', 'read', 'update', 'delete', 'search']
 })
 export class FeatureFlagsAdminController {
-  constructor(
-    private readonly flagService: FeatureFlagService,
-    private readonly eventEmitter: EventEmitter2
-  ) {}
+  constructor(private readonly flagService: FeatureFlagService) {}
 
   @Get('cursor')
   @Authorize(['search', 'FeatureFlag'])
@@ -137,10 +132,6 @@ export class FeatureFlagsAdminController {
       this.auditActor(req)
     );
 
-    this.eventEmitter.emit(
-      FeatureFlagChangedEvent.name,
-      new FeatureFlagChangedEvent()
-    );
     res.setHeader('ETag', versionEtag(flag.version));
 
     return flag;
@@ -174,10 +165,6 @@ export class FeatureFlagsAdminController {
       actor: this.auditActor(req)
     });
 
-    this.eventEmitter.emit(
-      FeatureFlagChangedEvent.name,
-      new FeatureFlagChangedEvent()
-    );
     res.setHeader('ETag', versionEtag(flag.version));
 
     return flag;
@@ -196,10 +183,6 @@ export class FeatureFlagsAdminController {
     @CurrentAbility() ability: AppAbility
   ) {
     await this.flagService.delete(id, ability, this.auditActor(req));
-    this.eventEmitter.emit(
-      FeatureFlagChangedEvent.name,
-      new FeatureFlagChangedEvent()
-    );
   }
 
   @Post(':id/preview')

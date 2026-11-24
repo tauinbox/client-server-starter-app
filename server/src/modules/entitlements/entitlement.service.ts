@@ -24,16 +24,26 @@ import type {
 
 const USER_VERSION_KEY = 'entitlements:user-version';
 const USER_VERSION_COUNTER_KEY = 'entitlements:user-version:counter';
+// A change of the plans or products drops every entry. Stored in the entry,
+// not in the key, so a failed per-user bump still knows its keys.
+const CATALOG_VERSION_KEY = 'entitlements:catalog-version';
+const CATALOG_VERSION_COUNTER_KEY = 'entitlements:catalog-version:counter';
 const USER_TTL_MS = 60_000;
 
+interface CachedEntitlements {
+  catalog: number;
+  value: ResolvedEntitlements;
+}
+
 function userCacheKey(userId: string, version: number): string {
-  return `entitlements:user:${userId}:u${version}`;
+  return `entitlements:user:v2:${userId}:u${version}`;
 }
 
 @Injectable()
 export class EntitlementService {
   readonly #logger = new Logger(EntitlementService.name);
   readonly #userVersion: CacheVersionCounter<string>;
+  readonly #catalogVersion: CacheVersionCounter;
 
   constructor(
     @InjectRepository(Customer)
@@ -55,26 +65,43 @@ export class EntitlementService {
       logger: this.#logger,
       entryKeys: (version, userId) => [userCacheKey(userId, version)]
     });
+    // No key to delete when its INCR fails: the entries stay until their TTL,
+    // and the failure is logged (MR-D1).
+    this.#catalogVersion = new CacheVersionCounter(cache, {
+      counterKey: CATALOG_VERSION_COUNTER_KEY,
+      fallbackKey: CATALOG_VERSION_KEY,
+      logger: this.#logger,
+      entryKeys: () => []
+    });
   }
 
   /**
    * Resolves the capability set + limits in effect for a user. Cached per-user,
    * keyed by a per-user version so a subscription change (`invalidateUser`)
-   * orphans the key a concurrent read is about to write. A plan edit in the
-   * seeder reaches a cached user when the entry expires (`USER_TTL_MS`).
+   * orphans the key a concurrent read is about to write. A change of the plans
+   * or products reaches every cached user through the settings change log
+   * (`invalidateCatalog`).
    */
   async capabilitiesFor(userId: string): Promise<ResolvedEntitlements> {
-    const userVersion = await this.#userVersion.read(userId);
+    const [userVersion, catalog] = await Promise.all([
+      this.#userVersion.read(userId),
+      this.#catalogVersion.read()
+    ]);
     const cacheKey = userCacheKey(userId, userVersion);
-    const cached = await this.cache.get<ResolvedEntitlements>(cacheKey);
+    const cached = await this.cache.get<CachedEntitlements>(cacheKey);
+    const hit = cached?.catalog === catalog;
 
-    this.metrics.recordCacheAccess('entitlements', cached ? 'hit' : 'miss');
+    this.metrics.recordCacheAccess('entitlements', hit ? 'hit' : 'miss');
 
-    if (cached) return cached;
+    if (cached && hit) return cached.value;
 
     const resolved = await this.resolve(userId);
 
-    await this.cache.set(cacheKey, resolved, USER_TTL_MS);
+    await this.cache.set(
+      cacheKey,
+      { catalog, value: resolved } satisfies CachedEntitlements,
+      USER_TTL_MS
+    );
 
     return resolved;
   }
@@ -106,6 +133,11 @@ export class EntitlementService {
   /** Drops the cached entitlements for a single user (subscription change). */
   async invalidateUser(userId: string): Promise<void> {
     await this.#userVersion.bump(userId);
+  }
+
+  /** Drops the cached entitlements of every user (plans or products changed). */
+  async invalidateCatalog(): Promise<void> {
+    await this.#catalogVersion.bump();
   }
 
   /**

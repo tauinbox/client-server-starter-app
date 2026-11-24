@@ -1,11 +1,12 @@
 import { Entity, ForeignKey, PrimaryColumn } from 'typeorm';
 import { User } from './user.entity';
-import { Role } from '../../auth/entities/role.entity';
 
 /**
  * One role that a user holds. The row is personal data and stays with the user;
- * the role is a settings row, so `roleId` has no relation and no query joins
- * through it. The two keys copy the constraints of the schema.
+ * the role is a settings row, so `roleId` has no relation, no foreign key and
+ * no query joins through it. The settings change log deletes the rows of a
+ * deleted role after it drops the caches of their holders; until then a row
+ * gives nothing, because the role it names is not found.
  */
 @Entity('user_roles')
 export class UserRole {
@@ -24,10 +25,6 @@ export class UserRole {
     name: 'role_id',
     type: 'uuid',
     primaryKeyConstraintName: 'PK_user_roles'
-  })
-  @ForeignKey<Role>(() => Role, {
-    onDelete: 'CASCADE',
-    name: 'FK_user_roles_role'
   })
   roleId: string;
 }

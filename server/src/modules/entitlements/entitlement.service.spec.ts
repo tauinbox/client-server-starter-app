@@ -403,7 +403,7 @@ describe('EntitlementService', () => {
     }
 
     function userCacheVersions(): string[] {
-      const prefix = 'entitlements:user:user-1:u';
+      const prefix = 'entitlements:user:v2:user-1:u';
 
       return cache.set.mock.calls
         .map((c: unknown[]) => c[0] as string)
@@ -480,8 +480,38 @@ describe('EntitlementService', () => {
       redis.incr.mockRejectedValue(new Error('OOM command not allowed'));
 
       await expect(svc.invalidateUser('user-1')).resolves.toBeUndefined();
-      expect(redis.del).toHaveBeenCalledWith(['entitlements:user:user-1:u2']);
+      expect(redis.del).toHaveBeenCalledWith([
+        'entitlements:user:v2:user-1:u2'
+      ]);
       expect(cache.set).not.toHaveBeenCalled();
+    });
+
+    it('invalidateCatalog bumps one counter, so a cached user reads as a miss', async () => {
+      const svc = await setupRedisBacked();
+
+      withProSubscription('active');
+      await svc.capabilitiesFor('user-1');
+      const [[key, entry]] = cache.set.mock.calls as [[string, unknown]];
+
+      cache.get.mockImplementation((k: string) =>
+        Promise.resolve(k === key ? entry : undefined)
+      );
+      await svc.capabilitiesFor('user-1');
+      expect(metrics.recordCacheAccess).toHaveBeenLastCalledWith(
+        'entitlements',
+        'hit'
+      );
+
+      await svc.invalidateCatalog();
+      await svc.capabilitiesFor('user-1');
+
+      expect(redis.incr).toHaveBeenCalledWith(
+        'entitlements:catalog-version:counter'
+      );
+      expect(metrics.recordCacheAccess).toHaveBeenLastCalledWith(
+        'entitlements',
+        'miss'
+      );
     });
 
     it('resolves and logs when Redis refuses the INCR and the delete', async () => {

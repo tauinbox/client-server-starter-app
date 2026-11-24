@@ -45,6 +45,7 @@ import { Permission } from '../src/modules/auth/entities/permission.entity';
 import { RolePermission } from '../src/modules/auth/entities/role-permission.entity';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
+import { SettingsChangeLogService } from '../src/modules/core/settings-change-log/settings-change-log.service';
 
 const ACTOR_ID = 'delegated-admin-id';
 const TARGET_ROLE_ID = '11111111-1111-4111-8111-111111111111';
@@ -150,6 +151,8 @@ describe('Grant scope over the HTTP path', () => {
       manager: {
         transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
           work({
+            // The settings log lock.
+            query: () => Promise.resolve([]),
             save: (_target: unknown, entity: unknown): unknown =>
               rolePermissionRepo.save(entity) as unknown,
             // The role row that the write locks; it holds no grant yet.
@@ -176,15 +179,13 @@ describe('Grant scope over the HTTP path', () => {
           provide: getRepositoryToken(Role),
           useValue: {
             findOne: jest.fn().mockResolvedValue(customRole),
-            // `invalidateUsersWithRole` runs after a successful write and goes
-            // through the entity manager, not the repository.
+            // A grant write runs in a settings transaction of the role
+            // manager; the rows land on the role-permission mock.
             manager: {
-              createQueryBuilder: jest.fn(() => ({
-                select: jest.fn().mockReturnThis(),
-                innerJoin: jest.fn().mockReturnThis(),
-                where: jest.fn().mockReturnThis(),
-                getMany: jest.fn().mockResolvedValue([])
-              }))
+              transaction: (
+                work: (em: unknown) => Promise<unknown>
+              ): Promise<unknown> =>
+                rolePermissionRepo.manager.transaction(work) as Promise<unknown>
             }
           }
         },
@@ -211,6 +212,10 @@ describe('Grant scope over the HTTP path', () => {
         },
         AccessRefusalService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        {
+          provide: SettingsChangeLogService,
+          useValue: { applyPending: jest.fn().mockResolvedValue(undefined) }
+        },
         {
           provide: CACHE_MANAGER,
           useValue: {

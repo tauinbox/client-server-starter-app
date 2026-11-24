@@ -527,11 +527,21 @@ of the push (or a super role), so the abilities of the other users are not resol
 the bus does nothing.
 
 `notifications.listener.ts` holds the `@OnEvent()` handlers. They react to `UserDeleted`,
-`UserCreated`, `UserUpdated`, `UserRestored`, `RoleRenamed`, `RoleDeleted`,
-`RolePermissionsChanged` and `ResourceActionsChanged`, and each one pushes a message.
-`ResourceActionsChanged` (a change of the grantable actions of a resource) sends
-`permissions_updated` to every connected user, because a holder of a grant on the resource can
-be in any role.
+`UserCreated`, `UserUpdated`, `UserRestored`, `RolePermissionsChanged` and `SettingsChanged`,
+and each one pushes a message. `SettingsChanged` is a batch of the settings change log
+(`core/settings-change-log/`): a change of a `roles` row sends `user_list_stale` to the clients
+that may search users, and a change of `resources`, `permissions` or `actions` sends
+`permissions_updated` to every connected user, because a holder of a grant on a resource can be
+in any role. `RolePermissionsChanged` comes from the RBAC listener of the same batch, with the
+holders of each changed role.
+
+**Settings change log.** Triggers on the 9 settings tables write `settings_change_log` for each
+change, whatever wrote it. A settings write of a service takes the log lock first
+(`lockSettingsLog`) and, after its commit, waits for `SettingsChangeLogService.applyPending`, so
+the request answers after the caches of the pool are dropped. A poll every 5 s applies the
+entries of seeders and direct SQL writes. With Redis one node of the pool applies each entry;
+with the memory cache each process applies every entry. `doc/architecture.md` section 12.8
+(MR-20, MR-D2) has the design.
 
 `user-notifications.service.ts` owns the table `user_notifications`: `notify(userId, content)`
 stores a notice, pushes `notification_created` and sends the mail through

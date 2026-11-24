@@ -7,6 +7,7 @@ import { Plan } from '../billing/entities/plan.entity';
 import { Subscription } from '../billing/entities/subscription.entity';
 import { EntitlementService } from './entitlement.service';
 import { EntitlementGuard } from './entitlement.guard';
+import { CatalogChangedListener } from './catalog-changed.listener';
 
 /**
  * The resolver lives in its own module because it has no auth dependency —
@@ -28,7 +29,7 @@ import { EntitlementGuard } from './entitlement.guard';
       Subscription
     ])
   ],
-  providers: [EntitlementService, EntitlementGuard],
+  providers: [EntitlementService, EntitlementGuard, CatalogChangedListener],
   exports: [EntitlementService, EntitlementGuard]
 })
 export class EntitlementsModule {}

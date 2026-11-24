@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
 import {
-  changesGrantableActions,
   grantableActionNames,
   reofferedActionNames
 } from '@app/shared/utils/grantable-actions';
@@ -125,11 +124,9 @@ router.post(
     }
 
     resource.isOrphaned = false;
-
-    // Mirrors the server's ResourceActionsChangedEvent broadcast.
-    if (woken.length > 0) {
-      pushToAll({ type: 'permissions_updated' });
-    }
+    // As the settings change log of the server: a change of a resource row is
+    // one broadcast.
+    pushToAll({ type: 'permissions_updated' });
 
     const actor = (req as AuthenticatedRequest).user;
 
@@ -257,9 +254,6 @@ router.patch(
       description,
       allowedActionNames
     });
-    const grantsChange =
-      allowedActionNames !== undefined &&
-      changesGrantableActions(resource, allowedActionNames as string[] | null);
 
     if (displayName !== undefined) {
       resource.displayName = displayName;
@@ -273,7 +267,9 @@ router.patch(
       resource.allowedActionNames = allowedActionNames;
     }
 
-    if (grantsChange) {
+    // As the settings change log of the server: a change of the resource row
+    // is one broadcast, and an update that changes nothing pushes nothing.
+    if (changed.length > 0) {
       pushToAll({ type: 'permissions_updated' });
     }
 

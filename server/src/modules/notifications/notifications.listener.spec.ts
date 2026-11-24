@@ -7,9 +7,7 @@ import { UserCreatedEvent } from '../users/events/user-created.event';
 import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
 import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
-import { RoleRenamedEvent } from '../auth/events/role-renamed.event';
-import { RoleDeletedEvent } from '../auth/events/role-deleted.event';
-import type { EntityManager } from 'typeorm';
+import { settingsChangedEvent } from '../core/settings-change-log/testing/settings-changed-event';
 import { UsersService } from '../users/services/users.service';
 import type { AppAbility } from '../auth/casl/app-ability';
 
@@ -174,32 +172,37 @@ describe('NotificationsListener', () => {
     expect(service.push).not.toHaveBeenCalled();
   });
 
-  it('should broadcast permissions_updated in one call on ResourceActionsChangedEvent', () => {
-    listener.handleResourceActionsChanged();
+  it.each([
+    ['resources', { tables: ['resources' as const] }],
+    ['permissions', { tables: ['permissions' as const] }],
+    ['actions', { tables: ['actions' as const] }],
+    ['a rebase', { all: true }]
+  ])(
+    'should broadcast permissions_updated in one call on a change of %s',
+    (_case, change) => {
+      listener.handleSettingsChanged(settingsChangedEvent(change));
 
-    expect(service.pushToAll.mock.calls).toEqual([
-      [{ type: 'permissions_updated' }]
-    ]);
+      expect(service.pushToAll.mock.calls).toEqual([
+        [{ type: 'permissions_updated' }]
+      ]);
+    }
+  );
+
+  it('should push nothing for a change of flags or plans', () => {
+    listener.handleSettingsChanged(
+      settingsChangedEvent({ tables: ['feature_flags', 'plans'] })
+    );
+
+    expect(service.pushToAll).not.toHaveBeenCalled();
+    expect(service.pushToAuthorized).not.toHaveBeenCalled();
   });
 
   describe('user_list_stale', () => {
-    // The listener does not read the manager of a role event.
-    const em = {} as EntityManager;
-    let commit: () => void;
-    let committed: Promise<void>;
-
-    beforeEach(() => {
-      ({ promise: committed, resolve: commit } = Promise.withResolvers<void>());
-    });
-
-    async function expectPushAfterCommit(handle: () => void): Promise<void> {
-      handle();
-      await Promise.resolve();
-      expect(service.pushToAuthorized).not.toHaveBeenCalled();
-
-      commit();
-      await committed;
-      await Promise.resolve();
+    it.each([
+      ['a role change', { tables: ['roles' as const] }],
+      ['a rebase', { all: true }]
+    ])('should push to user-list viewers on %s', (_case, change) => {
+      listener.handleSettingsChanged(settingsChangedEvent(change));
 
       expect(service.pushToAuthorized).toHaveBeenCalledWith(
         { type: 'user_list_stale' },
@@ -213,18 +216,17 @@ describe('NotificationsListener', () => {
 
       expect(allows(abilityOf((can) => can('search', 'User')))).toBe(true);
       expect(allows(abilityOf((can) => can('read', 'Role')))).toBe(false);
-    }
+    });
 
-    it('should push to user-list viewers after the commit of a role rename', () =>
-      expectPushAfterCommit(() =>
-        listener.handleRoleRenamed(
-          new RoleRenamedEvent('a', 'b', em, committed)
+    it('should not fail the apply when the push fails', async () => {
+      service.pushToAuthorized.mockRejectedValue(new Error('redis down'));
+
+      expect(() =>
+        listener.handleSettingsChanged(
+          settingsChangedEvent({ tables: ['roles'] })
         )
-      ));
-
-    it('should push to user-list viewers after the commit of a role delete', () =>
-      expectPushAfterCommit(() =>
-        listener.handleRoleDeleted(new RoleDeletedEvent('a', em, committed))
-      ));
+      ).not.toThrow();
+      await Promise.resolve();
+    });
   });
 });

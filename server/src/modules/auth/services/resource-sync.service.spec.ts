@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DiscoveryService, Reflector } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { poolLockDataSource } from '../../../common/testing/pool-lock.mock';
+import { SettingsChangeLogService } from '../../core/settings-change-log/settings-change-log.service';
 import { ResourceSyncService } from './resource-sync.service';
 import { ResourceService } from './resource.service';
 import { ResourceRegistryService } from './resource-registry.service';
@@ -23,10 +24,8 @@ describe('ResourceSyncService', () => {
   let service: ResourceSyncService;
   let discoveryServiceMock: { getControllers: jest.Mock };
   let reflectorMock: { get: jest.Mock };
-  let resourceServiceMock: {
-    upsertResource: jest.Mock;
-    invalidateSubjectMapCache: jest.Mock;
-  };
+  let resourceServiceMock: { upsertResource: jest.Mock };
+  let settingsChangeLog: { applyPending: jest.Mock };
   let resourceRegistryMock: { register: jest.Mock; isRegistered: jest.Mock };
   let resourceRepoMock: {
     find: jest.Mock;
@@ -68,8 +67,10 @@ describe('ResourceSyncService', () => {
     reflectorMock = { get: jest.fn().mockReturnValue(undefined) };
 
     resourceServiceMock = {
-      upsertResource: jest.fn().mockResolvedValue({ id: 'res-1' }),
-      invalidateSubjectMapCache: jest.fn().mockResolvedValue(undefined)
+      upsertResource: jest.fn().mockResolvedValue({ id: 'res-1' })
+    };
+    settingsChangeLog = {
+      applyPending: jest.fn().mockResolvedValue(undefined)
     };
 
     resourceRegistryMock = {
@@ -118,7 +119,8 @@ describe('ResourceSyncService', () => {
           useValue: permissionRepoMock
         },
         { provide: getRepositoryToken(Action), useValue: actionRepoMock },
-        { provide: DataSource, useValue: poolLockDataSource() }
+        { provide: DataSource, useValue: poolLockDataSource() },
+        { provide: SettingsChangeLogService, useValue: settingsChangeLog }
       ]
     }).compile();
 
@@ -136,10 +138,15 @@ describe('ResourceSyncService', () => {
   // ── onApplicationBootstrap ────────────────────────────────────────
 
   describe('onApplicationBootstrap', () => {
-    it('should call syncResources on startup', async () => {
+    it('should sync, then apply the settings change log', async () => {
+      resourceRegistryMock.register.mockImplementation(() => {
+        expect(settingsChangeLog.applyPending).not.toHaveBeenCalled();
+      });
+
       await service.onApplicationBootstrap();
 
-      expect(resourceServiceMock.invalidateSubjectMapCache).toHaveBeenCalled();
+      expect(resourceRegistryMock.register).toHaveBeenCalled();
+      expect(settingsChangeLog.applyPending).toHaveBeenCalledTimes(1);
     });
 
     it('should catch errors and log warning instead of crashing', async () => {
@@ -468,23 +475,15 @@ describe('ResourceSyncService', () => {
     });
   });
 
-  // ── syncResources — cache invalidation ───────────────────────────
+  // ── syncResources — settings change log ──────────────────────────
 
-  describe('syncResources — cache invalidation', () => {
-    it('should invalidate subject map cache after sync', async () => {
-      await service.onApplicationBootstrap();
-
-      expect(
-        resourceServiceMock.invalidateSubjectMapCache
-      ).toHaveBeenCalledTimes(1);
-    });
-
-    it('should invalidate cache even when no controllers are registered', async () => {
+  describe('syncResources — settings change log', () => {
+    it('should apply the log even when no controllers are registered', async () => {
       discoveryServiceMock.getControllers.mockReturnValue([]);
 
       await service.onApplicationBootstrap();
 
-      expect(resourceServiceMock.invalidateSubjectMapCache).toHaveBeenCalled();
+      expect(settingsChangeLog.applyPending).toHaveBeenCalledTimes(1);
     });
   });
 

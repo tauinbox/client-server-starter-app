@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository } from 'typeorm';
+import { Brackets, EntityManager, Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
@@ -19,12 +19,21 @@ import { MetricsService } from '../../core/metrics/metrics.service';
 
 const CACHE_TTL = 120_000; // 2 minutes
 // Versioned: a migration that deletes grants must not be outlived by a cached
-// list that still carries them.
-const CACHE_PREFIX = 'permissions:v2:';
-const ROLES_CACHE_PREFIX = 'roles:';
+// list that still carries them, and an entry of another shape is not read.
+const CACHE_PREFIX = 'permissions:v3:';
+const ROLES_CACHE_PREFIX = 'roles:v2:';
 // One counter per user for both lists: a role change alters both.
 const VERSION_KEY = 'permissions:user-version';
 const VERSION_COUNTER_KEY = 'permissions:user-version:counter';
+// Drops the lists of every user at once. It is stored in each entry and not in
+// the key, so a failed per-user bump still knows the keys it must delete.
+const GLOBAL_VERSION_KEY = 'permissions:global-version';
+const GLOBAL_VERSION_COUNTER_KEY = 'permissions:global-version:counter';
+
+interface CachedList<T> {
+  global: number;
+  value: T;
+}
 
 function permissionsCacheKey(userId: string, version: number): string {
   return `${CACHE_PREFIX}${userId}:v${version}`;
@@ -43,6 +52,7 @@ export interface RoleInfo {
 export class PermissionService {
   readonly #logger = new Logger(PermissionService.name);
   readonly #version: CacheVersionCounter<string>;
+  readonly #globalVersion: CacheVersionCounter;
   readonly #droppedCeilingGrants = new Set<string>();
 
   constructor(
@@ -61,6 +71,52 @@ export class PermissionService {
         rolesCacheKey(userId, version)
       ]
     });
+    // No key to delete when its INCR fails: the entries stay until their TTL,
+    // and the failure is logged (MR-D1).
+    this.#globalVersion = new CacheVersionCounter(cacheManager, {
+      counterKey: GLOBAL_VERSION_COUNTER_KEY,
+      fallbackKey: GLOBAL_VERSION_KEY,
+      logger: this.#logger,
+      entryKeys: () => []
+    });
+  }
+
+  /**
+   * Both versions are read before the query, so a read that started before a
+   * drop writes an entry that nobody reads again. `load` answers null for a
+   * result that must not be cached.
+   */
+  async #readThrough<T>(
+    userId: string,
+    {
+      metric,
+      key,
+      load
+    }: {
+      metric: 'permissions' | 'roles';
+      key: (userId: string, version: number) => string;
+      load: () => Promise<T | null>;
+    }
+  ): Promise<T | null> {
+    const [version, global] = await Promise.all([
+      this.#version.read(userId),
+      this.#globalVersion.read()
+    ]);
+    const cacheKey = key(userId, version);
+    const cached = await this.cacheManager.get<CachedList<T>>(cacheKey);
+    const hit = cached?.global === global;
+
+    this.metrics.recordCacheAccess(metric, hit ? 'hit' : 'miss');
+
+    if (cached && hit) return cached.value;
+
+    const value = await load();
+
+    if (value !== null) {
+      await this.cacheManager.set(cacheKey, { global, value }, CACHE_TTL);
+    }
+
+    return value;
   }
 
   async getPermissionsForUser(userId: string): Promise<ResolvedPermission[]> {
@@ -70,27 +126,29 @@ export class PermissionService {
       return [];
     }
 
-    const version = await this.#version.read(userId);
-    const cacheKey = permissionsCacheKey(userId, version);
-    const cached = await this.cacheManager.get<ResolvedPermission[]>(cacheKey);
+    const permissions = await this.#readThrough(userId, {
+      metric: 'permissions',
+      key: permissionsCacheKey,
+      load: () => this.#resolvePermissions(userId)
+    });
 
-    this.metrics.recordCacheAccess('permissions', cached ? 'hit' : 'miss');
+    return permissions ?? [];
+  }
 
-    if (cached) {
-      return cached;
-    }
-
+  async #resolvePermissions(
+    userId: string
+  ): Promise<ResolvedPermission[] | null> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
     if (!user) {
-      return [];
+      return null;
     }
 
     await attachRoles(this.userRepository.manager, [user], {
       rolePermissions: { permission: { resource: true, action: true } }
     });
 
-    const permissions = dedupPermissions(
+    return dedupPermissions(
       user.roles.flatMap((role) =>
         role.rolePermissions
           .map((rp) => ({
@@ -104,10 +162,6 @@ export class PermissionService {
           )
       )
     );
-
-    await this.cacheManager.set(cacheKey, permissions, CACHE_TTL);
-
-    return permissions;
   }
 
   #keepUserRoleGrant(grant: {
@@ -137,26 +191,21 @@ export class PermissionService {
       return [];
     }
 
-    const version = await this.#version.read(userId);
-    const cacheKey = rolesCacheKey(userId, version);
-    const cached = await this.cacheManager.get<RoleInfo[]>(cacheKey);
+    const roles = await this.#readThrough(userId, {
+      metric: 'roles',
+      key: rolesCacheKey,
+      load: async () => {
+        const user = await findUserWithRoles(this.userRepository.manager, {
+          where: { id: userId }
+        });
 
-    this.metrics.recordCacheAccess('roles', cached ? 'hit' : 'miss');
-
-    if (cached) {
-      return cached;
-    }
-
-    const user = await findUserWithRoles(this.userRepository.manager, {
-      where: { id: userId }
+        return (
+          user?.roles?.map((r) => ({ name: r.name, isSuper: r.isSuper })) ?? []
+        );
+      }
     });
 
-    const roles: RoleInfo[] =
-      user?.roles?.map((r) => ({ name: r.name, isSuper: r.isSuper })) ?? [];
-
-    await this.cacheManager.set(cacheKey, roles, CACHE_TTL);
-
-    return roles;
+    return roles ?? [];
   }
 
   async getRoleNamesForUser(userId: string): Promise<string[]> {
@@ -233,5 +282,37 @@ export class PermissionService {
 
   async invalidateUserCache(userId: string): Promise<void> {
     await this.#version.bump(userId);
+  }
+
+  /** Drops the cached lists of every user: a rebase of the settings log. */
+  async invalidateAll(): Promise<void> {
+    await this.#globalVersion.bump();
+  }
+
+  /**
+   * The users that hold one of `roleIds`, read on `manager` so that the apply
+   * of the settings log needs no second connection. Soft-deleted users have no
+   * session to refresh.
+   */
+  async findHolderIds(
+    manager: EntityManager,
+    roleIds: readonly string[]
+  ): Promise<string[]> {
+    if (roleIds.length === 0) return [];
+
+    const links = await manager
+      .createQueryBuilder(UserRole, 'link')
+      .select('link.userId')
+      .innerJoin(
+        User,
+        'user',
+        'user.id = link.userId AND user.deletedAt IS NULL'
+      )
+      .where('link.roleId = ANY(CAST(:roleIds AS uuid[]))', {
+        roleIds: [...roleIds]
+      })
+      .getMany();
+
+    return [...new Set(links.map(({ userId }) => userId))];
   }
 }

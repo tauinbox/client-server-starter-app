@@ -1,11 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ErrorKeys } from '@app/shared/constants';
 import { createMockResponse } from '../../../common/testing/express.mock';
 import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import { FeatureFlagsAdminController } from './feature-flags-admin.controller';
 import { FeatureFlagService } from '../services/feature-flag.service';
-import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
 import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import type { JwtAuthRequest } from '../../auth/types/auth.request';
 import { MfaRequiredGuard } from '../../auth/guards/mfa-required.guard';
@@ -35,7 +33,6 @@ describe('FeatureFlagsAdminController', () => {
     preview: jest.Mock;
     getAttributeCustomKeys: jest.Mock;
   };
-  let eventEmitter: { emit: jest.Mock };
 
   const req = {
     user: { userId: 'actor-1', email: 'a@b.com' },
@@ -72,14 +69,9 @@ describe('FeatureFlagsAdminController', () => {
         .fn()
         .mockReturnValue({ customKeys: ['billingConfigured'] })
     };
-    eventEmitter = { emit: jest.fn() };
-
     const module: TestingModule = await Test.createTestingModule({
       controllers: [FeatureFlagsAdminController],
-      providers: [
-        { provide: FeatureFlagService, useValue: flagService },
-        { provide: EventEmitter2, useValue: eventEmitter }
-      ]
+      providers: [{ provide: FeatureFlagService, useValue: flagService }]
     })
       .overrideGuard(PermissionsGuard)
       .useValue({ canActivate: () => true })
@@ -113,7 +105,7 @@ describe('FeatureFlagsAdminController', () => {
     expect(res.setHeader).toHaveBeenCalledWith('ETag', '"1"');
   });
 
-  it('create passes the ability and the audit actor, emits a change event and sends the ETag', async () => {
+  it('create passes the ability and the audit actor and sends the ETag', async () => {
     const res = response();
 
     await controller.create({ key: 'new-dashboard' }, req, fullAbility, res);
@@ -121,10 +113,6 @@ describe('FeatureFlagsAdminController', () => {
       { key: 'new-dashboard' },
       fullAbility,
       actor
-    );
-    expect(eventEmitter.emit).toHaveBeenCalledWith(
-      FeatureFlagChangedEvent.name,
-      expect.any(FeatureFlagChangedEvent)
     );
     expect(res.setHeader).toHaveBeenCalledWith('ETag', '"1"');
   });
@@ -194,16 +182,12 @@ describe('FeatureFlagsAdminController', () => {
     });
   });
 
-  it('delete passes the ability and emits a change event', async () => {
+  it('delete passes the ability', async () => {
     await controller.remove('flag-1', req, fullAbility);
     expect(flagService.delete).toHaveBeenCalledWith(
       'flag-1',
       fullAbility,
       actor
-    );
-    expect(eventEmitter.emit).toHaveBeenCalledWith(
-      FeatureFlagChangedEvent.name,
-      expect.any(FeatureFlagChangedEvent)
     );
   });
 });

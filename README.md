@@ -180,9 +180,10 @@ management and theming.
     the server then ends the stream. This is the one source of the event, so an administrator
     password change, a user delete and a role change reach the client the same way.
   - `permissions_updated` starts a silent permissions read. The server sends it when the permission
-    set of a role changes. It goes to each connected holder of that role. A change of the actions
-    that a resource offers (a narrowing, a widening, or the restore of an orphaned resource that
-    wakes a grant) sends it to every connected user. The client first waits a
+    set or the row of a role changes. It goes to each connected holder of that role. A change of
+    a resource (its labels, the actions that it offers, or the restore of an orphaned resource)
+    sends it to every connected user. Each push comes from the settings change log, so a change
+    that a seeder or a direct SQL write makes is pushed too, within 5 s. The client first waits a
     random 0 to 5 s, thus the holders do not all read their permissions at the same moment.
   - `user_crud_events` keeps the administrator user list current after a create, update, delete
     or restore, with no reload of the loaded pages. An update or a restore of a loaded row reads
@@ -192,8 +193,8 @@ management and theming.
     own name change and a confirmed email change. The server sends it only to a connected client
     whose current abilities permit `users:search` on the changed user. Thus an ordinary user
     never sees these events, and a grant with a condition sees only the users that its list shows.
-  - `user_list_stale` shows the same banner after a role rename or delete, which changes the
-    role chip of every holder. It names no user and goes to each client that may search users.
+  - `user_list_stale` shows the same banner after a role create, change or delete, which can change
+    the role chip of every holder or the role filter. It names no user and goes to each client that may search users.
     A reopened stream shows the same banner, because an event sent while the stream was down is
     lost.
 

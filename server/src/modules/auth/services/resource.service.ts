@@ -26,13 +26,14 @@ import { AuditService } from '../../audit/audit.service';
 import type { AuditLogParams } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
-  changesGrantableActions,
   grantableActionNames,
   reofferedActionNames
 } from '@app/shared/utils/grantable-actions';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceActionsChangedEvent } from '../events/resource-actions-changed.event';
 import { subject } from '@casl/ability';
+import {
+  lockSettingsLog,
+  SettingsChangeLogService
+} from '../../core/settings-change-log/settings-change-log.service';
 import { withChanges } from '@app/shared/utils/changed-fields';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { auditContextOf } from '../casl/ability-context';
@@ -77,7 +78,7 @@ export class ResourceService {
     private readonly metrics: MetricsService,
     private readonly auditService: AuditService,
     private readonly accessRefusals: AccessRefusalService,
-    private readonly eventEmitter: EventEmitter2
+    private readonly settingsChangeLog: SettingsChangeLogService
   ) {
     this.#subjectMapVersion = new CacheVersionCounter(cacheManager, {
       counterKey: SUBJECT_MAP_VERSION_COUNTER_KEY,
@@ -162,19 +163,9 @@ export class ResourceService {
 
     // Checked here to answer early, and again on the locked row.
     check(await this.loadResource(id));
-    const { before, saved } = await this.updateAudited(id, data, {
-      check,
-      audit
-    });
+    const { saved } = await this.updateAudited(id, data, { check, audit });
 
-    await this.invalidateSubjectMapCache();
-
-    if (
-      data.allowedActionNames !== undefined &&
-      changesGrantableActions(before, data.allowedActionNames)
-    ) {
-      this.#emitActionsChanged();
-    }
+    await this.settingsChangeLog.applyPending();
 
     return saved;
   }
@@ -282,6 +273,7 @@ export class ResourceService {
     }
   ): Promise<{ before: Resource; saved: Resource }> {
     return this.resourceRepository.manager.transaction(async (em) => {
+      await lockSettingsLog(em);
       const before = await this.lockResource(em, id);
 
       check(before);
@@ -341,6 +333,7 @@ export class ResourceService {
     // and audits and the other is refused.
     const resource = await this.resourceRepository.manager.transaction(
       async (em) => {
+        await lockSettingsLog(em);
         const locked = await this.lockResource(em, id);
 
         this.assertCanRestore(ability, locked, actorId);
@@ -357,13 +350,9 @@ export class ResourceService {
         return locked;
       }
     );
-    const woken = grantableActionNames(resource);
 
     resource.isOrphaned = false;
-    await this.invalidateSubjectMapCache();
-
-    if (woken.length > 0) this.#emitActionsChanged();
-
+    await this.settingsChangeLog.applyPending();
     resource.isRegistered = true;
 
     return resource;
@@ -389,13 +378,6 @@ export class ResourceService {
       reEnabled: grantableActionNames(resource),
       actorId
     });
-  }
-
-  #emitActionsChanged(): void {
-    this.eventEmitter.emit(
-      ResourceActionsChangedEvent.name,
-      new ResourceActionsChangedEvent()
-    );
   }
 
   async upsertResource(data: {

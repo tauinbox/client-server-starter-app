@@ -137,22 +137,22 @@ C-->G
 C-->H
 C-->B
 D-->A
-D-->2
-D-->9
-D-->P
 D-->B
+D-->2
+D-->P
 D-->U
 D-->V
+D-->9
 E-->P
 E-->U
 E-->9
+E-->B
 E-->G
 E-->H
 E-->2
 E-->V
 E-->8
 E-->R
-E-->B
 F-->2
 F-->P
 F-->U
@@ -218,11 +218,14 @@ subgraph 6["core"]
 subgraph C["region"]
 D["region.module.ts"]
 end
-subgraph U["metrics"]
-V["metrics.module.ts"]
+subgraph O["settings-change-log"]
+P["settings-change-log.module.ts"]
 end
-subgraph Z["health"]
-10["health.module.ts"]
+subgraph W["metrics"]
+X["metrics.module.ts"]
+end
+subgraph 11["health"]
+12["health.module.ts"]
 end
 end
 subgraph 8["audit"]
@@ -245,33 +248,33 @@ F["entitlements.module.ts"]
 end
 subgraph G["users"]
 H["users.module.ts"]
-Y["users-api.module.ts"]
+10["users-api.module.ts"]
 end
-subgraph O["billing"]
-P["billing.module.ts"]
+subgraph Q["billing"]
+R["billing.module.ts"]
 end
-subgraph Q["feature-flags"]
-R["feature-flags.module.ts"]
+subgraph S["feature-flags"]
+T["feature-flags.module.ts"]
 end
-subgraph S["notifications"]
-T["notifications.module.ts"]
+subgraph U["notifications"]
+V["notifications.module.ts"]
 end
-subgraph W["mail"]
-X["mail.module.ts"]
+subgraph Y["mail"]
+Z["mail.module.ts"]
 end
 end
 end
 end
 7-->9
 7-->B
-7-->P
 7-->R
-7-->X
 7-->T
-7-->Y
-7-->H
-7-->10
+7-->Z
 7-->V
+7-->10
+7-->H
+7-->12
+7-->X
 7-->D
 B-->4
 B-->D
@@ -282,18 +285,20 @@ B-->L
 B-->N
 H-->J
 N-->4
-P-->B
-P-->F
-P-->R
-P-->T
+N-->P
 R-->B
+R-->F
 R-->T
-R-->H
+R-->V
 T-->B
-T-->N
+T-->P
+T-->V
 T-->H
-Y-->B
-Y-->H
+V-->B
+V-->N
+V-->H
+10-->B
+10-->H
 ```
 
 ## Client modules

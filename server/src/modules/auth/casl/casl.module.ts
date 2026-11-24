@@ -13,6 +13,8 @@ import { ResourceSyncService } from '../services/resource-sync.service';
 import { ResourceRegistryService } from '../services/resource-registry.service';
 import { MfaPolicyService } from '../services/mfa-policy.service';
 import { CryptoModule } from '../../../common/crypto/crypto.module';
+import { SettingsChangeLogModule } from '../../core/settings-change-log/settings-change-log.module';
+import { RbacSettingsChangedListener } from '../listeners/rbac-settings-changed.listener';
 
 /**
  * Shared CASL module — provides PermissionService, CaslAbilityFactory,
@@ -27,6 +29,7 @@ import { CryptoModule } from '../../../common/crypto/crypto.module';
   imports: [
     CryptoModule,
     DiscoveryModule,
+    SettingsChangeLogModule,
     TypeOrmModule.forFeature([
       User,
       Resource,
@@ -41,9 +44,11 @@ import { CryptoModule } from '../../../common/crypto/crypto.module';
     CaslAbilityFactory,
     ResourceService,
     ResourceSyncService,
-    ResourceRegistryService
+    ResourceRegistryService,
+    RbacSettingsChangedListener
   ],
   exports: [
+    SettingsChangeLogModule,
     PermissionService,
     MfaPolicyService,
     CaslAbilityFactory,

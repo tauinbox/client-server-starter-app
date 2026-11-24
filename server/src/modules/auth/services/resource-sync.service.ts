@@ -16,6 +16,7 @@ import { Action } from '../entities/action.entity';
 import { ResourceService } from './resource.service';
 import { ResourceRegistryService } from './resource-registry.service';
 import { CASL_RESERVED_ACTION_NAMES } from '@app/shared/constants';
+import { SettingsChangeLogService } from '../../core/settings-change-log/settings-change-log.service';
 
 @Injectable()
 export class ResourceSyncService implements OnApplicationBootstrap {
@@ -32,7 +33,8 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     private readonly permissionRepository: Repository<Permission>,
     @InjectRepository(Action)
     private readonly actionRepository: Repository<Action>,
-    private readonly dataSource: DataSource
+    private readonly dataSource: DataSource,
+    private readonly settingsChangeLog: SettingsChangeLogService
   ) {}
 
   // Serialized, not skipped: a node that skipped would serve with an empty
@@ -44,6 +46,8 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         POOL_LOCK_KEYS.resourceSync,
         () => this.syncResources()
       );
+      // After the sync lock is free: the apply takes a lock of its own.
+      await this.settingsChangeLog.applyPending();
     } catch (error) {
       this.logger.warn(
         'Resource sync skipped — tables may not exist yet. Run migrations first.',
@@ -186,7 +190,6 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     }
 
     this.resourceRegistry.register([...registeredNames]);
-    await this.resourceService.invalidateSubjectMapCache();
   }
 
   /**

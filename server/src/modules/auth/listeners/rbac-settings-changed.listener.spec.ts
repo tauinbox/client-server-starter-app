@@ -1,0 +1,125 @@
+import type { EntityManager } from 'typeorm';
+import { In } from 'typeorm';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
+import { RbacSettingsChangedListener } from './rbac-settings-changed.listener';
+import type { PermissionService } from '../services/permission.service';
+import type { ResourceService } from '../services/resource.service';
+import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
+import { UserRole } from '../../users/entities/user-role.entity';
+import { settingsChangedEvent } from '../../core/settings-change-log/testing/settings-changed-event';
+
+describe('RbacSettingsChangedListener', () => {
+  let permissionService: {
+    findHolderIds: jest.Mock;
+    invalidateUserCache: jest.Mock;
+    invalidateAll: jest.Mock;
+  };
+  let resourceService: { invalidateSubjectMapCache: jest.Mock };
+  let eventEmitter: { emit: jest.Mock };
+  let manager: { delete: jest.Mock; query: jest.Mock };
+  let listener: RbacSettingsChangedListener;
+
+  beforeEach(() => {
+    permissionService = {
+      findHolderIds: jest.fn().mockResolvedValue(['u-1', 'u-2']),
+      invalidateUserCache: jest.fn().mockResolvedValue(undefined),
+      invalidateAll: jest.fn().mockResolvedValue(undefined)
+    };
+    resourceService = {
+      invalidateSubjectMapCache: jest.fn().mockResolvedValue(undefined)
+    };
+    eventEmitter = { emit: jest.fn() };
+    manager = {
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
+      query: jest.fn().mockResolvedValue([])
+    };
+    listener = new RbacSettingsChangedListener(
+      // @ts-expect-error partial mock: only the methods the listener calls
+      permissionService as PermissionService,
+      // @ts-expect-error partial mock: only the method the listener calls
+      resourceService as ResourceService,
+      // @ts-expect-error partial mock: only `emit`
+      eventEmitter as EventEmitter2
+    );
+  });
+
+  const run = (change: Parameters<typeof settingsChangedEvent>[0]) =>
+    listener.handleSettingsChanged(
+      // @ts-expect-error partial mock: only `delete` and `query`
+      settingsChangedEvent(change, manager as EntityManager)
+    );
+
+  it('drops the lists of each holder of a changed role, read on the apply manager, and pushes to them', async () => {
+    await run({ tables: ['role_permissions'], roleIds: ['r-1'] });
+
+    expect(permissionService.findHolderIds).toHaveBeenCalledWith(manager, [
+      'r-1'
+    ]);
+    expect(permissionService.invalidateUserCache.mock.calls).toEqual([
+      ['u-1'],
+      ['u-2']
+    ]);
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      RolePermissionsChangedEvent.name,
+      new RolePermissionsChangedEvent(['u-1', 'u-2'])
+    );
+    expect(manager.delete).not.toHaveBeenCalled();
+    expect(resourceService.invalidateSubjectMapCache).not.toHaveBeenCalled();
+  });
+
+  it('reads the holders of a deleted role before it deletes their membership rows', async () => {
+    await run({ tables: ['roles'], roleIds: ['r-1'], deletedRoleIds: ['r-1'] });
+
+    expect(manager.delete).toHaveBeenCalledWith(UserRole, {
+      roleId: In(['r-1'])
+    });
+    const [read] = permissionService.findHolderIds.mock.invocationCallOrder;
+    const [remove] = manager.delete.mock.invocationCallOrder;
+
+    expect(read).toBeLessThan(remove);
+    expect(permissionService.invalidateUserCache).toHaveBeenCalledTimes(2);
+  });
+
+  it('pushes nothing when a changed role has no holder', async () => {
+    permissionService.findHolderIds.mockResolvedValue([]);
+
+    await run({ tables: ['roles'], roleIds: ['r-1'] });
+
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it.each(['resources', 'permissions', 'actions'] as const)(
+    'drops the subject map on a change of %s',
+    async (table) => {
+      permissionService.findHolderIds.mockResolvedValue([]);
+
+      await run({ tables: [table] });
+
+      expect(resourceService.invalidateSubjectMapCache).toHaveBeenCalledTimes(
+        1
+      );
+    }
+  );
+
+  it('on a rebase drops every list and the subject map, and deletes the orphan membership rows', async () => {
+    await run({ all: true });
+
+    expect(permissionService.invalidateAll).toHaveBeenCalledTimes(1);
+    expect(resourceService.invalidateSubjectMapCache).toHaveBeenCalledTimes(1);
+    expect(manager.query).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM "user_roles"')
+    );
+    expect(permissionService.findHolderIds).not.toHaveBeenCalled();
+  });
+
+  it('lets a failed cache drop fail the apply', async () => {
+    permissionService.invalidateUserCache.mockRejectedValue(
+      new Error('redis down')
+    );
+
+    await expect(run({ tables: ['roles'], roleIds: ['r-1'] })).rejects.toThrow(
+      'redis down'
+    );
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
+  });
+});
