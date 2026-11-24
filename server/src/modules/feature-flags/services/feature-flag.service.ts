@@ -44,6 +44,7 @@ import { UpdateFeatureFlagDto } from '../dtos/update-feature-flag.dto';
 import { FeatureFlagRuleDto } from '../dtos/feature-flag-rule.dto';
 import { PreviewFlagContextDto } from '../dtos/preview-flag-context.dto';
 import { validateRulePayload } from '../utils/validate-rule-payload.util';
+import { attachRuleMembers, writeRuleMembers } from '../utils/rule-members';
 
 const FEATURE_FLAG_LIST_COLUMNS: ListColumns<typeof FEATURE_FLAG_LIST_QUERY> = {
   search: { key: 'flag.key', description: 'flag.description' },
@@ -163,6 +164,8 @@ export class FeatureFlagService {
       where: { flagId: In(flags.map((f) => f.id)) },
       order: { createdAt: 'ASC', id: 'ASC' }
     });
+
+    await attachRuleMembers(this.ruleRepo.manager, rules);
     const byFlag = new Map<string, FeatureFlagRule[]>();
 
     for (const r of rules) {
@@ -223,6 +226,7 @@ export class FeatureFlagService {
       where: { flagId: id },
       order: { createdAt: 'ASC', id: 'ASC' }
     });
+    await attachRuleMembers(this.ruleRepo.manager, flag.rules);
 
     return flag;
   }
@@ -487,9 +491,10 @@ export class FeatureFlagService {
     await em.delete(FeatureFlagRule, { flagId });
 
     // Insert sequentially so clock_timestamp() advances per row and
-    // preserves request-array order via the created_at column.
+    // preserves request-array order via the created_at column. The member
+    // rows of the removed rules go with the apply of the change log.
     for (const r of rules) {
-      await em.save(
+      const { id: ruleId } = await em.save(
         FeatureFlagRule,
         em.create(FeatureFlagRule, {
           flagId,
@@ -497,6 +502,10 @@ export class FeatureFlagService {
           payload: r.payload
         })
       );
+
+      if (r.payload.type === 'user') {
+        await writeRuleMembers(em, { ruleId, userIds: r.payload.userIds });
+      }
     }
   }
 

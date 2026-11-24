@@ -647,6 +647,26 @@ adminRouter.get(
   }
 );
 
+// The server refuses in the write transaction, when it inserts the member rows
+// of a `user` rule: an id with no user row (a soft deleted user counts).
+function refuseUnknownRuleUser(res: Response, rules: ValidatedRule[]): boolean {
+  const { users } = getState();
+  const unknown = rules.some(
+    ({ payload }) =>
+      payload.type === 'user' && payload.userIds.some((id) => !users.has(id))
+  );
+
+  if (unknown) {
+    sendError(
+      res,
+      ErrorKeys.FEATURE_FLAGS.UNKNOWN_RULE_USER,
+      'A user rule names a user that does not exist'
+    );
+  }
+
+  return unknown;
+}
+
 function rulesOf(body: {
   rules?: unknown;
 }): ReturnType<typeof parseRules> | null {
@@ -726,6 +746,8 @@ adminRouter.post('/', permissionGuard('create', 'FeatureFlag'), (req, res) => {
 
     return;
   }
+
+  if (rules && refuseUnknownRuleUser(res, rules.rules)) return;
 
   const now = nowIso();
   const flag: MockFeatureFlag = {
@@ -842,6 +864,8 @@ adminRouter.patch(
 
       return;
     }
+
+    if (rules && refuseUnknownRuleUser(res, rules.rules)) return;
 
     const changed = changedFields(flag, {
       description: validation.patch.description,

@@ -155,7 +155,11 @@ describe('FeatureFlagService', () => {
   describe('findOne', () => {
     it('returns the flag with rules ordered by createdAt', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
-      const rule = { id: 'r1', flagId: 'flag-1' };
+      const rule = {
+        id: 'r1',
+        flagId: 'flag-1',
+        payload: { type: 'role', roleNames: ['editor'] }
+      };
 
       ruleRepo.find.mockResolvedValueOnce([rule]);
       const result = await service.findOne('flag-1', SYSTEM_ABILITY);
