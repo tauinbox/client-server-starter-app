@@ -23,6 +23,7 @@ import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { stopSettingsPoll } from './settings-poll';
 
 // Both requests read the record, then wait in front of their write
 // transactions and go on together, so both writes meet in Postgres.
@@ -53,6 +54,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
+    stopSettingsPoll(app);
 
     dataSource = app.get(DataSource);
     roleService = app.get(RoleService);

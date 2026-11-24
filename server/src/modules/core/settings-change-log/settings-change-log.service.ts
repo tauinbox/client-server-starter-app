@@ -21,6 +21,8 @@ import { SettingsChangedEvent } from './settings-changed.event';
 
 /** The bound of the time a revoke on another pool waits (MR-20). */
 export const SETTINGS_POLL_INTERVAL_MS = 5_000;
+/** The name of the poll in the `SchedulerRegistry`. */
+export const SETTINGS_POLL_INTERVAL_NAME = 'settings-change-log-poll';
 const APPLY_BATCH = 500;
 const RETENTION_DAYS = 7;
 
@@ -158,7 +160,7 @@ export class SettingsChangeLogService {
   }
 
   /** Picks up the entries of seeders, direct SQL and other pools. */
-  @Interval(SETTINGS_POLL_INTERVAL_MS)
+  @Interval(SETTINGS_POLL_INTERVAL_NAME, SETTINGS_POLL_INTERVAL_MS)
   async poll(): Promise<void> {
     try {
       if (isSharedCache(this.cache)) {

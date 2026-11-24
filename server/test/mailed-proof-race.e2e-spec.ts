@@ -19,6 +19,7 @@ import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { User } from '../src/modules/users/entities/user.entity';
 import { MailService } from '../src/modules/mail/mail.service';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { stopSettingsPoll } from './settings-poll';
 
 // A write of a mailed proof, or of a new password, keys on the state that its
 // caller read. Each case holds that write until a change of the credential or
@@ -53,6 +54,7 @@ runWithInfra('Mailed proofs and own passwords under a race (e2e)', () => {
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
+    stopSettingsPoll(app);
 
     dataSource = app.get(DataSource);
     authService = app.get(AuthService);

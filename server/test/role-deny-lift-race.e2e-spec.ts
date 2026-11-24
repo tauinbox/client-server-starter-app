@@ -13,6 +13,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { User } from '../src/modules/users/entities/user.entity';
+import { stopSettingsPoll } from './settings-poll';
 
 // A restricted admin passes the deny-lift check, then another request changes
 // the role before the write transaction starts. The write must read the role
@@ -42,6 +43,7 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     await app.init();
+    stopSettingsPoll(app);
     dataSource = app.get(DataSource);
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);

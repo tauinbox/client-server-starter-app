@@ -36,6 +36,7 @@ import { User } from '../src/modules/users/entities/user.entity';
 import { findUserWithRolesOrFail } from '../src/modules/users/utils/user-roles';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
+import { stopSettingsPoll } from './settings-poll';
 
 // A write that loaded its row before a concurrent request changed it must not
 // put the old values back. The first request is held in front of its write
@@ -68,6 +69,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI });
     await app.init();
+    stopSettingsPoll(app);
 
     dataSource = app.get(DataSource);
     roleService = app.get(RoleService);
