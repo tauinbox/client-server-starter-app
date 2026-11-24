@@ -11,7 +11,6 @@ import { Exclude } from 'class-transformer';
 import { Money } from '@app/shared/utils/money';
 import { Customer } from './customer.entity';
 import { Subscription } from './subscription.entity';
-import { Product } from './product.entity';
 import type {
   BillingMode,
   BillingProviderId,
@@ -98,11 +97,10 @@ export class Invoice {
   @Column({ type: 'varchar', length: 16, default: 'subscription' })
   kind: InvoiceKind;
 
+  // A plain id, no foreign key: the product is a settings row, and after the
+  // split the settings are in another database. A reader of the product
+  // handles a product id that no row has.
   @Column({ name: 'product_id', type: 'uuid', nullable: true })
-  @ForeignKey<Product>(() => Product, {
-    onDelete: 'SET NULL',
-    name: 'FK_billing_invoices_product_id'
-  })
   productId: string | null;
 
   @Column({ name: 'period_start', type: 'timestamptz' })

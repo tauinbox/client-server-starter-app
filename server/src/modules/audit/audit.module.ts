@@ -5,6 +5,7 @@ import { AuditLog } from './entities/audit-log.entity';
 import { AuditService } from './audit.service';
 import { AccessRefusalService } from './access-refusal.service';
 import { AuditCleanupService } from './audit-cleanup.service';
+import { SettingsWriteSettleService } from './settings-write-settle.service';
 import { AuditLogInterceptor } from './interceptors/audit-log.interceptor';
 
 @Global()
@@ -14,6 +15,7 @@ import { AuditLogInterceptor } from './interceptors/audit-log.interceptor';
     AuditService,
     AccessRefusalService,
     AuditCleanupService,
+    SettingsWriteSettleService,
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditLogInterceptor

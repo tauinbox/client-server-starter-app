@@ -54,7 +54,19 @@ describe('ResourceService', () => {
     update: jest.Mock;
     findOneByOrFail: jest.Mock;
   };
-  let mockAudit: { log: jest.Mock; logFireAndForget: jest.Mock };
+  let mockAudit: {
+    log: jest.Mock;
+    logFireAndForget: jest.Mock;
+    openSettingsWrite: jest.Mock;
+    closeSettingsWrite: jest.Mock;
+    discardSettingsWrite: jest.Mock;
+  };
+  /** A refused settings write deletes the row that it committed first. */
+  const expectDiscardedAuditRow = () => {
+    expect(mockAudit.discardSettingsWrite).toHaveBeenCalledWith('audit-1');
+    expect(mockAudit.closeSettingsWrite).not.toHaveBeenCalled();
+    expect(mockAudit.log).not.toHaveBeenCalled();
+  };
   let mockCacheManager: {
     get: jest.Mock;
     set: jest.Mock;
@@ -174,7 +186,10 @@ describe('ResourceService', () => {
     };
     mockAudit = {
       log: jest.fn().mockResolvedValue(undefined),
-      logFireAndForget: jest.fn()
+      logFireAndForget: jest.fn(),
+      openSettingsWrite: jest.fn().mockResolvedValue('audit-1'),
+      closeSettingsWrite: jest.fn(),
+      discardSettingsWrite: jest.fn()
     };
 
     mockCacheManager = {
@@ -393,31 +408,46 @@ describe('ResourceService', () => {
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.RESOURCES.NOT_FOUND }
       });
-      expect(mockAudit.log).not.toHaveBeenCalled();
+      expectDiscardedAuditRow();
       expect(mockCacheManager.set).not.toHaveBeenCalled();
     });
 
-    it('writes the audit row in the transaction of the write', async () => {
+    it('commits the audit row before the write and closes it from the locked row', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
-      const audit = {
+      mockEm.findOne.mockResolvedValueOnce({
+        ...resource1,
+        displayName: 'Locked'
+      });
+      const audit = (before: Resource) => ({
         action: AuditAction.RESOURCE_UPDATE,
         targetId: 'res-1',
-        targetType: 'Resource'
-      };
+        targetType: 'Resource',
+        details: { displayName: before.displayName }
+      });
 
       await service.update(
         'res-1',
         { displayName: 'Audited' },
-        { ability: superAbility, audit: () => audit }
+        { ability: superAbility, audit }
       );
 
-      expect(mockEm.update).toHaveBeenCalled();
-      expect(mockAudit.log).toHaveBeenCalledWith(audit, mockEm);
+      const [open] = mockAudit.openSettingsWrite.mock.invocationCallOrder;
+      const [write] = mockEm.update.mock.invocationCallOrder;
+
+      expect(open).toBeLessThan(write);
+      expect(mockAudit.openSettingsWrite).toHaveBeenCalledWith(
+        audit({ ...resource1 })
+      );
+      expect(mockAudit.closeSettingsWrite).toHaveBeenCalledWith('audit-1', {
+        outcome: 'applied',
+        params: audit({ ...resource1, displayName: 'Locked' })
+      });
+      expect(mockAudit.log).not.toHaveBeenCalled();
     });
 
-    it('fails and leaves the cache when the audit row fails', async () => {
+    it('fails before the write and leaves the cache when the audit row fails', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
-      mockAudit.log.mockRejectedValue(new Error('audit down'));
+      mockAudit.openSettingsWrite.mockRejectedValue(new Error('audit down'));
 
       await expect(
         service.update(
@@ -429,6 +459,7 @@ describe('ResourceService', () => {
           }
         )
       ).rejects.toThrow('audit down');
+      expect(mockEm.update).not.toHaveBeenCalled();
       expect(mockCacheManager.del).not.toHaveBeenCalled();
     });
 
@@ -441,6 +472,7 @@ describe('ResourceService', () => {
         { ability: superAbility }
       );
 
+      expect(mockAudit.openSettingsWrite).not.toHaveBeenCalled();
       expect(mockAudit.log).not.toHaveBeenCalled();
     });
   });
@@ -983,7 +1015,7 @@ describe('ResourceService', () => {
       expect(result.isRegistered).toBe(true);
     });
 
-    it('writes the audit row in the transaction of the write', async () => {
+    it('commits the audit row before the write and closes it as applied', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
       const audit = {
         action: AuditAction.RESOURCE_RESTORE,
@@ -994,7 +1026,11 @@ describe('ResourceService', () => {
       await service.restore('res-3', { ability: superAbility, audit });
 
       expect(mockEm.update).toHaveBeenCalledTimes(1);
-      expect(mockAudit.log).toHaveBeenCalledWith(audit, mockEm);
+      expect(mockAudit.openSettingsWrite).toHaveBeenCalledWith(audit);
+      expect(mockAudit.closeSettingsWrite).toHaveBeenCalledWith('audit-1', {
+        outcome: 'applied',
+        params: audit
+      });
     });
 
     it('refuses a resource that is not orphaned, before any effect', async () => {
@@ -1031,7 +1067,7 @@ describe('ResourceService', () => {
         status: 409,
         response: { errorKey: ErrorKeys.RESOURCES.NOT_ORPHANED }
       });
-      expect(mockAudit.log).not.toHaveBeenCalled();
+      expectDiscardedAuditRow();
       expect(mockCacheManager.set).not.toHaveBeenCalled();
     });
 

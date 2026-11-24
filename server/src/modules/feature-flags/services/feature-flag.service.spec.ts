@@ -6,6 +6,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import type { IfMatchCondition } from '@app/shared/utils/if-match';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AuditService } from '../../audit/audit.service';
+import type { AuditLogParams } from '../../audit/audit.service';
 import { FeatureFlagService } from './feature-flag.service';
 import { AttributeRegistryService } from './attribute-registry.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
@@ -60,7 +61,36 @@ describe('FeatureFlagService', () => {
   let settingsChangeLog: { applyPending: jest.Mock };
   let attributeRegistry: AttributeRegistryService;
   let configService: { getOrThrow: jest.Mock };
-  let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
+  let auditService: {
+    log: jest.Mock;
+    logFireAndForget: jest.Mock;
+    openSettingsWrite: jest.Mock<Promise<string>, [AuditLogParams]>;
+    closeSettingsWrite: jest.Mock;
+    discardSettingsWrite: jest.Mock;
+  };
+  /** The row is committed before the write, then closed as applied. */
+  const expectAppliedAuditRow = (params: unknown) => {
+    expect(auditService.openSettingsWrite).toHaveBeenCalledWith(params);
+    expect(auditService.closeSettingsWrite).toHaveBeenCalledWith('audit-1', {
+      outcome: 'applied',
+      params
+    });
+    expect(auditService.log).not.toHaveBeenCalled();
+  };
+  /** A refused settings write deletes the row that it committed first. */
+  const expectDiscardedAuditRow = () => {
+    expect(auditService.discardSettingsWrite).toHaveBeenCalledWith('audit-1');
+    expect(auditService.closeSettingsWrite).not.toHaveBeenCalled();
+    expect(auditService.log).not.toHaveBeenCalled();
+  };
+  /** The id that `create` gives the flag before the write. */
+  const createdId = () => {
+    const [[{ targetId }]] = auditService.openSettingsWrite.mock.calls;
+
+    if (!targetId) throw new Error('The audit row names no flag');
+
+    return targetId;
+  };
   let metricsService: { recordPermissionDenied: jest.Mock };
 
   const actor = {
@@ -115,7 +145,12 @@ describe('FeatureFlagService', () => {
     };
     auditService = {
       log: jest.fn().mockResolvedValue(undefined),
-      logFireAndForget: jest.fn()
+      logFireAndForget: jest.fn(),
+      openSettingsWrite: jest
+        .fn<Promise<string>, [AuditLogParams]>()
+        .mockResolvedValue('audit-1'),
+      closeSettingsWrite: jest.fn(),
+      discardSettingsWrite: jest.fn()
     };
     metricsService = { recordPermissionDenied: jest.fn() };
 
@@ -229,75 +264,73 @@ describe('FeatureFlagService', () => {
       flagRepo.findOne
         .mockResolvedValueOnce(null) // duplicate check
         .mockResolvedValueOnce({ ...sampleFlag, id: 'new-id', rules: [] }); // findOne after save
-      const em = mockTransaction({
-        save: jest.fn().mockResolvedValue({ ...sampleFlag, id: 'new-id' })
-      });
+      const em = mockTransaction();
       const result = await service.create(
         { key: 'beta-export', enabled: true },
         SYSTEM_ABILITY,
         actor
       );
+      const id = createdId();
 
       expect(result.id).toBe('new-id');
+      expect(id).toMatch(/^[0-9a-f-]{36}$/);
       expect(em.create).toHaveBeenCalledWith(
         FeatureFlag,
         expect.objectContaining({
+          id,
           key: 'beta-export',
           enabled: true,
           version: 1,
           updatedByUserId: 'actor-1'
         })
       );
+      expect(flagRepo.findOne).toHaveBeenLastCalledWith({ where: { id } });
       expect(em.delete).not.toHaveBeenCalled();
-      expect(auditService.log).toHaveBeenCalledWith(
-        {
-          ...auditFields,
-          action: AuditAction.FEATURE_FLAG_CREATE,
-          targetId: 'new-id',
-          details: { key: sampleFlag.key, flagId: 'new-id' }
-        },
-        em
-      );
+      expectAppliedAuditRow({
+        ...auditFields,
+        action: AuditAction.FEATURE_FLAG_CREATE,
+        targetId: id,
+        details: { key: 'beta-export', flagId: id }
+      });
     });
 
-    it('fails the create when the audit row cannot be written', async () => {
+    it('fails the create before the write when the audit row cannot be written', async () => {
       flagRepo.findOne.mockResolvedValueOnce(null);
       mockTransaction();
-      auditService.log.mockRejectedValueOnce(new Error('audit down'));
+      auditService.openSettingsWrite.mockRejectedValueOnce(
+        new Error('audit down')
+      );
 
       await expect(
         service.create({ key: 'beta-export' }, SYSTEM_ABILITY, actor)
       ).rejects.toThrow('audit down');
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
     it('writes the rules in the same transaction as the flag', async () => {
       flagRepo.findOne
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ ...sampleFlag, id: 'new-id' });
-      const em = mockTransaction({
-        save: jest
-          .fn()
-          .mockResolvedValueOnce({ ...sampleFlag, id: 'new-id' })
-          .mockResolvedValue({})
-      });
+      const em = mockTransaction();
 
       await service.create(
         { key: 'beta-export', rules: [percentRule(25), percentRule(50)] },
         SYSTEM_ABILITY,
         actor
       );
+      const id = createdId();
+
       expect(dataSource.transaction).toHaveBeenCalledTimes(1);
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.openSettingsWrite).toHaveBeenCalledWith(
         expect.objectContaining({
-          details: { key: sampleFlag.key, flagId: 'new-id', ruleCount: 2 }
-        }),
-        em
+          details: { key: 'beta-export', flagId: id, ruleCount: 2 }
+        })
       );
       expect(em.delete).toHaveBeenCalledWith(FeatureFlagRule, {
-        flagId: 'new-id'
+        flagId: id
       });
       expect(em.create).toHaveBeenCalledWith(FeatureFlagRule, {
-        flagId: 'new-id',
+        flagId: id,
         ...percentRule(50)
       });
       expect(em.save).toHaveBeenCalledTimes(3);
@@ -330,6 +363,7 @@ describe('FeatureFlagService', () => {
         status: 409,
         response: { errorKey: ErrorKeys.FEATURE_FLAGS.KEY_EXISTS }
       });
+      expectDiscardedAuditRow();
     });
 
     it('reads the unique-violation code from a wrapped driver error', async () => {
@@ -352,6 +386,11 @@ describe('FeatureFlagService', () => {
       await expect(
         service.create({ key: sampleFlag.key }, SYSTEM_ABILITY, actor)
       ).rejects.toThrow('connection reset');
+      expect(auditService.closeSettingsWrite).toHaveBeenCalledWith(
+        'audit-1',
+        expect.objectContaining({ outcome: 'not_applied' })
+      );
+      expect(auditService.discardSettingsWrite).not.toHaveBeenCalled();
     });
   });
 
@@ -436,7 +475,7 @@ describe('FeatureFlagService', () => {
       expect(flagRepo.findOne).toHaveBeenCalledTimes(1);
       expect(em.delete).not.toHaveBeenCalled();
       expect(em.save).not.toHaveBeenCalled();
-      expect(auditService.log).not.toHaveBeenCalled();
+      expectDiscardedAuditRow();
     });
 
     it('updates and increments version when match (affected = 1)', async () => {
@@ -460,15 +499,12 @@ describe('FeatureFlagService', () => {
       expect(result.version).toBe(2);
       expect(flagRepo.findOne).toHaveBeenCalledTimes(2);
       expect(em.delete).not.toHaveBeenCalled();
-      expect(auditService.log).toHaveBeenCalledWith(
-        {
-          ...auditFields,
-          action: AuditAction.FEATURE_FLAG_UPDATE,
-          targetId: 'flag-1',
-          details: { changedFields: ['enabled'] }
-        },
-        em
-      );
+      expectAppliedAuditRow({
+        ...auditFields,
+        action: AuditAction.FEATURE_FLAG_UPDATE,
+        targetId: 'flag-1',
+        details: { changedFields: ['enabled'] }
+      });
     });
 
     it('replaces the rules after the version-checked write', async () => {
@@ -492,7 +528,7 @@ describe('FeatureFlagService', () => {
 
     it('audits a rule set as a count, not as a changed field', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
-      const em = mockTransaction({
+      mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(1))
       });
 
@@ -501,20 +537,21 @@ describe('FeatureFlagService', () => {
         { enabled: true, rules: [percentRule(25)] },
         { ifMatch: version(1), ability: SYSTEM_ABILITY, actor }
       );
-      expect(auditService.log).toHaveBeenCalledWith(
+      expect(auditService.openSettingsWrite).toHaveBeenCalledWith(
         expect.objectContaining({
           details: { changedFields: ['enabled'], ruleCount: 1 }
-        }),
-        em
+        })
       );
     });
 
-    it('fails the update when the audit row cannot be written', async () => {
+    it('fails the update before the write when the audit row cannot be written', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
       mockTransaction({
         createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder(1))
       });
-      auditService.log.mockRejectedValueOnce(new Error('audit down'));
+      auditService.openSettingsWrite.mockRejectedValueOnce(
+        new Error('audit down')
+      );
 
       await expect(
         service.update(
@@ -523,6 +560,7 @@ describe('FeatureFlagService', () => {
           { ifMatch: version(1), ability: SYSTEM_ABILITY, actor }
         )
       ).rejects.toThrow('audit down');
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
     it('rejects an invalid rule payload before the transaction opens', async () => {
@@ -573,7 +611,7 @@ describe('FeatureFlagService', () => {
         expect.objectContaining({ lock: { mode: 'pessimistic_write' } })
       );
       expect(em.delete).not.toHaveBeenCalled();
-      expect(auditService.log).not.toHaveBeenCalled();
+      expectDiscardedAuditRow();
     });
 
     it('refuses a read of a flag outside the grant and audits the actor', async () => {
@@ -861,41 +899,49 @@ describe('FeatureFlagService', () => {
   });
 
   describe('delete', () => {
-    it('removes the flag and audits its key in one transaction', async () => {
+    it('removes the flag and audits its key, committed before the delete', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
       const em = mockTransaction();
 
       await service.delete('flag-1', SYSTEM_ABILITY, actor);
+      const [open] = auditService.openSettingsWrite.mock.invocationCallOrder;
+      const [remove] = em.delete.mock.invocationCallOrder;
+
       expect(em.delete).toHaveBeenCalledWith(FeatureFlag, { id: 'flag-1' });
-      expect(auditService.log).toHaveBeenCalledWith(
-        {
-          ...auditFields,
-          action: AuditAction.FEATURE_FLAG_DELETE,
-          targetId: 'flag-1',
-          details: { key: sampleFlag.key }
-        },
-        em
-      );
+      expect(open).toBeLessThan(remove);
+      expect(em.query).toHaveBeenCalledWith('SELECT set_config($1, $2, true)', [
+        'nexus.audit_id',
+        'audit-1'
+      ]);
+      expectAppliedAuditRow({
+        ...auditFields,
+        action: AuditAction.FEATURE_FLAG_DELETE,
+        targetId: 'flag-1',
+        details: { key: sampleFlag.key }
+      });
     });
 
-    it('answers FEATURE_FLAGS.NOT_FOUND with no audit row when a concurrent delete won', async () => {
+    it('answers FEATURE_FLAGS.NOT_FOUND and deletes its audit row when a concurrent delete won', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
       mockTransaction({ delete: jest.fn().mockResolvedValue({ affected: 0 }) });
 
       await expect(
         service.delete('flag-1', SYSTEM_ABILITY, actor)
       ).rejects.toMatchObject({ errorKey: ErrorKeys.FEATURE_FLAGS.NOT_FOUND });
-      expect(auditService.log).not.toHaveBeenCalled();
+      expectDiscardedAuditRow();
     });
 
-    it('fails the delete when the audit row cannot be written', async () => {
+    it('fails the delete before the write when the audit row cannot be written', async () => {
       flagRepo.findOne.mockResolvedValue(sampleFlag);
       mockTransaction();
-      auditService.log.mockRejectedValueOnce(new Error('audit down'));
+      auditService.openSettingsWrite.mockRejectedValueOnce(
+        new Error('audit down')
+      );
 
       await expect(
         service.delete('flag-1', SYSTEM_ABILITY, actor)
       ).rejects.toThrow('audit down');
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
 });

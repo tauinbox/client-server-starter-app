@@ -1,9 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression, Interval } from '@nestjs/schedule';
 import type { Cache } from 'cache-manager';
 import { DataSource, EntityManager } from 'typeorm';
+import type { AuditLogParams, AuditService } from '../../audit/audit.service';
 import { isSharedCache } from '../../../common/utils/redis-client';
 import {
   POOL_LOCK_KEYS,
@@ -96,23 +97,92 @@ export async function lockSettingsLog(manager: EntityManager): Promise<void> {
 }
 
 /**
+ * The audit row of a settings write. `draft` is built from the rows that the
+ * service read before the write: it is committed first, as `pending`. The write
+ * passes the row built from its locked rows to `recordAudit`, and that row
+ * replaces the draft after the commit.
+ */
+export interface SettingsWriteAudit {
+  trail: Pick<
+    AuditService,
+    'openSettingsWrite' | 'closeSettingsWrite' | 'discardSettingsWrite'
+  >;
+  draft: AuditLogParams;
+}
+
+/** The body of a settings write; `recordAudit` sets its final audit row. */
+export type SettingsWrite<T> = (
+  em: EntityManager,
+  recordAudit: (params: AuditLogParams) => void
+) => Promise<T>;
+
+/** Puts the id of the audit row into each change log entry of the write. */
+export const SETTINGS_AUDIT_ID_SETTING = 'nexus.audit_id';
+
+/**
  * The one form of a settings write of a service: `write` runs in a transaction
  * that first takes the log lock, and after the commit the change log is applied,
  * so the caller answers only when the caches of its pool no longer hold the old
- * settings. A failed write applies nothing.
+ * settings. A failed write applies nothing. With `audit`, its row is committed
+ * before the transaction, because after the split the row is in the regional
+ * database and the write in the settings database, and a stop between the two
+ * must not leave a change with no row.
  */
 export async function writeSettings<T>(
   manager: {
     transaction<R>(run: (em: EntityManager) => Promise<R>): Promise<R>;
   },
-  log: Pick<SettingsChangeLogService, 'applyPending'>,
-  write: (em: EntityManager) => Promise<T>
+  {
+    log,
+    audit
+  }: {
+    log: Pick<SettingsChangeLogService, 'applyPending'>;
+    audit?: SettingsWriteAudit;
+  },
+  write: SettingsWrite<T>
 ): Promise<T> {
-  const result = await manager.transaction(async (em) => {
-    await lockSettingsLog(em);
+  const auditId = audit
+    ? await audit.trail.openSettingsWrite(audit.draft)
+    : null;
+  let recorded = audit?.draft;
+  let result: T;
 
-    return write(em);
-  });
+  try {
+    result = await manager.transaction(async (em) => {
+      await lockSettingsLog(em);
+
+      if (auditId) {
+        await em.query('SELECT set_config($1, $2, true)', [
+          SETTINGS_AUDIT_ID_SETTING,
+          auditId
+        ]);
+      }
+
+      return write(em, (params) => {
+        recorded = params;
+      });
+    });
+  } catch (error) {
+    // A refusal changed nothing, so it leaves no row; a fault leaves the row
+    // as `not_applied`.
+    if (audit && auditId && error instanceof HttpException) {
+      await audit.trail.discardSettingsWrite(auditId);
+    } else if (audit && auditId) {
+      await audit.trail.closeSettingsWrite(auditId, {
+        outcome: 'not_applied',
+        params: audit.draft
+      });
+    }
+
+    throw error;
+  }
+
+  if (audit && auditId && recorded) {
+    await audit.trail.closeSettingsWrite(auditId, {
+      outcome: 'applied',
+      params: recorded
+    });
+  }
 
   await log.applyPending();
 

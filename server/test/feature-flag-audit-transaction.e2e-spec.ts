@@ -23,12 +23,12 @@ import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
-// A flag change and its audit row commit together: when the row cannot be
-// written, the request fails and the flag table keeps its previous state.
+// A flag change commits its audit row first: when the row cannot be written,
+// the request fails and the flag table keeps its previous state.
 // CI runs the migrations and not the seeders; the super role comes from them.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
-runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
+runWithInfra('Feature flag audit row committed before the write (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let token: string;
@@ -98,7 +98,7 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
 
   beforeEach(() => {
     jest
-      .spyOn(app.get(AuditService), 'log')
+      .spyOn(app.get(AuditService), 'openSettingsWrite')
       .mockRejectedValue(new Error('audit down'));
   });
 
@@ -170,5 +170,6 @@ runWithInfra('Feature flag audit in the write transaction (e2e)', () => {
     });
 
     expect(row.details).toEqual({ key: flagKey });
+    expect(row.settingsOutcome).toBe('applied');
   });
 });
