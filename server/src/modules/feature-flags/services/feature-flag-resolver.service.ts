@@ -18,6 +18,7 @@ import type { EvaluatedFeatureFlagsResponse } from '@app/shared/types';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { AttributeRegistryService } from './attribute-registry.service';
+import { attachRuleMembers } from '../utils/rule-members';
 import { PermissionService } from '../../auth/services/permission.service';
 import { UsersService } from '../../users/services/users.service';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -247,6 +248,8 @@ export class FeatureFlagResolverService {
       where: { flagId: In(flags.map((f) => f.id)) },
       order: { createdAt: 'ASC', id: 'ASC' }
     });
+
+    await attachRuleMembers(this.ruleRepo.manager, rules);
     const rulesByFlag = new Map<string, typeof rules>();
 
     for (const r of rules) {

@@ -11,9 +11,14 @@ describe('FeatureFlagChangedListener', () => {
   let listener: FeatureFlagChangedListener;
   let resolver: { invalidateAll: jest.Mock };
   let notifications: { pushToAll: jest.Mock };
-  const flagChange = () => settingsChangedEvent({ tables: ['feature_flags'] });
+  let manager: { query: jest.Mock };
+  const event = (change: Parameters<typeof settingsChangedEvent>[0]) =>
+    // @ts-expect-error the listener calls only `query` of the manager
+    settingsChangedEvent(change, { manager });
+  const flagChange = () => event({ tables: ['feature_flags'] });
 
   beforeEach(async () => {
+    manager = { query: jest.fn().mockResolvedValue([]) };
     resolver = { invalidateAll: jest.fn().mockResolvedValue(undefined) };
     notifications = { pushToAll: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
@@ -35,17 +40,32 @@ describe('FeatureFlagChangedListener', () => {
       ['a rule row', { tables: ['feature_flag_rules' as const] }],
       ['a rebase', { all: true }]
     ])('drops the flag cache for %s', async (_case, change) => {
-      await listener.handleSettingsChanged(settingsChangedEvent(change));
+      await listener.handleSettingsChanged(event(change));
 
       expect(resolver.invalidateAll).toHaveBeenCalledTimes(1);
     });
 
+    it('deletes the members of removed rules before it drops the cache', async () => {
+      await listener.handleSettingsChanged(
+        event({ tables: ['feature_flag_rules'] })
+      );
+
+      expect(manager.query).toHaveBeenCalledTimes(1);
+      expect(manager.query).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM "feature_flag_rule_users"')
+      );
+      expect(manager.query.mock.invocationCallOrder[0]).toBeLessThan(
+        resolver.invalidateAll.mock.invocationCallOrder[0]
+      );
+    });
+
     it('ignores a change of other settings', async () => {
       await listener.handleSettingsChanged(
-        settingsChangedEvent({ tables: ['roles', 'plans'] })
+        event({ tables: ['roles', 'plans'] })
       );
 
       expect(resolver.invalidateAll).not.toHaveBeenCalled();
+      expect(manager.query).not.toHaveBeenCalled();
     });
   });
 

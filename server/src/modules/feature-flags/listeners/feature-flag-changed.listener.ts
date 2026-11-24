@@ -4,6 +4,7 @@ import { SettingsChangedEvent } from '../../core/settings-change-log/settings-ch
 import { touches } from '../../core/settings-change-log/settings-change.types';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { deleteOrphanRuleMembers } from '../utils/rule-members';
 
 export const FLAGS_BROADCAST_COALESCE_MS = 500;
 
@@ -18,9 +19,15 @@ export class FeatureFlagChangedListener implements OnModuleDestroy {
   ) {}
 
   @OnEvent(SettingsChangedEvent.name, { suppressErrors: false })
-  async handleSettingsChanged({ change }: SettingsChangedEvent): Promise<void> {
+  async handleSettingsChanged({
+    change,
+    manager
+  }: SettingsChangedEvent): Promise<void> {
     if (!touches(change, 'feature_flags', 'feature_flag_rules')) return;
 
+    // In every scope: no apply reads these rows, so an early delete hides
+    // nothing from another process.
+    await deleteOrphanRuleMembers(manager);
     await this.resolver.invalidateAll();
 
     // Every broadcast makes all connected clients refetch their flag set at

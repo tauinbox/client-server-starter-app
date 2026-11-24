@@ -107,7 +107,8 @@ export const ErrorKeys = {
     VERSION_CONFLICT: 'errors.featureFlags.versionConflict',
     IF_MATCH_REQUIRED: 'errors.featureFlags.ifMatchRequired',
     IF_MATCH_INVALID: 'errors.featureFlags.ifMatchInvalid',
-    INVALID_RULE: 'errors.featureFlags.invalidRule'
+    INVALID_RULE: 'errors.featureFlags.invalidRule',
+    UNKNOWN_RULE_USER: 'errors.featureFlags.unknownRuleUser'
   },
   BILLING: {
     REGION_UNAVAILABLE: 'errors.billing.regionUnavailable',
