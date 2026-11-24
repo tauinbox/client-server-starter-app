@@ -295,10 +295,14 @@ runWithRedis('server pushes across instances (e2e)', () => {
 
       await settle();
       expect(viewerOnSecond()).toContainEqual({ type: 'permissions_updated' });
-      // One message names the holder, and only the holder. A broadcast of an
-      // apply of another suite names nobody, so it is not counted here.
+      // One message names the holder, and only the holder. A `user_list_stale`
+      // of another suite also names the viewer once this grant gives it
+      // `search:User`, so it is not counted.
       expect(
-        messages.filter(({ userIds }) => userIds?.includes(viewer.id))
+        messages.filter(
+          ({ userIds, event }) =>
+            userIds?.includes(viewer.id) && event.type !== 'user_list_stale'
+        )
       ).toEqual([
         expect.objectContaining({
           userIds: [viewer.id],
