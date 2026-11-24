@@ -1,8 +1,8 @@
 import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { expectApiError } from '../../../common/testing/api-error.expect';
 import { In, Not } from 'typeorm';
 import type { FindOperator } from 'typeorm';
@@ -221,11 +221,11 @@ async function build() {
     providers: [
       PlanChangeService,
       ProrationCalculator,
-      { provide: getRepositoryToken(Customer), useValue: customers },
-      { provide: getRepositoryToken(Subscription), useValue: subscriptions },
-      { provide: getRepositoryToken(Invoice), useValue: invoices },
+      { provide: repositoryToken(Customer), useValue: customers },
+      { provide: repositoryToken(Subscription), useValue: subscriptions },
+      { provide: repositoryToken(Invoice), useValue: invoices },
       {
-        provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+        provide: repositoryToken(Plan),
         useValue: plans
       },
       { provide: getDataSourceToken(), useValue: dataSource },

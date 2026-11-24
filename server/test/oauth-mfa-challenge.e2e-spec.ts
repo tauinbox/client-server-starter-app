@@ -7,7 +7,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource } from 'typeorm';
 import { postgresConfig } from '../src/postgres.config';
 import { createMockConfigService } from '../src/common/testing/config-service.mock';
@@ -67,11 +67,11 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
         TokenGeneratorService,
         { provide: DataSource, useValue: ds },
         {
-          provide: getRepositoryToken(RefreshToken),
+          provide: repositoryToken(RefreshToken),
           useValue: ds.getRepository(RefreshToken)
         },
         {
-          provide: getRepositoryToken(OAuthAccount),
+          provide: repositoryToken(OAuthAccount),
           useValue: ds.getRepository(OAuthAccount)
         },
         {

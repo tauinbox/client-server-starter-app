@@ -16,7 +16,7 @@ import {
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import request from 'supertest';
 import { Server } from 'http';
 import { ErrorKeys } from '@app/shared/constants';
@@ -99,7 +99,7 @@ describe('Two-factor requirement on the @Authorize surface (e2e)', () => {
         SecretEncryptionService,
         { provide: ConfigService, useValue: config },
         { provide: PermissionService, useValue: roles },
-        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: repositoryToken(User), useValue: userRepository },
         { provide: AuditService, useValue: auditService },
         {
           provide: MetricsService,

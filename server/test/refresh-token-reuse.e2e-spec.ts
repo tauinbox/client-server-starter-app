@@ -12,7 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { OAuthAccountService } from '../src/modules/auth/services/oauth-account.service';
@@ -268,7 +268,7 @@ describe('Refresh token reuse detection (e2e)', () => {
           provide: EntitlementService,
           useValue: { limitFor: jest.fn().mockResolvedValue(null) }
         },
-        { provide: getRepositoryToken(RefreshToken), useValue: rtRepo },
+        { provide: repositoryToken(RefreshToken), useValue: rtRepo },
         { provide: DataSource, useValue: ds },
         {
           provide: ConfigService,

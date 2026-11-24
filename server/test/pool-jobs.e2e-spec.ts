@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import {
   DataSource,
   DataSourceOptions,
@@ -169,7 +169,7 @@ runWithInfra('jobs on many nodes of one pool (e2e)', () => {
     it('runs the audit log cleanup on one node when two nodes fire it at once', async () => {
       const cleanup = app.get(AuditCleanupService);
       const repository = app.get<Repository<AuditLog>>(
-        getRepositoryToken(AuditLog)
+        repositoryToken(AuditLog)
       );
       const held = gate();
       const remove = jest

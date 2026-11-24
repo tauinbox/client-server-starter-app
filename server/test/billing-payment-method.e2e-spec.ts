@@ -11,8 +11,8 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
-import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { Server } from 'http';
@@ -397,13 +397,13 @@ describe('Billing payment-method update flow (e2e)', () => {
           useValue: { get: () => undefined }
         },
         {
-          provide: getRepositoryToken(User),
+          provide: repositoryToken(User),
           useValue: {
             findOne: jest.fn().mockResolvedValue({ email: 'buyer@example.com' })
           }
         },
         {
-          provide: getRepositoryToken(PaymentMethod),
+          provide: repositoryToken(PaymentMethod),
           useValue: {
             findOne: (opts: { where: { id: string } }) =>
               Promise.resolve(
@@ -413,15 +413,15 @@ describe('Billing payment-method update flow (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(WebhookEvent),
+          provide: repositoryToken(WebhookEvent),
           useValue: makeWebhookEventRepo(stores)
         },
         {
-          provide: getRepositoryToken(Subscription),
+          provide: repositoryToken(Subscription),
           useValue: subscriptionsRepo(stores)
         },
         {
-          provide: getRepositoryToken(Customer),
+          provide: repositoryToken(Customer),
           useValue: {
             findOne: (opts: { where: { id: string } }) =>
               Promise.resolve(
@@ -430,7 +430,7 @@ describe('Billing payment-method update flow (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: {
             findOne: (opts: { where: { key: string } }) =>
               Promise.resolve(
@@ -439,7 +439,7 @@ describe('Billing payment-method update flow (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Product),
           useValue: {
             find: () => Promise.resolve([]),
             findOne: () => Promise.resolve(null)

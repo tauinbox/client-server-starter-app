@@ -7,8 +7,8 @@ import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ErrorKeys } from '@app/shared/constants';
 import { expectApiError } from '../src/common/testing/api-error.expect';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
@@ -145,23 +145,23 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
         BillingAdminService,
         { provide: getDataSourceToken(), useValue: ds },
         {
-          provide: getRepositoryToken(Subscription),
+          provide: repositoryToken(Subscription),
           useValue: ds.getRepository(Subscription)
         },
         {
-          provide: getRepositoryToken(Invoice),
+          provide: repositoryToken(Invoice),
           useValue: ds.getRepository(Invoice)
         },
         {
-          provide: getRepositoryToken(Customer),
+          provide: repositoryToken(Customer),
           useValue: ds.getRepository(Customer)
         },
         {
-          provide: getRepositoryToken(WebhookEvent),
+          provide: repositoryToken(WebhookEvent),
           useValue: ds.getRepository(WebhookEvent)
         },
         {
-          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Product),
           useValue: ds.getRepository(Product)
         },
         {

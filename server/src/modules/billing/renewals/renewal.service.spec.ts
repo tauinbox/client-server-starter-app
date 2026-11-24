@@ -2,8 +2,8 @@ import { expect } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { Customer } from '../entities/customer.entity';
@@ -376,11 +376,11 @@ async function build(
       RenewalService,
       FixedRating,
       {
-        provide: getRepositoryToken(Subscription),
+        provide: repositoryToken(Subscription),
         useValue: subscriptionsRepo(store)
       },
       {
-        provide: getRepositoryToken(Customer),
+        provide: repositoryToken(Customer),
         useValue: {
           findOne: (opts: { where: { id: string } }) =>
             Promise.resolve(
@@ -389,7 +389,7 @@ async function build(
         }
       },
       {
-        provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+        provide: repositoryToken(Plan),
         useValue: {
           findOne: (opts: { where: { key: string } }) =>
             Promise.resolve(

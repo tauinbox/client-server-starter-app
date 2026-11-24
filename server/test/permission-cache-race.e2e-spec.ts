@@ -1,8 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import {
@@ -94,7 +93,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
-    plans = app.get(getRepositoryToken(Plan, SETTINGS_DATA_SOURCE));
+    plans = app.get(repositoryToken(Plan));
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);
     resourceService = app.get(ResourceService);
@@ -246,9 +245,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     resourceId = resource.id;
     await resourceService.invalidateSubjectMapCache();
 
-    const resources = app.get<Repository<Resource>>(
-      getRepositoryToken(Resource)
-    );
+    const resources = app.get<Repository<Resource>>(repositoryToken(Resource));
 
     held = holdNextCall(resources, 'find');
 
@@ -314,7 +311,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     );
 
     const subscriptions = app.get<Repository<Subscription>>(
-      getRepositoryToken(Subscription)
+      repositoryToken(Subscription)
     );
 
     held = holdNextCall(subscriptions, 'findOne');

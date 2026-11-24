@@ -1,6 +1,6 @@
 import { HttpException, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource, In, Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -311,7 +311,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
       expect(users.isOrphaned).toBe(false);
       jest
         .spyOn(
-          app.get<Repository<Resource>>(getRepositoryToken(Resource)),
+          app.get<Repository<Resource>>(repositoryToken(Resource)),
           'findOne'
         )
         .mockResolvedValueOnce({ ...users, isOrphaned: true });

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { DiscoveryService, Reflector } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { poolLockDataSource } from '../../../common/testing/pool-lock.mock';
@@ -113,12 +113,12 @@ describe('ResourceSyncService', () => {
           provide: ResourceRegistryService,
           useValue: resourceRegistryMock
         },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepoMock },
+        { provide: repositoryToken(Resource), useValue: resourceRepoMock },
         {
-          provide: getRepositoryToken(Permission),
+          provide: repositoryToken(Permission),
           useValue: permissionRepoMock
         },
-        { provide: getRepositoryToken(Action), useValue: actionRepoMock },
+        { provide: repositoryToken(Action), useValue: actionRepoMock },
         { provide: DataSource, useValue: poolLockDataSource() },
         { provide: SettingsChangeLogService, useValue: settingsChangeLog }
       ]

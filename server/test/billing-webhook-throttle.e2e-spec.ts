@@ -7,7 +7,7 @@ import { Test } from '@nestjs/testing';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { Server } from 'http';
@@ -148,7 +148,7 @@ describe('Billing webhook throttle exemption (e2e)', () => {
         // WebhookIpAllowlistGuard dep; unset allowlist keeps the receivers open
         { provide: ConfigService, useValue: { get: () => undefined } },
         {
-          provide: getRepositoryToken(WebhookEvent),
+          provide: repositoryToken(WebhookEvent),
           useValue: makeWebhookEventRepo()
         },
         { provide: BillingEventReducer, useValue: { reduce: jest.fn() } },

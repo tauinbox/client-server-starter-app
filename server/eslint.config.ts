@@ -203,6 +203,28 @@ export default defineConfig(
     }
   },
   {
+    // The data source of a repository token changes when an entity moves
+    // between data sources; repositoryToken(entity) reads it from the list.
+    basePath: __dirname,
+    files: ['src/**/*.spec.ts', 'test/**/*.ts'],
+    ignores: ['src/common/testing/repository-token.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@nestjs/typeorm',
+              importNames: ['getRepositoryToken'],
+              message:
+                'Use repositoryToken(entity) from src/common/testing/repository-token. It picks the data source of the entity.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
     // A migration is applied history, and Prettier skips this folder too.
     basePath: __dirname,
     files: ['src/migrations/**/*.ts'],

@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { PlanService } from './plan.service';
 import { Plan } from '../entities/plan.entity';
 
@@ -15,7 +14,7 @@ describe('PlanService', () => {
       providers: [
         PlanService,
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: repo
         }
       ]

@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
@@ -63,8 +63,8 @@ describe('FeatureFlagResolverService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FeatureFlagResolverService,
-        { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
-        { provide: getRepositoryToken(FeatureFlagRule), useValue: ruleRepo },
+        { provide: repositoryToken(FeatureFlag), useValue: flagRepo },
+        { provide: repositoryToken(FeatureFlagRule), useValue: ruleRepo },
         { provide: CACHE_MANAGER, useValue: cacheManager },
         {
           provide: AttributeRegistryService,

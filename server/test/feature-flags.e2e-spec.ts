@@ -25,7 +25,7 @@ import { Reflector } from '@nestjs/core';
 import request from 'supertest';
 import type { Server } from 'http';
 import { DataSource } from 'typeorm';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-flag-rule.entity';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
@@ -394,8 +394,8 @@ describe('Feature flags end-to-end', () => {
         AttributeRegistryService,
         FeatureFlagChangedListener,
         settingsChangeLogOfFlags(),
-        { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
-        { provide: getRepositoryToken(FeatureFlagRule), useValue: ruleRepo },
+        { provide: repositoryToken(FeatureFlag), useValue: flagRepo },
+        { provide: repositoryToken(FeatureFlagRule), useValue: ruleRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: CACHE_MANAGER, useValue: cache.manager },
         { provide: NotificationsService, useValue: notifications },
@@ -1002,9 +1002,9 @@ describe('GET /feature-flags anonymous rollout id', () => {
           provide: SettingsChangeLogService,
           useValue: { applyPending: jest.fn().mockResolvedValue(undefined) }
         },
-        { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
+        { provide: repositoryToken(FeatureFlag), useValue: flagRepo },
         {
-          provide: getRepositoryToken(FeatureFlagRule),
+          provide: repositoryToken(FeatureFlagRule),
           useValue: makeRuleRepoMock(stores)
         },
         {

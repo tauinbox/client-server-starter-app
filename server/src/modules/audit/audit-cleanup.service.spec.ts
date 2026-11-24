@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../common/testing/repository-token';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -24,7 +24,7 @@ describe('AuditCleanupService', () => {
       providers: [
         AuditCleanupService,
         {
-          provide: getRepositoryToken(AuditLog),
+          provide: repositoryToken(AuditLog),
           useValue: mockRepository
         },
         {

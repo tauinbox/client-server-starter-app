@@ -6,8 +6,8 @@
 import { Test } from '@nestjs/testing';
 import type { Provider } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
@@ -215,35 +215,35 @@ runWithInfra('billing write paths (e2e)', () => {
         RenewalService,
         { provide: getDataSourceToken(), useValue: ds },
         {
-          provide: getRepositoryToken(Customer),
+          provide: repositoryToken(Customer),
           useValue: ds.getRepository(Customer)
         },
         {
-          provide: getRepositoryToken(Subscription),
+          provide: repositoryToken(Subscription),
           useValue: ds.getRepository(Subscription)
         },
         {
-          provide: getRepositoryToken(Invoice),
+          provide: repositoryToken(Invoice),
           useValue: ds.getRepository(Invoice)
         },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: ds.getRepository(Plan)
         },
         {
-          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Product),
           useValue: ds.getRepository(Product)
         },
         {
-          provide: getRepositoryToken(WebhookEvent),
+          provide: repositoryToken(WebhookEvent),
           useValue: ds.getRepository(WebhookEvent)
         },
         {
-          provide: getRepositoryToken(CreditBalance),
+          provide: repositoryToken(CreditBalance),
           useValue: ds.getRepository(CreditBalance)
         },
         {
-          provide: getRepositoryToken(PaymentMethod),
+          provide: repositoryToken(PaymentMethod),
           useValue: ds.getRepository(PaymentMethod)
         },
         { provide: BILLING_PROVIDERS, useValue: [provider] },

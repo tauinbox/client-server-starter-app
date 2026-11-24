@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { Logger } from '@nestjs/common';
 import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import type { ICreatePayment, ICreateRefund } from '@a2seven/yoo-checkout';
@@ -71,8 +71,8 @@ async function build(
     providers: [
       YooKassaProvider,
       { provide: YOOKASSA_CLIENT, useValue: client },
-      { provide: getRepositoryToken(User), useValue: users },
-      { provide: getRepositoryToken(PaymentMethod), useValue: paymentMethods },
+      { provide: repositoryToken(User), useValue: users },
+      { provide: repositoryToken(PaymentMethod), useValue: paymentMethods },
       {
         provide: ConfigService,
         useValue: {

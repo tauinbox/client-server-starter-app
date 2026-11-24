@@ -9,8 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { DataSource, Repository } from 'typeorm';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
@@ -221,19 +220,19 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
         SessionIssuerService,
         SessionLimitService,
         EntitlementService,
-        { provide: getRepositoryToken(RefreshToken), useValue: rt.repo },
-        { provide: getRepositoryToken(Customer), useValue: customers },
-        { provide: getRepositoryToken(Subscription), useValue: subscriptions },
+        { provide: repositoryToken(RefreshToken), useValue: rt.repo },
+        { provide: repositoryToken(Customer), useValue: customers },
+        { provide: repositoryToken(Subscription), useValue: subscriptions },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: plans
         },
         {
-          provide: getRepositoryToken(CustomerGrant),
+          provide: repositoryToken(CustomerGrant),
           useValue: { find: jest.fn().mockResolvedValue([]) }
         },
         {
-          provide: getRepositoryToken(CreditBalance),
+          provide: repositoryToken(CreditBalance),
           useValue: { findOne: jest.fn().mockResolvedValue(null) }
         },
         { provide: CACHE_MANAGER, useValue: cache },

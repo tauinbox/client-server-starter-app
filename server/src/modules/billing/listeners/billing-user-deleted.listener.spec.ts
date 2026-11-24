@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { In } from 'typeorm';
 import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
 import { UserDeletedEvent } from '../../users/events/user-deleted.event';
@@ -39,8 +39,8 @@ describe('BillingUserDeletedListener', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillingUserDeletedListener,
-        { provide: getRepositoryToken(Customer), useValue: customers },
-        { provide: getRepositoryToken(Subscription), useValue: subscriptions },
+        { provide: repositoryToken(Customer), useValue: customers },
+        { provide: repositoryToken(Subscription), useValue: subscriptions },
         {
           provide: BILLING_PROVIDERS,
           useValue: [

@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { IsNull } from 'typeorm';
 import { HttpException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -218,7 +218,7 @@ describe('ResourceService', () => {
       providers: [
         ResourceService,
         {
-          provide: getRepositoryToken(Resource),
+          provide: repositoryToken(Resource),
           useValue: mockResourceRepo
         },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },

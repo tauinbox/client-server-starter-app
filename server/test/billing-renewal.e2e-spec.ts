@@ -8,8 +8,8 @@
 import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import type { INestApplication } from '@nestjs/common';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -261,11 +261,11 @@ describe('Billing renewal scheduler (e2e)', () => {
         FixedRating,
         EntitlementChangedListener,
         {
-          provide: getRepositoryToken(Subscription),
+          provide: repositoryToken(Subscription),
           useValue: subscriptionsRepo(store)
         },
         {
-          provide: getRepositoryToken(Customer),
+          provide: repositoryToken(Customer),
           useValue: {
             findOne: (opts: { where: { id: string } }) =>
               Promise.resolve(
@@ -274,7 +274,7 @@ describe('Billing renewal scheduler (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: {
             findOne: (opts: { where: { key: string } }) =>
               Promise.resolve(

@@ -16,7 +16,7 @@ import {
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import request from 'supertest';
@@ -181,7 +181,7 @@ describe('Grant scope over the HTTP path', () => {
         { provide: APP_GUARD, useClass: TestJwtAuthGuard },
         { provide: APP_GUARD, useClass: TestPermissionsGuard },
         {
-          provide: getRepositoryToken(Role),
+          provide: repositoryToken(Role),
           useValue: {
             findOne: jest.fn().mockResolvedValue(customRole),
             // A grant write runs in a settings transaction of the role
@@ -195,11 +195,11 @@ describe('Grant scope over the HTTP path', () => {
           }
         },
         {
-          provide: getRepositoryToken(Permission),
+          provide: repositoryToken(Permission),
           useValue: { find: jest.fn().mockResolvedValue([permission]) }
         },
         {
-          provide: getRepositoryToken(RolePermission),
+          provide: repositoryToken(RolePermission),
           useValue: rolePermissionRepo
         },
         {

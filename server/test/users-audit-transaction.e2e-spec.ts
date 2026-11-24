@@ -4,7 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource, Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -317,7 +317,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
       const live = await stored(targetId);
 
       jest
-        .spyOn(app.get<Repository<User>>(getRepositoryToken(User)), 'findOne')
+        .spyOn(app.get<Repository<User>>(repositoryToken(User)), 'findOne')
         .mockResolvedValueOnce({ ...live, deletedAt: new Date() } as User);
       const audit = jest.fn().mockReturnValue([]);
 

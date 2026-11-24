@@ -4,7 +4,7 @@
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { postgresConfig } from '../src/postgres.config';
@@ -47,7 +47,7 @@ runWithInfra('One linked identity per provider (e2e)', () => {
         OAuthAccountService,
         { provide: DataSource, useValue: ds },
         {
-          provide: getRepositoryToken(OAuthAccount),
+          provide: repositoryToken(OAuthAccount),
           useValue: ds.getRepository(OAuthAccount)
         },
         {
