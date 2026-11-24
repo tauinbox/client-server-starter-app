@@ -152,6 +152,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
     await expect(
       createFlag('unknown-create', [userRule([member.id, missing])])
     ).rejects.toMatchObject({
+      status: 422,
       errorKey: ErrorKeys.FEATURE_FLAGS.UNKNOWN_RULE_USER
     });
     expect(
@@ -173,6 +174,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
         }
       )
     ).rejects.toMatchObject({
+      status: 422,
       errorKey: ErrorKeys.FEATURE_FLAGS.UNKNOWN_RULE_USER
     });
 
