@@ -39,6 +39,7 @@ import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-s
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { AuditService } from '../src/modules/audit/audit.service';
+import { fakeSettingsAuditTrail } from './audit-fakes';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
@@ -119,7 +120,10 @@ describe('Grant scope over the HTTP path', () => {
     create: jest.Mock;
     manager: { transaction: jest.Mock };
   };
-  let auditService: { logFireAndForget: jest.Mock; log: jest.Mock };
+  let auditService: {
+    logFireAndForget: jest.Mock;
+    log: jest.Mock;
+  } & ReturnType<typeof fakeSettingsAuditTrail>;
 
   beforeAll(async () => {
     holder = new AbilityHolder();
@@ -164,7 +168,8 @@ describe('Grant scope over the HTTP path', () => {
     };
     auditService = {
       logFireAndForget: jest.fn(),
-      log: jest.fn().mockResolvedValue(undefined)
+      log: jest.fn().mockResolvedValue(undefined),
+      ...fakeSettingsAuditTrail()
     };
 
     @Module({

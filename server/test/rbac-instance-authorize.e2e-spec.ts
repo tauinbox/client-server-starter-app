@@ -34,6 +34,7 @@ import { PermissionService } from '../src/modules/auth/services/permission.servi
 import { BreachedPasswordService } from '../src/modules/auth/breached-password/breached-password.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
 import { AuditService } from '../src/modules/audit/audit.service';
+import { fakeSettingsAuditTrail } from './audit-fakes';
 import { MailService } from '../src/modules/mail/mail.service';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -193,7 +194,8 @@ describe('Instance-level @Authorize re-check', () => {
           provide: AuditService,
           useValue: {
             log: jest.fn().mockResolvedValue(undefined),
-            logFireAndForget: jest.fn()
+            logFireAndForget: jest.fn(),
+            ...fakeSettingsAuditTrail()
           }
         },
         {

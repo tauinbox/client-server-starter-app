@@ -27,14 +27,14 @@ import { AuditService } from '../src/modules/audit/audit.service';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { withPrivateThrottlerStorage } from './private-throttler';
 
-// An administrator change to a role, a role grant or a resource and its audit
-// row commit together: when the row cannot be written, the request fails and
-// nothing changes.
+// An administrator change to a role, a role grant or a resource commits its
+// audit row first, and a role assignment writes it in its transaction: when
+// the row cannot be written, the request fails and nothing changes.
 // CI runs the migrations and not the seeders; the super role comes from them.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 runWithInfra(
-  'Role and resource changes: audit in the write transaction (e2e)',
+  'Role and resource changes: a failed audit row changes nothing (e2e)',
   () => {
     let app: INestApplication;
     let dataSource: DataSource;
@@ -140,6 +140,11 @@ runWithInfra(
       jest
         .spyOn(app.get(ResourceRegistryService), 'isRegistered')
         .mockImplementation((name) => name === resourceName);
+      // A settings write commits its row first; a role assignment writes it
+      // in its transaction.
+      jest
+        .spyOn(app.get(AuditService), 'openSettingsWrite')
+        .mockRejectedValue(new Error('audit down'));
       jest
         .spyOn(app.get(AuditService), 'log')
         .mockRejectedValue(new Error('audit down'));
@@ -325,6 +330,7 @@ runWithInfra(
 
     it('with a working audit, each change writes one row with its details', async () => {
       jest.mocked(app.get(AuditService).log).mockRestore();
+      jest.mocked(app.get(AuditService).openSettingsWrite).mockRestore();
 
       const name = `${prefix}-working`;
       const created = await api().post('/roles').send({ name }).expect(201);

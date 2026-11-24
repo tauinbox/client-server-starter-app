@@ -53,6 +53,7 @@ import type { FeatureFlagRulePayload } from '@app/shared/types';
 import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
 import type { FlagAuditActor } from '../src/modules/feature-flags/services/feature-flag.service';
 import { AuditService } from '../src/modules/audit/audit.service';
+import { fakeSettingsAuditTrail } from './audit-fakes';
 import { createMockConfigService } from '../src/common/testing/config-service.mock';
 import { flagAuditActor } from './flag-audit-actor';
 import type { IfMatchCondition } from '@app/shared/utils/if-match';
@@ -417,7 +418,10 @@ describe('Feature flags end-to-end', () => {
         AccessRefusalService,
         {
           provide: AuditService,
-          useValue: { log: jest.fn().mockResolvedValue(undefined) }
+          useValue: {
+            log: jest.fn().mockResolvedValue(undefined),
+            ...fakeSettingsAuditTrail()
+          }
         }
       ]
     }).compile();
@@ -1027,7 +1031,10 @@ describe('GET /feature-flags anonymous rollout id', () => {
         AccessRefusalService,
         {
           provide: AuditService,
-          useValue: { log: jest.fn().mockResolvedValue(undefined) }
+          useValue: {
+            log: jest.fn().mockResolvedValue(undefined),
+            ...fakeSettingsAuditTrail()
+          }
         }
       ]
     }).compile();
