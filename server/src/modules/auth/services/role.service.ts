@@ -57,8 +57,8 @@ import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { auditContextOf } from '../casl/ability-context';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  lockSettingsLog,
-  SettingsChangeLogService
+  SettingsChangeLogService,
+  writeSettings
 } from '../../core/settings-change-log/settings-change-log.service';
 import { RoleRenamedEvent } from '../events/role-renamed.event';
 import { RoleDeletedEvent } from '../events/role-deleted.event';
@@ -733,18 +733,14 @@ export class RoleService {
    * applies the change log after the commit, so the caller answers only when
    * the caches of its pool no longer hold the old settings.
    */
-  private async writeSettings<T>(
+  private writeSettings<T>(
     write: (em: EntityManager) => Promise<T>
   ): Promise<T> {
-    const result = await this.roleRepository.manager.transaction(async (em) => {
-      await lockSettingsLog(em);
-
-      return write(em);
-    });
-
-    await this.settingsChangeLog.applyPending();
-
-    return result;
+    return writeSettings(
+      this.roleRepository.manager,
+      this.settingsChangeLog,
+      write
+    );
   }
 
   /** `writeAudited` for a settings write: the log lock and the apply. */

@@ -94,6 +94,30 @@ export async function lockSettingsLog(manager: EntityManager): Promise<void> {
 }
 
 /**
+ * The one form of a settings write of a service: `write` runs in a transaction
+ * that first takes the log lock, and after the commit the change log is applied,
+ * so the caller answers only when the caches of its pool no longer hold the old
+ * settings. A failed write applies nothing.
+ */
+export async function writeSettings<T>(
+  manager: {
+    transaction<R>(run: (em: EntityManager) => Promise<R>): Promise<R>;
+  },
+  log: Pick<SettingsChangeLogService, 'applyPending'>,
+  write: (em: EntityManager) => Promise<T>
+): Promise<T> {
+  const result = await manager.transaction(async (em) => {
+    await lockSettingsLog(em);
+
+    return write(em);
+  });
+
+  await log.applyPending();
+
+  return result;
+}
+
+/**
  * Applies the settings change log to the caches of this pool. The scope of an
  * apply is the scope of the cache store: with Redis every node of the pool
  * reads the same entries, so one node applies each entry and the applied

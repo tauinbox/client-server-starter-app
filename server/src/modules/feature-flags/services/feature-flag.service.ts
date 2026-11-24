@@ -58,8 +58,8 @@ const FEATURE_FLAG_LIST_COLUMNS: ListColumns<typeof FEATURE_FLAG_LIST_QUERY> = {
 
 import { AttributeRegistryService } from './attribute-registry.service';
 import {
-  lockSettingsLog,
-  SettingsChangeLogService
+  SettingsChangeLogService,
+  writeSettings
 } from '../../core/settings-change-log/settings-change-log.service';
 
 function keyExistsConflict(): ApiError {
@@ -116,18 +116,8 @@ export class FeatureFlagService {
    * applies the change log after the commit, so the caller answers only when
    * the flag caches of its pool no longer hold the old flag.
    */
-  async #writeSettings<T>(
-    write: (em: EntityManager) => Promise<T>
-  ): Promise<T> {
-    const result = await this.dataSource.transaction(async (em) => {
-      await lockSettingsLog(em);
-
-      return write(em);
-    });
-
-    await this.settingsChangeLog.applyPending();
-
-    return result;
+  #writeSettings<T>(write: (em: EntityManager) => Promise<T>): Promise<T> {
+    return writeSettings(this.dataSource, this.settingsChangeLog, write);
   }
 
   /**

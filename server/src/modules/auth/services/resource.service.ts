@@ -31,8 +31,8 @@ import {
 } from '@app/shared/utils/grantable-actions';
 import { subject } from '@casl/ability';
 import {
-  lockSettingsLog,
-  SettingsChangeLogService
+  SettingsChangeLogService,
+  writeSettings
 } from '../../core/settings-change-log/settings-change-log.service';
 import { withChanges } from '@app/shared/utils/changed-fields';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
@@ -165,8 +165,6 @@ export class ResourceService {
     check(await this.loadResource(id));
     const { saved } = await this.updateAudited(id, data, { check, audit });
 
-    await this.settingsChangeLog.applyPending();
-
     return saved;
   }
 
@@ -261,6 +259,14 @@ export class ResourceService {
    * audit row of the change in one transaction. An edit that loses to a delete
    * answers not found. `before` is the locked row as it was before the write.
    */
+  #writeSettings<T>(write: (em: EntityManager) => Promise<T>): Promise<T> {
+    return writeSettings(
+      this.resourceRepository.manager,
+      this.settingsChangeLog,
+      write
+    );
+  }
+
   private updateAudited(
     id: string,
     changes: QueryDeepPartialEntity<Resource>,
@@ -272,8 +278,7 @@ export class ResourceService {
       audit?: (before: Resource) => AuditLogParams;
     }
   ): Promise<{ before: Resource; saved: Resource }> {
-    return this.resourceRepository.manager.transaction(async (em) => {
-      await lockSettingsLog(em);
+    return this.#writeSettings(async (em) => {
       const before = await this.lockResource(em, id);
 
       check(before);
@@ -331,28 +336,24 @@ export class ResourceService {
     this.assertCanRestore(ability, await this.loadResource(id), actorId);
     // Keyed on the orphaned state, so of two concurrent restores one writes
     // and audits and the other is refused.
-    const resource = await this.resourceRepository.manager.transaction(
-      async (em) => {
-        await lockSettingsLog(em);
-        const locked = await this.lockResource(em, id);
+    const resource = await this.#writeSettings(async (em) => {
+      const locked = await this.lockResource(em, id);
 
-        this.assertCanRestore(ability, locked, actorId);
-        const { affected } = await em.update(
-          Resource,
-          { id, isOrphaned: true },
-          { isOrphaned: false }
-        );
+      this.assertCanRestore(ability, locked, actorId);
+      const { affected } = await em.update(
+        Resource,
+        { id, isOrphaned: true },
+        { isOrphaned: false }
+      );
 
-        if (affected === 0) throw notOrphaned(locked);
+      if (affected === 0) throw notOrphaned(locked);
 
-        if (audit) await this.auditService.log(audit, em);
+      if (audit) await this.auditService.log(audit, em);
 
-        return locked;
-      }
-    );
+      return locked;
+    });
 
     resource.isOrphaned = false;
-    await this.settingsChangeLog.applyPending();
     resource.isRegistered = true;
 
     return resource;
