@@ -20,6 +20,7 @@ import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
+import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
@@ -434,6 +435,13 @@ describe('Billing payment-method update flow (e2e)', () => {
               Promise.resolve(
                 stores.plans.find((p) => p.key === opts.where.key) ?? null
               )
+          }
+        },
+        {
+          provide: getRepositoryToken(Product),
+          useValue: {
+            find: () => Promise.resolve([]),
+            findOne: () => Promise.resolve(null)
           }
         },
         { provide: getDataSourceToken(), useValue: dataSource },

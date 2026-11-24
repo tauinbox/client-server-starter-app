@@ -13,6 +13,7 @@ import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
+import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
@@ -78,10 +79,12 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
         BillingAdminService,
         FirstPaymentUnclaimedListener,
         { provide: getDataSourceToken(), useValue: ds },
-        ...[Subscription, Invoice, Customer, WebhookEvent].map((entity) => ({
-          provide: getRepositoryToken(entity),
-          useValue: ds.getRepository(entity)
-        })),
+        ...[Subscription, Invoice, Customer, WebhookEvent, Plan, Product].map(
+          (entity) => ({
+            provide: getRepositoryToken(entity),
+            useValue: ds.getRepository(entity)
+          })
+        ),
         {
           provide: BillingService,
           useValue: { getProviderById: () => provider }

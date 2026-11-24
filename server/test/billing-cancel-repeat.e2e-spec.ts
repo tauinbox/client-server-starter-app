@@ -20,6 +20,7 @@ import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
+import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
@@ -55,10 +56,12 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
         RESPONSE_SERIALIZER,
         BillingAdminService,
         { provide: getDataSourceToken(), useValue: ds },
-        ...[Subscription, Invoice, Customer, WebhookEvent].map((entity) => ({
-          provide: getRepositoryToken(entity),
-          useValue: ds.getRepository(entity)
-        })),
+        ...[Subscription, Invoice, Customer, WebhookEvent, Product].map(
+          (entity) => ({
+            provide: getRepositoryToken(entity),
+            useValue: ds.getRepository(entity)
+          })
+        ),
         {
           provide: BillingService,
           useValue: { getProviderById: () => ({ cancel: providerCancel }) }

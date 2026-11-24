@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectDataSource } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
   DataSource,
   In,
   IsNull,
+  Repository,
   type EntityManager,
   type QueryDeepPartialEntity
 } from 'typeorm';
@@ -91,6 +92,8 @@ function lifecycleOwnerFor(provider: BillingProviderId): 'provider' | 'self' {
  * state). Idempotency at the event level is guaranteed upstream by the
  * `billing_webhook_events` unique key; within a delivery the subscription upsert
  * and the unique `provider_event_id` on `Invoice` keep re-application safe.
+ * The plan and product catalog is read before that transaction, not in it:
+ * the catalog is settings data and the transaction writes personal data.
  */
 @Injectable()
 export class BillingEventReducer {
@@ -98,6 +101,8 @@ export class BillingEventReducer {
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
+    @InjectRepository(Plan) private readonly plans: Repository<Plan>,
+    @InjectRepository(Product) private readonly products: Repository<Product>,
     private readonly credits: CreditService,
     private readonly events: EventEmitter2,
     private readonly metrics: MetricsService
@@ -161,12 +166,11 @@ export class BillingEventReducer {
    * is and the gap is reported.
    */
   private async planForPrices(
-    manager: EntityManager,
     provider: BillingProviderId,
     payload: NormalizedSubscriptionPayload
   ): Promise<Plan | null> {
     const plan = findByPriceId(
-      await manager.find(Plan),
+      await this.plans.find(),
       payload.providerPriceIds,
       (row) => row.prices[provider]?.providerPriceId
     );
@@ -185,14 +189,13 @@ export class BillingEventReducer {
    * server wrote it, else matched by the catalog price that was paid.
    */
   private async purchasedProduct(
-    manager: EntityManager,
     provider: BillingProviderId,
     payload: NormalizedInvoicePayload
   ): Promise<Product | null> {
     const product = payload.productId
-      ? await manager.findOne(Product, { where: { id: payload.productId } })
+      ? await this.products.findOne({ where: { id: payload.productId } })
       : findByPriceId(
-          await manager.find(Product),
+          await this.products.find(),
           payload.providerPriceIds ?? [],
           (row) => row.prices[provider]?.paddlePriceId
         );
@@ -223,10 +226,10 @@ export class BillingEventReducer {
       return;
     }
 
+    const plan = await this.planForPrices(provider, payload);
     const result = await withTransaction(this.dataSource, async (manager) => {
       const userId = await this.resolveUserId(manager, payload.ref);
       const now = new Date();
-      const plan = await this.planForPrices(manager, provider, payload);
 
       const subscription = await manager.findOne(Subscription, {
         where: { providerSubscriptionId: payload.providerSubscriptionId }
@@ -550,19 +553,19 @@ export class BillingEventReducer {
       return;
     }
 
+    // A one-time purchase belongs to no subscription — it must never match
+    // the self-managed open-subscription fallback below (which would
+    // activate it).
+    const oneTime = payload.kind === 'one_time';
+    const product = oneTime
+      ? await this.purchasedProduct(provider, payload)
+      : null;
     const result = await withTransaction(this.dataSource, async (manager) => {
       const userId = await this.resolveUserId(manager, payload.ref);
       const now = new Date();
-
-      // A one-time purchase belongs to no subscription — it must never match
-      // the self-managed open-subscription fallback below (which would
-      // activate it). Provider-managed invoices link by the provider
-      // subscription id; a self-managed (YooKassa) first payment has none, so
-      // the incomplete subscription created at checkout is found by customer id.
-      const oneTime = payload.kind === 'one_time';
-      const product = oneTime
-        ? await this.purchasedProduct(manager, provider, payload)
-        : null;
+      // Provider-managed invoices link by the provider subscription id; a
+      // self-managed (YooKassa) first payment has none, so the incomplete
+      // subscription created at checkout is found by customer id.
       const subscription = oneTime
         ? null
         : payload.providerSubscriptionId

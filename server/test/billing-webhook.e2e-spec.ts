@@ -95,31 +95,17 @@ function makeManager(stores: Stores) {
       if (entity === Subscription)
         return Promise.resolve(findWhere(stores.subscriptions, opts.where));
 
-      if (entity === Plan)
-        return Promise.resolve(findWhere(stores.plans, opts.where));
-
       if (entity === Customer)
         return Promise.resolve(findWhere(stores.customers, opts.where));
 
       if (entity === Invoice)
         return Promise.resolve(findWhere(stores.invoices, opts.where));
 
-      if (entity === Product)
-        return Promise.resolve(findWhere(stores.products, opts.where));
-
       if (entity === CreditBalance)
         return Promise.resolve(findWhere(stores.creditBalances, opts.where));
 
       return Promise.resolve(null);
     },
-    find: (entity: unknown) =>
-      Promise.resolve(
-        entity === Plan
-          ? stores.plans
-          : entity === Product
-            ? stores.products
-            : []
-      ),
     update: (
       entity: unknown,
       where: Record<string, unknown>,
@@ -438,8 +424,17 @@ describe('Billing Paddle webhook (e2e)', () => {
         {
           provide: getRepositoryToken(Plan),
           useValue: {
+            find: () => Promise.resolve(stores.plans),
             findOne: (opts: { where: Partial<Plan> }) =>
               Promise.resolve(findWhere(stores.plans, opts.where))
+          }
+        },
+        {
+          provide: getRepositoryToken(Product),
+          useValue: {
+            find: () => Promise.resolve(stores.products),
+            findOne: (opts: { where: Partial<Product> }) =>
+              Promise.resolve(findWhere(stores.products, opts.where))
           }
         },
         {

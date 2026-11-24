@@ -239,6 +239,11 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
               ds.transaction((m) => cb(racingManager(m, duringWindow)))
           }
         },
+        { provide: getRepositoryToken(Plan), useValue: ds.getRepository(Plan) },
+        {
+          provide: getRepositoryToken(Product),
+          useValue: ds.getRepository(Product)
+        },
         {
           provide: CreditService,
           useValue: { addPurchase: jest.fn() }

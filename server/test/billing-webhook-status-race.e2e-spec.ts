@@ -12,6 +12,7 @@ import { expectApiError } from '../src/common/testing/api-error.expect';
 import { postgresConfig } from '../src/postgres.config';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
+import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
@@ -129,6 +130,10 @@ runWithInfra('Webhook status writes vs. a concurrent writer (e2e)', () => {
             useValue: ds.getRepository(Customer)
           },
           { provide: getRepositoryToken(WebhookEvent), useValue: repo },
+          {
+            provide: getRepositoryToken(Product),
+            useValue: ds.getRepository(Product)
+          },
           { provide: BillingService, useValue: {} },
           { provide: CreditService, useValue: {} },
           { provide: RenewalService, useValue: {} },

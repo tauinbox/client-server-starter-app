@@ -17,6 +17,7 @@ import { User } from '../src/modules/users/entities/user.entity';
 import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
+import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { PADDLE_CLIENT } from '../src/modules/billing/providers/paddle.client';
@@ -125,6 +126,14 @@ runWithRedis('billing webhook queue (real Redis)', () => {
         {
           provide: getRepositoryToken(CreditBalance),
           useValue: ds.getRepository(CreditBalance)
+        },
+        {
+          provide: getRepositoryToken(Plan),
+          useValue: ds.getRepository(Plan)
+        },
+        {
+          provide: getRepositoryToken(Product),
+          useValue: ds.getRepository(Product)
         },
         {
           provide: MetricsService,

@@ -12,6 +12,7 @@ import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
+import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { User } from '../src/modules/users/entities/user.entity';
 import {
@@ -284,6 +285,13 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
               Promise.resolve(
                 store.plans.find((p) => p.key === opts.where.key) ?? null
               )
+          }
+        },
+        {
+          provide: getRepositoryToken(Product),
+          useValue: {
+            find: () => Promise.resolve([]),
+            findOne: () => Promise.resolve(null)
           }
         },
         {
