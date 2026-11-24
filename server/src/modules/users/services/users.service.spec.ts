@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { ApiError } from '../../../common/errors/api-error';
 import bcrypt from 'bcrypt';
@@ -161,7 +161,7 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         {
-          provide: getRepositoryToken(User),
+          provide: repositoryToken(User),
           useValue: mockRepository
         },
         {

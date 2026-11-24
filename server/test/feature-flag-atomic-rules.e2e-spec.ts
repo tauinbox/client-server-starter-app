@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
@@ -210,7 +210,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     );
     // The read of the next update returns the row as it was before that write.
     jest
-      .spyOn(app.get(getRepositoryToken(FeatureFlag)), 'findOne')
+      .spyOn(app.get(repositoryToken(FeatureFlag)), 'findOne')
       .mockResolvedValueOnce(flag);
 
     await expect(

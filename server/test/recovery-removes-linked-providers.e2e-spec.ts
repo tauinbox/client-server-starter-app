@@ -7,7 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource, EntityManager } from 'typeorm';
 import { ErrorKeys, OAUTH_ERROR } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -64,7 +64,7 @@ runWithInfra('Account recovery removes the linked providers (e2e)', () => {
         OAuthAccountService,
         { provide: DataSource, useValue: ds },
         {
-          provide: getRepositoryToken(OAuthAccount),
+          provide: repositoryToken(OAuthAccount),
           useValue: ds.getRepository(OAuthAccount)
         },
         {

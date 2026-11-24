@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
@@ -157,8 +157,8 @@ describe('FeatureFlagService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FeatureFlagService,
-        { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
-        { provide: getRepositoryToken(FeatureFlagRule), useValue: ruleRepo },
+        { provide: repositoryToken(FeatureFlag), useValue: flagRepo },
+        { provide: repositoryToken(FeatureFlagRule), useValue: ruleRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: AttributeRegistryService, useValue: attributeRegistry },
         { provide: ConfigService, useValue: configService },

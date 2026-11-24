@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { DataSource } from 'typeorm';
 import type { Subjects } from '../src/modules/auth/casl/app-ability';
@@ -157,19 +157,19 @@ describe('Instance-level @Authorize re-check', () => {
         { provide: APP_GUARD, useClass: TestJwtAuthGuard },
         { provide: APP_GUARD, useClass: TestPermissionsGuard },
         {
-          provide: getRepositoryToken(User),
+          provide: repositoryToken(User),
           useValue: repositoryOf(userRows, write)
         },
         {
-          provide: getRepositoryToken(Role),
+          provide: repositoryToken(Role),
           useValue: repositoryOf(roleRows, write)
         },
         {
-          provide: getRepositoryToken(Resource),
+          provide: repositoryToken(Resource),
           useValue: repositoryOf(resourceRows, write)
         },
-        { provide: getRepositoryToken(Permission), useValue: {} },
-        { provide: getRepositoryToken(RolePermission), useValue: {} },
+        { provide: repositoryToken(Permission), useValue: {} },
+        { provide: repositoryToken(RolePermission), useValue: {} },
         { provide: DataSource, useValue: {} },
         { provide: BreachedPasswordService, useValue: {} },
         {

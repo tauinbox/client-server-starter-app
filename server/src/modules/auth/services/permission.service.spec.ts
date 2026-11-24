@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { PermissionService } from './permission.service';
 import { User } from '../../users/entities/user.entity';
@@ -93,7 +93,7 @@ describe('PermissionService', () => {
       providers: [
         PermissionService,
         {
-          provide: getRepositoryToken(User),
+          provide: repositoryToken(User),
           useValue: mockUserRepository
         },
         {

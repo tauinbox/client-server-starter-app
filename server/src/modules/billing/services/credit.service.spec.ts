@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { Money } from '@app/shared/utils/money';
 import { CreditBalance } from '../entities/credit-balance.entity';
 import { CreditLedger } from '../entities/credit-ledger.entity';
@@ -29,7 +29,7 @@ async function build(balance: Partial<CreditBalance> | null = null) {
   const moduleRef = await Test.createTestingModule({
     providers: [
       CreditService,
-      { provide: getRepositoryToken(CreditBalance), useValue: balances }
+      { provide: repositoryToken(CreditBalance), useValue: balances }
     ]
   }).compile();
 

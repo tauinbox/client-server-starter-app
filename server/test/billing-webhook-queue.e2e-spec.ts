@@ -7,8 +7,8 @@ import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { EventName } from '@paddle/paddle-node-sdk';
 import type { Queue } from 'bullmq';
 import { DataSource, Like } from 'typeorm';
@@ -121,19 +121,19 @@ runWithRedis('billing webhook queue (real Redis)', () => {
         { provide: ConfigService, useValue: { get: () => 'whsec_test' } },
         { provide: getDataSourceToken(), useValue: ds },
         {
-          provide: getRepositoryToken(WebhookEvent),
+          provide: repositoryToken(WebhookEvent),
           useValue: ds.getRepository(WebhookEvent)
         },
         {
-          provide: getRepositoryToken(CreditBalance),
+          provide: repositoryToken(CreditBalance),
           useValue: ds.getRepository(CreditBalance)
         },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: ds.getRepository(Plan)
         },
         {
-          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Product),
           useValue: ds.getRepository(Product)
         },
         {

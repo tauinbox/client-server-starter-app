@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../common/testing/repository-token';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { AUDIT_FIELD_MAX_LENGTH } from '@app/shared/utils/audit-field';
 import { AuditService } from './audit.service';
@@ -27,7 +27,7 @@ describe('AuditService', () => {
       providers: [
         AuditService,
         {
-          provide: getRepositoryToken(AuditLog),
+          provide: repositoryToken(AuditLog),
           useValue: mockRepository
         },
         { provide: MetricsService, useValue: mockMetrics }

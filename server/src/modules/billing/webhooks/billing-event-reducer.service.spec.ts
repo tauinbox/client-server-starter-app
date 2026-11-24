@@ -2,8 +2,8 @@ import { expect } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { In, IsNull } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
@@ -158,11 +158,11 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
       { provide: MetricsService, useValue: metrics },
       { provide: getDataSourceToken(), useValue: dataSource },
       {
-        provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+        provide: repositoryToken(Plan),
         useValue: plans
       },
       {
-        provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+        provide: repositoryToken(Product),
         useValue: products
       },
       { provide: CreditService, useValue: credits },

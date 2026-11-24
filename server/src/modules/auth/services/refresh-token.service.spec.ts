@@ -1,7 +1,7 @@
 import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { createMockConfigService } from '../../../common/testing/config-service.mock';
 import { RefreshTokenService } from './refresh-token.service';
 import { RefreshToken } from '../entities/refresh-token.entity';
@@ -69,7 +69,7 @@ describe('RefreshTokenService', () => {
       providers: [
         RefreshTokenService,
         {
-          provide: getRepositoryToken(RefreshToken),
+          provide: repositoryToken(RefreshToken),
           useValue: mockRepository
         },
         { provide: GeoIpService, useValue: mockGeoIp },
@@ -93,7 +93,7 @@ describe('RefreshTokenService', () => {
         providers: [
           RefreshTokenService,
           {
-            provide: getRepositoryToken(RefreshToken),
+            provide: repositoryToken(RefreshToken),
             useValue: mockRepository
           },
           { provide: GeoIpService, useValue: mockGeoIp },

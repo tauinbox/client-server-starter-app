@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { HttpException } from '@nestjs/common';
 import { ApiError } from '../../../common/errors/api-error';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
@@ -304,13 +304,13 @@ describe('RoleService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RoleService,
-        { provide: getRepositoryToken(Role), useValue: mockRoleRepo },
+        { provide: repositoryToken(Role), useValue: mockRoleRepo },
         {
-          provide: getRepositoryToken(Permission),
+          provide: repositoryToken(Permission),
           useValue: mockPermissionRepo
         },
         {
-          provide: getRepositoryToken(RolePermission),
+          provide: repositoryToken(RolePermission),
           useValue: mockRolePermissionRepo
         },
         { provide: PermissionService, useValue: mockPermissionService },

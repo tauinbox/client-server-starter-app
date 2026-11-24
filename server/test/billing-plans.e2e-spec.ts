@@ -5,8 +5,7 @@
 // The same controller serves the public Paddle.js config: GET /billing/paddle-config.
 
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { Server } from 'http';
@@ -81,7 +80,7 @@ describe('Billing plan catalog (e2e)', () => {
         RESPONSE_SERIALIZER,
         PlanService,
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: planRepo
         },
         PaddleProvider,

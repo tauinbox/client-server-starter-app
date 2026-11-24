@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { DataSource, EntityManager } from 'typeorm';
 import { HttpStatus } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
@@ -51,7 +51,7 @@ describe('OAuthAccountService', () => {
       providers: [
         OAuthAccountService,
         {
-          provide: getRepositoryToken(OAuthAccount),
+          provide: repositoryToken(OAuthAccount),
           useValue: mockRepository
         },
         {

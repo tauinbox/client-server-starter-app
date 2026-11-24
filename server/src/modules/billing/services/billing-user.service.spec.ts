@@ -2,8 +2,7 @@ import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { ApiError } from '../../../common/errors/api-error';
 import { DataSource, In } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -94,19 +93,19 @@ async function build() {
     providers: [
       BillingUserService,
       { provide: BillingConsentService, useValue: consents },
-      { provide: getRepositoryToken(Customer), useValue: customers },
-      { provide: getRepositoryToken(Subscription), useValue: subscriptions },
-      { provide: getRepositoryToken(Invoice), useValue: invoices },
-      { provide: getRepositoryToken(PaymentMethod), useValue: paymentMethods },
+      { provide: repositoryToken(Customer), useValue: customers },
+      { provide: repositoryToken(Subscription), useValue: subscriptions },
+      { provide: repositoryToken(Invoice), useValue: invoices },
+      { provide: repositoryToken(PaymentMethod), useValue: paymentMethods },
       {
-        provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+        provide: repositoryToken(Plan),
         useValue: plans
       },
       {
-        provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+        provide: repositoryToken(Product),
         useValue: products
       },
-      { provide: getRepositoryToken(User), useValue: users },
+      { provide: repositoryToken(User), useValue: users },
       { provide: BillingService, useValue: billing },
       { provide: CreditService, useValue: credits },
       {

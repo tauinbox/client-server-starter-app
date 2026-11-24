@@ -9,7 +9,7 @@ import { ErrorKeys } from '@app/shared/constants';
 import { HttpStatus, HttpException } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { UsersController } from '../src/modules/users/controllers/users.controller';
@@ -162,7 +162,7 @@ describe('UsersService.update — email change side effects', () => {
           useValue: { assertNotBreached: jest.fn() }
         },
         UsersService,
-        { provide: getRepositoryToken(User), useValue: repo },
+        { provide: repositoryToken(User), useValue: repo },
         { provide: DataSource, useValue: transactionOver(store) },
         { provide: AuditService, useValue: { logFireAndForget: jest.fn() } },
         {
@@ -386,7 +386,7 @@ describe('Admin email change - session revocation through the real event bus', (
         },
         UsersService,
         SessionRevocationListener,
-        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: repositoryToken(User), useValue: userRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: RefreshTokenService, useValue: refreshTokenService },
         { provide: AuditService, useValue: auditService },

@@ -10,8 +10,8 @@ import { Reflector } from '@nestjs/core';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { FindOperator } from 'typeorm';
@@ -401,29 +401,29 @@ describe('Billing Paddle webhook (e2e)', () => {
         // WebhookIpAllowlistGuard dep; unset allowlist keeps the receivers open
         { provide: ConfigService, useValue: { get: () => undefined } },
         {
-          provide: getRepositoryToken(CreditBalance),
+          provide: repositoryToken(CreditBalance),
           useValue: {
             findOne: (opts: { where: Partial<CreditBalance> }) =>
               Promise.resolve(findWhere(stores.creditBalances, opts.where))
           }
         },
         {
-          provide: getRepositoryToken(WebhookEvent),
+          provide: repositoryToken(WebhookEvent),
           useValue: makeWebhookEventRepo(stores)
         },
         {
-          provide: getRepositoryToken(Customer),
+          provide: repositoryToken(Customer),
           useValue: {
             findOne: (opts: { where: Partial<Customer> }) =>
               Promise.resolve(findWhere(stores.customers, opts.where))
           }
         },
         {
-          provide: getRepositoryToken(Subscription),
+          provide: repositoryToken(Subscription),
           useValue: { findOne: () => Promise.resolve(null) }
         },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: {
             find: () => Promise.resolve(stores.plans),
             findOne: (opts: { where: Partial<Plan> }) =>
@@ -431,7 +431,7 @@ describe('Billing Paddle webhook (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Product),
           useValue: {
             find: () => Promise.resolve(stores.products),
             findOne: (opts: { where: Partial<Product> }) =>
@@ -439,7 +439,7 @@ describe('Billing Paddle webhook (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(CustomerGrant),
+          provide: repositoryToken(CustomerGrant),
           useValue: {
             find: (opts: { where: { customerId: string } }) =>
               Promise.resolve(

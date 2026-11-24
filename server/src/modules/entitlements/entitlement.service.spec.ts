@@ -1,7 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../../data-sources';
+import { repositoryToken } from '../../common/testing/repository-token';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import KeyvRedis from '@keyv/redis';
 import { In, IsNull } from 'typeorm';
@@ -67,14 +66,14 @@ describe('EntitlementService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EntitlementService,
-        { provide: getRepositoryToken(Customer), useValue: customers },
-        { provide: getRepositoryToken(Subscription), useValue: subscriptions },
+        { provide: repositoryToken(Customer), useValue: customers },
+        { provide: repositoryToken(Subscription), useValue: subscriptions },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: plans
         },
-        { provide: getRepositoryToken(CustomerGrant), useValue: grants },
-        { provide: getRepositoryToken(CreditBalance), useValue: balances },
+        { provide: repositoryToken(CustomerGrant), useValue: grants },
+        { provide: repositoryToken(CreditBalance), useValue: balances },
         { provide: CACHE_MANAGER, useValue: cache },
         { provide: MetricsService, useValue: metrics }
       ]
@@ -390,17 +389,17 @@ describe('EntitlementService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           EntitlementService,
-          { provide: getRepositoryToken(Customer), useValue: customers },
+          { provide: repositoryToken(Customer), useValue: customers },
           {
-            provide: getRepositoryToken(Subscription),
+            provide: repositoryToken(Subscription),
             useValue: subscriptions
           },
           {
-            provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+            provide: repositoryToken(Plan),
             useValue: plans
           },
-          { provide: getRepositoryToken(CustomerGrant), useValue: grants },
-          { provide: getRepositoryToken(CreditBalance), useValue: balances },
+          { provide: repositoryToken(CustomerGrant), useValue: grants },
+          { provide: repositoryToken(CreditBalance), useValue: balances },
           { provide: CACHE_MANAGER, useValue: redisCache },
           { provide: MetricsService, useValue: metrics }
         ]

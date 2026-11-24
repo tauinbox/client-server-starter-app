@@ -1,7 +1,7 @@
 import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Not } from 'typeorm';
 import { WebhookEvent } from '../entities/webhook-event.entity';
@@ -70,7 +70,7 @@ async function buildHarness(opts: {
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       WebhookIngestionService,
-      { provide: getRepositoryToken(WebhookEvent), useValue: repo },
+      { provide: repositoryToken(WebhookEvent), useValue: repo },
       { provide: BILLING_PROVIDERS, useValue: [paddle, yookassa] },
       { provide: BillingEventReducer, useValue: { reduce } },
       ...(opts.withQueue

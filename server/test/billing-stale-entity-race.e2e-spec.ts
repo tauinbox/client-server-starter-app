@@ -6,8 +6,8 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import {
   DataSource,
   type EntityManager,
@@ -241,11 +241,11 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: ds.getRepository(Plan)
         },
         {
-          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Product),
           useValue: ds.getRepository(Product)
         },
         {
@@ -282,30 +282,30 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         DRAFT_TERMS_CONSENTS,
         { provide: getDataSourceToken(), useValue: ds },
         {
-          provide: getRepositoryToken(Customer),
+          provide: repositoryToken(Customer),
           useValue: ds.getRepository(Customer)
         },
         {
-          provide: getRepositoryToken(Subscription),
+          provide: repositoryToken(Subscription),
           useValue: racingSubscriptions
         },
         {
-          provide: getRepositoryToken(Invoice),
+          provide: repositoryToken(Invoice),
           useValue: ds.getRepository(Invoice)
         },
         {
-          provide: getRepositoryToken(PaymentMethod),
+          provide: repositoryToken(PaymentMethod),
           useValue: ds.getRepository(PaymentMethod)
         },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: ds.getRepository(Plan)
         },
         {
-          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Product),
           useValue: ds.getRepository(Product)
         },
-        { provide: getRepositoryToken(User), useValue: ds.getRepository(User) },
+        { provide: repositoryToken(User), useValue: ds.getRepository(User) },
         {
           provide: BillingService,
           useValue: {

@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { ErrorKeys } from '@app/shared/constants';
 import { Money } from '@app/shared/utils/money';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -68,8 +69,8 @@ async function build({
   const moduleRef = await Test.createTestingModule({
     providers: [
       MeteringService,
-      { provide: getRepositoryToken(UsageRecord), useValue: usageRecords },
-      { provide: getRepositoryToken(Customer), useValue: customers },
+      { provide: repositoryToken(UsageRecord), useValue: usageRecords },
+      { provide: repositoryToken(Customer), useValue: customers },
       { provide: getDataSourceToken(), useValue: dataSource },
       { provide: CreditService, useValue: credits },
       { provide: EntitlementService, useValue: entitlements },

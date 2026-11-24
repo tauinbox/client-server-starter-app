@@ -4,7 +4,8 @@
 
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource, type EntityManager } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -95,11 +96,11 @@ runWithInfra('Pay-as-you-go metering on real PostgreSQL (e2e)', () => {
         { provide: CreditService, useValue: credits },
         { provide: getDataSourceToken(), useValue: ds },
         {
-          provide: getRepositoryToken(UsageRecord),
+          provide: repositoryToken(UsageRecord),
           useValue: ds.getRepository(UsageRecord)
         },
         {
-          provide: getRepositoryToken(Customer),
+          provide: repositoryToken(Customer),
           useValue: ds.getRepository(Customer)
         },
         { provide: EntitlementService, useValue: entitlements },

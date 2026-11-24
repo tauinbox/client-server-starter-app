@@ -1,8 +1,8 @@
 import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../../../common/testing/repository-token';
 import { ApiError } from '../../../common/errors/api-error';
 import { expectApiRejection } from '../../../common/testing/api-error.expect';
 import { In, IsNull } from 'typeorm';
@@ -189,13 +189,13 @@ async function build() {
   const module = await Test.createTestingModule({
     providers: [
       BillingAdminService,
-      { provide: getRepositoryToken(Subscription), useValue: subscriptions },
-      { provide: getRepositoryToken(Invoice), useValue: invoices },
-      { provide: getRepositoryToken(Customer), useValue: customers },
-      { provide: getRepositoryToken(WebhookEvent), useValue: webhookEvents },
-      { provide: getRepositoryToken(CustomerGrant), useValue: grants },
+      { provide: repositoryToken(Subscription), useValue: subscriptions },
+      { provide: repositoryToken(Invoice), useValue: invoices },
+      { provide: repositoryToken(Customer), useValue: customers },
+      { provide: repositoryToken(WebhookEvent), useValue: webhookEvents },
+      { provide: repositoryToken(CustomerGrant), useValue: grants },
       {
-        provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+        provide: repositoryToken(Product),
         useValue: products
       },
       { provide: BillingService, useValue: billing },

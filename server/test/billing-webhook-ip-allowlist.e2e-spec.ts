@@ -5,7 +5,7 @@
 
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { VersioningType } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
@@ -131,7 +131,7 @@ async function makeApp(options: {
         }
       },
       {
-        provide: getRepositoryToken(WebhookEvent),
+        provide: repositoryToken(WebhookEvent),
         useValue: makeWebhookEventRepo()
       },
       { provide: BillingEventReducer, useValue: { reduce: jest.fn() } },

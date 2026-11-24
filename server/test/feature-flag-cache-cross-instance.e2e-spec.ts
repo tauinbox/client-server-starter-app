@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import type { Cache } from 'cache-manager';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { DataSource } from 'typeorm';
@@ -107,8 +107,8 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
       }
     };
     const resolver = new FeatureFlagResolverService(
-      app.get(getRepositoryToken(FeatureFlag)),
-      app.get(getRepositoryToken(FeatureFlagRule)),
+      app.get(repositoryToken(FeatureFlag)),
+      app.get(repositoryToken(FeatureFlagRule)),
       // @ts-expect-error - partial Cache: the resolver uses get/set/del and stores
       gatedCache,
       app.get(AttributeRegistryService),

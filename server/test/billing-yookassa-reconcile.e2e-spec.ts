@@ -6,8 +6,8 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { FindOperator } from 'typeorm';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -256,13 +256,13 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
           useValue: { addPurchase: jest.fn() }
         },
         {
-          provide: getRepositoryToken(User),
+          provide: repositoryToken(User),
           useValue: {
             findOne: () => Promise.resolve({ email: 'u@example.com' })
           }
         },
         {
-          provide: getRepositoryToken(PaymentMethod),
+          provide: repositoryToken(PaymentMethod),
           useValue: {
             findOne: (opts: { where: { id: string } }) =>
               Promise.resolve(
@@ -271,7 +271,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Customer),
+          provide: repositoryToken(Customer),
           useValue: {
             findOne: (opts: { where: { id: string } }) =>
               Promise.resolve(
@@ -280,7 +280,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: {
             findOne: (opts: { where: { key: string } }) =>
               Promise.resolve(
@@ -289,14 +289,14 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Product),
           useValue: {
             find: () => Promise.resolve([]),
             findOne: () => Promise.resolve(null)
           }
         },
         {
-          provide: getRepositoryToken(Subscription),
+          provide: repositoryToken(Subscription),
           useValue: {
             update: (
               where: Record<string, unknown>,

@@ -1,7 +1,6 @@
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import type { Cache } from 'cache-manager';
 import { createClient } from '@keyv/redis';
 import { buildCacheOptions } from '../src/modules/core/redis-cache.store';
@@ -41,17 +40,17 @@ runWithRedis('entitlement version counter (real Redis)', () => {
       ],
       providers: [
         EntitlementService,
-        { provide: getRepositoryToken(Customer), useValue: empty },
-        { provide: getRepositoryToken(Subscription), useValue: empty },
+        { provide: repositoryToken(Customer), useValue: empty },
+        { provide: repositoryToken(Subscription), useValue: empty },
         {
-          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          provide: repositoryToken(Plan),
           useValue: empty
         },
         {
-          provide: getRepositoryToken(CustomerGrant),
+          provide: repositoryToken(CustomerGrant),
           useValue: { find: jest.fn().mockResolvedValue([]) }
         },
-        { provide: getRepositoryToken(CreditBalance), useValue: empty },
+        { provide: repositoryToken(CreditBalance), useValue: empty },
         { provide: MetricsService, useValue: { recordCacheAccess: jest.fn() } }
       ]
     }).compile();

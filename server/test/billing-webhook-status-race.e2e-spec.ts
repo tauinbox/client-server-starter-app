@@ -5,8 +5,8 @@
 
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource, In, type Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { expectApiError } from '../src/common/testing/api-error.expect';
@@ -119,20 +119,20 @@ runWithInfra('Webhook status writes vs. a concurrent writer (e2e)', () => {
           BillingAdminService,
           { provide: getDataSourceToken(), useValue: ds },
           {
-            provide: getRepositoryToken(Subscription),
+            provide: repositoryToken(Subscription),
             useValue: ds.getRepository(Subscription)
           },
           {
-            provide: getRepositoryToken(Invoice),
+            provide: repositoryToken(Invoice),
             useValue: ds.getRepository(Invoice)
           },
           {
-            provide: getRepositoryToken(Customer),
+            provide: repositoryToken(Customer),
             useValue: ds.getRepository(Customer)
           },
-          { provide: getRepositoryToken(WebhookEvent), useValue: repo },
+          { provide: repositoryToken(WebhookEvent), useValue: repo },
           {
-            provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+            provide: repositoryToken(Product),
             useValue: ds.getRepository(Product)
           },
           { provide: BillingService, useValue: {} },
@@ -189,7 +189,7 @@ runWithInfra('Webhook status writes vs. a concurrent writer (e2e)', () => {
       const module = await Test.createTestingModule({
         providers: [
           WebhookIngestionService,
-          { provide: getRepositoryToken(WebhookEvent), useValue: repo },
+          { provide: repositoryToken(WebhookEvent), useValue: repo },
           {
             provide: BILLING_PROVIDERS,
             useValue: [
