@@ -17,7 +17,6 @@ import { ROLE_LIST_COLUMNS } from '../utils/rbac-sort-columns.util';
 import { Permission } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
-import { UserRole } from '../../users/entities/user-role.entity';
 import { lockUserWithRoles } from '../../users/utils/lock-user';
 import { addUserRole, findUserWithRoles } from '../../users/utils/user-roles';
 import { userNotFound } from '../../users/utils/user-not-found';
@@ -57,7 +56,10 @@ import { keyedUpdate } from '../../../common/utils/keyed-update.util';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { auditContextOf } from '../casl/ability-context';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
+import {
+  SettingsChangeLogService,
+  writeSettings
+} from '../../core/settings-change-log/settings-change-log.service';
 import { RoleRenamedEvent } from '../events/role-renamed.event';
 import { RoleDeletedEvent } from '../events/role-deleted.event';
 
@@ -86,7 +88,8 @@ export class RoleService {
     private readonly permissionService: PermissionService,
     private readonly auditService: AuditService,
     private readonly accessRefusals: AccessRefusalService,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventEmitter: EventEmitter2,
+    private readonly settingsChangeLog: SettingsChangeLogService
   ) {}
 
   private async resolveGrantItems(
@@ -583,7 +586,7 @@ export class RoleService {
 
     const role = this.roleRepository.create({ ...data, isSuper: false });
 
-    return this.roleRepository.manager.transaction(async (em) => {
+    return this.writeSettings(async (em) => {
       const saved = await this.saveRole(em, role);
 
       if (audit) await this.auditService.log(audit(saved), em);
@@ -619,32 +622,23 @@ export class RoleService {
 
     // The old name comes from the locked row: a rename that committed after
     // the read above changed it, and the listeners rewrite by that name.
-    const { saved, renamed } = await this.writeWithRoleEvent(async (em) => {
+    return this.writeWithRoleEvent(async (em) => {
       const before = await this.lockRole(em, id);
 
       if (!before) throw this.roleNotFound();
 
       check(before);
       const written = await this.updateRole(em, id, data);
-      const nameChanged = written.name !== before.name;
 
       return {
-        result: { saved: written, renamed: nameChanged },
+        result: written,
         audit: audit?.({ ...before }),
-        event: nameChanged
-          ? {
-              name: RoleRenamedEvent.name,
-              create: (committed) =>
-                new RoleRenamedEvent(before.name, written.name, em, committed)
-            }
-          : undefined
+        event:
+          written.name !== before.name
+            ? new RoleRenamedEvent(before.name, written.name, em)
+            : undefined
       };
     });
-
-    // Holders have the old name in the cached role names that flag rules use.
-    if (renamed) await this.invalidateUsersWithRole(id);
-
-    return saved;
   }
 
   async delete(
@@ -661,10 +655,8 @@ export class RoleService {
 
     // Checked here to answer early, and again on the locked row.
     check(role);
-    // Invalidate after the commit, or a holder read in between re-caches the
-    // deleted grants for the TTL. Holders are read before the delete cascades.
-    let holderIds: string[] = [];
-
+    // The membership rows stay until the apply of the change log has read
+    // them as the holders whose caches it drops.
     await this.writeWithRoleEvent(async (em) => {
       const locked = await this.lockRoleForLift(em, ability, {
         roleId: id,
@@ -672,20 +664,14 @@ export class RoleService {
         check
       });
 
-      holderIds = await this.findHolderIds(em, id);
       await em.delete(Role, { id });
 
       return {
         result: undefined,
         audit: audit?.(locked),
-        event: {
-          name: RoleDeletedEvent.name,
-          create: (committed) =>
-            new RoleDeletedEvent(locked.name, em, committed)
-        }
+        event: new RoleDeletedEvent(locked.name, em)
       };
     });
-    await this.invalidateHolders(holderIds);
   }
 
   private nameExists(): ApiError {
@@ -743,38 +729,60 @@ export class RoleService {
   }
 
   /**
-   * Runs `write`, then the listeners of the event and the audit row that it
-   * returns, in one transaction, so a failed row or listener rolls the write
-   * back. `write` builds both from the rows it locked. The event gets a
-   * promise that resolves after the commit.
+   * Runs `write` in a transaction that first takes the settings log lock, then
+   * applies the change log after the commit, so the caller answers only when
+   * the caches of its pool no longer hold the old settings.
    */
-  private async writeWithRoleEvent<T>(
+  private writeSettings<T>(
+    write: (em: EntityManager) => Promise<T>
+  ): Promise<T> {
+    return writeSettings(
+      this.roleRepository.manager,
+      this.settingsChangeLog,
+      write
+    );
+  }
+
+  /** `writeAudited` for a settings write: the log lock and the apply. */
+  private writeSettingsAudited(
+    write: (em: EntityManager) => Promise<void>,
+    audit?: AuditLogParams
+  ): Promise<void> {
+    return this.writeSettings(async (em) => {
+      await write(em);
+
+      if (audit) await this.auditService.log(audit, em);
+    });
+  }
+
+  /**
+   * Runs `write`, then the listeners of the event and the audit row that it
+   * returns, in one settings write, so a failed row or listener rolls the
+   * write back. `write` builds both from the rows it locked.
+   */
+  private writeWithRoleEvent<T>(
     write: (em: EntityManager) => Promise<{
       result: T;
       audit?: AuditLogParams;
-      event?: { name: string; create: (committed: Promise<void>) => object };
+      event?: RoleRenamedEvent | RoleDeletedEvent;
     }>
   ): Promise<T> {
-    const { promise: committed, resolve: markCommitted } =
-      Promise.withResolvers<void>();
-    const result = await this.roleRepository.manager.transaction(async (em) => {
+    return this.writeSettings(async (em) => {
       const change = await write(em);
 
       if (change.event) {
-        await this.eventEmitter.emitAsync(
-          change.event.name,
-          change.event.create(committed)
-        );
+        const name =
+          change.event instanceof RoleRenamedEvent
+            ? RoleRenamedEvent.name
+            : RoleDeletedEvent.name;
+
+        await this.eventEmitter.emitAsync(name, change.event);
       }
 
       if (change.audit) await this.auditService.log(change.audit, em);
 
       return change.result;
     });
-
-    markCommitted();
-
-    return result;
   }
 
   /**
@@ -961,44 +969,39 @@ export class RoleService {
     check(role);
     await this.assertGrantsApplicable(role, items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
-    await this.writeAudited(
-      this.rolePermissionRepository.manager,
-      async (em) => {
-        // The lock also makes two replaces of one role run one after the
-        // other: else both delete the old rows, and the second insert breaks
-        // the unique index of the grant. A deny row survives a replace only
-        // when it is sent back unchanged.
-        await this.lockRoleForLift(em, ability, {
-          roleId,
-          actorId,
-          check,
-          lifted: (rows) =>
-            rows.filter(
-              (row) =>
-                !items.some(
-                  (item) =>
-                    item.permissionId === row.permissionId &&
-                    sameConditions(item.conditions, row.conditions)
-                )
-            )
-        });
-        await em.delete(RolePermission, { roleId });
+    await this.writeSettingsAudited(async (em) => {
+      // The lock also makes two replaces of one role run one after the
+      // other: else both delete the old rows, and the second insert breaks
+      // the unique index of the grant. A deny row survives a replace only
+      // when it is sent back unchanged.
+      await this.lockRoleForLift(em, ability, {
+        roleId,
+        actorId,
+        check,
+        lifted: (rows) =>
+          rows.filter(
+            (row) =>
+              !items.some(
+                (item) =>
+                  item.permissionId === row.permissionId &&
+                  sameConditions(item.conditions, row.conditions)
+              )
+          )
+      });
+      await em.delete(RolePermission, { roleId });
 
-        if (items.length > 0) {
-          const records = items.map(({ permissionId, conditions }) =>
-            em.create(RolePermission, {
-              roleId,
-              permissionId,
-              conditions: conditions ?? null
-            })
-          );
+      if (items.length > 0) {
+        const records = items.map(({ permissionId, conditions }) =>
+          em.create(RolePermission, {
+            roleId,
+            permissionId,
+            conditions: conditions ?? null
+          })
+        );
 
-          await em.save(RolePermission, records);
-        }
-      },
-      audit
-    );
-    await this.invalidateUsersWithRole(roleId);
+        await em.save(RolePermission, records);
+      }
+    }, audit);
   }
 
   async assignPermissionsToRole(
@@ -1031,21 +1034,16 @@ export class RoleService {
       })
     );
 
-    await this.writeAudited(
-      this.rolePermissionRepository.manager,
-      async (em) => {
-        // An add lifts no stored row.
-        await this.lockRoleForLift(em, ability, {
-          roleId,
-          actorId,
-          check,
-          lifted: () => []
-        });
-        await em.save(RolePermission, rolePermissions);
-      },
-      audit
-    );
-    await this.invalidateUsersWithRole(roleId);
+    await this.writeSettingsAudited(async (em) => {
+      // An add lifts no stored row.
+      await this.lockRoleForLift(em, ability, {
+        roleId,
+        actorId,
+        check,
+        lifted: () => []
+      });
+      await em.save(RolePermission, rolePermissions);
+    }, audit);
   }
 
   async removePermissionFromRole(
@@ -1058,31 +1056,26 @@ export class RoleService {
 
     // Checked here to answer early, and again on the locked row.
     check(await this.loadRole(roleId));
-    await this.writeAudited(
-      this.rolePermissionRepository.manager,
-      async (em) => {
-        await this.lockRoleForLift(em, ability, {
-          roleId,
-          actorId,
-          check,
-          lifted: (rows) =>
-            rows.filter((row) => row.permissionId === permissionId)
-        });
-        const { affected } = await em.delete(RolePermission, {
-          roleId,
-          permissionId
-        });
+    await this.writeSettingsAudited(async (em) => {
+      await this.lockRoleForLift(em, ability, {
+        roleId,
+        actorId,
+        check,
+        lifted: (rows) =>
+          rows.filter((row) => row.permissionId === permissionId)
+      });
+      const { affected } = await em.delete(RolePermission, {
+        roleId,
+        permissionId
+      });
 
-        if (!affected) {
-          throw new ApiError(
-            ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED,
-            'The role does not hold this permission'
-          );
-        }
-      },
-      audit
-    );
-    await this.invalidateUsersWithRole(roleId);
+      if (!affected) {
+        throw new ApiError(
+          ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED,
+          'The role does not hold this permission'
+        );
+      }
+    }, audit);
   }
 
   async findAllPermissions(): Promise<Permission[]> {
@@ -1103,44 +1096,5 @@ export class RoleService {
     }
 
     return role;
-  }
-
-  private async invalidateUsersWithRole(roleId: string): Promise<void> {
-    await this.invalidateHolders(
-      await this.findHolderIds(this.roleRepository.manager, roleId)
-    );
-  }
-
-  private async findHolderIds(
-    em: EntityManager,
-    roleId: string
-  ): Promise<string[]> {
-    const links = await em
-      .createQueryBuilder(UserRole, 'link')
-      .select('link.userId')
-      .innerJoin(
-        User,
-        'user',
-        'user.id = link.userId AND user.deletedAt IS NULL'
-      )
-      .where('link.roleId = :roleId', { roleId })
-      .getMany();
-
-    return links.map(({ userId }) => userId);
-  }
-
-  private async invalidateHolders(userIds: string[]): Promise<void> {
-    if (userIds.length === 0) return;
-
-    await Promise.all(
-      userIds.map((id) => this.permissionService.invalidateUserCache(id))
-    );
-    // Notify every connected holder so their client-side abilities refresh
-    // without a reload. A separate event from UserRoleChangedEvent: this must
-    // NOT revoke tokens — abilities are re-derived from the DB per request.
-    this.eventEmitter.emit(
-      RolePermissionsChangedEvent.name,
-      new RolePermissionsChangedEvent(userIds)
-    );
   }
 }

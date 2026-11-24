@@ -57,6 +57,19 @@ describe('PermissionService', () => {
     roles: [mockRole]
   };
 
+  // The fallback counters of the memory cache: user-1 at 7, everyone at 3.
+  const VERSIONS: Record<string, number> = {
+    'permissions:user-version:user-1': 7,
+    'permissions:global-version': 3
+  };
+
+  /** Serves `value` as the entry of `key`, written under `global`. */
+  function cacheEntry(key: string, value: unknown, global = 3): void {
+    mockCacheManager.get.mockImplementation((k: string) =>
+      Promise.resolve(k === key ? { global, value } : (VERSIONS[k] ?? null))
+    );
+  }
+
   beforeEach(async () => {
     const findOne = jest.fn();
 
@@ -69,9 +82,7 @@ describe('PermissionService', () => {
     };
 
     mockCacheManager = {
-      get: jest.fn((key: string) =>
-        Promise.resolve(key === 'permissions:user-version:user-1' ? 7 : null)
-      ),
+      get: jest.fn((key: string) => Promise.resolve(VERSIONS[key] ?? null)),
       set: jest.fn().mockResolvedValue(undefined),
       del: jest.fn().mockResolvedValue(undefined)
     };
@@ -123,7 +134,7 @@ describe('PermissionService', () => {
         }
       ];
 
-      mockCacheManager.get.mockResolvedValue(cachedPermissions);
+      cacheEntry('permissions:v3:user-1:v7', cachedPermissions);
 
       const result = await service.getPermissionsForUser('user-1');
 
@@ -132,6 +143,24 @@ describe('PermissionService', () => {
       expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
         'permissions',
         'hit'
+      );
+    });
+
+    it('should not serve an entry written before a drop of every list', async () => {
+      cacheEntry('permissions:v3:user-1:v7', [], 2);
+      mockUserRepository.findOne.mockResolvedValue(mockUser);
+
+      const result = await service.getPermissionsForUser('user-1');
+
+      expect(result).toHaveLength(1);
+      expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
+        'permissions',
+        'miss'
+      );
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
+        'permissions:v3:user-1:v7',
+        { global: 3, value: result },
+        120_000
       );
     });
 
@@ -154,8 +183,8 @@ describe('PermissionService', () => {
         { rolePermissions: { permission: { resource: true, action: true } } }
       );
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'permissions:v2:user-1:v7',
-        result,
+        'permissions:v3:user-1:v7',
+        { global: 3, value: result },
         120_000
       );
       expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
@@ -397,7 +426,7 @@ describe('PermissionService', () => {
     it('should return cached roles if available', async () => {
       const cachedRoles = [{ name: 'admin', isSuper: true }];
 
-      mockCacheManager.get.mockResolvedValue(cachedRoles);
+      cacheEntry('roles:v2:user-1:v7', cachedRoles);
 
       const result = await service.getRolesForUser('user-1');
 
@@ -424,8 +453,8 @@ describe('PermissionService', () => {
         { name: 'user', isSuper: false }
       ]);
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'roles:user-1:v7',
-        result,
+        'roles:v2:user-1:v7',
+        { global: 3, value: result },
         120_000
       );
       expect(mockMetrics.recordCacheAccess).toHaveBeenCalledWith(
@@ -475,6 +504,54 @@ describe('PermissionService', () => {
 
       expect(version).toBeGreaterThan(7);
       expect(mockCacheManager.del).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('invalidateAll', () => {
+    it('bumps the global version, so an entry of any user reads as a miss', async () => {
+      await service.invalidateAll();
+
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
+        'permissions:global-version',
+        expect.any(Number),
+        0
+      );
+      const [[, global]] = mockCacheManager.set.mock.calls as [
+        [string, number, number]
+      ];
+
+      expect(global).toBeGreaterThan(3);
+    });
+  });
+
+  describe('findHolderIds', () => {
+    it('reads the holders on the given manager, once each, and nothing for no role', async () => {
+      const qb = {
+        select: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getMany: jest
+          .fn()
+          .mockResolvedValue([
+            { userId: 'u-1' },
+            { userId: 'u-2' },
+            { userId: 'u-1' }
+          ])
+      };
+      const manager = { createQueryBuilder: jest.fn().mockReturnValue(qb) };
+
+      // @ts-expect-error partial mock: only `createQueryBuilder`
+      await expect(service.findHolderIds(manager, [])).resolves.toEqual([]);
+      expect(manager.createQueryBuilder).not.toHaveBeenCalled();
+
+      await expect(
+        // @ts-expect-error partial mock: only `createQueryBuilder`
+        service.findHolderIds(manager, ['r-1', 'r-2'])
+      ).resolves.toEqual(['u-1', 'u-2']);
+      expect(qb.where).toHaveBeenCalledWith(
+        'link.roleId = ANY(CAST(:roleIds AS uuid[]))',
+        { roleIds: ['r-1', 'r-2'] }
+      );
     });
   });
 });

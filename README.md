@@ -180,9 +180,10 @@ management and theming.
     the server then ends the stream. This is the one source of the event, so an administrator
     password change, a user delete and a role change reach the client the same way.
   - `permissions_updated` starts a silent permissions read. The server sends it when the permission
-    set of a role changes. It goes to each connected holder of that role. A change of the actions
-    that a resource offers (a narrowing, a widening, or the restore of an orphaned resource that
-    wakes a grant) sends it to every connected user. The client first waits a
+    set or the row of a role changes. It goes to each connected holder of that role. A change of
+    a resource (its labels, the actions that it offers, or the restore of an orphaned resource)
+    sends it to every connected user. Each push comes from the settings change log, so a change
+    that a seeder or a direct SQL write makes is pushed too, within 5 s. The client first waits a
     random 0 to 5 s, thus the holders do not all read their permissions at the same moment.
   - `user_crud_events` keeps the administrator user list current after a create, update, delete
     or restore, with no reload of the loaded pages. An update or a restore of a loaded row reads
@@ -192,8 +193,8 @@ management and theming.
     own name change and a confirmed email change. The server sends it only to a connected client
     whose current abilities permit `users:search` on the changed user. Thus an ordinary user
     never sees these events, and a grant with a condition sees only the users that its list shows.
-  - `user_list_stale` shows the same banner after a role rename or delete, which changes the
-    role chip of every holder. It names no user and goes to each client that may search users.
+  - `user_list_stale` shows the same banner after a role create, change or delete, which can change
+    the role chip of every holder or the role filter. It names no user and goes to each client that may search users.
     A reopened stream shows the same banner, because an event sent while the stream was down is
     lost.
 
@@ -2081,11 +2082,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3437 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 1035 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 999 pass and 36 skip. CI then runs the Redis suites and the mail suite with Redis: 49 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3468 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 1044 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 1006 pass and 38 skip. CI then runs the Redis suites and the mail suite with Redis: 58 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1869 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 369 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1532 tests pass |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1534 tests pass |
 
 ## CI/CD
 

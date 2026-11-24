@@ -13,13 +13,15 @@ import { FeatureFlagsController } from './controllers/feature-flags.controller';
 import { FeatureFlagChangedListener } from './listeners/feature-flag-changed.listener';
 import { RoleRulesListener } from './listeners/role-rules.listener';
 import { FeatureFlagGuard } from './guards/feature-flag.guard';
+import { SettingsChangeLogModule } from '../core/settings-change-log/settings-change-log.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([FeatureFlag, FeatureFlagRule]),
     AuthModule,
     UsersModule,
-    NotificationsModule
+    NotificationsModule,
+    SettingsChangeLogModule
   ],
   controllers: [FeatureFlagsAdminController, FeatureFlagsController],
   providers: [

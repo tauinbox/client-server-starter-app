@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import type { DataSource } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 
 /**
  * The advisory lock keys of the jobs that write shared data. One closed list,
@@ -9,19 +9,32 @@ export const POOL_LOCK_KEYS = {
   bootSteps: 'nexus:boot-steps',
   resourceSync: 'nexus:resource-sync',
   auditLogCleanup: 'nexus:audit-log-cleanup',
-  refreshTokenCleanup: 'nexus:refresh-token-cleanup'
+  refreshTokenCleanup: 'nexus:refresh-token-cleanup',
+  settingsChangeApply: 'nexus:settings-change-apply',
+  settingsChangeLogCleanup: 'nexus:settings-change-log-cleanup'
 } as const;
 
 export type PoolLockKey = (typeof POOL_LOCK_KEYS)[keyof typeof POOL_LOCK_KEYS];
 
+/**
+ * The longest wait for a serialized lock, for a lock that a request waits for:
+ * past it the call fails instead of holding its connection. A key with no
+ * entry waits until the holder ends (a boot step).
+ */
+const POOL_LOCK_WAIT_MS: Partial<Record<PoolLockKey, number>> = {
+  [POOL_LOCK_KEYS.settingsChangeApply]: 10_000
+};
+
 const logger = new Logger('PoolLock');
 
 /*
- * Both helpers hold a transaction advisory lock on one connection of the pool
- * while `job` runs on its own connections, so the job keeps its own
- * transactions. Postgres frees the lock when that transaction ends, also when
- * the node dies. Postgres holds the lock, so the same path works with and
- * without Redis, and through a pooler in transaction mode.
+ * Both helpers hold a transaction advisory lock on one connection of the pool.
+ * `job` gets the manager of that transaction: a job that uses it needs no
+ * second connection, so waiters that hold the other connections cannot starve
+ * it. A job that runs its own transactions ignores it. Postgres frees the lock
+ * when that transaction ends, also when the node dies. Postgres holds the
+ * lock, so the same path works with and without Redis, and through a pooler in
+ * transaction mode.
  */
 
 /**
@@ -32,7 +45,7 @@ const logger = new Logger('PoolLock');
 export async function runOncePerPool(
   dataSource: DataSource,
   key: PoolLockKey,
-  job: () => Promise<void>
+  job: (manager: EntityManager) => Promise<void>
 ): Promise<boolean> {
   return dataSource.transaction(async (manager) => {
     const [{ locked }] = await manager.query<Array<{ locked: boolean }>>(
@@ -46,7 +59,7 @@ export async function runOncePerPool(
       return false;
     }
 
-    await job();
+    await job(manager);
 
     return true;
   });
@@ -60,11 +73,18 @@ export async function runOncePerPool(
 export async function runSerializedInPool<T>(
   dataSource: DataSource,
   key: PoolLockKey,
-  job: () => Promise<T>
+  job: (manager: EntityManager) => Promise<T>
 ): Promise<T> {
   return dataSource.transaction(async (manager) => {
+    const waitMs = POOL_LOCK_WAIT_MS[key];
+
+    // An integer literal: SET takes no bind parameter.
+    if (waitMs !== undefined) {
+      await manager.query(`SET LOCAL lock_timeout = ${Math.trunc(waitMs)}`);
+    }
+
     await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
 
-    return job();
+    return job(manager);
   });
 }

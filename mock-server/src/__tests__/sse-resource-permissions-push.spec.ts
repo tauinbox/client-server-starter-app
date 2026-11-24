@@ -5,9 +5,9 @@ import { getState, resetState } from '../state';
 import { mockId } from '../utils/mock-id';
 import { untilSentinel } from '../utils/sse-sentinel';
 
-// Mirrors ResourceService and the ResourceActionsChangedEvent listener: a
-// committed change of the grantable actions of a resource sends one
-// permissions_updated to every connected user.
+// Mirrors the settings change log of the server: a committed change of a
+// resource row sends one permissions_updated to every connected user, and a
+// write that changes nothing sends none.
 
 const USERS_RESOURCE_ID = mockId('res-users');
 
@@ -130,28 +130,28 @@ describe('permissions_updated after a resource write', () => {
     ).toBe(1);
   });
 
-  it('is not sent when the grantable actions stay the same', async () => {
-    const declared = getState().resources.get(USERS_RESOURCE_ID)!.actionNames;
+  it('is sent once for a change of a label', async () => {
+    expect(
+      await pushesAfter((token) =>
+        call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, {
+          token,
+          body: { displayName: 'Members' }
+        })
+      )
+    ).toBe(1);
+  });
+
+  it('is not sent for a write that changes nothing', async () => {
+    const { displayName, allowedActionNames } =
+      getState().resources.get(USERS_RESOURCE_ID)!;
 
     expect(
-      await pushesAfter(async (token) => {
-        const statuses = [
-          await call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, {
-            token,
-            body: {
-              displayName: 'Members'
-            }
-          }),
-          await call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, {
-            token,
-            body: {
-              allowedActionNames: [...declared].reverse()
-            }
-          })
-        ];
-
-        return statuses.every((status) => status === 200) ? 200 : 500;
-      })
+      await pushesAfter((token) =>
+        call('PATCH', `/rbac/resources/${USERS_RESOURCE_ID}`, {
+          token,
+          body: { displayName, allowedActionNames }
+        })
+      )
     ).toBe(0);
   });
 

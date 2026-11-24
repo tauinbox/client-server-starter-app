@@ -4,9 +4,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { IsNull } from 'typeorm';
 import { HttpException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceService } from './resource.service';
-import { ResourceActionsChangedEvent } from '../events/resource-actions-changed.event';
+import { SettingsChangeLogService } from '../../core/settings-change-log/settings-change-log.service';
 import { ResourceRegistryService } from './resource-registry.service';
 import { Resource } from '../entities/resource.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -50,6 +49,7 @@ describe('ResourceService', () => {
     manager: { transaction: jest.Mock };
   };
   let mockEm: {
+    query: jest.Mock<Promise<unknown[]>, [string, unknown[]?]>;
     findOne: jest.Mock;
     update: jest.Mock;
     findOneByOrFail: jest.Mock;
@@ -68,7 +68,7 @@ describe('ResourceService', () => {
     recordCacheAccess: jest.Mock;
     recordPermissionDenied: jest.Mock;
   };
-  let mockEventEmitter: { emit: jest.Mock<boolean, [string, unknown]> };
+  let settingsChangeLog: { applyPending: jest.Mock };
 
   const resource1: Resource = {
     id: 'res-1',
@@ -158,6 +158,9 @@ describe('ResourceService', () => {
     // The transactional writes go through the repository mock, so the
     // assertions on `update` below cover both paths.
     mockEm = {
+      query: jest
+        .fn<Promise<unknown[]>, [string, unknown[]?]>()
+        .mockResolvedValue([]),
       findOne: jest.fn((_target: unknown, options: unknown): unknown =>
         mockResourceRepo.findOne(options)
       ),
@@ -192,7 +195,9 @@ describe('ResourceService', () => {
       recordPermissionDenied: jest.fn()
     };
 
-    mockEventEmitter = { emit: jest.fn<boolean, [string, unknown]>() };
+    settingsChangeLog = {
+      applyPending: jest.fn().mockResolvedValue(undefined)
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -206,7 +211,7 @@ describe('ResourceService', () => {
         { provide: MetricsService, useValue: mockMetrics },
         AccessRefusalService,
         { provide: AuditService, useValue: mockAudit },
-        { provide: EventEmitter2, useValue: mockEventEmitter }
+        { provide: SettingsChangeLogService, useValue: settingsChangeLog }
       ]
     }).compile();
 
@@ -342,7 +347,7 @@ describe('ResourceService', () => {
       ).rejects.toThrow('Resource not found');
     });
 
-    it('should invalidate subject map cache after update', async () => {
+    it('should apply the settings change log after update', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
 
       await service.update(
@@ -351,7 +356,7 @@ describe('ResourceService', () => {
         { ability: superAbility }
       );
 
-      expectSubjectMapVersionBumped();
+      expect(settingsChangeLog.applyPending).toHaveBeenCalledTimes(1);
     });
 
     it('writes only the changed columns, keyed on the row', async () => {
@@ -483,58 +488,31 @@ describe('ResourceService', () => {
     });
   });
 
-  describe('push of a change of the grantable actions', () => {
-    const emitted = () =>
-      mockEventEmitter.emit.mock.calls.filter(
-        ([name]) => name === ResourceActionsChangedEvent.name
+  describe('apply of the settings change log', () => {
+    const logLock = () =>
+      mockEm.query.mock.calls.filter(([sql]) =>
+        String(sql).includes('pg_advisory_xact_lock')
       );
 
-    it('emits once after a narrowing, a widening and a reset to null are committed', async () => {
-      const writes: [string[] | null, string[] | null][] = [
-        [null, ['read']],
-        [['read'], ['read', 'update']],
-        [['read'], null]
-      ];
+    it('takes the log lock first and applies after the commit of an edit', async () => {
+      mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
+      mockResourceRepo.update.mockImplementationOnce(() => {
+        expect(logLock()).toHaveLength(1);
+        expect(settingsChangeLog.applyPending).not.toHaveBeenCalled();
 
-      for (const [before, allowedActionNames] of writes) {
-        mockResourceRepo.findOne.mockResolvedValue({
-          ...resource1,
-          allowedActionNames: before
-        });
-        mockEventEmitter.emit.mockClear();
-        mockResourceRepo.update.mockImplementationOnce(() => {
-          expect(emitted()).toHaveLength(0);
+        return Promise.resolve({ affected: 1 });
+      });
 
-          return Promise.resolve({ affected: 1 });
-        });
+      await service.update(
+        'res-1',
+        { allowedActionNames: ['read'] },
+        { ability: superAbility }
+      );
 
-        await service.update(
-          'res-1',
-          { allowedActionNames },
-          { ability: superAbility }
-        );
-
-        expect(emitted()).toHaveLength(1);
-      }
+      expect(settingsChangeLog.applyPending).toHaveBeenCalledTimes(1);
     });
 
-    it('emits nothing when the grantable actions stay the same', async () => {
-      const writes = [
-        { displayName: 'Members' },
-        { allowedActionNames: ['update', 'read'] },
-        { allowedActionNames: null }
-      ];
-
-      for (const data of writes) {
-        mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
-        await service.update('res-1', data, { ability: superAbility });
-      }
-
-      expect(mockResourceRepo.update).toHaveBeenCalledTimes(3);
-      expect(emitted()).toHaveLength(0);
-    });
-
-    it('emits nothing when the write fails', async () => {
+    it('applies nothing when the write fails', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...resource1 });
       mockResourceRepo.update.mockRejectedValueOnce(new Error('db down'));
 
@@ -545,36 +523,26 @@ describe('ResourceService', () => {
           { ability: superAbility }
         )
       ).rejects.toThrow('db down');
-      expect(emitted()).toHaveLength(0);
+      expect(settingsChangeLog.applyPending).not.toHaveBeenCalled();
     });
 
-    it('emits once after the restore of an orphaned resource that wakes a grant', async () => {
+    it('applies once after the restore of an orphaned resource', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
 
       await service.restore('res-3', { ability: superAbility });
 
-      expect(emitted()).toHaveLength(1);
+      expect(logLock()).toHaveLength(1);
+      expect(settingsChangeLog.applyPending).toHaveBeenCalledTimes(1);
     });
 
-    it('emits nothing after a restore that wakes no grant', async () => {
-      mockResourceRepo.findOne.mockResolvedValue({
-        ...orphanedResource,
-        allowedActionNames: []
-      });
-      await service.restore('res-3', { ability: superAbility });
-
-      expect(mockEm.update).toHaveBeenCalledTimes(1);
-      expect(emitted()).toHaveLength(0);
-    });
-
-    it('emits nothing after a restore that a concurrent restore won', async () => {
+    it('applies nothing after a restore that a concurrent restore won', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
       mockEm.update.mockResolvedValueOnce({ affected: 0 });
 
       await expect(
         service.restore('res-3', { ability: superAbility })
       ).rejects.toThrow(HttpException);
-      expect(emitted()).toHaveLength(0);
+      expect(settingsChangeLog.applyPending).not.toHaveBeenCalled();
     });
   });
 
@@ -1067,12 +1035,12 @@ describe('ResourceService', () => {
       expect(mockCacheManager.set).not.toHaveBeenCalled();
     });
 
-    it('should invalidate subject map cache after restore', async () => {
+    it('should apply the settings change log after restore', async () => {
       mockResourceRepo.findOne.mockResolvedValue({ ...orphanedResource });
 
       await service.restore('res-3', { ability: superAbility });
 
-      expectSubjectMapVersionBumped();
+      expect(settingsChangeLog.applyPending).toHaveBeenCalledTimes(1);
     });
 
     it('should throw NotFoundException if resource not found', async () => {

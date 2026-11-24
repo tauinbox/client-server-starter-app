@@ -244,6 +244,10 @@ cmd_restore() {
   cell_compose "$region" exec -T db psql -U "$user" -d "$db" -v ON_ERROR_STOP=1 -At \
     < scripts/restore-end-sessions.sql
 
+  log "Renewing the epoch of the settings change log"
+  cell_compose "$region" exec -T db psql -U "$user" -d "$db" -v ON_ERROR_STOP=1 -At \
+    < scripts/restore-renew-settings-epoch.sql
+
   # The purpose tokens minted before the restore carry no session row, and
   # their single-use ledger was in the Redis of the old cell.
   local server_env min_iat

@@ -1,11 +1,13 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
+import { SettingsChangedEvent } from '../../core/settings-change-log/settings-changed.event';
+import { touches } from '../../core/settings-change-log/settings-change.types';
 import { FeatureFlagResolverService } from '../services/feature-flag-resolver.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 
 export const FLAGS_BROADCAST_COALESCE_MS = 500;
 
+/** Applies a change of the flags or their rules from the settings change log. */
 @Injectable()
 export class FeatureFlagChangedListener implements OnModuleDestroy {
   #broadcastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -15,8 +17,10 @@ export class FeatureFlagChangedListener implements OnModuleDestroy {
     private readonly notificationsService: NotificationsService
   ) {}
 
-  @OnEvent(FeatureFlagChangedEvent.name)
-  async handleFeatureFlagChanged(): Promise<void> {
+  @OnEvent(SettingsChangedEvent.name, { suppressErrors: false })
+  async handleSettingsChanged({ change }: SettingsChangedEvent): Promise<void> {
+    if (!touches(change, 'feature_flags', 'feature_flag_rules')) return;
+
     await this.resolver.invalidateAll();
 
     // Every broadcast makes all connected clients refetch their flag set at

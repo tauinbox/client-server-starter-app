@@ -46,6 +46,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
 import type { JwtAuthRequest } from '../src/modules/auth/types/auth.request';
 import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
+import { SettingsChangeLogService } from '../src/modules/core/settings-change-log/settings-change-log.service';
 
 // ── Per-test ability container ──────────────────────────────────────
 // A single mutable holder lets each test build the ability it wants
@@ -100,6 +101,8 @@ function repositoryOf(rows: Rows, write: jest.Mock) {
       find: (): Promise<never[]> => Promise.resolve([]),
       transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
         work({
+          // The settings log lock.
+          query: (): Promise<never[]> => Promise.resolve([]),
           find: (): Promise<never[]> => Promise.resolve([]),
           save: (...args: unknown[]): unknown => write(args.at(-1)),
           // A keyed update is recorded as the row key with the written columns.
@@ -202,6 +205,10 @@ describe('Instance-level @Authorize re-check', () => {
           useValue: { recordPermissionDenied: jest.fn() }
         },
         AccessRefusalService,
+        {
+          provide: SettingsChangeLogService,
+          useValue: { applyPending: jest.fn().mockResolvedValue(undefined) }
+        },
         {
           provide: CACHE_MANAGER,
           useValue: {

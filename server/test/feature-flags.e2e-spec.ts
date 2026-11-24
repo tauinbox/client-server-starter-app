@@ -57,6 +57,26 @@ import { createMockConfigService } from '../src/common/testing/config-service.mo
 import { flagAuditActor } from './flag-audit-actor';
 import type { IfMatchCondition } from '@app/shared/utils/if-match';
 import { AccessRefusalService } from '../src/modules/audit/access-refusal.service';
+import { settingsChangedEvent } from '../src/modules/core/settings-change-log/testing/settings-changed-event';
+import { SettingsChangeLogService } from '../src/modules/core/settings-change-log/settings-change-log.service';
+
+/**
+ * The apply of the settings change log for the in-memory repositories: a
+ * flag write reaches the flag listener after its commit, as the triggers and
+ * the apply make it reach it on Postgres.
+ */
+function settingsChangeLogOfFlags() {
+  return {
+    provide: SettingsChangeLogService,
+    inject: [FeatureFlagChangedListener],
+    useFactory: (listener: FeatureFlagChangedListener) => ({
+      applyPending: () =>
+        listener.handleSettingsChanged(
+          settingsChangedEvent({ tables: ['feature_flags'] })
+        )
+    })
+  };
+}
 
 /** The If-Match condition of one strong version tag. */
 const version = (v: number): IfMatchCondition => ({
@@ -254,6 +274,8 @@ function makeDataSourceMock(
   flagRepo: ReturnType<typeof makeFlagRepoMock>
 ): DataSource {
   const em = {
+    // The settings log lock.
+    query: (): Promise<never[]> => Promise.resolve([]),
     delete(
       _entity: unknown,
       where: { flagId: string }
@@ -355,6 +377,7 @@ describe('Feature flags end-to-end', () => {
         FeatureFlagResolverService,
         AttributeRegistryService,
         FeatureFlagChangedListener,
+        settingsChangeLogOfFlags(),
         { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
         { provide: getRepositoryToken(FeatureFlagRule), useValue: ruleRepo },
         { provide: DataSource, useValue: dataSource },
@@ -561,7 +584,9 @@ describe('Feature flags end-to-end', () => {
 
     expect(cache.store.has(flagsKey())).toBe(true);
 
-    await listener.handleFeatureFlagChanged();
+    await listener.handleSettingsChanged(
+      settingsChangedEvent({ tables: ['feature_flags'] })
+    );
 
     expect(cache.store.has(flagsKey())).toBe(false);
     // The broadcast is coalesced: nothing is pushed until the window elapses.
@@ -956,6 +981,10 @@ describe('GET /feature-flags anonymous rollout id', () => {
         FeatureFlagResolverService,
         AttributeRegistryService,
         FeatureFlagGuard,
+        {
+          provide: SettingsChangeLogService,
+          useValue: { applyPending: jest.fn().mockResolvedValue(undefined) }
+        },
         { provide: getRepositoryToken(FeatureFlag), useValue: flagRepo },
         {
           provide: getRepositoryToken(FeatureFlagRule),

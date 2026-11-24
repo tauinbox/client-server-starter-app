@@ -27,9 +27,9 @@ const failedConnects = new WeakMap<KeyvRedis<unknown>, number>();
 export async function redisClientOf(
   cache: Cache
 ): Promise<RedisClientConnectionType | null> {
-  const store: unknown = cache.stores?.[0]?.store;
+  const store = redisStoreOf(cache);
 
-  if (!(store instanceof KeyvRedis)) return null;
+  if (!store) return null;
 
   const { client } = store;
 
@@ -53,6 +53,20 @@ export async function redisClientOf(
   }
 
   return connected;
+}
+
+function redisStoreOf(cache: Cache): KeyvRedis<unknown> | null {
+  const store: unknown = cache.stores?.[0]?.store;
+
+  return store instanceof KeyvRedis ? store : null;
+}
+
+/**
+ * True when the cache lives in Redis, so every node of the pool reads the same
+ * entries; false for the in-memory store, which only its own process reads.
+ */
+export function isSharedCache(cache: Cache): boolean {
+  return redisStoreOf(cache) !== null;
 }
 
 /**

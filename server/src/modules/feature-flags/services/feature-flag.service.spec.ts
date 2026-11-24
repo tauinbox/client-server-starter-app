@@ -18,6 +18,7 @@ import {
   type AppAbility
 } from '../../auth/casl/app-ability';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
+import { SettingsChangeLogService } from '../../core/settings-change-log/settings-change-log.service';
 
 interface QueryBuilderMock {
   update: jest.Mock;
@@ -56,6 +57,7 @@ describe('FeatureFlagService', () => {
   };
   let ruleRepo: { find: jest.Mock; manager: { transaction: jest.Mock } };
   let dataSource: { transaction: jest.Mock };
+  let settingsChangeLog: { applyPending: jest.Mock };
   let attributeRegistry: AttributeRegistryService;
   let configService: { getOrThrow: jest.Mock };
   let auditService: { log: jest.Mock; logFireAndForget: jest.Mock };
@@ -102,6 +104,9 @@ describe('FeatureFlagService', () => {
       manager: { transaction: jest.fn() }
     };
     dataSource = { transaction: jest.fn() };
+    settingsChangeLog = {
+      applyPending: jest.fn().mockResolvedValue(undefined)
+    };
     attributeRegistry = new AttributeRegistryService();
     configService = {
       getOrThrow: jest.fn((key: string) =>
@@ -124,7 +129,8 @@ describe('FeatureFlagService', () => {
         { provide: ConfigService, useValue: configService },
         { provide: AuditService, useValue: auditService },
         { provide: MetricsService, useValue: metricsService },
-        AccessRefusalService
+        AccessRefusalService,
+        { provide: SettingsChangeLogService, useValue: settingsChangeLog }
       ]
     }).compile();
 
@@ -174,6 +180,7 @@ describe('FeatureFlagService', () => {
   });
 
   interface MockEm {
+    query: jest.Mock;
     findOne: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
@@ -183,6 +190,7 @@ describe('FeatureFlagService', () => {
 
   function mockTransaction(overrides: Partial<MockEm> = {}): MockEm {
     const em: MockEm = {
+      query: jest.fn().mockResolvedValue([]),
       findOne: jest.fn((_e: unknown, options: unknown): unknown =>
         flagRepo.findOne(options)
       ),
@@ -796,6 +804,55 @@ describe('FeatureFlagService', () => {
         reason: 'env-mismatch',
         matchedRule: null
       });
+    });
+  });
+
+  describe('apply of the settings change log', () => {
+    const lockCalls = (em: MockEm) =>
+      (em.query.mock.calls as [string][]).filter(([sql]) =>
+        sql.includes('pg_advisory_xact_lock')
+      );
+
+    it('takes the log lock first and applies after the commit of a delete', async () => {
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
+      const em = mockTransaction();
+
+      em.delete.mockImplementation(() => {
+        expect(lockCalls(em)).toHaveLength(1);
+        expect(settingsChangeLog.applyPending).not.toHaveBeenCalled();
+
+        return Promise.resolve({ affected: 1 });
+      });
+
+      await service.delete('flag-1', SYSTEM_ABILITY, actor);
+
+      expect(settingsChangeLog.applyPending).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes the log lock first and applies after the commit of a create', async () => {
+      flagRepo.findOne.mockResolvedValueOnce(null);
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
+      const em = mockTransaction();
+
+      em.save.mockImplementation((_e: unknown, v: unknown) => {
+        expect(lockCalls(em)).toHaveLength(1);
+
+        return Promise.resolve({ ...sampleFlag, ...(v as object) });
+      });
+
+      await service.create({ key: 'new-dashboard' }, SYSTEM_ABILITY, actor);
+
+      expect(settingsChangeLog.applyPending).toHaveBeenCalledTimes(1);
+    });
+
+    it('applies nothing when the write fails', async () => {
+      flagRepo.findOne.mockResolvedValue(sampleFlag);
+      mockTransaction({ delete: jest.fn().mockResolvedValue({ affected: 0 }) });
+
+      await expect(
+        service.delete('flag-1', SYSTEM_ABILITY, actor)
+      ).rejects.toMatchObject({ errorKey: ErrorKeys.FEATURE_FLAGS.NOT_FOUND });
+      expect(settingsChangeLog.applyPending).not.toHaveBeenCalled();
     });
   });
 

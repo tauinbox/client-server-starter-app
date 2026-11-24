@@ -26,13 +26,14 @@ import { AuditService } from '../../audit/audit.service';
 import type { AuditLogParams } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
-  changesGrantableActions,
   grantableActionNames,
   reofferedActionNames
 } from '@app/shared/utils/grantable-actions';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceActionsChangedEvent } from '../events/resource-actions-changed.event';
 import { subject } from '@casl/ability';
+import {
+  SettingsChangeLogService,
+  writeSettings
+} from '../../core/settings-change-log/settings-change-log.service';
 import { withChanges } from '@app/shared/utils/changed-fields';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { auditContextOf } from '../casl/ability-context';
@@ -77,7 +78,7 @@ export class ResourceService {
     private readonly metrics: MetricsService,
     private readonly auditService: AuditService,
     private readonly accessRefusals: AccessRefusalService,
-    private readonly eventEmitter: EventEmitter2
+    private readonly settingsChangeLog: SettingsChangeLogService
   ) {
     this.#subjectMapVersion = new CacheVersionCounter(cacheManager, {
       counterKey: SUBJECT_MAP_VERSION_COUNTER_KEY,
@@ -162,19 +163,7 @@ export class ResourceService {
 
     // Checked here to answer early, and again on the locked row.
     check(await this.loadResource(id));
-    const { before, saved } = await this.updateAudited(id, data, {
-      check,
-      audit
-    });
-
-    await this.invalidateSubjectMapCache();
-
-    if (
-      data.allowedActionNames !== undefined &&
-      changesGrantableActions(before, data.allowedActionNames)
-    ) {
-      this.#emitActionsChanged();
-    }
+    const { saved } = await this.updateAudited(id, data, { check, audit });
 
     return saved;
   }
@@ -270,6 +259,14 @@ export class ResourceService {
    * audit row of the change in one transaction. An edit that loses to a delete
    * answers not found. `before` is the locked row as it was before the write.
    */
+  #writeSettings<T>(write: (em: EntityManager) => Promise<T>): Promise<T> {
+    return writeSettings(
+      this.resourceRepository.manager,
+      this.settingsChangeLog,
+      write
+    );
+  }
+
   private updateAudited(
     id: string,
     changes: QueryDeepPartialEntity<Resource>,
@@ -281,7 +278,7 @@ export class ResourceService {
       audit?: (before: Resource) => AuditLogParams;
     }
   ): Promise<{ before: Resource; saved: Resource }> {
-    return this.resourceRepository.manager.transaction(async (em) => {
+    return this.#writeSettings(async (em) => {
       const before = await this.lockResource(em, id);
 
       check(before);
@@ -339,31 +336,24 @@ export class ResourceService {
     this.assertCanRestore(ability, await this.loadResource(id), actorId);
     // Keyed on the orphaned state, so of two concurrent restores one writes
     // and audits and the other is refused.
-    const resource = await this.resourceRepository.manager.transaction(
-      async (em) => {
-        const locked = await this.lockResource(em, id);
+    const resource = await this.#writeSettings(async (em) => {
+      const locked = await this.lockResource(em, id);
 
-        this.assertCanRestore(ability, locked, actorId);
-        const { affected } = await em.update(
-          Resource,
-          { id, isOrphaned: true },
-          { isOrphaned: false }
-        );
+      this.assertCanRestore(ability, locked, actorId);
+      const { affected } = await em.update(
+        Resource,
+        { id, isOrphaned: true },
+        { isOrphaned: false }
+      );
 
-        if (affected === 0) throw notOrphaned(locked);
+      if (affected === 0) throw notOrphaned(locked);
 
-        if (audit) await this.auditService.log(audit, em);
+      if (audit) await this.auditService.log(audit, em);
 
-        return locked;
-      }
-    );
-    const woken = grantableActionNames(resource);
+      return locked;
+    });
 
     resource.isOrphaned = false;
-    await this.invalidateSubjectMapCache();
-
-    if (woken.length > 0) this.#emitActionsChanged();
-
     resource.isRegistered = true;
 
     return resource;
@@ -389,13 +379,6 @@ export class ResourceService {
       reEnabled: grantableActionNames(resource),
       actorId
     });
-  }
-
-  #emitActionsChanged(): void {
-    this.eventEmitter.emit(
-      ResourceActionsChangedEvent.name,
-      new ResourceActionsChangedEvent()
-    );
   }
 
   async upsertResource(data: {

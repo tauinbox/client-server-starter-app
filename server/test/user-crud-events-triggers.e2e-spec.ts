@@ -281,11 +281,12 @@ runWithInfra(
     }, 30000);
 
     it('sends updated for a role assign and a role remove', async () => {
-      const stream = await openStream(viewer);
+      // Created before the stream opens: a role create pushes user_list_stale.
       const extra = await roleService.create(
         { name: `${tag}-extra` },
         { ability: SYSTEM_ABILITY }
       );
+      const stream = await openStream(viewer);
       const req = requestOf(randomUUID());
 
       await rolesController.assignRole(
@@ -304,7 +305,11 @@ runWithInfra(
       await settle(stream, 2);
       const updated = crud('updated', target.id);
 
-      expect(stream()).toEqual([updated, updated]);
+      // Only the user events: a role change of a parallel suite reaches this
+      // process through the settings change log as user_list_stale.
+      expect(
+        stream().filter(({ type }) => type === 'user_crud_events')
+      ).toEqual([updated, updated]);
     }, 30000);
 
     it('sends updated for an own name change and not for a locale change', async () => {
@@ -344,12 +349,13 @@ runWithInfra(
     }, 30000);
 
     it('sends user_list_stale after a role rename and a role delete, only to list viewers', async () => {
-      const stream = await openStream(viewer);
-      const plainStream = await openStream(plain);
+      // Created before the streams open: a role create pushes user_list_stale.
       const renamed = await roleService.create(
         { name: `${tag}-doomed` },
         { ability: SYSTEM_ABILITY }
       );
+      const stream = await openStream(viewer);
+      const plainStream = await openStream(plain);
       const req = requestOf(randomUUID());
 
       await rolesController.update(
@@ -363,7 +369,12 @@ runWithInfra(
       const stale: ListEvent = { type: 'user_list_stale' };
 
       await settle(stream, 2);
-      expect(stream()).toEqual([stale, stale]);
+      // At least one for each change: a role change of a parallel suite on the
+      // same database reaches this process through the settings change log too.
+      const events = stream();
+
+      expect(events.every((event) => event.type === stale.type)).toBe(true);
+      expect(events.length).toBeGreaterThanOrEqual(2);
       expect(plainStream()).toEqual([]);
     }, 30000);
   }

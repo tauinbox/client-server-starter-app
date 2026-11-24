@@ -3,7 +3,6 @@ import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import type { EntityManager } from 'typeorm';
 import { RoleRulesListener } from './role-rules.listener';
 import { FeatureFlagService } from '../services/feature-flag.service';
-import { FeatureFlagChangedEvent } from '../events/feature-flag-changed.event';
 import { RoleRenamedEvent } from '../../auth/events/role-renamed.event';
 import { RoleDeletedEvent } from '../../auth/events/role-deleted.event';
 
@@ -14,13 +13,9 @@ describe('RoleRulesListener', () => {
   let module: TestingModule;
   let eventEmitter: EventEmitter2;
   let flagService: { rewriteRoleName: jest.Mock };
-  let flagChanged: jest.Mock;
-  let commit: () => void;
-  let committed: Promise<void>;
 
   beforeEach(async () => {
     flagService = { rewriteRoleName: jest.fn().mockResolvedValue([]) };
-    ({ promise: committed, resolve: commit } = Promise.withResolvers<void>());
 
     module = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot()],
@@ -32,8 +27,6 @@ describe('RoleRulesListener', () => {
 
     await module.init();
     eventEmitter = module.get(EventEmitter2);
-    flagChanged = jest.fn();
-    eventEmitter.on(FeatureFlagChangedEvent.name, flagChanged);
   });
 
   afterEach(async () => {
@@ -43,7 +36,7 @@ describe('RoleRulesListener', () => {
   it('should rewrite the old name to the new name in the role transaction', async () => {
     await eventEmitter.emitAsync(
       RoleRenamedEvent.name,
-      new RoleRenamedEvent('beta', 'beta-2', em, committed)
+      new RoleRenamedEvent('beta', 'beta-2', em)
     );
 
     expect(flagService.rewriteRoleName).toHaveBeenCalledWith(
@@ -56,51 +49,27 @@ describe('RoleRulesListener', () => {
   it('should remove the name on delete', async () => {
     await eventEmitter.emitAsync(
       RoleDeletedEvent.name,
-      new RoleDeletedEvent('beta', em, committed)
+      new RoleDeletedEvent('beta', em)
     );
 
     expect(flagService.rewriteRoleName).toHaveBeenCalledWith(em, 'beta', null);
   });
 
-  it('should announce the changed flags once, only after the commit', async () => {
-    flagService.rewriteRoleName.mockResolvedValue(['flag-a', 'flag-b']);
-
-    await eventEmitter.emitAsync(
-      RoleDeletedEvent.name,
-      new RoleDeletedEvent('beta', em, committed)
-    );
-    expect(flagChanged).not.toHaveBeenCalled();
-
-    commit();
-    await committed;
-
-    expect(flagChanged).toHaveBeenCalledTimes(1);
-    expect(flagChanged).toHaveBeenCalledWith(new FeatureFlagChangedEvent());
-  });
-
-  it('should announce nothing when no rule names the role', async () => {
-    await eventEmitter.emitAsync(
-      RoleRenamedEvent.name,
-      new RoleRenamedEvent('beta', 'beta-2', em, committed)
-    );
-    commit();
-    await committed;
-
-    expect(flagChanged).not.toHaveBeenCalled();
-  });
-
   it.each([
-    ['rename', () => new RoleRenamedEvent('beta', 'beta-2', em, committed)],
-    ['delete', () => new RoleDeletedEvent('beta', em, committed)]
+    [
+      'rename',
+      RoleRenamedEvent.name,
+      () => new RoleRenamedEvent('beta', 'beta-2', em)
+    ],
+    ['delete', RoleDeletedEvent.name, () => new RoleDeletedEvent('beta', em)]
   ])(
     'should propagate a failed rewrite on %s to the emitter',
-    async (_name, makeEvent) => {
+    async (_case, name, makeEvent) => {
       flagService.rewriteRoleName.mockRejectedValue(new Error('db down'));
-      const event = makeEvent();
 
-      await expect(
-        eventEmitter.emitAsync(event.constructor.name, event)
-      ).rejects.toThrow('db down');
+      await expect(eventEmitter.emitAsync(name, makeEvent())).rejects.toThrow(
+        'db down'
+      );
     }
   );
 });

@@ -252,4 +252,34 @@ describe('SSE user list events outside the admin user routes', () => {
     expect(admin.events()).toEqual([stale, stale]);
     expect(plain.events()).toEqual([]);
   });
+
+  it('sends user_list_stale after a role create and a description change, and none for a write that changes nothing', async () => {
+    const adminToken = await login('admin@example.com');
+    const admin = await openStream('admin@example.com');
+
+    expect(
+      await call('POST', '/roles', {
+        token: adminToken,
+        body: { name: 'stale-probe' }
+      })
+    ).toBe(201);
+    expect(
+      await call('PATCH', `/roles/${ROLE_ID}`, {
+        token: adminToken,
+        body: { description: 'A new description' }
+      })
+    ).toBe(200);
+    expect(
+      await call('PATCH', `/roles/${ROLE_ID}`, {
+        token: adminToken,
+        body: { description: 'A new description' }
+      })
+    ).toBe(200);
+
+    await settled(admin);
+    admin.close();
+    const stale = { type: 'user_list_stale' };
+
+    expect(admin.events()).toEqual([stale, stale]);
+  });
 });

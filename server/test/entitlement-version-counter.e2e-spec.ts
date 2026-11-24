@@ -84,13 +84,32 @@ runWithRedis('entitlement version counter (real Redis)', () => {
 
   it('starts at version 0 with no write, then keys per-user entries by the counter', async () => {
     await service.capabilitiesFor('u1');
-    expect(await cache.get('entitlements:user:u1:u0')).toBeDefined();
+    expect(await cache.get('entitlements:user:v2:u1:u0')).toBeDefined();
     expect(await redis.exists(COUNTER_KEY)).toBe(0);
 
     await service.invalidateUser('u1');
     // The bumped suffix orphans the previous entry instead of serving it.
-    expect(await cache.get('entitlements:user:u1:u1')).toBeUndefined();
+    expect(await cache.get('entitlements:user:v2:u1:u1')).toBeUndefined();
     await service.capabilitiesFor('u1');
-    expect(await cache.get('entitlements:user:u1:u1')).toBeDefined();
+    expect(await cache.get('entitlements:user:v2:u1:u1')).toBeDefined();
+  });
+
+  it('serves no entry of a user after a change of the plans or products', async () => {
+    await service.capabilitiesFor('u2');
+    const entry = await cache.get<{ catalog: number }>(
+      'entitlements:user:v2:u2:u0'
+    );
+
+    expect(entry).toBeDefined();
+
+    await service.invalidateCatalog();
+    await service.capabilitiesFor('u2');
+    // A parallel suite can bump the same counter, so the test compares with
+    // the version of the first entry, not with an exact value.
+    const rewritten = await cache.get<{ catalog: number }>(
+      'entitlements:user:v2:u2:u0'
+    );
+
+    expect(rewritten?.catalog).toBeGreaterThan(entry?.catalog ?? 0);
   });
 });

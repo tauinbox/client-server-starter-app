@@ -57,6 +57,10 @@ const FEATURE_FLAG_LIST_COLUMNS: ListColumns<typeof FEATURE_FLAG_LIST_QUERY> = {
 };
 
 import { AttributeRegistryService } from './attribute-registry.service';
+import {
+  SettingsChangeLogService,
+  writeSettings
+} from '../../core/settings-change-log/settings-change-log.service';
 
 function keyExistsConflict(): ApiError {
   return new ApiError(
@@ -103,8 +107,18 @@ export class FeatureFlagService {
     private readonly attributeRegistry: AttributeRegistryService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
-    private readonly accessRefusals: AccessRefusalService
+    private readonly accessRefusals: AccessRefusalService,
+    private readonly settingsChangeLog: SettingsChangeLogService
   ) {}
+
+  /**
+   * Runs `write` in a transaction that first takes the settings log lock, then
+   * applies the change log after the commit, so the caller answers only when
+   * the flag caches of its pool no longer hold the old flag.
+   */
+  #writeSettings<T>(write: (em: EntityManager) => Promise<T>): Promise<T> {
+    return writeSettings(this.dataSource, this.settingsChangeLog, write);
+  }
 
   /**
    * The `custom` attribute keys a rule payload may reference. The registry is
@@ -248,7 +262,7 @@ export class FeatureFlagService {
     let saved: FeatureFlag;
 
     try {
-      saved = await this.dataSource.transaction(async (em) => {
+      saved = await this.#writeSettings(async (em) => {
         const flag = await em.save(
           FeatureFlag,
           em.create(FeatureFlag, {
@@ -307,7 +321,7 @@ export class FeatureFlagService {
     // A successful write then replaced exactly `current`, the audit diff base.
     if (!ifMatchHolds(ifMatch, current.version)) throw versionConflict();
 
-    await this.dataSource.transaction(async (em) => {
+    await this.#writeSettings(async (em) => {
       const result = await em
         .createQueryBuilder()
         .update(FeatureFlag)
@@ -361,7 +375,7 @@ export class FeatureFlagService {
 
     // Checked here to answer early, and again on the locked row.
     check(await this.#load(id));
-    await this.dataSource.transaction(async (em) => {
+    await this.#writeSettings(async (em) => {
       const locked = await em.findOne(FeatureFlag, {
         where: { id },
         lock: { mode: 'pessimistic_write' }

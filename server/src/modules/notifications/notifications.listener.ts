@@ -7,9 +7,8 @@ import { UserCreatedEvent } from '../users/events/user-created.event';
 import { UserUpdatedEvent } from '../users/events/user-updated.event';
 import { UserRestoredEvent } from '../users/events/user-restored.event';
 import { RolePermissionsChangedEvent } from '../auth/events/role-permissions-changed.event';
-import { ResourceActionsChangedEvent } from '../auth/events/resource-actions-changed.event';
-import { RoleRenamedEvent } from '../auth/events/role-renamed.event';
-import { RoleDeletedEvent } from '../auth/events/role-deleted.event';
+import { SettingsChangedEvent } from '../core/settings-change-log/settings-changed.event';
+import { touches } from '../core/settings-change-log/settings-change.types';
 import { UsersService } from '../users/services/users.service';
 import type { User } from '../users/entities/user.entity';
 import type { NotificationEvent } from '@app/shared/types';
@@ -53,26 +52,29 @@ export class NotificationsListener {
     await this.#pushUserCrudEvent('restored', event.userId);
   }
 
-  @OnEvent(RoleRenamedEvent.name)
-  handleRoleRenamed(event: RoleRenamedEvent): void {
-    this.#pushUserListStale(event.committed);
+  /**
+   * Runs inside the apply of the settings change log, after the settings
+   * write committed. The pushes do not wait: they read on their own
+   * connections, and the apply holds a lock that other requests wait for. A
+   * role change shows in the role column of the user list; a change of the
+   * resources can change the abilities of any user, so it is one broadcast
+   * and not a search for the holders.
+   */
+  @OnEvent(SettingsChangedEvent.name, { suppressErrors: false })
+  handleSettingsChanged({ change }: SettingsChangedEvent): void {
+    if (touches(change, 'roles')) this.#pushUserListStale();
+
+    if (touches(change, 'resources', 'permissions', 'actions')) {
+      this.notificationsService.pushToAll({ type: 'permissions_updated' });
+    }
   }
 
-  @OnEvent(RoleDeletedEvent.name)
-  handleRoleDeleted(event: RoleDeletedEvent): void {
-    this.#pushUserListStale(event.committed);
-  }
-
-  // The role events are emitted inside the role transaction. The push waits
-  // for the commit, but the handler must not: the commit waits for it.
-  #pushUserListStale(committed: Promise<void>): void {
-    void committed
-      .then(() =>
-        this.notificationsService.pushToAuthorized(
-          { type: 'user_list_stale' },
-          (ability) => ability.can('search', 'User'),
-          SEARCH_USER
-        )
+  #pushUserListStale(): void {
+    this.notificationsService
+      .pushToAuthorized(
+        { type: 'user_list_stale' },
+        (ability) => ability.can('search', 'User'),
+        SEARCH_USER
       )
       .catch((error: unknown) =>
         this.#logger.warn(
@@ -90,13 +92,6 @@ export class NotificationsListener {
     await this.notificationsService.pushToUsers(event.userIds, {
       type: 'permissions_updated'
     });
-  }
-
-  // The event names no users, and a super user's abilities do not change, but
-  // a one-message broadcast costs less than finding the holders.
-  @OnEvent(ResourceActionsChangedEvent.name)
-  handleResourceActionsChanged(): void {
-    this.notificationsService.pushToAll({ type: 'permissions_updated' });
   }
 
   async #pushUserCrudEvent(

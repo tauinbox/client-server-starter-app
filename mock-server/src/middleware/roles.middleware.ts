@@ -567,6 +567,8 @@ router.post('/', permissionGuard('create', 'Role'), (req, res) => {
   };
 
   state.roles.set(role.id, role);
+  // A new role row is a settings change: the server pushes it to the user lists.
+  pushUserListStale();
 
   const actor = (req as AuthenticatedRequest).user;
 
@@ -675,14 +677,20 @@ router.patch(
           user.roles = user.roles.map((r) => (r === oldName ? role.name : r));
         }
 
-        notifyRoleHolders(role.name);
         rewriteRoleNameInRules(oldName, role.name);
-        pushUserListStale();
       }
     }
 
     if (description !== undefined) {
       role.description = description;
+    }
+
+    // As the settings change log of the server: a change of the role row
+    // reaches its holders and the user lists; an update that changes nothing
+    // writes no log entry and pushes nothing.
+    if (changed.length > 0) {
+      notifyRoleHolders(role.name);
+      pushUserListStale();
     }
 
     role.updatedAt = new Date().toISOString();

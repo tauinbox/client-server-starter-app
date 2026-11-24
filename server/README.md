@@ -527,11 +527,21 @@ of the push (or a super role), so the abilities of the other users are not resol
 the bus does nothing.
 
 `notifications.listener.ts` holds the `@OnEvent()` handlers. They react to `UserDeleted`,
-`UserCreated`, `UserUpdated`, `UserRestored`, `RoleRenamed`, `RoleDeleted`,
-`RolePermissionsChanged` and `ResourceActionsChanged`, and each one pushes a message.
-`ResourceActionsChanged` (a change of the grantable actions of a resource) sends
-`permissions_updated` to every connected user, because a holder of a grant on the resource can
-be in any role.
+`UserCreated`, `UserUpdated`, `UserRestored`, `RolePermissionsChanged` and `SettingsChanged`,
+and each one pushes a message. `SettingsChanged` is a batch of the settings change log
+(`core/settings-change-log/`): a change of a `roles` row sends `user_list_stale` to the clients
+that may search users, and a change of `resources`, `permissions` or `actions` sends
+`permissions_updated` to every connected user, because a holder of a grant on a resource can be
+in any role. `RolePermissionsChanged` comes from the RBAC listener of the same batch, with the
+holders of each changed role.
+
+**Settings change log.** Triggers on the 9 settings tables write `settings_change_log` for each
+change, whatever wrote it. A settings write of a service takes the log lock first
+(`lockSettingsLog`) and, after its commit, waits for `SettingsChangeLogService.applyPending`, so
+the request answers after the caches of the pool are dropped. A poll every 5 s applies the
+entries of seeders and direct SQL writes. With Redis one node of the pool applies each entry;
+with the memory cache each process applies every entry. `doc/architecture.md` section 12.8
+(MR-20, MR-D2) has the design.
 
 `user-notifications.service.ts` owns the table `user_notifications`: `notify(userId, content)`
 stores a notice, pushes `notification_created` and sends the mail through
@@ -607,12 +617,11 @@ environment other than `local`, a life of 1 year and `httpOnly=true`. Outside `l
 that name to pick the rollout bucket of a visitor. The read also ignores a value that is not a UUID
 (`ANON_ID_PATTERN`), because each value the server issues is a UUID.
 
-`events/feature-flag-changed.event.ts` has no fields: the listener resets the whole cache, so it does
-not need to know which flag changed. A role rename or delete that changes role rules emits one event
-after the commit.
-
-`listeners/feature-flag-changed.listener.ts` reacts to `FeatureFlagChangedEvent`. It invalidates the
-cache and calls `pushToAll` over SSE, through a coalescing window of 500 ms. It does not handle
+`listeners/feature-flag-changed.listener.ts` reacts to `SettingsChangedEvent`, a batch of the
+settings change log that changed `feature_flags` or `feature_flag_rules`, whatever wrote it (the
+admin routes, a role rename or delete that rewrote role rules, a seeder, SQL). It resets the whole
+cache, so it does not need to know which flag changed, and calls `pushToAll` over SSE, through a
+coalescing window of 500 ms. It does not handle
 `UserRoleChangedEvent`: a role change ends the sessions of the user, and the next sign-in loads the
 flags.
 
@@ -2752,7 +2761,8 @@ sends no flag event, because it ends the sessions of that user.
 Role rules store role names. `RoleService` emits `RoleRenamedEvent` and `RoleDeletedEvent` inside the
 transaction that renames or deletes the role. `RoleRulesListener` rewrites the rules in that
 transaction, so a failed rewrite rolls the role write back and fails the request. Each changed flag
-gets a new version, and a `FeatureFlagChangedEvent` after the commit. The
+gets a new version; the rewritten rows reach the flag cache through the settings change log after
+the commit. The
 cross-module communication uses `EventEmitter2` and never `forwardRef`. A `no-restricted-syntax`
 ESLint rule rejects a `forwardRef()` call in `src/`.
 
