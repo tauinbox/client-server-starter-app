@@ -11,6 +11,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { FindOperator } from 'typeorm';
@@ -422,7 +423,7 @@ describe('Billing Paddle webhook (e2e)', () => {
           useValue: { findOne: () => Promise.resolve(null) }
         },
         {
-          provide: getRepositoryToken(Plan),
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
           useValue: {
             find: () => Promise.resolve(stores.plans),
             findOne: (opts: { where: Partial<Plan> }) =>
@@ -430,7 +431,7 @@ describe('Billing Paddle webhook (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Product),
+          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
           useValue: {
             find: () => Promise.resolve(stores.products),
             findOne: (opts: { where: Partial<Product> }) =>

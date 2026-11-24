@@ -6,6 +6,7 @@
 
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { Server } from 'http';
@@ -79,7 +80,10 @@ describe('Billing plan catalog (e2e)', () => {
       providers: [
         RESPONSE_SERIALIZER,
         PlanService,
-        { provide: getRepositoryToken(Plan), useValue: planRepo },
+        {
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          useValue: planRepo
+        },
         PaddleProvider,
         // Only its presence counts: clientConfig reads no API.
         { provide: PADDLE_CLIENT, useValue: paddleClient },

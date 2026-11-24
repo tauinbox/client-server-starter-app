@@ -12,6 +12,7 @@ import { Test } from '@nestjs/testing';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { VersioningType, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { Server } from 'http';
@@ -429,7 +430,7 @@ describe('Billing payment-method update flow (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Plan),
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
           useValue: {
             findOne: (opts: { where: { key: string } }) =>
               Promise.resolve(
@@ -438,7 +439,7 @@ describe('Billing payment-method update flow (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Product),
+          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
           useValue: {
             find: () => Promise.resolve([]),
             findOne: () => Promise.resolve(null)

@@ -10,6 +10,7 @@ import {
   Repository,
   type QueryDeepPartialEntity
 } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import type { SubscriptionStatus } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { renewalAnchor } from '@app/shared/utils/billing-rules';
@@ -92,7 +93,7 @@ export class RenewalService {
     private readonly subscriptions: Repository<Subscription>,
     @InjectRepository(Customer)
     private readonly customers: Repository<Customer>,
-    @InjectRepository(Plan)
+    @InjectRepository(Plan, SETTINGS_DATA_SOURCE)
     private readonly plans: Repository<Plan>,
     @InjectDataSource() private readonly dataSource: DataSource,
     @Inject(BILLING_PROVIDERS)

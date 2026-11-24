@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { Customer } from '../entities/customer.entity';
 import { Plan } from '../entities/plan.entity';
 import { Subscription } from '../entities/subscription.entity';
@@ -51,7 +52,7 @@ export class RenewalNoticeService {
     private readonly subscriptions: Repository<Subscription>,
     @InjectRepository(Customer)
     private readonly customers: Repository<Customer>,
-    @InjectRepository(Plan)
+    @InjectRepository(Plan, SETTINGS_DATA_SOURCE)
     private readonly plans: Repository<Plan>,
     private readonly fixedRating: FixedRating,
     private readonly events: EventEmitter2

@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import {
   billingGeo,
@@ -130,9 +131,9 @@ export class BillingUserService {
     private readonly invoices: Repository<Invoice>,
     @InjectRepository(PaymentMethod)
     private readonly paymentMethods: Repository<PaymentMethod>,
-    @InjectRepository(Plan)
+    @InjectRepository(Plan, SETTINGS_DATA_SOURCE)
     private readonly plans: Repository<Plan>,
-    @InjectRepository(Product)
+    @InjectRepository(Product, SETTINGS_DATA_SOURCE)
     private readonly products: Repository<Product>,
     @InjectRepository(User)
     private readonly users: Repository<User>,

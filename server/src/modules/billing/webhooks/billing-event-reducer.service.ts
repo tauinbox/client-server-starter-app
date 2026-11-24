@@ -9,6 +9,7 @@ import {
   type EntityManager,
   type QueryDeepPartialEntity
 } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import {
@@ -101,8 +102,10 @@ export class BillingEventReducer {
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
-    @InjectRepository(Plan) private readonly plans: Repository<Plan>,
-    @InjectRepository(Product) private readonly products: Repository<Product>,
+    @InjectRepository(Plan, SETTINGS_DATA_SOURCE)
+    private readonly plans: Repository<Plan>,
+    @InjectRepository(Product, SETTINGS_DATA_SOURCE)
+    private readonly products: Repository<Product>,
     private readonly credits: CreditService,
     private readonly events: EventEmitter2,
     private readonly metrics: MetricsService

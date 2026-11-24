@@ -38,33 +38,58 @@ describe('db-pool gauge', () => {
   });
 
   describe('createDbPoolGauge', () => {
-    it('registers the gauge and populates labels from the pool on collect', async () => {
-      const source = {
-        driver: { master: { totalCount: 10, idleCount: 6, waitingCount: 1 } }
-      };
-      const gauge = createDbPoolGauge(source);
+    it('populates the labels of each pool on collect', async () => {
+      const gauge = createDbPoolGauge({
+        regional: {
+          driver: { master: { totalCount: 8, idleCount: 6, waitingCount: 1 } }
+        },
+        settings: {
+          driver: { master: { totalCount: 2, idleCount: 2, waitingCount: 0 } }
+        }
+      });
 
       const metric = await gauge.get();
-      const byState = new Map(
-        metric.values.map((v) => [v.labels['state'], v.value])
+      const values = Object.fromEntries(
+        metric.values.map(({ labels, value }) => [
+          `${labels['pool']}/${labels['state']}`,
+          value
+        ])
       );
 
-      expect(byState.get('total')).toBe(10);
-      expect(byState.get('idle')).toBe(6);
-      expect(byState.get('waiting')).toBe(1);
+      expect(values).toEqual({
+        'regional/total': 8,
+        'regional/idle': 6,
+        'regional/waiting': 1,
+        'settings/total': 2,
+        'settings/idle': 2,
+        'settings/waiting': 0
+      });
     });
 
-    it('emits nothing when the pool is unavailable', async () => {
-      const gauge = createDbPoolGauge({ driver: {} });
+    it('emits nothing for a pool that is unavailable', async () => {
+      const gauge = createDbPoolGauge({
+        regional: {
+          driver: { master: { totalCount: 8, idleCount: 6, waitingCount: 1 } }
+        },
+        settings: { driver: {} }
+      });
 
       const metric = await gauge.get();
 
-      expect(metric.values).toHaveLength(0);
+      expect(metric.values.map(({ labels }) => labels['pool'])).toEqual([
+        'regional',
+        'regional',
+        'regional'
+      ]);
     });
 
     it('reuses an already-registered metric', () => {
-      const first = createDbPoolGauge({ driver: {} });
-      const second = createDbPoolGauge({ driver: {} });
+      const unavailable = {
+        regional: { driver: {} },
+        settings: { driver: {} }
+      };
+      const first = createDbPoolGauge(unavailable);
+      const second = createDbPoolGauge(unavailable);
 
       expect(second).toBe(first);
     });

@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import type { BillingProviderId } from '@app/shared/types';
 import { Money } from '@app/shared/utils/money';
 import { Customer } from '../entities/customer.entity';
@@ -388,7 +389,7 @@ async function build(
         }
       },
       {
-        provide: getRepositoryToken(Plan),
+        provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
         useValue: {
           findOne: (opts: { where: { key: string } }) =>
             Promise.resolve(

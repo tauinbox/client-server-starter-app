@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { EventName } from '@paddle/paddle-node-sdk';
 import { DataSource } from 'typeorm';
 import { postgresConfig } from '../src/postgres.config';
@@ -113,11 +114,11 @@ runWithInfra(
             useValue: ds.getRepository(CreditBalance)
           },
           {
-            provide: getRepositoryToken(Plan),
+            provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
             useValue: ds.getRepository(Plan)
           },
           {
-            provide: getRepositoryToken(Product),
+            provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
             useValue: ds.getRepository(Product)
           },
           {

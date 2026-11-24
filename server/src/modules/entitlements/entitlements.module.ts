@@ -5,6 +5,7 @@ import { Customer } from '../billing/entities/customer.entity';
 import { CustomerGrant } from '../billing/entities/customer-grant.entity';
 import { Plan } from '../billing/entities/plan.entity';
 import { Subscription } from '../billing/entities/subscription.entity';
+import { SETTINGS_DATA_SOURCE } from '../../data-sources';
 import { EntitlementService } from './entitlement.service';
 import { EntitlementGuard } from './entitlement.guard';
 import { CatalogChangedListener } from './catalog-changed.listener';
@@ -25,9 +26,9 @@ import { CatalogChangedListener } from './catalog-changed.listener';
       CreditBalance,
       Customer,
       CustomerGrant,
-      Plan,
       Subscription
-    ])
+    ]),
+    TypeOrmModule.forFeature([Plan], SETTINGS_DATA_SOURCE)
   ],
   providers: [EntitlementService, EntitlementGuard, CatalogChangedListener],
   exports: [EntitlementService, EntitlementGuard]

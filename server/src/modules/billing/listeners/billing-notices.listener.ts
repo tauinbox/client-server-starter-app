@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import type { UserNotificationContent } from '@app/shared/types';
 import { renewalAnchor } from '@app/shared/utils/billing-rules';
 import { UserNotificationsService } from '../../notifications/user-notifications.service';
@@ -33,7 +34,7 @@ export class BillingNoticesListener {
     private readonly invoices: Repository<Invoice>,
     @InjectRepository(Subscription)
     private readonly subscriptions: Repository<Subscription>,
-    @InjectRepository(Plan)
+    @InjectRepository(Plan, SETTINGS_DATA_SOURCE)
     private readonly plans: Repository<Plan>
   ) {}
 

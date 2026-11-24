@@ -9,7 +9,14 @@ import { buildCacheOptions } from './redis-cache.store';
 import { buildThrottlerOptions } from './throttler-options';
 import { buildLoggerOptions } from './logger-options';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { postgresConfig } from '../../postgres.config';
+import { loadEntities, postgresConfig } from '../../postgres.config';
+import {
+  SETTINGS_DATA_SOURCE,
+  SETTINGS_ENTITIES,
+  regionalEntities,
+  splitPoolMax
+} from '../../data-sources';
+import type { PoolSizes } from '../../data-sources';
 import { UsersModule } from '../users/users.module';
 import { UsersApiModule } from '../users/users-api.module';
 import { AuthModule } from '../auth/auth.module';
@@ -33,6 +40,16 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 import { BillingModule } from '../billing/billing.module';
 import { OAuthProviderFlagAttributesRegistrar } from '../auth/registrars/oauth-provider-flag-attributes.registrar';
+
+function poolOptions(config: ConfigService, pool: keyof PoolSizes) {
+  return {
+    max: splitPoolMax(config.getOrThrow<number>('DB_POOL_MAX'))[pool],
+    idleTimeoutMillis: config.getOrThrow<number>('DB_POOL_IDLE_TIMEOUT'),
+    connectionTimeoutMillis: config.getOrThrow<number>(
+      'DB_POOL_CONNECTION_TIMEOUT'
+    )
+  };
+}
 
 @Module({})
 export class CoreModule implements NestModule {
@@ -83,15 +100,18 @@ export class CoreModule implements NestModule {
           inject: [ConfigService],
           useFactory: (config: ConfigService) => ({
             ...postgresConfig(),
-            extra: {
-              max: config.getOrThrow<number>('DB_POOL_MAX'),
-              idleTimeoutMillis: config.getOrThrow<number>(
-                'DB_POOL_IDLE_TIMEOUT'
-              ),
-              connectionTimeoutMillis: config.getOrThrow<number>(
-                'DB_POOL_CONNECTION_TIMEOUT'
-              )
-            }
+            entities: regionalEntities(loadEntities()),
+            extra: poolOptions(config, 'regional')
+          })
+        }),
+        TypeOrmModule.forRootAsync({
+          name: SETTINGS_DATA_SOURCE,
+          inject: [ConfigService],
+          useFactory: (config: ConfigService) => ({
+            ...postgresConfig(),
+            entities: [...SETTINGS_ENTITIES],
+            migrations: [],
+            extra: poolOptions(config, 'settings')
           })
         }),
         MetricsModule,

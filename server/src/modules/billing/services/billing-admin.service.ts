@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ApiError } from '../../../common/errors/api-error';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import {
   crossesZero,
   type BalanceChange
@@ -71,7 +72,7 @@ export class BillingAdminService {
     private readonly customers: Repository<Customer>,
     @InjectRepository(WebhookEvent)
     private readonly webhookEvents: Repository<WebhookEvent>,
-    @InjectRepository(Product)
+    @InjectRepository(Product, SETTINGS_DATA_SOURCE)
     private readonly products: Repository<Product>,
     private readonly billing: BillingService,
     private readonly credits: CreditService,

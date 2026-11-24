@@ -45,13 +45,18 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
     : undefined,
   migrationsRun: false, // automatically run migrations on startup
   synchronize: false, // always false — run 'npm run build && npm run migrations:run' manually
-  entities: loadExportedClasses(join(__dirname, 'modules'), ENTITY_FILE),
+  entities: loadEntities(),
   migrations: loadExportedClasses(
     join(__dirname, 'migrations'),
     MIGRATION_FILE
   ),
   applicationName: 'Starter Project'
 });
+
+/** Every entity class of `modules/`, of both data sources. */
+export function loadEntities(): NewableFunction[] {
+  return loadExportedClasses(join(__dirname, 'modules'), ENTITY_FILE);
+}
 
 function isJsonString(str: string) {
   try {

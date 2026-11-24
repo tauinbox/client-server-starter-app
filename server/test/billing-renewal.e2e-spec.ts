@@ -9,6 +9,7 @@ import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import type { INestApplication } from '@nestjs/common';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -273,7 +274,7 @@ describe('Billing renewal scheduler (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Plan),
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
           useValue: {
             findOne: (opts: { where: { key: string } }) =>
               Promise.resolve(
