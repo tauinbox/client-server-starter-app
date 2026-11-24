@@ -14,6 +14,7 @@ import { CreditBalance } from '../src/modules/billing/entities/credit-balance.en
 import { CreditLedger } from '../src/modules/billing/entities/credit-ledger.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { PaymentMethod } from '../src/modules/billing/entities/payment-method.entity';
+import { Plan } from '../src/modules/billing/entities/plan.entity';
 import { Product } from '../src/modules/billing/entities/product.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BILLING_PROVIDERS } from '../src/modules/billing/providers/payment-provider.interface';
@@ -106,7 +107,14 @@ runWithInfra('YooKassa webhook dedup key (e2e)', () => {
         { provide: YOOKASSA_CLIENT, useValue: { getPayment } },
         { provide: ConfigService, useValue: { get: () => '1' } },
         { provide: getDataSourceToken(), useValue: ds },
-        ...[User, PaymentMethod, WebhookEvent, CreditBalance].map((entity) => ({
+        ...[
+          User,
+          PaymentMethod,
+          WebhookEvent,
+          CreditBalance,
+          Plan,
+          Product
+        ].map((entity) => ({
           provide: getRepositoryToken(entity),
           useValue: ds.getRepository(entity)
         })),

@@ -113,6 +113,14 @@ runWithInfra(
             useValue: ds.getRepository(CreditBalance)
           },
           {
+            provide: getRepositoryToken(Plan),
+            useValue: ds.getRepository(Plan)
+          },
+          {
+            provide: getRepositoryToken(Product),
+            useValue: ds.getRepository(Product)
+          },
+          {
             provide: MetricsService,
             useValue: { recordUnmatchedOffSessionCharge: jest.fn() }
           },

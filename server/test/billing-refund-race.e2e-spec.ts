@@ -14,6 +14,7 @@ import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
+import { Product } from '../src/modules/billing/entities/product.entity';
 import { Subscription } from '../src/modules/billing/entities/subscription.entity';
 import { WebhookEvent } from '../src/modules/billing/entities/webhook-event.entity';
 import { BillingService } from '../src/modules/billing/billing.service';
@@ -157,6 +158,10 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
         {
           provide: getRepositoryToken(WebhookEvent),
           useValue: ds.getRepository(WebhookEvent)
+        },
+        {
+          provide: getRepositoryToken(Product),
+          useValue: ds.getRepository(Product)
         },
         {
           provide: BillingService,
