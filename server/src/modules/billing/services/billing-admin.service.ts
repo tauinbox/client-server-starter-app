@@ -71,6 +71,8 @@ export class BillingAdminService {
     private readonly customers: Repository<Customer>,
     @InjectRepository(WebhookEvent)
     private readonly webhookEvents: Repository<WebhookEvent>,
+    @InjectRepository(Product)
+    private readonly products: Repository<Product>,
     private readonly billing: BillingService,
     private readonly credits: CreditService,
     private readonly events: EventEmitter2,
@@ -176,48 +178,55 @@ export class BillingAdminService {
    * pair of values is the signature to reconcile on.
    */
   async refundInvoice(id: string, amountMinor?: number): Promise<Invoice> {
-    const { refundAmount, cumulativeRefunded, providerRef, owner } =
-      await withTransaction(this.dataSource, async (manager) => {
-        const invoice = await lockInvoice(manager, { where: { id } });
+    const {
+      refundAmount,
+      cumulativeRefunded,
+      providerRef,
+      owner,
+      purchasedProductId
+    } = await withTransaction(this.dataSource, async (manager) => {
+      const invoice = await lockInvoice(manager, { where: { id } });
 
-        if (!invoice) {
-          throw invoiceNotFound();
-        }
+      if (!invoice) {
+        throw invoiceNotFound();
+      }
 
-        const remaining = remainingRefundable(invoice);
+      const remaining = remainingRefundable(invoice);
 
-        if (invoice.status !== 'paid' || remaining.compare(ZERO) <= 0) {
-          throw new ApiError(
-            ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE,
-            'Only a paid invoice with an amount left can be refunded'
-          );
-        }
+      if (invoice.status !== 'paid' || remaining.compare(ZERO) <= 0) {
+        throw new ApiError(
+          ErrorKeys.BILLING.INVOICE_NOT_REFUNDABLE,
+          'Only a paid invoice with an amount left can be refunded'
+        );
+      }
 
-        // Rejecting rather than capping is this route's policy: an admin who
-        // asked for more than is left gets told, not quietly given less.
-        const requested =
-          amountMinor != null ? Money.fromMinor(amountMinor) : remaining;
+      // Rejecting rather than capping is this route's policy: an admin who
+      // asked for more than is left gets told, not quietly given less.
+      const requested =
+        amountMinor != null ? Money.fromMinor(amountMinor) : remaining;
 
-        if (requested.compare(ZERO) <= 0 || requested.compare(remaining) > 0) {
-          throw new ApiError(
-            ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE,
-            'Refund amount must be between 1 and the remaining refundable total'
-          );
-        }
+      if (requested.compare(ZERO) <= 0 || requested.compare(remaining) > 0) {
+        throw new ApiError(
+          ErrorKeys.BILLING.REFUND_AMOUNT_OUT_OF_RANGE,
+          'Refund amount must be between 1 and the remaining refundable total'
+        );
+      }
 
-        const { reserved: refundAmount, cumulative: cumulativeRefunded } =
-          await reserveRefund(manager, invoice, requested);
+      const { reserved: refundAmount, cumulative: cumulativeRefunded } =
+        await reserveRefund(manager, invoice, requested);
 
-        return {
-          refundAmount,
-          cumulativeRefunded,
-          providerRef: {
-            provider: invoice.provider,
-            invoiceRef: invoice.providerInvoiceRef
-          },
-          owner: { customerId: invoice.customerId, currency: invoice.currency }
-        };
-      });
+      return {
+        refundAmount,
+        cumulativeRefunded,
+        providerRef: {
+          provider: invoice.provider,
+          invoiceRef: invoice.providerInvoiceRef
+        },
+        owner: { customerId: invoice.customerId, currency: invoice.currency },
+        purchasedProductId:
+          invoice.kind === 'one_time' ? invoice.productId : null
+      };
+    });
 
     try {
       const provider = this.billing.getProviderById(providerRef.provider);
@@ -248,6 +257,12 @@ export class BillingAdminService {
       );
     }
 
+    // The catalog is settings data, read outside the transaction that writes
+    // the invoice and the credits.
+    const product = purchasedProductId
+      ? await this.products.findOne({ where: { id: purchasedProductId } })
+      : null;
+
     // The money side is already recorded, so settling is only the status flip.
     const { saved, revokedUserId, crossed } = await withTransaction(
       this.dataSource,
@@ -271,7 +286,10 @@ export class BillingAdminService {
 
         invoice.status = 'refunded';
         const revokedUserId = await this.revokeOneTimeGrants(manager, invoice);
-        const clawback = await this.clawbackCreditPurchase(manager, invoice);
+        const clawback = await this.clawbackCreditPurchase(manager, {
+          invoice,
+          product
+        });
         const crossed =
           clawback && crossesZero(clawback)
             ? {
@@ -373,16 +391,8 @@ export class BillingAdminService {
    */
   private async clawbackCreditPurchase(
     manager: EntityManager,
-    invoice: Invoice
+    { invoice, product }: { invoice: Invoice; product: Product | null }
   ): Promise<BalanceChange | null> {
-    if (invoice.kind !== 'one_time' || !invoice.productId) {
-      return null;
-    }
-
-    const product = await manager.findOne(Product, {
-      where: { id: invoice.productId }
-    });
-
     if (product?.type !== 'credits' || !product.grant?.credits) {
       return null;
     }

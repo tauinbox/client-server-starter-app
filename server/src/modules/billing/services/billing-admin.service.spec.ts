@@ -155,13 +155,11 @@ async function build() {
 
   // Transactional manager that routes the refund's entity-typed calls to the
   // same repo mocks, so the existing per-test setups/assertions still apply.
+  // A product read through it finds nothing: the catalog has its own repo.
   const manager = {
     findOne: jest.fn((entity: unknown, options: unknown): Promise<unknown> => {
       if (entity === Invoice)
         return invoices.findOne(options) as Promise<unknown>;
-
-      if (entity === Product)
-        return products.findOne(options) as Promise<unknown>;
 
       return Promise.resolve(null);
     }),
@@ -603,7 +601,7 @@ describe('BillingAdminService', () => {
       // pessimistic write lock, and the clawback must join the settling
       // transaction (same manager) so it commits atomically with the flip.
       expect(ctx.dataSource.transaction).toHaveBeenCalledTimes(2);
-      expect(ctx.manager.findOne).toHaveBeenCalledTimes(3);
+      expect(ctx.manager.findOne).toHaveBeenCalledTimes(2);
       expect(ctx.manager.findOne).toHaveBeenNthCalledWith(
         1,
         Invoice,
@@ -619,6 +617,53 @@ describe('BillingAdminService', () => {
         { customerId: 'cust-1', invoiceId: 'inv-1' },
         500
       );
+    });
+
+    it('reads the purchased product between the two transactions, not inside one', async () => {
+      const ctx = await build();
+
+      ctx.invoices.findOne.mockResolvedValue(
+        makeInvoice({
+          kind: 'one_time',
+          subscriptionId: null,
+          productId: 'prod-cr',
+          amountMinor: Money.fromMinor(49000)
+        })
+      );
+      ctx.products.findOne.mockResolvedValue({
+        id: 'prod-cr',
+        type: 'credits',
+        grant: { credits: 500 }
+      });
+      ctx.billing.getProviderById.mockReturnValue(providerStub('yookassa'));
+
+      await ctx.service.refundInvoice('inv-1');
+
+      const [pricing, settling] =
+        ctx.dataSource.transaction.mock.invocationCallOrder;
+      const [productRead] = ctx.products.findOne.mock.invocationCallOrder;
+
+      expect(ctx.products.findOne).toHaveBeenCalledWith({
+        where: { id: 'prod-cr' }
+      });
+      expect(productRead).toBeGreaterThan(pricing);
+      expect(productRead).toBeLessThan(settling);
+      expect(ctx.manager.findOne).not.toHaveBeenCalledWith(
+        Product,
+        expect.anything()
+      );
+    });
+
+    it('reads no product for a subscription invoice', async () => {
+      const ctx = await build();
+
+      ctx.invoices.findOne.mockResolvedValue(makeInvoice({ productId: null }));
+      ctx.billing.getProviderById.mockReturnValue(providerStub('yookassa'));
+
+      await ctx.service.refundInvoice('inv-1');
+
+      expect(ctx.products.findOne).not.toHaveBeenCalled();
+      expect(ctx.credits.clawbackPurchase).not.toHaveBeenCalled();
     });
 
     it.each([

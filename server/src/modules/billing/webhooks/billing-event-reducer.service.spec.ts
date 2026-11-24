@@ -2,7 +2,7 @@ import { expect } from '@jest/globals';
 import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { In, IsNull } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
@@ -56,24 +56,15 @@ function buildManager(stubs: ManagerStubs) {
   const findOne = jest.fn((entity: unknown, _opts: unknown) => {
     if (entity === Subscription) return Promise.resolve(stubs.subscription);
 
-    if (entity === Plan) return Promise.resolve(stubs.plan);
-
     if (entity === Customer) return Promise.resolve(stubs.customer);
 
     if (entity === Invoice) return Promise.resolve(stubs.invoice);
 
-    if (entity === Product) return Promise.resolve(stubs.product);
-
     return Promise.resolve(null);
   });
-  const find = jest.fn<Promise<unknown[]>, [unknown]>((entity) => {
-    if (entity === Plan) return Promise.resolve(stubs.plan ? [stubs.plan] : []);
-
-    if (entity === Product)
-      return Promise.resolve(stubs.product ? [stubs.product] : []);
-
-    return Promise.resolve([]);
-  });
+  // The catalog comes from its own repositories: a plan or product read
+  // through a manager finds nothing here.
+  const find = jest.fn<Promise<unknown[]>, [unknown]>().mockResolvedValue([]);
   const execute = jest.fn().mockResolvedValue({ raw: stubs.invoiceInsertRows });
   const insertValues = jest.fn();
 
@@ -115,7 +106,7 @@ function buildManager(stubs: ManagerStubs) {
 }
 
 async function build(stubs: Partial<ManagerStubs> = {}) {
-  const manager = buildManager({
+  const resolved: ManagerStubs = {
     subscription: null,
     plan: null,
     customer: null,
@@ -124,7 +115,21 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
     invoiceInsertRows: [{ id: 'inv-1' }],
     updateAffected: 0,
     ...stubs
-  });
+  };
+  const manager = buildManager(resolved);
+  const plans = {
+    find: jest
+      .fn<Promise<Plan[]>, []>()
+      .mockResolvedValue(resolved.plan ? [resolved.plan] : [])
+  };
+  const products = {
+    find: jest
+      .fn<Promise<Product[]>, []>()
+      .mockResolvedValue(resolved.product ? [resolved.product] : []),
+    findOne: jest
+      .fn<Promise<Product | null>, [unknown]>()
+      .mockResolvedValue(resolved.product)
+  };
   const emit = jest.fn();
   // Deliberately a different stub from the transactional `manager`: any write
   // that reaches `dataSource.manager` ran outside a transaction, and the tests
@@ -151,6 +156,8 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
       BillingEventReducer,
       { provide: MetricsService, useValue: metrics },
       { provide: getDataSourceToken(), useValue: dataSource },
+      { provide: getRepositoryToken(Plan), useValue: plans },
+      { provide: getRepositoryToken(Product), useValue: products },
       { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } }
     ]
@@ -159,6 +166,8 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
   return {
     reducer: module.get(BillingEventReducer),
     manager,
+    plans,
+    products,
     bareManager,
     dataSource,
     emit,
@@ -394,9 +403,9 @@ describe('BillingEventReducer', () => {
     });
 
     it('creates the subscription on the plan whose price was charged', async () => {
-      const { reducer, manager } = await build();
+      const { reducer, manager, plans } = await build();
 
-      manager.find.mockResolvedValue([planRow('business'), planRow('pro')]);
+      plans.find.mockResolvedValue([planRow('business'), planRow('pro')]);
 
       await reducer.reduce(
         event(
@@ -1287,11 +1296,11 @@ describe('BillingEventReducer', () => {
       });
 
       it('grants the pack whose price was paid', async () => {
-        const { reducer, manager, credits } = await build({
+        const { reducer, manager, products, credits } = await build({
           invoiceInsertRows: [{ id: 'inv-cr' }]
         });
 
-        manager.find.mockResolvedValue([
+        products.find.mockResolvedValue([
           pack('cr-5000', 5000),
           pack('cr-500', 500)
         ]);
@@ -1311,11 +1320,11 @@ describe('BillingEventReducer', () => {
       });
 
       it('records the payment and grants nothing when no product has the paid price', async () => {
-        const { reducer, manager, credits, emit } = await build({
+        const { reducer, manager, products, credits, emit } = await build({
           invoiceInsertRows: [{ id: 'inv-x' }]
         });
 
-        manager.find.mockResolvedValue([pack('cr-500', 500)]);
+        products.find.mockResolvedValue([pack('cr-500', 500)]);
 
         await reducer.reduce(
           event('invoice.paid', paddlePayload(['pri_inline']))
@@ -1594,6 +1603,66 @@ describe('BillingEventReducer', () => {
         expect(dataSource.transaction).toHaveBeenCalledTimes(1);
         expect(bareManager.update).not.toHaveBeenCalled();
         expect(bareManager.findOne).not.toHaveBeenCalled();
+      }
+    });
+  });
+
+  describe('catalog', () => {
+    it('reads the plan and product catalog before the transaction, never through its manager', async () => {
+      const subscription = await build({ plan: planRow('pro') });
+
+      await subscription.reducer.reduce(
+        event('subscription.activated', subPayload())
+      );
+
+      const oneTime = await build({
+        product: {
+          id: 'prod-1',
+          type: 'custom',
+          grant: null,
+          prices: {
+            paddle: {
+              currency: 'USD',
+              amountMinor: 500,
+              paddlePriceId: 'pri_1'
+            }
+          }
+        } as Product
+      });
+
+      await oneTime.reducer.reduce(
+        event('invoice.paid', {
+          ref: { customerId: 'cust-1', userId: 'user-1' },
+          providerSubscriptionId: null,
+          providerInvoiceRef: 'txn_1',
+          amountMinor: 500,
+          currency: 'USD',
+          periodStart: null,
+          periodEnd: null,
+          paidAt: null,
+          kind: 'one_time',
+          productId: null,
+          providerPriceIds: ['pri_1']
+        } satisfies NormalizedInvoicePayload)
+      );
+
+      for (const [{ manager, dataSource }, catalogRead] of [
+        [subscription, subscription.plans.find],
+        [oneTime, oneTime.products.find]
+      ] as const) {
+        const [catalogOrder] = catalogRead.mock.invocationCallOrder;
+        const [transactionOrder] =
+          dataSource.transaction.mock.invocationCallOrder;
+
+        expect(catalogOrder).toBeLessThan(transactionOrder);
+
+        for (const call of [
+          ...manager.find.mock.calls,
+          ...manager.findOne.mock.calls
+        ]) {
+          expect(call[0]).not.toBe(Plan);
+          expect(call[0]).not.toBe(Product);
+        }
       }
     });
   });
