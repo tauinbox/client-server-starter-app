@@ -6,7 +6,7 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { postgresConfig } from '../src/postgres.config';
@@ -32,6 +32,7 @@ import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
 } from './billing-db-lock';
+import { repositoryProviders } from './repository-providers';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -82,7 +83,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
         DRAFT_TERMS_CONSENTS,
         BillingEventReducer,
         { provide: getDataSourceToken(), useValue: ds },
-        ...[
+        ...repositoryProviders(ds, [
           Customer,
           Subscription,
           Invoice,
@@ -90,10 +91,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
           Plan,
           Product,
           User
-        ].map((entity) => ({
-          provide: getRepositoryToken(entity),
-          useValue: ds.getRepository(entity)
-        })),
+        ]),
         {
           provide: BillingService,
           useValue: {

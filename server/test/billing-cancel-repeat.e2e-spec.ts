@@ -8,7 +8,7 @@ import { VersioningType, type INestApplication } from '@nestjs/common';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 import type { Server } from 'http';
@@ -33,6 +33,7 @@ import { MfaRequiredGuard } from '../src/modules/auth/guards/mfa-required.guard'
 import { AuditService } from '../src/modules/audit/audit.service';
 import { AuditLogInterceptor } from '../src/modules/audit/interceptors/audit-log.interceptor';
 import { RESPONSE_SERIALIZER } from '../src/modules/core/interceptors/response-serializer.provider';
+import { repositoryProviders } from './repository-providers';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -56,12 +57,13 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
         RESPONSE_SERIALIZER,
         BillingAdminService,
         { provide: getDataSourceToken(), useValue: ds },
-        ...[Subscription, Invoice, Customer, WebhookEvent, Product].map(
-          (entity) => ({
-            provide: getRepositoryToken(entity),
-            useValue: ds.getRepository(entity)
-          })
-        ),
+        ...repositoryProviders(ds, [
+          Subscription,
+          Invoice,
+          Customer,
+          WebhookEvent,
+          Product
+        ]),
         {
           provide: BillingService,
           useValue: { getProviderById: () => ({ cancel: providerCancel }) }

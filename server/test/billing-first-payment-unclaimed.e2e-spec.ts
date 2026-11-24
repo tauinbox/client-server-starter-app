@@ -5,7 +5,7 @@
 
 import { Test, type TestingModule } from '@nestjs/testing';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -29,6 +29,7 @@ import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
 } from './billing-db-lock';
+import { repositoryProviders } from './repository-providers';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -79,12 +80,14 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
         BillingAdminService,
         FirstPaymentUnclaimedListener,
         { provide: getDataSourceToken(), useValue: ds },
-        ...[Subscription, Invoice, Customer, WebhookEvent, Plan, Product].map(
-          (entity) => ({
-            provide: getRepositoryToken(entity),
-            useValue: ds.getRepository(entity)
-          })
-        ),
+        ...repositoryProviders(ds, [
+          Subscription,
+          Invoice,
+          Customer,
+          WebhookEvent,
+          Plan,
+          Product
+        ]),
         {
           provide: BillingService,
           useValue: { getProviderById: () => provider }

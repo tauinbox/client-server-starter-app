@@ -13,6 +13,8 @@ import { randomBytes, randomUUID } from 'crypto';
 import { Server } from 'http';
 import request from 'supertest';
 import { DataSource, In } from 'typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { generateSync } from 'otplib';
 import {
   BILLING_PROVIDER_FLAGS,
@@ -140,6 +142,7 @@ interface Answer {
 runWithInfra('Request scenarios (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let auditWrites: ReturnType<typeof trackAuditWrites>;
   let refreshCookieName: string;
   let oauthDataCookieName: string;
@@ -227,6 +230,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = app.get(getDataSourceToken(SETTINGS_DATA_SOURCE));
     auditWrites = trackAuditWrites(app);
     const secure = requiresSecureCookies(
       app.get(ConfigService).get<string>('ENVIRONMENT')
@@ -336,12 +340,12 @@ runWithInfra('Request scenarios (e2e)', () => {
         await dataSource.getRepository(User).delete({ id: In(ids) });
       }
 
-      for (const [entity, column] of [
-        [Plan, 'key'],
-        [Product, 'key'],
-        [WebhookEvent, 'provider_event_id']
+      for (const [source, entity, column] of [
+        [settingsDataSource, Plan, 'key'],
+        [settingsDataSource, Product, 'key'],
+        [dataSource, WebhookEvent, 'provider_event_id']
       ] as const) {
-        await dataSource
+        await source
           .getRepository(entity)
           .createQueryBuilder()
           .delete()
@@ -791,7 +795,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       ctx.values.$invoiceId = invoice.id;
     },
     'api-access-plan': async (ctx) => {
-      await dataSource.getRepository(Plan).save({
+      await settingsDataSource.getRepository(Plan).save({
         ...fixedPlan(ctx.values.$fixedPlanKey!),
         entitlements: ['api-access']
       });
@@ -815,17 +819,17 @@ runWithInfra('Request scenarios (e2e)', () => {
       });
     },
     'fixed-plan': async (ctx) => {
-      await dataSource
+      await settingsDataSource
         .getRepository(Plan)
         .save(fixedPlan(ctx.values.$fixedPlanKey!));
     },
     'other-plan': async (ctx) => {
-      await dataSource
+      await settingsDataSource
         .getRepository(Plan)
         .save(fixedPlan(ctx.values.$planKey!));
     },
     product: async (ctx) => {
-      await dataSource.getRepository(Product).save({
+      await settingsDataSource.getRepository(Product).save({
         key: ctx.values.$productKey!,
         name: 'Scenario product',
         description: null,

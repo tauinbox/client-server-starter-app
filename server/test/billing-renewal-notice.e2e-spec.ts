@@ -4,7 +4,7 @@
 
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { postgresConfig } from '../src/postgres.config';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -19,6 +19,7 @@ import {
   holdBillingDbLock
 } from './billing-db-lock';
 import { waitsOnLock } from './lock-wait';
+import { repositoryProvider } from './repository-providers';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -62,10 +63,8 @@ runWithInfra('Renewal notice scan (e2e)', () => {
     );
 
     emit = jest.fn();
-    const repository = <T extends object>(entity: new () => T) => ({
-      provide: getRepositoryToken(entity),
-      useValue: ds.getRepository(entity)
-    });
+    const repository = (entity: NewableFunction) =>
+      repositoryProvider(ds, entity);
     const module = await Test.createTestingModule({
       providers: [
         RenewalNoticeService,

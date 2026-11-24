@@ -6,7 +6,7 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
@@ -34,6 +34,7 @@ import {
   holdBillingDbLock
 } from './billing-db-lock';
 import { waitsOnLock } from './lock-wait';
+import { repositoryProvider } from './repository-providers';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -154,10 +155,8 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   async function build(): Promise<void> {
     provider = fakeProvider();
     charges = [];
-    const repository = <T extends object>(entity: new () => T) => ({
-      provide: getRepositoryToken(entity),
-      useValue: ds.getRepository(entity)
-    });
+    const repository = (entity: NewableFunction) =>
+      repositoryProvider(ds, entity);
     const module = await Test.createTestingModule({
       providers: [
         PlanChangeService,
