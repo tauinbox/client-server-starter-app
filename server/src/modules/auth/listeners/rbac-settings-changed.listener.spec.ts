@@ -7,6 +7,7 @@ import type { ResourceService } from '../services/resource.service';
 import { RolePermissionsChangedEvent } from '../events/role-permissions-changed.event';
 import { UserRole } from '../../users/entities/user-role.entity';
 import { settingsChangedEvent } from '../../core/settings-change-log/testing/settings-changed-event';
+import type { SettingsApplyScope } from '../../core/settings-change-log/settings-change.types';
 
 describe('RbacSettingsChangedListener', () => {
   let permissionService: {
@@ -43,10 +44,16 @@ describe('RbacSettingsChangedListener', () => {
     );
   });
 
-  const run = (change: Parameters<typeof settingsChangedEvent>[0]) =>
+  const run = (
+    change: Parameters<typeof settingsChangedEvent>[0],
+    scope: SettingsApplyScope = 'pool'
+  ) =>
     listener.handleSettingsChanged(
-      // @ts-expect-error partial mock: only `delete` and `query`
-      settingsChangedEvent(change, manager as EntityManager)
+      settingsChangedEvent(change, {
+        // @ts-expect-error partial mock: only `delete` and `query`
+        manager: manager as EntityManager,
+        scope
+      })
     );
 
   it('drops the lists of each holder of a changed role, read on the apply manager, and pushes to them', async () => {
@@ -78,6 +85,18 @@ describe('RbacSettingsChangedListener', () => {
 
     expect(read).toBeLessThan(remove);
     expect(permissionService.invalidateUserCache).toHaveBeenCalledTimes(2);
+  });
+
+  it('in the process scope drops the lists of the holders of a deleted role and keeps their rows for the other processes', async () => {
+    await run(
+      { tables: ['roles'], roleIds: ['r-1'], deletedRoleIds: ['r-1'] },
+      'process'
+    );
+    await run({ all: true }, 'process');
+
+    expect(permissionService.invalidateUserCache).toHaveBeenCalledTimes(2);
+    expect(manager.delete).not.toHaveBeenCalled();
+    expect(manager.query).not.toHaveBeenCalled();
   });
 
   it('pushes nothing when a changed role has no holder', async () => {

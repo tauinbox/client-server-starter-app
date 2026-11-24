@@ -1,8 +1,15 @@
 import type { EntityManager } from 'typeorm';
-import type { SettingsChange, SettingsTable } from '../settings-change.types';
+import type {
+  SettingsApplyScope,
+  SettingsChange,
+  SettingsTable
+} from '../settings-change.types';
 import { SettingsChangedEvent } from '../settings-changed.event';
 
-/** A `SettingsChangedEvent` for a listener spec; nothing changed by default. */
+/**
+ * A `SettingsChangedEvent` for a listener spec; nothing changed by default,
+ * applied in the pool scope.
+ */
 export function settingsChangedEvent(
   change: {
     all?: boolean;
@@ -10,7 +17,10 @@ export function settingsChangedEvent(
     roleIds?: string[];
     deletedRoleIds?: string[];
   } = {},
-  manager: EntityManager = {} as EntityManager
+  {
+    manager = {} as EntityManager,
+    scope = 'pool'
+  }: { manager?: EntityManager; scope?: SettingsApplyScope } = {}
 ): SettingsChangedEvent {
   const full: SettingsChange = {
     all: change.all ?? false,
@@ -19,5 +29,5 @@ export function settingsChangedEvent(
     deletedRoleIds: change.deletedRoleIds ?? []
   };
 
-  return new SettingsChangedEvent(full, manager);
+  return new SettingsChangedEvent(full, manager, scope);
 }

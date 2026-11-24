@@ -18,6 +18,8 @@ import {
 import { SETTINGS_TABLES } from '../src/modules/core/settings-change-log/settings-change.types';
 import { waitsOnLock } from './lock-wait';
 import { waitUntil } from './eventually';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { isSharedCache } from '../src/common/utils/redis-client';
 
 // The settings change log on real Postgres: the triggers, the order of the
 // versions, the apply after a write and after a direct SQL write, and the
@@ -225,9 +227,9 @@ runWithInfra('Settings change log (e2e)', () => {
     }
   });
 
-  it('a role delete answers after the holder lost the role, and the apply deletes its membership rows', async () => {
+  async function heldRole(suffix: string): Promise<string> {
     const role = await roleService.create(
-      { name: `${tag}-deleted` },
+      { name: `${tag}-${suffix}` },
       { ability: SYSTEM_ABILITY }
     );
 
@@ -239,21 +241,58 @@ runWithInfra('Settings change log (e2e)', () => {
     await roleService.assignRoleToUser(holder.id, role.id, {
       ability: SYSTEM_ABILITY
     });
+
+    return role.id;
+  }
+
+  const roleNamesOf = async (service: PermissionService): Promise<string[]> =>
+    (await service.getRolesForUser(holder.id)).map((r) => r.name);
+
+  it('a role delete answers after the holder lost the role; only a pool apply deletes the membership rows', async () => {
+    const roleId = await heldRole('deleted');
+
     // Cached before the delete.
-    expect(
-      (await permissionService.getRolesForUser(holder.id)).map((r) => r.name)
-    ).toContain(`${tag}-deleted`);
+    expect(await roleNamesOf(permissionService)).toContain(`${tag}-deleted`);
 
-    await roleService.delete(role.id, { ability: SYSTEM_ABILITY });
+    await roleService.delete(roleId, { ability: SYSTEM_ABILITY });
 
-    expect(
-      (await permissionService.getRolesForUser(holder.id)).map((r) => r.name)
-    ).not.toContain(`${tag}-deleted`);
-    expect(
-      await dataSource
-        .getRepository(UserRole)
-        .count({ where: { roleId: role.id } })
-    ).toBe(0);
+    expect(await roleNamesOf(permissionService)).not.toContain(
+      `${tag}-deleted`
+    );
+    // With the memory cache each process applies the entry for itself, so
+    // the rows stay for the processes that read them as holders later.
+    const rows = await dataSource
+      .getRepository(UserRole)
+      .count({ where: { roleId } });
+
+    expect(rows).toBe(isSharedCache(app.get(CACHE_MANAGER)) ? 0 : 1);
+  });
+
+  it('a second process with its own cache drops the deleted role of a holder when it applies the entry later', async () => {
+    const other = await bootApp();
+
+    try {
+      const otherPermissions = other.get(PermissionService);
+      const otherLog = other.get(SettingsChangeLogService);
+
+      await otherLog.applyPending();
+      const roleId = await heldRole('two-processes');
+
+      await otherLog.applyPending();
+      expect(await roleNamesOf(otherPermissions)).toContain(
+        `${tag}-two-processes`
+      );
+
+      // Deleted and applied by this app first.
+      await roleService.delete(roleId, { ability: SYSTEM_ABILITY });
+      await otherLog.applyPending();
+
+      expect(await roleNamesOf(otherPermissions)).not.toContain(
+        `${tag}-two-processes`
+      );
+    } finally {
+      await other.close();
+    }
   });
 
   it('a grant written in SQL, as a seeder writes it, reaches a cached list through the poll', async () => {

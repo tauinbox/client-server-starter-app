@@ -129,6 +129,7 @@ describe('SettingsChangeLogService with the memory cache (process scope)', () =>
 
     await log.applyPending();
     expect(emitted.map(({ change }) => change.all)).toEqual([true]);
+    expect(emitted.map(({ scope }) => scope)).toEqual(['process']);
 
     state.entries.push(row(2, ['plans', 'UPDATE', 'p-1']));
     await log.applyPending();

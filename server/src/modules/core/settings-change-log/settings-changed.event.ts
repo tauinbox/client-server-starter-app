@@ -1,5 +1,8 @@
 import type { EntityManager } from 'typeorm';
-import type { SettingsChange } from './settings-change.types';
+import type {
+  SettingsApplyScope,
+  SettingsChange
+} from './settings-change.types';
 
 /**
  * Emitted once for each applied batch of the settings change log, inside the
@@ -12,6 +15,7 @@ import type { SettingsChange } from './settings-change.types';
 export class SettingsChangedEvent {
   constructor(
     readonly change: SettingsChange,
-    readonly manager: EntityManager
+    readonly manager: EntityManager,
+    readonly scope: SettingsApplyScope
   ) {}
 }

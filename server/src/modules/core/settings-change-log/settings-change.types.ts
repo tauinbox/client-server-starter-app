@@ -20,6 +20,15 @@ export type SettingsTable = (typeof SETTINGS_TABLES)[number];
 /** The key of the log lock that orders the versions; the trigger uses it too. */
 export const SETTINGS_LOG_LOCK_KEY = 'nexus:settings-change-log';
 
+/**
+ * Who applies a log entry: one node for the pool (the cache is in Redis), or
+ * each process for itself (the memory cache). A write that only one applier may
+ * do, such as the delete of the membership rows of a deleted role, runs only in
+ * the pool scope: in the process scope another process still reads those rows
+ * as the holders whose caches it drops.
+ */
+export type SettingsApplyScope = 'pool' | 'process';
+
 /** What a batch of log entries changed. */
 export interface SettingsChange {
   /**

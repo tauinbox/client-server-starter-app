@@ -13,6 +13,7 @@ import {
 import {
   SETTINGS_LOG_LOCK_KEY,
   SETTINGS_TABLES,
+  type SettingsApplyScope,
   type SettingsChange,
   type SettingsTable
 } from './settings-change.types';
@@ -176,7 +177,7 @@ export class SettingsChangeLogService {
       rows.length > 0
         ? { epoch: rows[0].epoch, version: Number(rows[0].version) }
         : null;
-    const next = await this.#apply(manager, applied);
+    const next = await this.#apply(manager, { applied, scope: 'pool' });
 
     if (next === applied) return;
 
@@ -193,7 +194,10 @@ export class SettingsChangeLogService {
   #applyForProcess(): Promise<void> {
     const run = this.#processQueue.then(async () => {
       this.#processState = await this.dataSource.transaction((manager) =>
-        this.#apply(manager, this.#processState)
+        this.#apply(manager, {
+          applied: this.#processState,
+          scope: 'process'
+        })
       );
     });
 
@@ -208,8 +212,16 @@ export class SettingsChangeLogService {
    */
   async #apply(
     manager: EntityManager,
-    applied: AppliedState | null
+    {
+      applied,
+      scope
+    }: { applied: AppliedState | null; scope: SettingsApplyScope }
   ): Promise<AppliedState> {
+    const emit = (change: SettingsChange) =>
+      this.eventEmitter.emitAsync(
+        SettingsChangedEvent.name,
+        new SettingsChangedEvent(change, manager, scope)
+      );
     const [{ epoch }] = await manager.query<Array<{ epoch: string }>>(
       'SELECT "epoch" FROM "settings_change_epoch" WHERE "id" = 1'
     );
@@ -227,7 +239,7 @@ export class SettingsChangeLogService {
       applied.version > last ||
       (first !== null && first > applied.version + 1)
     ) {
-      await this.#emit(ALL_CHANGED, manager);
+      await emit(ALL_CHANGED);
 
       return { epoch, version: last };
     }
@@ -244,19 +256,12 @@ export class SettingsChangeLogService {
 
       if (entries.length === 0) break;
 
-      await this.#emit(summarizeSettingsChanges(entries), manager);
+      await emit(summarizeSettingsChanges(entries));
       version = Number(entries.at(-1)?.version ?? version);
 
       if (entries.length < APPLY_BATCH) break;
     }
 
     return version === applied.version ? applied : { epoch, version };
-  }
-
-  async #emit(change: SettingsChange, manager: EntityManager): Promise<void> {
-    await this.eventEmitter.emitAsync(
-      SettingsChangedEvent.name,
-      new SettingsChangedEvent(change, manager)
-    );
   }
 }
