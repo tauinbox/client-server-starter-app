@@ -6,7 +6,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -37,6 +37,7 @@ import {
   holdBillingDbLock
 } from './billing-db-lock';
 import { eventually } from './eventually';
+import { repositoryProviders } from './repository-providers';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -88,7 +89,7 @@ runWithInfra('Removal of the saved card (e2e)', () => {
         AuditService,
         { provide: getDataSourceToken(), useValue: ds },
         { provide: DataSource, useValue: ds },
-        ...[
+        ...repositoryProviders(ds, [
           Customer,
           Subscription,
           Invoice,
@@ -97,10 +98,7 @@ runWithInfra('Removal of the saved card (e2e)', () => {
           Product,
           User,
           AuditLog
-        ].map((entity) => ({
-          provide: getRepositoryToken(entity),
-          useValue: ds.getRepository(entity)
-        })),
+        ]),
         { provide: YOOKASSA_CLIENT, useValue: { createPayment } },
         { provide: BillingService, useValue: { getProviderById: jest.fn() } },
         { provide: CreditService, useValue: {} },

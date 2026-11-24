@@ -2,6 +2,7 @@ import { expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { expectApiError } from '../../../common/testing/api-error.expect';
 import { In, Not } from 'typeorm';
 import type { FindOperator } from 'typeorm';
@@ -223,7 +224,10 @@ async function build() {
       { provide: getRepositoryToken(Customer), useValue: customers },
       { provide: getRepositoryToken(Subscription), useValue: subscriptions },
       { provide: getRepositoryToken(Invoice), useValue: invoices },
-      { provide: getRepositoryToken(Plan), useValue: plans },
+      {
+        provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+        useValue: plans
+      },
       { provide: getDataSourceToken(), useValue: dataSource },
       { provide: BillingService, useValue: billing },
       { provide: EventEmitter2, useValue: { emit } }

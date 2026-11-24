@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { ApiError } from '../../../common/errors/api-error';
 import { DataSource, In } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -97,8 +98,14 @@ async function build() {
       { provide: getRepositoryToken(Subscription), useValue: subscriptions },
       { provide: getRepositoryToken(Invoice), useValue: invoices },
       { provide: getRepositoryToken(PaymentMethod), useValue: paymentMethods },
-      { provide: getRepositoryToken(Plan), useValue: plans },
-      { provide: getRepositoryToken(Product), useValue: products },
+      {
+        provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+        useValue: plans
+      },
+      {
+        provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+        useValue: products
+      },
       { provide: getRepositoryToken(User), useValue: users },
       { provide: BillingService, useValue: billing },
       { provide: CreditService, useValue: credits },

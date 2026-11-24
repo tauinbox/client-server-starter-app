@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import type { Provider } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { DataSource } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
@@ -225,9 +226,12 @@ runWithInfra('billing write paths (e2e)', () => {
           provide: getRepositoryToken(Invoice),
           useValue: ds.getRepository(Invoice)
         },
-        { provide: getRepositoryToken(Plan), useValue: ds.getRepository(Plan) },
         {
-          provide: getRepositoryToken(Product),
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          useValue: ds.getRepository(Plan)
+        },
+        {
+          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
           useValue: ds.getRepository(Product)
         },
         {

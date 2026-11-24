@@ -4,7 +4,7 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { postgresConfig } from '../src/postgres.config';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
@@ -27,6 +27,7 @@ import {
   BILLING_DB_LOCK_TIMEOUT_MS,
   holdBillingDbLock
 } from './billing-db-lock';
+import { repositoryProviders } from './repository-providers';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -107,17 +108,14 @@ runWithInfra('YooKassa webhook dedup key (e2e)', () => {
         { provide: YOOKASSA_CLIENT, useValue: { getPayment } },
         { provide: ConfigService, useValue: { get: () => '1' } },
         { provide: getDataSourceToken(), useValue: ds },
-        ...[
+        ...repositoryProviders(ds, [
           User,
           PaymentMethod,
           WebhookEvent,
           CreditBalance,
           Plan,
           Product
-        ].map((entity) => ({
-          provide: getRepositoryToken(entity),
-          useValue: ds.getRepository(entity)
-        })),
+        ]),
         {
           provide: BILLING_PROVIDERS,
           useFactory: (p: YooKassaProvider) => [p],

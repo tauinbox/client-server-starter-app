@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { Plan } from '../entities/plan.entity';
 
 @Injectable()
 export class PlanService {
   constructor(
-    @InjectRepository(Plan)
+    @InjectRepository(Plan, SETTINGS_DATA_SOURCE)
     private readonly planRepo: Repository<Plan>
   ) {}
 

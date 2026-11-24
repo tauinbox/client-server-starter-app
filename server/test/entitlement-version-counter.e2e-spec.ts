@@ -1,6 +1,7 @@
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import type { Cache } from 'cache-manager';
 import { createClient } from '@keyv/redis';
 import { buildCacheOptions } from '../src/modules/core/redis-cache.store';
@@ -42,7 +43,10 @@ runWithRedis('entitlement version counter (real Redis)', () => {
         EntitlementService,
         { provide: getRepositoryToken(Customer), useValue: empty },
         { provide: getRepositoryToken(Subscription), useValue: empty },
-        { provide: getRepositoryToken(Plan), useValue: empty },
+        {
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          useValue: empty
+        },
         {
           provide: getRepositoryToken(CustomerGrant),
           useValue: { find: jest.fn().mockResolvedValue([]) }

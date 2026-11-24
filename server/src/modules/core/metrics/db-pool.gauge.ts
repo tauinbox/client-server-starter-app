@@ -55,7 +55,10 @@ export function readDbPoolCounts(
   };
 }
 
-export function createDbPoolGauge(source: PoolHost): Gauge<string> {
+/** The pools of the node by their `pool` label: one for each data source. */
+export type DbPools = Readonly<Record<'regional' | 'settings', PoolHost>>;
+
+export function createDbPoolGauge(pools: DbPools): Gauge<string> {
   // Re-use the existing metric if already registered (multiple module
   // initializations in the same process during E2E tests or hot-reload).
   const existing = register.getSingleMetric(DB_POOL_METRIC_NAME);
@@ -67,17 +70,19 @@ export function createDbPoolGauge(source: PoolHost): Gauge<string> {
   return new Gauge<string>({
     name: DB_POOL_METRIC_NAME,
     help: 'PostgreSQL connection-pool size by state',
-    labelNames: ['state'],
+    labelNames: ['pool', 'state'],
     collect() {
-      const counts = readDbPoolCounts(source);
+      for (const [pool, source] of Object.entries(pools)) {
+        const counts = readDbPoolCounts(source);
 
-      if (!counts) {
-        return;
+        if (!counts) {
+          continue;
+        }
+
+        this.set({ pool, state: 'total' }, counts.total);
+        this.set({ pool, state: 'idle' }, counts.idle);
+        this.set({ pool, state: 'waiting' }, counts.waiting);
       }
-
-      this.set({ state: 'total' }, counts.total);
-      this.set({ state: 'idle' }, counts.idle);
-      this.set({ state: 'waiting' }, counts.waiting);
     }
   });
 }

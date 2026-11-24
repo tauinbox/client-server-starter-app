@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { FindOperator } from 'typeorm';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -279,7 +280,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Plan),
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
           useValue: {
             findOne: (opts: { where: { key: string } }) =>
               Promise.resolve(
@@ -288,7 +289,7 @@ describe('YooKassa off-session charge reconcile (e2e)', () => {
           }
         },
         {
-          provide: getRepositoryToken(Product),
+          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
           useValue: {
             find: () => Promise.resolve([]),
             findOne: () => Promise.resolve(null)

@@ -7,12 +7,12 @@ router.get('/live', (_req, res) => {
 });
 
 router.get('/ready', (_req, res) => {
-  res.json({
-    status: 'ok',
-    info: { database: { status: 'up' } },
-    error: {},
-    details: { database: { status: 'up' } }
-  });
+  const databases = {
+    database: { status: 'up' },
+    settingsDatabase: { status: 'up' }
+  };
+
+  res.json({ status: 'ok', info: databases, error: {}, details: databases });
 });
 
 export default router;

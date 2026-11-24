@@ -8,6 +8,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ErrorKeys } from '@app/shared/constants';
 import { expectApiError } from '../src/common/testing/api-error.expect';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { DataSource } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { postgresConfig } from '../src/postgres.config';
@@ -160,7 +161,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
           useValue: ds.getRepository(WebhookEvent)
         },
         {
-          provide: getRepositoryToken(Product),
+          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
           useValue: ds.getRepository(Product)
         },
         {

@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { DataSource, EntityManager, Like } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { Money } from '@app/shared/utils/money';
@@ -243,9 +244,12 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
           provide: getRepositoryToken(PaymentMethod),
           useValue: ds.getRepository(PaymentMethod)
         },
-        { provide: getRepositoryToken(Plan), useValue: ds.getRepository(Plan) },
         {
-          provide: getRepositoryToken(Product),
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          useValue: ds.getRepository(Plan)
+        },
+        {
+          provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
           useValue: ds.getRepository(Product)
         },
         { provide: getRepositoryToken(User), useValue: ds.getRepository(User) },

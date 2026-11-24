@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { MAX_CONCURRENT_SESSIONS } from '@app/shared/constants';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
@@ -223,7 +224,10 @@ describe('Plan-driven concurrent-session allowance (e2e)', () => {
         { provide: getRepositoryToken(RefreshToken), useValue: rt.repo },
         { provide: getRepositoryToken(Customer), useValue: customers },
         { provide: getRepositoryToken(Subscription), useValue: subscriptions },
-        { provide: getRepositoryToken(Plan), useValue: plans },
+        {
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          useValue: plans
+        },
         {
           provide: getRepositoryToken(CustomerGrant),
           useValue: { find: jest.fn().mockResolvedValue([]) }

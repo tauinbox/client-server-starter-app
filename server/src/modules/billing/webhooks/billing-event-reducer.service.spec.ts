@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { In, IsNull } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
 import { OPEN_SUBSCRIPTION_STATUSES } from '@app/shared/constants';
@@ -156,8 +157,14 @@ async function build(stubs: Partial<ManagerStubs> = {}) {
       BillingEventReducer,
       { provide: MetricsService, useValue: metrics },
       { provide: getDataSourceToken(), useValue: dataSource },
-      { provide: getRepositoryToken(Plan), useValue: plans },
-      { provide: getRepositoryToken(Product), useValue: products },
+      {
+        provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+        useValue: plans
+      },
+      {
+        provide: getRepositoryToken(Product, SETTINGS_DATA_SOURCE),
+        useValue: products
+      },
       { provide: CreditService, useValue: credits },
       { provide: EventEmitter2, useValue: { emit } }
     ]

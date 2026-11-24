@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../data-sources';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import KeyvRedis from '@keyv/redis';
 import { In, IsNull } from 'typeorm';
@@ -68,7 +69,10 @@ describe('EntitlementService', () => {
         EntitlementService,
         { provide: getRepositoryToken(Customer), useValue: customers },
         { provide: getRepositoryToken(Subscription), useValue: subscriptions },
-        { provide: getRepositoryToken(Plan), useValue: plans },
+        {
+          provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+          useValue: plans
+        },
         { provide: getRepositoryToken(CustomerGrant), useValue: grants },
         { provide: getRepositoryToken(CreditBalance), useValue: balances },
         { provide: CACHE_MANAGER, useValue: cache },
@@ -391,7 +395,10 @@ describe('EntitlementService', () => {
             provide: getRepositoryToken(Subscription),
             useValue: subscriptions
           },
-          { provide: getRepositoryToken(Plan), useValue: plans },
+          {
+            provide: getRepositoryToken(Plan, SETTINGS_DATA_SOURCE),
+            useValue: plans
+          },
           { provide: getRepositoryToken(CustomerGrant), useValue: grants },
           { provide: getRepositoryToken(CreditBalance), useValue: balances },
           { provide: CACHE_MANAGER, useValue: redisCache },

@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import { In, IsNull, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../data-sources';
 import type { EntitlementLimitKey } from '@app/shared/types';
 import {
   ENTITLED_SUBSCRIPTION_STATUSES,
@@ -50,7 +51,7 @@ export class EntitlementService {
     private readonly customers: Repository<Customer>,
     @InjectRepository(Subscription)
     private readonly subscriptions: Repository<Subscription>,
-    @InjectRepository(Plan)
+    @InjectRepository(Plan, SETTINGS_DATA_SOURCE)
     private readonly plans: Repository<Plan>,
     @InjectRepository(CustomerGrant)
     private readonly grants: Repository<CustomerGrant>,

@@ -1,6 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { DynamicModule, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SETTINGS_DATA_SOURCE } from '../../data-sources';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
@@ -101,8 +102,6 @@ export class BillingModule {
           CreditLedger,
           Customer,
           CustomerGrant,
-          Plan,
-          Product,
           Subscription,
           Invoice,
           PaymentMethod,
@@ -112,6 +111,7 @@ export class BillingModule {
           // user record to fiscalize 54-FZ receipts.
           User
         ]),
+        TypeOrmModule.forFeature([Plan, Product], SETTINGS_DATA_SOURCE),
         ...(redisUrl
           ? [
               BullModule.registerQueue({

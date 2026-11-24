@@ -879,11 +879,11 @@
       "targets": [
         {
           "expr": "db_pool_connections",
-          "legendFormat": "{{state}}",
+          "legendFormat": "{{pool}} {{state}}",
           "refId": "A"
         }
       ],
-      "description": "PostgreSQL connection-pool size by state (total = open connections, idle = free, waiting = requests blocked waiting for a free connection). A sustained non-zero waiting count means the pool is exhausted and requests are queuing — raise DB_POOL_MAX or investigate slow queries.",
+      "description": "PostgreSQL connection-pool size by pool (regional, settings) and state (total = open connections, idle = free, waiting = requests blocked waiting for a free connection). DB_POOL_MAX is divided between the two pools. A sustained non-zero waiting count means a pool is exhausted and requests are queuing — raise DB_POOL_MAX or investigate slow queries.",
       "title": "DB Connection Pool",
       "type": "timeseries"
     },
@@ -912,7 +912,7 @@
       },
       "targets": [
         {
-          "expr": "db_pool_connections{state=\"waiting\"}",
+          "expr": "sum(db_pool_connections{state=\"waiting\"})",
           "legendFormat": "waiting",
           "refId": "A"
         }

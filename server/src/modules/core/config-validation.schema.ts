@@ -251,7 +251,9 @@ export const configValidationSchema = Joi.object({
         : DEFAULT_SESSION_ABSOLUTE_MAX_MS;
     }),
   AUDIT_LOG_RETENTION_DAYS: Joi.number().min(1).default(90),
-  DB_POOL_MAX: Joi.number().min(1).default(10),
+  // Divided between the regional and the settings pool (splitPoolMax), each
+  // with at least one connection.
+  DB_POOL_MAX: Joi.number().min(2).default(10),
   DB_POOL_IDLE_TIMEOUT: Joi.number().min(0).default(30000),
   DB_POOL_CONNECTION_TIMEOUT: Joi.number().min(0).default(5000),
   TRUSTED_PROXIES: Joi.string().optional().allow(''),

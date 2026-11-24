@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ApiError } from '../../../common/errors/api-error';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
@@ -96,7 +97,7 @@ export class PlanChangeService {
     private readonly subscriptions: Repository<Subscription>,
     @InjectRepository(Invoice)
     private readonly invoices: Repository<Invoice>,
-    @InjectRepository(Plan)
+    @InjectRepository(Plan, SETTINGS_DATA_SOURCE)
     private readonly plans: Repository<Plan>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly billing: BillingService,
