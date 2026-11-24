@@ -5,6 +5,10 @@ import { HealthController } from './health.controller';
 import { SmtpHealthIndicator } from './smtp.health';
 import { RedisHealthIndicator } from './redis.health';
 import { MailService } from '../../mail/mail.service';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+
+const settingsDataSource = { name: SETTINGS_DATA_SOURCE };
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -52,7 +56,11 @@ describe('HealthController', () => {
         { provide: SmtpHealthIndicator, useValue: smtpMock },
         { provide: RedisHealthIndicator, useValue: redisMock },
         { provide: MailService, useValue: mailServiceMock },
-        { provide: ConfigService, useValue: configMock }
+        { provide: ConfigService, useValue: configMock },
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: settingsDataSource
+        }
       ]
     }).compile();
 
@@ -70,17 +78,24 @@ describe('HealthController', () => {
   });
 
   describe('ready', () => {
-    it('should call health.check with db ping when not production and SMTP not configured', () => {
+    it('pings the regional and the settings data source', async () => {
       configValues['ENVIRONMENT'] = 'local';
       mailServiceMock.isSmtpConfigured.mockReturnValue(false);
 
       void controller.ready();
 
       const [[checks]] = healthServiceMock.check.mock.calls as [
-        [(() => unknown)[]]
+        [(() => Promise<unknown>)[]]
       ];
 
-      expect(checks).toHaveLength(1);
+      expect(checks).toHaveLength(2);
+
+      await Promise.all(checks.map((check) => check()));
+
+      expect(dbMock.pingCheck.mock.calls).toEqual([
+        ['database'],
+        ['settingsDatabase', { connection: settingsDataSource }]
+      ]);
     });
 
     it('should not include Redis check when REDIS_URL is unset', () => {
@@ -93,7 +108,7 @@ describe('HealthController', () => {
         [(() => unknown)[]]
       ];
 
-      expect(checks).toHaveLength(1);
+      expect(checks).toHaveLength(2);
     });
 
     it('should include Redis check when REDIS_URL is set outside production', () => {
@@ -107,7 +122,7 @@ describe('HealthController', () => {
         [(() => unknown)[]]
       ];
 
-      expect(checks).toHaveLength(2);
+      expect(checks).toHaveLength(3);
     });
 
     it('should include SMTP check when SMTP is configured', () => {
@@ -120,7 +135,7 @@ describe('HealthController', () => {
         [(() => unknown)[]]
       ];
 
-      expect(checks).toHaveLength(2);
+      expect(checks).toHaveLength(3);
     });
 
     it('should include Redis and SMTP checks when REDIS_URL is set and SMTP configured', () => {
@@ -134,7 +149,7 @@ describe('HealthController', () => {
         [(() => unknown)[]]
       ];
 
-      expect(checks).toHaveLength(3);
+      expect(checks).toHaveLength(4);
     });
   });
 });

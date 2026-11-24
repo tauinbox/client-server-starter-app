@@ -12,6 +12,9 @@ import {
   ApiTags
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { SmtpHealthIndicator } from './smtp.health';
 import { RedisHealthIndicator } from './redis.health';
 import { MailService } from '../../mail/mail.service';
@@ -27,7 +30,9 @@ export class HealthController {
     private readonly smtp: SmtpHealthIndicator,
     private readonly redis: RedisHealthIndicator,
     private readonly mailService: MailService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    @InjectDataSource(SETTINGS_DATA_SOURCE)
+    private readonly settingsDataSource: DataSource
   ) {}
 
   @Get('live')
@@ -43,8 +48,13 @@ export class HealthController {
   @ApiOkResponse({ description: 'Service is ready' })
   @ApiServiceUnavailableResponse({ description: 'Service is not ready' })
   ready() {
+    // Each data source has its own pool, so one can fail while the other works.
     const checks: HealthIndicatorFunction[] = [
-      () => this.db.pingCheck('database')
+      () => this.db.pingCheck('database'),
+      () =>
+        this.db.pingCheck('settingsDatabase', {
+          connection: this.settingsDataSource
+        })
     ];
 
     // A production node does not start without REDIS_URL (main.ts), so only

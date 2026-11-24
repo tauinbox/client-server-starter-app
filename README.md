@@ -1720,7 +1720,7 @@ client **IDs** such as `GOOGLE_CLIENT_ID`, `ADMIN_EMAIL`, `JWT_ALGORITHM`, `JWT_
 5. Make the root `.env` from `.env.example`, with `DB_NAME`, `DB_USER` and the image names. Leave
    `DB_PASSWORD` empty, because the deploy injects it.
 6. Start `deploy.yml` with `workflow_dispatch`. The sync script fills the secret-managed keys. The
-   stack starts, and `/api/health/ready` reports `database/redis/smtp: up`.
+   stack starts, and `/api/health/ready` reports `database/settingsDatabase/redis/smtp: up`.
 
 ---
 

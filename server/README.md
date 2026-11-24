@@ -315,7 +315,7 @@ owner. `UsersService.declareResidence` keys both writes on the country that the 
 concurrent write loses with a 409 and overwrites nothing.
 
 `health/` holds `HealthModule`, with `GET /api/health/live` and `GET /api/health/ready`. The
-readiness check pings the database. It also sends a Redis PING when `REDIS_URL` has a value.
+readiness check pings the pool of each data source (`database`, `settingsDatabase`). It also sends a Redis PING when `REDIS_URL` has a value.
 
 A dead Redis fails the readiness check, with a timeout of 2 s. A full Redis still answers PING, so
 the check also reads `INFO memory` and exports `used_memory / maxmemory` as
@@ -352,7 +352,7 @@ other source.
 
 The metrics are `http_requests_total`, `http_request_duration_seconds`, `auth_events_total`,
 `rbac_permission_denied_total{action,subject,level}`, `mail_queue_jobs{state}`,
-`mail_jobs_processed_total{outcome}`, `db_pool_connections{state}`,
+`mail_jobs_processed_total{outcome}`, `db_pool_connections{pool,state}`,
 `cache_requests_total{cache,outcome}`,
 `password_breach_lookups_total{outcome}`, `audit_write_failures_total{action}` and
 `dependency_up{dependency}`. The module also supplies `HttpMetricsInterceptor`. Its `route` label is
