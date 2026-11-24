@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -35,7 +36,7 @@ import { SYSTEM_ABILITY } from '../../auth/casl/app-ability';
 import type { AbilityOrSystem, AppAbility } from '../../auth/casl/app-ability';
 import { AuditService } from '../../audit/audit.service';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
-import type { AuditContext } from '../../audit/audit.service';
+import type { AuditContext, AuditLogParams } from '../../audit/audit.service';
 import { FeatureFlag } from '../entities/feature-flag.entity';
 import { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 
@@ -115,10 +116,22 @@ export class FeatureFlagService {
   /**
    * Runs `write` in a transaction that first takes the settings log lock, then
    * applies the change log after the commit, so the caller answers only when
-   * the flag caches of its pool no longer hold the old flag.
+   * the flag caches of its pool no longer hold the old flag. The audit row is
+   * committed before the write (`writeSettings`); each field of the row is
+   * known before the transaction.
    */
-  #writeSettings<T>(write: (em: EntityManager) => Promise<T>): Promise<T> {
-    return writeSettings(this.dataSource, this.settingsChangeLog, write);
+  #writeSettings<T>(
+    write: (em: EntityManager) => Promise<T>,
+    audit: AuditLogParams
+  ): Promise<T> {
+    return writeSettings(
+      this.dataSource,
+      {
+        log: this.settingsChangeLog,
+        audit: { trail: this.auditService, draft: audit }
+      },
+      write
+    );
   }
 
   /**
@@ -260,43 +273,45 @@ export class FeatureFlagService {
     }
 
     const rules = this.#validateRules(dto.rules);
-    // The check above races a concurrent create against UQ_feature_flags_key.
-    // The loser gets a unique violation, which the global filter would report
-    // as a generic conflict - map it to the flag-specific key instead.
-    let saved: FeatureFlag;
+    // The id is set here, so the audit row that is committed first names it.
+    const id = randomUUID();
 
-    try {
-      saved = await this.#writeSettings(async (em) => {
-        const flag = await em.save(
-          FeatureFlag,
-          em.create(FeatureFlag, {
-            ...this.#newFlagFields(dto),
-            version: 1,
-            updatedByUserId: actor.actorId
-          })
-        );
+    await this.#writeSettings(
+      async (em) => {
+        // The check above races a concurrent create against
+        // UQ_feature_flags_key. The loser gets a unique violation, which the
+        // global filter would report as a generic conflict - map it to the
+        // flag-specific key instead.
+        try {
+          await em.save(
+            FeatureFlag,
+            em.create(FeatureFlag, {
+              ...this.#newFlagFields(dto),
+              id,
+              version: 1,
+              updatedByUserId: actor.actorId
+            })
+          );
+        } catch (error: unknown) {
+          if (isUniqueViolation(error)) throw keyExistsConflict();
 
-        if (rules) await this.#writeRules(em, flag.id, rules);
+          throw error;
+        }
 
-        await this.#audit(em, actor, {
-          action: AuditAction.FEATURE_FLAG_CREATE,
-          flagId: flag.id,
-          details: {
-            key: flag.key,
-            flagId: flag.id,
-            ...(rules ? { ruleCount: rules.length } : {})
-          }
-        });
+        if (rules) await this.#writeRules(em, id, rules);
+      },
+      this.#auditRow(actor, {
+        action: AuditAction.FEATURE_FLAG_CREATE,
+        flagId: id,
+        details: {
+          key: dto.key,
+          flagId: id,
+          ...(rules ? { ruleCount: rules.length } : {})
+        }
+      })
+    );
 
-        return flag;
-      });
-    } catch (error: unknown) {
-      if (isUniqueViolation(error)) throw keyExistsConflict();
-
-      throw error;
-    }
-
-    return this.#load(saved.id);
+    return this.#load(id);
   }
 
   // race-checked: the write is keyed on the version that the checks read
@@ -325,42 +340,43 @@ export class FeatureFlagService {
     // A successful write then replaced exactly `current`, the audit diff base.
     if (!ifMatchHolds(ifMatch, current.version)) throw versionConflict();
 
-    await this.#writeSettings(async (em) => {
-      const result = await em
-        .createQueryBuilder()
-        .update(FeatureFlag)
-        .set({
-          ...(dto.description !== undefined
-            ? { description: dto.description }
-            : {}),
-          ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
-          ...(dto.environments !== undefined
-            ? { environments: dto.environments }
-            : {}),
-          ...(dto.public !== undefined ? { public: dto.public } : {}),
-          updatedByUserId: actor.actorId,
-          version: () => `version + 1`
-        })
-        .where('id = :id AND version = :expected', {
-          id,
-          expected: current.version
-        })
-        .execute();
+    await this.#writeSettings(
+      async (em) => {
+        const result = await em
+          .createQueryBuilder()
+          .update(FeatureFlag)
+          .set({
+            ...(dto.description !== undefined
+              ? { description: dto.description }
+              : {}),
+            ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+            ...(dto.environments !== undefined
+              ? { environments: dto.environments }
+              : {}),
+            ...(dto.public !== undefined ? { public: dto.public } : {}),
+            updatedByUserId: actor.actorId,
+            version: () => `version + 1`
+          })
+          .where('id = :id AND version = :expected', {
+            id,
+            expected: current.version
+          })
+          .execute();
 
-      if (result.affected === 0) throw versionConflict();
+        if (result.affected === 0) throw versionConflict();
 
-      if (rules) await this.#writeRules(em, id, rules);
-
+        if (rules) await this.#writeRules(em, id, rules);
+      },
       // Rule rows and rule DTOs do not compare field by field: count them.
-      await this.#audit(em, actor, {
+      this.#auditRow(actor, {
         action: AuditAction.FEATURE_FLAG_UPDATE,
         flagId: id,
         details: {
           changedFields: changedFields(current, fields),
           ...(rules ? { ruleCount: rules.length } : {})
         }
-      });
-    });
+      })
+    );
 
     return this.#load(id);
   }
@@ -377,60 +393,53 @@ export class FeatureFlagService {
         actorId: actor.actorId
       });
 
+    const current = await this.#load(id);
+
     // Checked here to answer early, and again on the locked row.
-    check(await this.#load(id));
-    await this.#writeSettings(async (em) => {
-      const locked = await em.findOne(FeatureFlag, {
-        where: { id },
-        lock: { mode: 'pessimistic_write' }
-      });
+    check(current);
+    await this.#writeSettings(
+      async (em) => {
+        const locked = await em.findOne(FeatureFlag, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' }
+        });
 
-      if (!locked) throw flagNotFound();
+        if (!locked) throw flagNotFound();
 
-      check(locked);
+        check(locked);
+        // The rule rows go by ON DELETE CASCADE.
+        const { affected } = await em.delete(FeatureFlag, { id });
+
+        if (!affected) throw flagNotFound();
+      },
       // The row is gone after the delete, so the key is recorded: a bare
-      // targetId resolves to nothing once the flag no longer exists.
-      const { key } = locked;
-      // The rule rows go by ON DELETE CASCADE.
-      const { affected } = await em.delete(FeatureFlag, { id });
-
-      if (!affected) throw flagNotFound();
-
-      await this.#audit(em, actor, {
+      // targetId resolves to nothing once the flag no longer exists. No
+      // route changes the key of a flag.
+      this.#auditRow(actor, {
         action: AuditAction.FEATURE_FLAG_DELETE,
         flagId: id,
-        details: {
-          key
-        }
-      });
-    });
+        details: { key: current.key }
+      })
+    );
   }
 
-  /**
-   * Writes the audit row through the transaction of the change, so a change
-   * never commits without its row and a failed row rolls the change back.
-   */
-  #audit(
-    em: EntityManager,
+  #auditRow(
     actor: FlagAuditActor,
     {
       action,
       flagId,
       details
     }: { action: AuditAction; flagId: string; details: Record<string, unknown> }
-  ): Promise<void> {
-    return this.auditService.log(
-      {
-        action,
-        actorId: actor.actorId,
-        actorEmail: actor.actorEmail,
-        targetId: flagId,
-        targetType: 'FeatureFlag',
-        details,
-        context: actor.context
-      },
-      em
-    );
+  ): AuditLogParams {
+    return {
+      action,
+      actorId: actor.actorId,
+      actorEmail: actor.actorEmail,
+      targetId: flagId,
+      targetType: 'FeatureFlag',
+      details,
+      context: actor.context
+    };
   }
 
   preview(

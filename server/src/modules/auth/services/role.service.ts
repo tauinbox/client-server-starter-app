@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   Injectable,
   InternalServerErrorException,
@@ -60,6 +61,7 @@ import {
   SettingsChangeLogService,
   writeSettings
 } from '../../core/settings-change-log/settings-change-log.service';
+import type { SettingsWrite } from '../../core/settings-change-log/settings-change-log.service';
 import { RoleRenamedEvent } from '../events/role-renamed.event';
 import { RoleDeletedEvent } from '../events/role-deleted.event';
 
@@ -584,15 +586,20 @@ export class RoleService {
 
     if (existing) throw this.nameExists();
 
-    const role = this.roleRepository.create({ ...data, isSuper: false });
+    // The id is set here, so the audit row that is committed first names it.
+    const role = this.roleRepository.create({
+      ...data,
+      id: randomUUID(),
+      isSuper: false
+    });
 
-    return this.writeSettings(async (em) => {
+    return this.writeSettings(async (em, recordAudit) => {
       const saved = await this.saveRole(em, role);
 
-      if (audit) await this.auditService.log(audit(saved), em);
+      if (audit) recordAudit(audit(saved));
 
       return saved;
-    });
+    }, audit?.(role));
   }
 
   /** `audit` gets the locked role as it is before the write. */
@@ -622,23 +629,26 @@ export class RoleService {
 
     // The old name comes from the locked row: a rename that committed after
     // the read above changed it, and the listeners rewrite by that name.
-    return this.writeWithRoleEvent(async (em) => {
-      const before = await this.lockRole(em, id);
+    return this.writeWithRoleEvent(
+      async (em) => {
+        const before = await this.lockRole(em, id);
 
-      if (!before) throw this.roleNotFound();
+        if (!before) throw this.roleNotFound();
 
-      check(before);
-      const written = await this.updateRole(em, id, data);
+        check(before);
+        const written = await this.updateRole(em, id, data);
 
-      return {
-        result: written,
-        audit: audit?.({ ...before }),
-        event:
-          written.name !== before.name
-            ? new RoleRenamedEvent(before.name, written.name, em)
-            : undefined
-      };
-    });
+        return {
+          result: written,
+          audit: audit?.({ ...before }),
+          event:
+            written.name !== before.name
+              ? new RoleRenamedEvent(before.name, written.name, em)
+              : undefined
+        };
+      },
+      audit?.({ ...role })
+    );
   }
 
   async delete(
@@ -671,7 +681,7 @@ export class RoleService {
         audit: audit?.(locked),
         event: new RoleDeletedEvent(locked.name, em)
       };
-    });
+    }, audit?.(role));
   }
 
   private nameExists(): ApiError {
@@ -731,43 +741,38 @@ export class RoleService {
   /**
    * Runs `write` in a transaction that first takes the settings log lock, then
    * applies the change log after the commit, so the caller answers only when
-   * the caches of its pool no longer hold the old settings.
+   * the caches of its pool no longer hold the old settings. `audit` is the
+   * row that is committed before the write (`writeSettings`).
    */
   private writeSettings<T>(
-    write: (em: EntityManager) => Promise<T>
+    write: SettingsWrite<T>,
+    audit?: AuditLogParams
   ): Promise<T> {
     return writeSettings(
       this.roleRepository.manager,
-      this.settingsChangeLog,
+      {
+        log: this.settingsChangeLog,
+        audit: audit && { trail: this.auditService, draft: audit }
+      },
       write
     );
   }
 
-  /** `writeAudited` for a settings write: the log lock and the apply. */
-  private writeSettingsAudited(
-    write: (em: EntityManager) => Promise<void>,
-    audit?: AuditLogParams
-  ): Promise<void> {
-    return this.writeSettings(async (em) => {
-      await write(em);
-
-      if (audit) await this.auditService.log(audit, em);
-    });
-  }
-
   /**
-   * Runs `write`, then the listeners of the event and the audit row that it
-   * returns, in one settings write, so a failed row or listener rolls the
-   * write back. `write` builds both from the rows it locked.
+   * Runs `write`, then the listeners of the event, in one settings write, so a
+   * failed listener rolls the write back. `write` builds the event and the
+   * final audit row from the rows it locked; `draft` is built from the rows
+   * read before the transaction.
    */
   private writeWithRoleEvent<T>(
     write: (em: EntityManager) => Promise<{
       result: T;
       audit?: AuditLogParams;
       event?: RoleRenamedEvent | RoleDeletedEvent;
-    }>
+    }>,
+    draft?: AuditLogParams
   ): Promise<T> {
-    return this.writeSettings(async (em) => {
+    return this.writeSettings(async (em, recordAudit) => {
       const change = await write(em);
 
       if (change.event) {
@@ -779,10 +784,10 @@ export class RoleService {
         await this.eventEmitter.emitAsync(name, change.event);
       }
 
-      if (change.audit) await this.auditService.log(change.audit, em);
+      if (change.audit) recordAudit(change.audit);
 
       return change.result;
-    });
+    }, draft);
   }
 
   /**
@@ -969,7 +974,7 @@ export class RoleService {
     check(role);
     await this.assertGrantsApplicable(role, items);
     await this.assertGrantAllowed(ability, items, { actorId, roleId });
-    await this.writeSettingsAudited(async (em) => {
+    await this.writeSettings(async (em) => {
       // The lock also makes two replaces of one role run one after the
       // other: else both delete the old rows, and the second insert breaks
       // the unique index of the grant. A deny row survives a replace only
@@ -1034,7 +1039,7 @@ export class RoleService {
       })
     );
 
-    await this.writeSettingsAudited(async (em) => {
+    await this.writeSettings(async (em) => {
       // An add lifts no stored row.
       await this.lockRoleForLift(em, ability, {
         roleId,
@@ -1056,7 +1061,7 @@ export class RoleService {
 
     // Checked here to answer early, and again on the locked row.
     check(await this.loadRole(roleId));
-    await this.writeSettingsAudited(async (em) => {
+    await this.writeSettings(async (em) => {
       await this.lockRoleForLift(em, ability, {
         roleId,
         actorId,

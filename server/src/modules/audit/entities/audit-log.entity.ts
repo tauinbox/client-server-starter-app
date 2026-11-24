@@ -7,7 +7,17 @@ import {
 } from 'typeorm';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 
+/**
+ * The state of the row of a settings write. The row is committed before the
+ * write, so it is `pending` until the write commits or fails. A row of any
+ * other write has none.
+ */
+export type SettingsWriteOutcome = 'pending' | 'applied' | 'not_applied';
+
 @Entity('audit_logs')
+@Index('IDX_audit_logs_settings_pending', ['createdAt'], {
+  where: `"settings_outcome" = 'pending'`
+})
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -37,6 +47,14 @@ export class AuditLog {
 
   @Column({ name: 'request_id', type: 'varchar', nullable: true })
   requestId: string | null;
+
+  @Column({
+    name: 'settings_outcome',
+    type: 'varchar',
+    length: 16,
+    nullable: true
+  })
+  settingsOutcome: SettingsWriteOutcome | null;
 
   @Index('IDX_audit_logs_created_at')
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

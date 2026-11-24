@@ -13,6 +13,7 @@ import { SYSTEM_ABILITY } from '../casl/app-ability';
 import type { AppAbility } from '../casl/app-ability';
 import { User } from '../../users/entities/user.entity';
 import { AuditService } from '../../audit/audit.service';
+import type { AuditLogParams } from '../../audit/audit.service';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -74,7 +75,26 @@ describe('RoleService', () => {
   let mockPermissionService: { invalidateUserCache: jest.Mock };
   let mockSettingsChangeLog: { applyPending: jest.Mock };
   let mockSettingsLogQuery: jest.Mock<Promise<unknown[]>, [string, unknown[]?]>;
-  let mockAuditService: { log: jest.Mock; logFireAndForget: jest.Mock };
+  /** A refused settings write deletes the row that it committed first. */
+  const expectDiscardedAuditRow = () => {
+    expect(mockAuditService.openSettingsWrite).toHaveBeenCalled();
+    expect(mockAuditService.discardSettingsWrite).toHaveBeenCalledWith(
+      'audit-1'
+    );
+    expect(mockAuditService.closeSettingsWrite).not.toHaveBeenCalled();
+  };
+  const expectAppliedAuditRow = (params: unknown) =>
+    expect(mockAuditService.closeSettingsWrite).toHaveBeenCalledWith(
+      'audit-1',
+      { outcome: 'applied', params }
+    );
+  let mockAuditService: {
+    log: jest.Mock;
+    logFireAndForget: jest.Mock;
+    openSettingsWrite: jest.Mock<Promise<string>, [AuditLogParams]>;
+    closeSettingsWrite: jest.Mock;
+    discardSettingsWrite: jest.Mock;
+  };
   let mockMetricsService: { recordPermissionDenied: jest.Mock };
   let mockEventEmitter: { emit: jest.Mock; emitAsync: jest.Mock };
   let mockRelationQueryBuilder: {
@@ -264,7 +284,12 @@ describe('RoleService', () => {
 
     mockAuditService = {
       log: jest.fn(),
-      logFireAndForget: jest.fn()
+      logFireAndForget: jest.fn(),
+      openSettingsWrite: jest
+        .fn<Promise<string>, [AuditLogParams]>()
+        .mockResolvedValue('audit-1'),
+      closeSettingsWrite: jest.fn(),
+      discardSettingsWrite: jest.fn()
     };
 
     mockMetricsService = {
@@ -350,7 +375,7 @@ describe('RoleService', () => {
     it('should answer nameExists when the unique index refuses a name that a concurrent request took', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
       mockRoleRepo.save.mockRejectedValueOnce({ code: '23505' });
-      const audit = jest.fn();
+      const audit = jest.fn(() => ({ action: AuditAction.ROLE_CREATE }));
 
       await expect(
         service.create(
@@ -361,7 +386,7 @@ describe('RoleService', () => {
         status: 409,
         response: { errorKey: ErrorKeys.ROLES.NAME_EXISTS }
       });
-      expect(mockAuditService.log).not.toHaveBeenCalled();
+      expectDiscardedAuditRow();
     });
 
     it('should pass on a save error that is not a unique violation', async () => {
@@ -433,7 +458,7 @@ describe('RoleService', () => {
       ).rejects.toMatchObject({
         response: { errorKey: ErrorKeys.ROLES.NOT_FOUND }
       });
-      expect(mockAuditService.log).not.toHaveBeenCalled();
+      expectDiscardedAuditRow();
       expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(mockSettingsChangeLog.applyPending).not.toHaveBeenCalled();
     });
@@ -531,10 +556,10 @@ describe('RoleService', () => {
     });
   });
 
-  describe('audit row in the write transaction', () => {
+  describe('audit row committed before the settings write', () => {
     const audit = { action: AuditAction.ROLE_UPDATE, targetId: 'role-2' };
 
-    it('create builds the row from the saved role', async () => {
+    it('create commits a row that names the id of the role before the save', async () => {
       mockRoleRepo.findOne.mockResolvedValue(null);
 
       await service.create(
@@ -548,14 +573,24 @@ describe('RoleService', () => {
         }
       );
 
-      expect(mockRoleRepo.manager.transaction).toHaveBeenCalled();
-      expect(mockAuditService.log).toHaveBeenCalledWith(
-        { action: AuditAction.ROLE_CREATE, targetId: 'new-role' },
-        expect.anything()
+      const [[draft]] = mockAuditService.openSettingsWrite.mock.calls;
+      const [open] =
+        mockAuditService.openSettingsWrite.mock.invocationCallOrder;
+      const [write] = mockRoleRepo.manager.transaction.mock.invocationCallOrder;
+
+      expect(draft.action).toBe(AuditAction.ROLE_CREATE);
+      expect(draft.targetId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(mockRoleRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ id: draft.targetId })
       );
+      expect(open).toBeLessThan(write);
+      expectAppliedAuditRow({
+        action: AuditAction.ROLE_CREATE,
+        targetId: draft.targetId
+      });
     });
 
-    it('an update without a rename writes the row', async () => {
+    it('an update without a rename closes the row as applied', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
       await service.update(
@@ -564,13 +599,12 @@ describe('RoleService', () => {
         { ability: SYSTEM_ABILITY, audit: () => audit }
       );
 
-      expect(mockAuditService.log).toHaveBeenCalledWith(
-        audit,
-        expect.anything()
-      );
+      expect(mockAuditService.openSettingsWrite).toHaveBeenCalledWith(audit);
+      expectAppliedAuditRow(audit);
+      expect(mockAuditService.log).not.toHaveBeenCalled();
     });
 
-    it('a rename writes the row in the transaction of the event listeners', async () => {
+    it('a rename closes the row after the transaction of the event listeners', async () => {
       mockRoleRepo.findOne.mockResolvedValueOnce({ ...customRole });
       mockRoleRepo.findOne.mockResolvedValueOnce(null);
 
@@ -580,17 +614,20 @@ describe('RoleService', () => {
         { ability: SYSTEM_ABILITY, audit: () => audit }
       );
 
+      const [emit] = mockEventEmitter.emitAsync.mock.invocationCallOrder;
+      const [close] =
+        mockAuditService.closeSettingsWrite.mock.invocationCallOrder;
+
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(1);
-      expect(mockEventEmitter.emitAsync).toHaveBeenCalled();
-      expect(mockAuditService.log).toHaveBeenCalledWith(
-        audit,
-        expect.anything()
-      );
+      expect(emit).toBeLessThan(close);
+      expectAppliedAuditRow(audit);
     });
 
-    it('a failed row fails the delete and applies nothing', async () => {
+    it('a row that cannot be committed fails the delete before the write', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
-      mockAuditService.log.mockRejectedValue(new Error('audit down'));
+      mockAuditService.openSettingsWrite.mockRejectedValue(
+        new Error('audit down')
+      );
 
       await expect(
         service.delete('role-2', {
@@ -598,10 +635,11 @@ describe('RoleService', () => {
           audit: () => audit
         })
       ).rejects.toThrow('audit down');
+      expect(mockRoleRepo.manager.transaction).not.toHaveBeenCalled();
       expect(mockSettingsChangeLog.applyPending).not.toHaveBeenCalled();
     });
 
-    it('a role assignment writes the row and fails without it', async () => {
+    it('a role assignment is not a settings write: its row is in its transaction', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
       await service.assignRoleToUser('user-1', 'role-2', {
@@ -630,7 +668,7 @@ describe('RoleService', () => {
       expect(mockPermissionService.invalidateUserCache).not.toHaveBeenCalled();
     });
 
-    it('a permission write writes the row in the transaction of the grants', async () => {
+    it('a permission write commits its row before the grants and closes it after', async () => {
       mockRoleRepo.findOne.mockResolvedValue({ ...customRole });
 
       await service.setPermissionsForRole('role-2', [], {
@@ -650,7 +688,10 @@ describe('RoleService', () => {
       });
 
       expect(mockRoleRepo.manager.transaction).toHaveBeenCalledTimes(3);
-      expect(mockAuditService.log).toHaveBeenCalledTimes(3);
+      expect(mockAuditService.openSettingsWrite).toHaveBeenCalledTimes(3);
+      expect(mockAuditService.closeSettingsWrite).toHaveBeenCalledTimes(3);
+      expectAppliedAuditRow(audit);
+      expect(mockAuditService.log).not.toHaveBeenCalled();
     });
 
     it('writes no row without audit params', async () => {
@@ -660,6 +701,8 @@ describe('RoleService', () => {
         ability: SYSTEM_ABILITY
       });
 
+      expect(mockAuditService.openSettingsWrite).not.toHaveBeenCalled();
+      expect(mockAuditService.closeSettingsWrite).not.toHaveBeenCalled();
       expect(mockAuditService.log).not.toHaveBeenCalled();
     });
   });
@@ -765,7 +808,7 @@ describe('RoleService', () => {
         status: 404,
         response: { errorKey: ErrorKeys.ROLES.PERMISSION_NOT_ASSIGNED }
       });
-      expect(mockAuditService.log).not.toHaveBeenCalled();
+      expectDiscardedAuditRow();
       expect(mockSettingsChangeLog.applyPending).not.toHaveBeenCalled();
     });
 
@@ -2589,9 +2632,15 @@ describe('RoleService', () => {
         ability: SYSTEM_ABILITY,
         audit: deleteRow
       });
-      expect(mockAuditService.log).toHaveBeenLastCalledWith(
-        { action: AuditAction.ROLE_DELETE, details: { name: 'editor' } },
-        expect.anything()
+      expect(mockAuditService.closeSettingsWrite).toHaveBeenLastCalledWith(
+        'audit-1',
+        {
+          outcome: 'applied',
+          params: {
+            action: AuditAction.ROLE_DELETE,
+            details: { name: 'editor' }
+          }
+        }
       );
     });
   });

@@ -11,7 +11,8 @@ export const POOL_LOCK_KEYS = {
   auditLogCleanup: 'nexus:audit-log-cleanup',
   refreshTokenCleanup: 'nexus:refresh-token-cleanup',
   settingsChangeApply: 'nexus:settings-change-apply',
-  settingsChangeLogCleanup: 'nexus:settings-change-log-cleanup'
+  settingsChangeLogCleanup: 'nexus:settings-change-log-cleanup',
+  settingsWriteSettle: 'nexus:settings-write-settle'
 } as const;
 
 export type PoolLockKey = (typeof POOL_LOCK_KEYS)[keyof typeof POOL_LOCK_KEYS];

@@ -34,6 +34,7 @@ import {
   SettingsChangeLogService,
   writeSettings
 } from '../../core/settings-change-log/settings-change-log.service';
+import type { SettingsWrite } from '../../core/settings-change-log/settings-change-log.service';
 import { withChanges } from '@app/shared/utils/changed-fields';
 import { AccessRefusalService } from '../../audit/access-refusal.service';
 import { auditContextOf } from '../casl/ability-context';
@@ -161,9 +162,15 @@ export class ResourceService {
     const check = (record: Resource) =>
       this.assertCanEdit(ability, record, { data, actorId });
 
+    const current = await this.loadResource(id);
+
     // Checked here to answer early, and again on the locked row.
-    check(await this.loadResource(id));
-    const { saved } = await this.updateAudited(id, data, { check, audit });
+    check(current);
+    const { saved } = await this.updateAudited(id, data, {
+      current,
+      check,
+      audit
+    });
 
     return saved;
   }
@@ -254,43 +261,55 @@ export class ResourceService {
     );
   }
 
-  /**
-   * Locks the row, runs `check` on it, then writes the changed columns and the
-   * audit row of the change in one transaction. An edit that loses to a delete
-   * answers not found. `before` is the locked row as it was before the write.
-   */
-  #writeSettings<T>(write: (em: EntityManager) => Promise<T>): Promise<T> {
+  #writeSettings<T>(
+    write: SettingsWrite<T>,
+    audit?: AuditLogParams
+  ): Promise<T> {
     return writeSettings(
       this.resourceRepository.manager,
-      this.settingsChangeLog,
+      {
+        log: this.settingsChangeLog,
+        audit: audit && { trail: this.auditService, draft: audit }
+      },
       write
     );
   }
 
+  /**
+   * Locks the row, runs `check` on it, then writes the changed columns. An edit
+   * that loses to a delete answers not found. `audit` gets the row as it was
+   * before the write: `current`, the row read before the transaction, for the
+   * row that is committed first, and the locked row for the final row.
+   */
   private updateAudited(
     id: string,
     changes: QueryDeepPartialEntity<Resource>,
     {
+      current,
       check,
       audit
     }: {
+      current: Resource;
       check: (locked: Resource) => void;
       audit?: (before: Resource) => AuditLogParams;
     }
   ): Promise<{ before: Resource; saved: Resource }> {
-    return this.#writeSettings(async (em) => {
-      const before = await this.lockResource(em, id);
+    return this.#writeSettings(
+      async (em, recordAudit) => {
+        const before = await this.lockResource(em, id);
 
-      check(before);
+        check(before);
 
-      if (!(await keyedUpdate(em, Resource, { where: { id }, changes }))) {
-        throw resourceNotFound();
-      }
+        if (!(await keyedUpdate(em, Resource, { where: { id }, changes }))) {
+          throw resourceNotFound();
+        }
 
-      if (audit) await this.auditService.log(audit({ ...before }), em);
+        if (audit) recordAudit(audit({ ...before }));
 
-      return { before, saved: await em.findOneByOrFail(Resource, { id }) };
-    });
+        return { before, saved: await em.findOneByOrFail(Resource, { id }) };
+      },
+      audit?.({ ...current })
+    );
   }
 
   async getSubjectMaps(): Promise<SubjectMaps> {
@@ -348,10 +367,8 @@ export class ResourceService {
 
       if (affected === 0) throw notOrphaned(locked);
 
-      if (audit) await this.auditService.log(audit, em);
-
       return locked;
-    });
+    }, audit);
 
     resource.isOrphaned = false;
     resource.isRegistered = true;
