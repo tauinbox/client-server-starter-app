@@ -85,11 +85,6 @@ export class PermissionService {
     });
   }
 
-  /**
-   * Both versions are read before the query, so a read that started before a
-   * drop writes an entry that nobody reads again. `load` answers null for a
-   * result that must not be cached.
-   */
   get #managers(): SourceManagers {
     return {
       regional: this.userRepository.manager,
@@ -97,6 +92,11 @@ export class PermissionService {
     };
   }
 
+  /**
+   * Both versions are read before the query, so a read that started before a
+   * drop writes an entry that nobody reads again. `load` answers null for a
+   * result that must not be cached.
+   */
   async #readThrough<T>(
     userId: string,
     {
