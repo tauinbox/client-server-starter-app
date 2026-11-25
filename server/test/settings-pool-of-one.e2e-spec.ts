@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { DataSource, In } from 'typeorm';
@@ -15,6 +15,7 @@ import { Role } from '../src/modules/auth/entities/role.entity';
 import { PermissionService } from '../src/modules/auth/services/permission.service';
 import { ResourceService } from '../src/modules/auth/services/resource.service';
 import { ResourceRegistryService } from '../src/modules/auth/services/resource-registry.service';
+import { ResourceSyncService } from '../src/modules/auth/services/resource-sync.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
@@ -256,6 +257,21 @@ runWithInfra('Settings pool of one connection (e2e)', () => {
     expect(roles.map(({ role_id: id }) => id)).toEqual([live.id]);
     expect(members).toEqual([]);
     await roleService.delete(live.id, { ability: SYSTEM_ABILITY });
+  }, 60000);
+
+  it('runs the resource sync while its pool lock holds a regional connection', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn');
+    const registry = app.get(ResourceRegistryService);
+
+    registry.register([]);
+    await app.get(ResourceSyncService).onApplicationBootstrap();
+
+    expect({
+      skipped: warn.mock.calls.some(([message]) =>
+        String(message).includes('Resource sync skipped')
+      ),
+      registered: registry.isRegistered('users')
+    }).toEqual({ skipped: false, registered: true });
   }, 60000);
 
   it('updates and restores a resource', async () => {

@@ -40,6 +40,8 @@ export class ResourceSyncService implements OnApplicationBootstrap {
 
   // Serialized, not skipped: a node that skipped would serve with an empty
   // registry, and two concurrent syncs insert the same new action twice.
+  // The lock holds a regional connection: the sync writes through the small
+  // settings pool, which a held settings connection could empty.
   async onApplicationBootstrap(): Promise<void> {
     try {
       await runSerializedInPool(
