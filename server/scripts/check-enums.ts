@@ -49,8 +49,9 @@ function readMigrationCoverage(
 ): Set<string> {
   const covered = new Set<string>();
 
+  // The migrations live in the folders of the two sets.
   const files = fs
-    .readdirSync(migrationsDir)
+    .readdirSync(migrationsDir, { recursive: true, encoding: 'utf8' })
     .filter((f) => f.endsWith('.ts'))
     .toSorted();
 

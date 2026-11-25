@@ -1,8 +1,10 @@
 /**
  * Keeps the two migration sets apart, and keeps the seeders on the home pool.
  *
- * - `src/migrations/` is the frozen history of the time when one database held
- *   every table: a file there newer than `LAST_FROZEN_MIGRATION` is refused.
+ * - `src/migrations/` holds only the two set folders: a file there is refused.
+ * - Each set starts with its baseline (`<timestamp>-<set>-baseline.ts`), the
+ *   schema of the frozen history of one database: a set with no baseline, or
+ *   with a file older than it, is refused.
  * - `src/migrations/settings/` runs only on the home pool, on the settings
  *   database: a file there that names a regional table is refused.
  * - `src/migrations/regional/` runs on every pool: a file there that names a
@@ -26,9 +28,6 @@ import { SETTINGS_ENTITIES } from '../src/data-sources';
 import { loadEntities } from '../src/postgres.config';
 
 const SRC = path.resolve(__dirname, '../src');
-
-/** The newest migration of the frozen history. */
-const LAST_FROZEN_MIGRATION = 1795533760005;
 
 /** The tables that no entity maps, by set. */
 const EXTRA_TABLES = {
@@ -81,9 +80,29 @@ function scan(root: string, sets: Sets): string[] {
       }
 
       const foreign = entry.name === 'settings' ? sets.regional : sets.settings;
+      const files = fs
+        .readdirSync(full)
+        .filter((file) => file.endsWith('.ts'))
+        .toSorted();
+      const baseline = files.find((file) =>
+        file.endsWith(`-${entry.name}-baseline.ts`)
+      );
+      const baselineAt = Number(MIGRATION_FILE.exec(baseline ?? '')?.[1]);
 
-      for (const file of fs.readdirSync(full).toSorted()) {
-        if (!file.endsWith('.ts')) continue;
+      if (!baseline) {
+        violations.push(
+          `migrations/${entry.name}/: the set has no baseline (<timestamp>-${entry.name}-baseline.ts)`
+        );
+      }
+
+      for (const file of files) {
+        const timestamp = Number(MIGRATION_FILE.exec(file)?.[1]);
+
+        if (baseline && file !== baseline && !(timestamp > baselineAt)) {
+          violations.push(
+            `migrations/${entry.name}/${file}: a migration of the set is not newer than its baseline ${baseline}`
+          );
+        }
 
         const named = namedTables(
           fs.readFileSync(path.join(full, file), 'utf8'),
@@ -97,13 +116,9 @@ function scan(root: string, sets: Sets): string[] {
         }
       }
     } else {
-      const timestamp = MIGRATION_FILE.exec(entry.name)?.[1];
-
-      if (timestamp && Number(timestamp) > LAST_FROZEN_MIGRATION) {
-        violations.push(
-          `migrations/${entry.name}: the top level is frozen; put the migration in migrations/settings/ or migrations/regional/`
-        );
-      }
+      violations.push(
+        `migrations/${entry.name}: put a migration in migrations/settings/ or migrations/regional/`
+      );
     }
   }
 
@@ -134,13 +149,14 @@ function selfTest(): void {
   };
 
   try {
-    write('migrations/1700000000000-old.ts', 'ALTER TABLE "roles"; "users"');
-    write(`migrations/${LAST_FROZEN_MIGRATION + 1}-new.ts`, '"users"');
-    write('migrations/settings/1800000000000-ok.ts', 'ALTER TABLE "roles"');
-    write('migrations/settings/1800000000001-bad.ts', 'ALTER TABLE "users"');
-    write('migrations/regional/1800000000002-ok.ts', 'ALTER TABLE "users"');
-    write('migrations/regional/1800000000003-bad.ts', 'DROP TABLE "roles"');
-    write('migrations/other/1800000000004-x.ts', '');
+    write('migrations/1700000000000-old.ts', '"users"');
+    write('migrations/settings/1800000000000-settings-baseline.ts', '"roles"');
+    write('migrations/settings/1800000000001-ok.ts', 'ALTER TABLE "roles"');
+    write('migrations/settings/1800000000002-bad.ts', 'ALTER TABLE "users"');
+    write('migrations/settings/1700000000003-older.ts', '"roles"');
+    write('migrations/regional/1800000000004-ok.ts', 'ALTER TABLE "users"');
+    write('migrations/regional/1800000000005-bad.ts', 'DROP TABLE "roles"');
+    write('migrations/other/1800000000006-x.ts', '');
     write('seeders/ok.seeder.ts', 'assertSettingsWriter();');
     write('seeders/bad.seeder.ts', 'export default class X {}');
 
@@ -148,10 +164,12 @@ function selfTest(): void {
       .map((violation) => violation.split(':')[0])
       .toSorted();
     const expected = [
-      `migrations/${LAST_FROZEN_MIGRATION + 1}-new.ts`,
+      'migrations/1700000000000-old.ts',
       'migrations/other/',
-      'migrations/regional/1800000000003-bad.ts',
-      'migrations/settings/1800000000001-bad.ts',
+      'migrations/regional/',
+      'migrations/regional/1800000000005-bad.ts',
+      'migrations/settings/1700000000003-older.ts',
+      'migrations/settings/1800000000002-bad.ts',
       'seeders/bad.seeder.ts'
     ];
 

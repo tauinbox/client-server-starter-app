@@ -1,7 +1,8 @@
 import { join } from 'node:path';
 import type { Logger } from 'typeorm';
 import { importClassesFromDirectories } from 'typeorm/util/DirectoryExportedClassesLoader.js';
-import { postgresConfig } from './postgres.config';
+import { BASELINE_MIGRATIONS } from './frozen-migration-history';
+import { postgresConfig, settingsMigrations } from './postgres.config';
 
 const silentLogger: Logger = {
   logQuery: () => undefined,
@@ -40,7 +41,7 @@ describe('postgresConfig', () => {
 
     const [globEntities, globMigrations] = await Promise.all([
       viaGlob('modules/**/*.entity{.ts,.js}'),
-      viaGlob('migrations/*{ts,.js}', 'migrations/regional/*{ts,.js}')
+      viaGlob('migrations/regional/*{ts,.js}')
     ]);
 
     expect(classNames(entities as unknown[])).toEqual(classNames(globEntities));
@@ -48,5 +49,16 @@ describe('postgresConfig', () => {
       classNames(globMigrations)
     );
     expect(globMigrations.length).toBeGreaterThan(0);
+  });
+
+  it('starts each set with its baseline', () => {
+    const first = (classes: readonly unknown[]) =>
+      classNames(classes).toSorted((a, b) =>
+        a.slice(-13).localeCompare(b.slice(-13))
+      )[0];
+    const regional = first(postgresConfig().migrations as unknown[]);
+    const settings = first(settingsMigrations());
+
+    expect({ regional, settings }).toEqual(BASELINE_MIGRATIONS);
   });
 });
