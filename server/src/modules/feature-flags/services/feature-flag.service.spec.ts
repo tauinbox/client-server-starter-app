@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { repositoryToken } from '../../../common/testing/repository-token';
+import { dataSourceDouble } from '../../../common/testing/data-source.double';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
@@ -56,8 +59,11 @@ describe('FeatureFlagService', () => {
     remove: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
-  let ruleRepo: { find: jest.Mock; manager: { transaction: jest.Mock } };
-  let dataSource: { transaction: jest.Mock };
+  let ruleRepo: { find: jest.Mock };
+  // One fake manager serves the regional and the settings transaction of a
+  // write; the counts of `dataSource.transaction` stay the counts of writes.
+  let dataSource: { transaction: jest.Mock; manager: { find: jest.Mock } };
+  let settingsSource: { createQueryRunner: jest.Mock };
   let settingsChangeLog: { applyPending: jest.Mock };
   let attributeRegistry: AttributeRegistryService;
   let configService: { getOrThrow: jest.Mock };
@@ -129,11 +135,12 @@ describe('FeatureFlagService', () => {
       remove: jest.fn(),
       createQueryBuilder: jest.fn()
     };
-    ruleRepo = {
-      find: jest.fn().mockResolvedValue([]),
-      manager: { transaction: jest.fn() }
+    ruleRepo = { find: jest.fn().mockResolvedValue([]) };
+    dataSource = {
+      transaction: jest.fn(),
+      manager: { find: jest.fn().mockResolvedValue([]) }
     };
-    dataSource = { transaction: jest.fn() };
+    settingsSource = { createQueryRunner: jest.fn() };
     settingsChangeLog = {
       applyPending: jest.fn().mockResolvedValue(undefined)
     };
@@ -160,6 +167,10 @@ describe('FeatureFlagService', () => {
         { provide: repositoryToken(FeatureFlag), useValue: flagRepo },
         { provide: repositoryToken(FeatureFlagRule), useValue: ruleRepo },
         { provide: DataSource, useValue: dataSource },
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: settingsSource
+        },
         { provide: AttributeRegistryService, useValue: attributeRegistry },
         { provide: ConfigService, useValue: configService },
         { provide: AuditService, useValue: auditService },
@@ -240,8 +251,11 @@ describe('FeatureFlagService', () => {
       ...overrides
     };
 
-    dataSource.transaction.mockImplementation(
-      (cb: (em: MockEm) => Promise<unknown>) => cb(em)
+    const source = dataSourceDouble(em);
+
+    dataSource.transaction.mockImplementation(source.transaction);
+    settingsSource.createQueryRunner.mockImplementation(
+      source.createQueryRunner
     );
 
     return em;

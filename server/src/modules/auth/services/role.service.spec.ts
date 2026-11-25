@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { repositoryToken } from '../../../common/testing/repository-token';
+import { dataSourceDouble } from '../../../common/testing/data-source.double';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { HttpException } from '@nestjs/common';
 import { ApiError } from '../../../common/errors/api-error';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
@@ -58,6 +62,8 @@ describe('RoleService', () => {
     createQueryBuilder: jest.Mock;
   };
   let mockPermissionRepo: { find: jest.Mock };
+  let regionalSource: object;
+  let settingsSource: object;
   let mockRolePermissionRepo: {
     find: jest.Mock;
     findOne: jest.Mock;
@@ -193,9 +199,10 @@ describe('RoleService', () => {
         // Role membership writes now resolve the target user first, so the
         // default is an existing row; absence is opted into per test.
         findOne: jest.fn().mockResolvedValue({ id: 'user-1' }),
-        find: jest.fn(
-          (_target: unknown, options: unknown): unknown =>
-            mockRolePermissionRepo.find(options) as unknown
+        find: jest.fn((target: unknown, options: unknown): unknown =>
+          target === Permission
+            ? (mockPermissionRepo.find(options) as unknown)
+            : (mockRolePermissionRepo.find(options) as unknown)
         ),
         // The writes inside the transaction land on the repository mocks, so
         // a test asserts them in one place whether or not a transaction ran.
@@ -206,38 +213,50 @@ describe('RoleService', () => {
     const roleRepo = mockRoleRepo;
 
     // A grant write runs in the same transaction kind as a role write, so the
-    // grant rows land on the role-permission mock.
+    // grant rows land on the role-permission mock. The regional and the
+    // settings transaction of one write share this manager, which routes by
+    // the entity.
+    const txManager = {
+      query: mockSettingsLogQuery,
+      create: (_target: unknown, data: unknown) => data,
+      save: (target: unknown, entity: unknown): unknown =>
+        target === RolePermission
+          ? (mockRolePermissionRepo.save(entity) as unknown)
+          : (roleRepo.save(entity) as unknown),
+      delete: (target: unknown, criteria: unknown): unknown =>
+        target === RolePermission
+          ? (mockRolePermissionRepo.delete(criteria) as unknown)
+          : (roleRepo.delete(criteria) as unknown),
+      update: (_target: unknown, criteria: unknown, set: unknown): unknown =>
+        roleRepo.update(criteria, set) as unknown,
+      findOneByOrFail: (_target: unknown, where: unknown): unknown =>
+        roleRepo.findOneByOrFail(where) as unknown,
+      // The locked user is the one the test resolves for the target.
+      findOne: (target: unknown, options: unknown): unknown =>
+        target === User
+          ? (roleRepo.manager.findOne(target, options) as unknown)
+          : (mockRolePermissionRepo.lockRole(options) as unknown),
+      find: (target: unknown, options: unknown): unknown =>
+        target === Permission
+          ? (mockPermissionRepo.find(options) as unknown)
+          : (mockRolePermissionRepo.find(options) as unknown),
+      createQueryBuilder: (...args: unknown[]): unknown =>
+        roleRepo.manager.createQueryBuilder(...args) as unknown
+    };
+
+    // One regional transaction for each write, as before the split, so the
+    // counts of `manager.transaction` below stay the counts of writes.
     roleRepo.manager.transaction.mockImplementation(
-      (cb: (em: unknown) => Promise<unknown>) =>
-        cb({
-          query: mockSettingsLogQuery,
-          create: (_target: unknown, data: unknown) => data,
-          save: (target: unknown, entity: unknown): unknown =>
-            target === RolePermission
-              ? (mockRolePermissionRepo.save(entity) as unknown)
-              : (roleRepo.save(entity) as unknown),
-          delete: (target: unknown, criteria: unknown): unknown =>
-            target === RolePermission
-              ? (mockRolePermissionRepo.delete(criteria) as unknown)
-              : (roleRepo.delete(criteria) as unknown),
-          update: (
-            _target: unknown,
-            criteria: unknown,
-            set: unknown
-          ): unknown => roleRepo.update(criteria, set) as unknown,
-          findOneByOrFail: (_target: unknown, where: unknown): unknown =>
-            roleRepo.findOneByOrFail(where) as unknown,
-          // The locked user is the one the test resolves for the target.
-          findOne: (target: unknown, options: unknown): unknown =>
-            target === User
-              ? (roleRepo.manager.findOne(target, options) as unknown)
-              : (mockRolePermissionRepo.lockRole(options) as unknown),
-          find: (_target: unknown, options: unknown): unknown =>
-            mockRolePermissionRepo.find(options) as unknown,
-          createQueryBuilder: (...args: unknown[]): unknown =>
-            roleRepo.manager.createQueryBuilder(...args) as unknown
-        })
+      (cb: (em: unknown) => Promise<unknown>) => cb(txManager)
     );
+    regionalSource = {
+      manager: roleRepo.manager,
+      transaction: roleRepo.manager.transaction
+    };
+    settingsSource = {
+      ...dataSourceDouble(txManager),
+      manager: roleRepo.manager
+    };
 
     mockPermissionRepo = {
       find: jest.fn().mockResolvedValue([])
@@ -312,6 +331,11 @@ describe('RoleService', () => {
         {
           provide: repositoryToken(RolePermission),
           useValue: mockRolePermissionRepo
+        },
+        { provide: DataSource, useValue: regionalSource },
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: settingsSource
         },
         { provide: PermissionService, useValue: mockPermissionService },
         { provide: AuditService, useValue: mockAuditService },

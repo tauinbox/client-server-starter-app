@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { RoleDeletedEvent } from '../src/modules/auth/events/role-deleted.event';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -67,7 +68,9 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
   });
 
   it('drops the grants of a role deleted while a holder reads them', async () => {
-    const permissions = await dataSource.getRepository(Permission).find();
+    const permissions = await settingsDataSourceOf(app)
+      .getRepository(Permission)
+      .find();
     const deleteRole = permissions.find(
       (p) => p.action.name === 'delete' && p.resource.subject === 'Role'
     );
@@ -110,7 +113,7 @@ runWithInfra('Role delete and the permission cache (e2e)', () => {
     await roleService.delete(role.id, { ability: SYSTEM_ABILITY });
 
     expect(readInside).toBe(true);
-    const roleRepository = dataSource.getRepository(Role);
+    const roleRepository = settingsDataSourceOf(app).getRepository(Role);
 
     expect(await roleRepository.findOne({ where: { id: role.id } })).toBeNull();
     const cachedPermissions = await permissionService.getPermissionsForUser(

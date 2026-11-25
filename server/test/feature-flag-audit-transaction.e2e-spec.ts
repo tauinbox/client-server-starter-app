@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
   applyBodyParsers,
@@ -31,6 +32,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Feature flag audit row committed before the write (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let token: string;
   let flag: FeatureFlag;
   const stamp = Date.now();
@@ -56,6 +58,7 @@ runWithInfra('Feature flag audit row committed before the write (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
 
     await request(http())
       .post('/api/v1/auth/register')
@@ -66,7 +69,7 @@ runWithInfra('Feature flag audit row committed before the write (e2e)', () => {
         residenceCountry: 'DE'
       })
       .expect(201);
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     const adminId = (
@@ -107,7 +110,7 @@ runWithInfra('Feature flag audit row committed before the write (e2e)', () => {
   });
 
   afterAll(async () => {
-    await dataSource
+    await settingsDataSource
       ?.getRepository(FeatureFlag)
       .delete([{ key: flagKey }, { key: createdKey }]);
     await dataSource?.getRepository(User).delete({ email: adminEmail });
@@ -119,7 +122,7 @@ runWithInfra('Feature flag audit row committed before the write (e2e)', () => {
   }
 
   function storedFlag(key: string): Promise<FeatureFlag | null> {
-    return dataSource.getRepository(FeatureFlag).findOneBy({ key });
+    return settingsDataSource.getRepository(FeatureFlag).findOneBy({ key });
   }
 
   it('create answers 500 and stores no flag', async () => {

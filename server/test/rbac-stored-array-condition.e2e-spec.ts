@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { subject } from '@casl/ability';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { CaslAbilityFactory } from '../src/modules/auth/casl/casl-ability.factory';
@@ -22,6 +23,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let roleService: RoleService;
   let permissionService: PermissionService;
   let abilityFactory: CaslAbilityFactory;
@@ -47,7 +49,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
       { ability: SYSTEM_ABILITY }
     );
 
-    await dataSource.getRepository(RolePermission).insert({
+    await settingsDataSource.getRepository(RolePermission).insert({
       roleId: role.id,
       permissionId: updateUser.id,
       // @ts-expect-error -- a stored row can hold what the type forbids
@@ -78,6 +80,7 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);
     abilityFactory = app.get(CaslAbilityFactory);
@@ -87,9 +90,9 @@ runWithInfra('A grant condition stored as an array (e2e)', () => {
       .spyOn(app.get(AuditService), 'logFireAndForget')
       .mockImplementation(() => undefined);
 
-    const found = (await dataSource.getRepository(Permission).find()).find(
-      (p) => p.action.name === 'update' && p.resource.subject === 'User'
-    );
+    const found = (
+      await settingsDataSource.getRepository(Permission).find()
+    ).find((p) => p.action.name === 'update' && p.resource.subject === 'User');
 
     if (!found) throw new Error('Permission update:User missing');
 

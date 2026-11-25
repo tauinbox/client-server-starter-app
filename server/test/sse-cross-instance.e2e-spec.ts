@@ -5,6 +5,7 @@ import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import Redis from 'ioredis';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import type { NotificationEvent } from '@app/shared/types';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuthService } from '../src/modules/auth/services/auth.service';
@@ -104,10 +105,12 @@ runWithRedis('server pushes across instances (e2e)', () => {
     plain = await saveUser(emails.plain);
     idle = await saveUser(emails.idle);
 
-    const permission = await dataSource.getRepository(Permission).findOne({
-      where: { action: { name: 'search' }, resource: { subject: 'User' } },
-      relations: { action: true, resource: true }
-    });
+    const permission = await settingsDataSourceOf(first)
+      .getRepository(Permission)
+      .findOne({
+        where: { action: { name: 'search' }, resource: { subject: 'User' } },
+        relations: { action: true, resource: true }
+      });
 
     if (!permission) throw new Error('Permission search:User missing');
 
@@ -152,7 +155,9 @@ runWithRedis('server pushes across instances (e2e)', () => {
     if (first) {
       const dataSource = first.get(DataSource);
 
-      await dataSource.getRepository(Role).delete({ name: roleName });
+      await settingsDataSourceOf(first)
+        .getRepository(Role)
+        .delete({ name: roleName });
       await dataSource
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });

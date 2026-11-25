@@ -4,6 +4,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import Redis from 'ioredis';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import {
   ErrorKeys,
   REAUTH_PROOF_MAX_AGE_SECONDS,
@@ -102,13 +103,15 @@ runWithRedis('two nodes of one pool (e2e)', () => {
     prover = await saveUser(emails.prover);
 
     const roleService = context.get(RoleService);
-    const userRole = await dataSource
+    const userRole = await settingsDataSourceOf(context)
       .getRepository(Role)
       .findOneByOrFail({ name: SYSTEM_ROLES.USER });
-    const searchUser = await dataSource.getRepository(Permission).findOne({
-      where: { action: { name: 'search' }, resource: { subject: 'User' } },
-      relations: { action: true, resource: true }
-    });
+    const searchUser = await settingsDataSourceOf(context)
+      .getRepository(Permission)
+      .findOne({
+        where: { action: { name: 'search' }, resource: { subject: 'User' } },
+        relations: { action: true, resource: true }
+      });
 
     if (!searchUser) throw new Error('Permission search:User missing');
 
@@ -144,7 +147,9 @@ runWithRedis('two nodes of one pool (e2e)', () => {
     if (context) {
       const dataSource = context.get(DataSource);
 
-      await dataSource.getRepository(Role).delete({ name: roleName });
+      await settingsDataSourceOf(context)
+        .getRepository(Role)
+        .delete({ name: roleName });
       await dataSource
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });

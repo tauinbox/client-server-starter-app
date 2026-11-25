@@ -1,9 +1,12 @@
 import { expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { repositoryToken } from '../../../common/testing/repository-token';
-import { IsNull } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import { HttpException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import { dataSourceDouble } from '../../../common/testing/data-source.double';
 import { ResourceService } from './resource.service';
 import { SettingsChangeLogService } from '../../core/settings-change-log/settings-change-log.service';
 import { ResourceRegistryService } from './resource-registry.service';
@@ -46,8 +49,9 @@ describe('ResourceService', () => {
     save: jest.Mock;
     update: jest.Mock;
     findOneByOrFail: jest.Mock;
-    manager: { transaction: jest.Mock };
   };
+  // The settings writes run on `mockEm`; the regional transaction holds nothing.
+  let settingsSource: { createQueryRunner: jest.Mock };
   let mockEm: {
     query: jest.Mock<Promise<unknown[]>, [string, unknown[]?]>;
     findOne: jest.Mock;
@@ -160,12 +164,7 @@ describe('ResourceService', () => {
             mockResourceRepo.update.mock.lastCall as unknown[] | undefined
           )?.[1] as Partial<Resource>)
         })
-      ),
-      manager: {
-        transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
-          work(mockEm)
-        )
-      }
+      )
     };
     // The transactional writes go through the repository mock, so the
     // assertions on `update` below cover both paths.
@@ -184,6 +183,7 @@ describe('ResourceService', () => {
         mockResourceRepo.findOneByOrFail(where)
       )
     };
+    settingsSource = dataSourceDouble(mockEm);
     mockAudit = {
       log: jest.fn().mockResolvedValue(undefined),
       logFireAndForget: jest.fn(),
@@ -220,6 +220,11 @@ describe('ResourceService', () => {
         {
           provide: repositoryToken(Resource),
           useValue: mockResourceRepo
+        },
+        { provide: DataSource, useValue: dataSourceDouble({}) },
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: settingsSource
         },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: ResourceRegistryService, useValue: mockRegistry },
@@ -1047,7 +1052,7 @@ describe('ResourceService', () => {
         status: 409,
         response: { errorKey: ErrorKeys.RESOURCES.NOT_ORPHANED }
       });
-      expect(mockResourceRepo.manager.transaction).not.toHaveBeenCalled();
+      expect(settingsSource.createQueryRunner).not.toHaveBeenCalled();
       expect(mockAudit.log).not.toHaveBeenCalled();
       expect(mockCacheManager.set).not.toHaveBeenCalled();
     });

@@ -2,6 +2,7 @@ import { HttpException, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { subject } from '@casl/ability';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -28,6 +29,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let roleService: RoleService;
   let permissionService: PermissionService;
   let abilityFactory: CaslAbilityFactory;
@@ -51,7 +53,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
   const storeRows = async (
     conditions: RolePermission['conditions'][]
   ): Promise<void> => {
-    const repository = dataSource.getRepository(RolePermission);
+    const repository = settingsDataSource.getRepository(RolePermission);
 
     await repository.delete({ roleId: role.id });
     await repository.save(
@@ -74,6 +76,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);
     abilityFactory = app.get(CaslAbilityFactory);
@@ -83,7 +86,9 @@ runWithInfra('Grant condition fields (e2e)', () => {
       .spyOn(app.get(AuditService), 'logFireAndForget')
       .mockImplementation(() => undefined);
 
-    const permissions = await dataSource.getRepository(Permission).find();
+    const permissions = await settingsDataSource
+      .getRepository(Permission)
+      .find();
     const found = permissions.find(
       (p) => p.action.name === 'read' && p.resource.subject === 'User'
     );
@@ -116,7 +121,9 @@ runWithInfra('Grant condition fields (e2e)', () => {
 
   afterAll(async () => {
     if (dataSource) {
-      await dataSource.getRepository(Role).delete({ name: `${tag}-role` });
+      await settingsDataSource
+        .getRepository(Role)
+        .delete({ name: `${tag}-role` });
       await dataSource
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });
@@ -150,7 +157,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
 
     expect(outcome).toBe(`422 ${ErrorKeys.ROLES.CONDITION_FIELD_UNKNOWN}`);
     expect(
-      await dataSource
+      await settingsDataSource
         .getRepository(RolePermission)
         .countBy({ roleId: role.id })
     ).toBe(0);
@@ -184,7 +191,7 @@ runWithInfra('Grant condition fields (e2e)', () => {
       await storeRows([{ effect: 'deny', fieldMatch: { name: ['Other'] } }]);
       expect(await canReadTarget()).toBe(true);
     } finally {
-      await dataSource.getRepository(Role).delete({ id: allowRole.id });
+      await settingsDataSource.getRepository(Role).delete({ id: allowRole.id });
     }
   });
 });

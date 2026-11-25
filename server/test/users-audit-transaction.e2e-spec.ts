@@ -6,6 +6,7 @@ import request from 'supertest';
 import { Server } from 'http';
 import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource, Repository } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
@@ -87,7 +88,7 @@ runWithInfra('Admin user changes: audit in the write transaction (e2e)', () => {
     ).id;
     await usersService.remove(deletedId, { ability: SYSTEM_ABILITY });
 
-    const superRole = await dataSource
+    const superRole = await settingsDataSourceOf(app)
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
 

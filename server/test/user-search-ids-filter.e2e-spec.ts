@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { MAX_PAGE_SIZE } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
@@ -64,7 +65,7 @@ runWithInfra('GET /users/search/cursor?ids= (e2e)', () => {
       ids.push((await users.findOneByOrFail({ email })).id);
     }
 
-    const superRole = await dataSource
+    const superRole = await settingsDataSourceOf(app)
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     const admin = await users.findOneByOrFail({ email: adminEmail });

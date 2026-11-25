@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -41,6 +42,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
 
   let app: NestExpressApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let auditWrites: ReturnType<typeof trackAuditWrites>;
   const ids = {} as Record<keyof typeof emails, string>;
   let token: string;
@@ -64,6 +66,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     auditWrites = trackAuditWrites(app);
     const roleService = app.get(RoleService);
 
@@ -82,7 +85,9 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       ids[key] = saved.id;
     }
 
-    const permissions = await dataSource.getRepository(Permission).find();
+    const permissions = await settingsDataSource
+      .getRepository(Permission)
+      .find();
     const find = (action: string, resource: string): Permission => {
       const found = permissions.find(
         (p) => p.action.name === action && p.resource.subject === resource
@@ -132,7 +137,7 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       ability: SYSTEM_ABILITY
     });
 
-    const roleRepository = dataSource.getRepository(Role);
+    const roleRepository = settingsDataSource.getRepository(Role);
 
     superRole = await roleRepository.findOneByOrFail({ isSuper: true });
     systemRole = await roleRepository.findOneByOrFail({
@@ -159,7 +164,9 @@ runWithInfra('Audit row of an authorization refusal (e2e)', () => {
       await dataSource
         .getRepository(AuditLog)
         .delete({ actorId: In(Object.values(ids)) });
-      await dataSource.getRepository(Role).delete({ name: In(roleNames) });
+      await settingsDataSource
+        .getRepository(Role)
+        .delete({ name: In(roleNames) });
       await dataSource
         .getRepository(User)
         .delete({ email: In(Object.values(emails)) });

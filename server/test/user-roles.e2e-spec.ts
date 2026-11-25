@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
+import type { SourceManagers } from '../src/data-sources';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
@@ -25,6 +27,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('User roles read without a join (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let permissions: PermissionService;
   let users: UsersService;
   const tag = randomUUID().slice(0, 8);
@@ -47,8 +50,12 @@ runWithInfra('User roles read without a join (e2e)', () => {
 
     return user;
   };
+  const managers = (): SourceManagers => ({
+    regional: dataSource.manager,
+    settings: settingsDataSource.manager
+  });
   const saveRole = async (name: string): Promise<Role> => {
-    const role = await dataSource
+    const role = await settingsDataSource
       .getRepository(Role)
       .save({ name: `${name}-${tag}` });
 
@@ -65,9 +72,10 @@ runWithInfra('User roles read without a join (e2e)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     permissions = app.get(PermissionService);
     users = app.get(UsersService);
-    [grant] = await dataSource.getRepository(Permission).find({
+    [grant] = await settingsDataSource.getRepository(Permission).find({
       relations: { resource: true, action: true },
       take: 1
     });
@@ -75,7 +83,7 @@ runWithInfra('User roles read without a join (e2e)', () => {
 
   afterAll(async () => {
     if (roleIds.length > 0) {
-      await dataSource?.getRepository(Role).delete(roleIds);
+      await settingsDataSource?.getRepository(Role).delete(roleIds);
     }
 
     if (userIds.length > 0) {
@@ -99,21 +107,38 @@ runWithInfra('User roles read without a join (e2e)', () => {
       userId: holder.id,
       roleId: alpha.id
     });
-    await attachRoles(dataSource.manager, [holder, empty]);
+    await attachRoles(managers(), [holder, empty]);
 
     expect(holder.roles.map(({ id }) => id)).toEqual([alpha.id, zeta.id]);
     expect(empty.roles).toEqual([]);
+  });
+
+  it('reads the roles only on the settings manager', async () => {
+    const holder = await saveUser('regional-only');
+    const role = await saveRole('regional-only');
+
+    await addUserRole(dataSource.manager, {
+      userId: holder.id,
+      roleId: role.id
+    });
+
+    await expect(
+      attachRoles(
+        { regional: dataSource.manager, settings: dataSource.manager },
+        [holder]
+      )
+    ).rejects.toThrow(/No metadata for "Role"/);
   });
 
   it('loads the relations of each role that the caller names', async () => {
     const user = await saveUser('relations');
     const role = await saveRole('granted');
 
-    await dataSource
+    await settingsDataSource
       .getRepository(RolePermission)
       .save({ roleId: role.id, permissionId: grant.id, conditions: null });
     await addUserRole(dataSource.manager, { userId: user.id, roleId: role.id });
-    await attachRoles(dataSource.manager, [user], {
+    await attachRoles(managers(), [user], {
       rolePermissions: { permission: { resource: true, action: true } }
     });
 
@@ -132,10 +157,10 @@ runWithInfra('User roles read without a join (e2e)', () => {
     await dataSource.getRepository(User).softDelete(user.id);
 
     await expect(
-      findUserWithRoles(dataSource.manager, { where: { id: user.id } })
+      findUserWithRoles(managers(), { where: { id: user.id } })
     ).resolves.toBeNull();
 
-    const found = await findUserWithRoles(dataSource.manager, {
+    const found = await findUserWithRoles(managers(), {
       where: { id: user.id },
       withDeleted: true
     });
@@ -164,13 +189,13 @@ runWithInfra('User roles read without a join (e2e)', () => {
     const deletedSuper = await saveUser('gone');
     // A partial unique index allows one super role, which the migrations
     // already created.
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     const allowRole = await saveRole('allow');
     const plainRole = await saveRole('plain');
 
-    await dataSource
+    await settingsDataSource
       .getRepository(RolePermission)
       .save({ roleId: allowRole.id, permissionId: grant.id, conditions: null });
 

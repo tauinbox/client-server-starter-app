@@ -3,6 +3,7 @@ import { DiscoveryService } from '@nestjs/core';
 import { InstanceWrapper } from '@nestjs/core/injector/instance-wrapper';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { RegisterResource } from '../src/modules/auth/decorators/register-resource.decorator';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
@@ -39,7 +40,7 @@ runWithInfra('Startup sync of an edited resource (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     await app.init();
-    dataSource = app.get(DataSource);
+    dataSource = settingsDataSourceOf(app);
 
     // The real controllers stay in the list, so the sync orphans none of them.
     const discovery = app.get(DiscoveryService);

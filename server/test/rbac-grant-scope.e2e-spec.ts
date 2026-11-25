@@ -17,6 +17,10 @@ import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { repositoryToken } from '../src/common/testing/repository-token';
+import { dataSourceDouble } from '../src/common/testing/data-source.double';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import request from 'supertest';
@@ -115,11 +119,7 @@ function abilityWith(conditions: PermissionCondition | null): AppAbility {
 describe('Grant scope over the HTTP path', () => {
   let app: INestApplication;
   let holder: AbilityHolder;
-  let rolePermissionRepo: {
-    save: jest.Mock;
-    create: jest.Mock;
-    manager: { transaction: jest.Mock };
-  };
+  let rolePermissionRepo: { save: jest.Mock; create: jest.Mock };
   let auditService: {
     logFireAndForget: jest.Mock;
     log: jest.Mock;
@@ -149,23 +149,26 @@ describe('Grant scope over the HTTP path', () => {
 
     rolePermissionRepo = {
       save: jest.fn().mockResolvedValue([]),
-      create: jest.fn((v: unknown) => v),
-      // The grant is saved through the transaction of its audit row; the
-      // save lands on the repository mock.
-      manager: {
-        transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
-          work({
-            // The settings log lock.
-            query: () => Promise.resolve([]),
-            save: (_target: unknown, entity: unknown): unknown =>
-              rolePermissionRepo.save(entity) as unknown,
-            // The role row that the write locks; it holds no grant yet.
-            findOne: () => Promise.resolve(customRole),
-            find: () => Promise.resolve([])
-          })
-        )
-      }
+      create: jest.fn((v: unknown) => v)
     };
+    // The permissions of a grant check, read outside or inside a transaction.
+    const findGrantRows = (target: unknown) =>
+      Promise.resolve(target === Permission ? [permission] : []);
+    // The regional and the settings transaction of a grant write share this
+    // manager; the save lands on the repository mock.
+    const grantSource = {
+      ...dataSourceDouble({
+        // The settings log lock.
+        query: () => Promise.resolve([]),
+        save: (_target: unknown, entity: unknown): unknown =>
+          rolePermissionRepo.save(entity) as unknown,
+        // The role row that the write locks; it holds no grant yet.
+        findOne: () => Promise.resolve(customRole),
+        find: findGrantRows
+      }),
+      manager: { find: findGrantRows }
+    };
+
     auditService = {
       logFireAndForget: jest.fn(),
       log: jest.fn().mockResolvedValue(undefined),
@@ -184,15 +187,13 @@ describe('Grant scope over the HTTP path', () => {
           provide: repositoryToken(Role),
           useValue: {
             findOne: jest.fn().mockResolvedValue(customRole),
-            // A grant write runs in a settings transaction of the role
-            // manager; the rows land on the role-permission mock.
-            manager: {
-              transaction: (
-                work: (em: unknown) => Promise<unknown>
-              ): Promise<unknown> =>
-                rolePermissionRepo.manager.transaction(work) as Promise<unknown>
-            }
+            manager: grantSource.manager
           }
+        },
+        { provide: DataSource, useValue: grantSource },
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: grantSource
         },
         {
           provide: repositoryToken(Permission),

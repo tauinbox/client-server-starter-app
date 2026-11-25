@@ -1,6 +1,7 @@
 import { HttpException, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys, SYSTEM_ROLES } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -28,6 +29,7 @@ runWithInfra('The permission ceiling of the user role (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let roleService: RoleService;
   let permissionService: PermissionService;
   let abilityFactory: CaslAbilityFactory;
@@ -62,7 +64,7 @@ runWithInfra('The permission ceiling of the user role (e2e)', () => {
   };
 
   const storedGrants = (): Promise<RolePermission[]> =>
-    dataSource
+    settingsDataSource
       .getRepository(RolePermission)
       .find({ where: { roleId: userRole.id } });
 
@@ -75,6 +77,7 @@ runWithInfra('The permission ceiling of the user role (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);
     abilityFactory = app.get(CaslAbilityFactory);
@@ -84,11 +87,13 @@ runWithInfra('The permission ceiling of the user role (e2e)', () => {
       .spyOn(app.get(AuditService), 'logFireAndForget')
       .mockImplementation(() => undefined);
 
-    const roles = dataSource.getRepository(Role);
+    const roles = settingsDataSource.getRepository(Role);
 
     userRole = await roles.findOneByOrFail({ name: SYSTEM_ROLES.USER });
     const superRole = await roles.findOneByOrFail({ name: SYSTEM_ROLES.ADMIN });
-    const permissions = await dataSource.getRepository(Permission).find();
+    const permissions = await settingsDataSource
+      .getRepository(Permission)
+      .find();
     const found = permissions.find(
       (p) => p.action.name === 'search' && p.resource.subject === 'User'
     );

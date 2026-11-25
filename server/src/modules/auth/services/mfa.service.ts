@@ -2,7 +2,9 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { PurposeTokenService } from './purpose-token.service';
 import type { Cache } from 'cache-manager';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Not } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import * as crypto from 'crypto';
 import * as QRCode from 'qrcode';
 import {
@@ -113,6 +115,8 @@ export class MfaService {
 
   constructor(
     private readonly dataSource: DataSource,
+    @InjectDataSource(SETTINGS_DATA_SOURCE)
+    private readonly settingsDataSource: DataSource,
     private readonly purposeTokens: PurposeTokenService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
@@ -367,7 +371,10 @@ export class MfaService {
     // only one audits and mails; the other is told there is nothing to reset.
     // The row shares the transaction: a reset never commits without it.
     await withTransaction(this.dataSource, async (manager) => {
-      const locked = await lockUserWithRoles(manager, { id: target.id });
+      const locked = await lockUserWithRoles(
+        { regional: manager, settings: this.settingsDataSource.manager },
+        { id: target.id }
+      );
 
       if (!locked) throw userNotFound(target.id);
 
@@ -606,9 +613,13 @@ export class MfaService {
         : undefined;
     const refused = { userId: sub, provider, context };
 
-    const found = await findUserWithRoles(this.dataSource.manager, {
-      where: { id: sub }
-    });
+    const found = await findUserWithRoles(
+      {
+        regional: this.dataSource.manager,
+        settings: this.settingsDataSource.manager
+      },
+      { where: { id: sub } }
+    );
 
     // Anything that ended the account's sessions since the password check
     // must end this attempt too.

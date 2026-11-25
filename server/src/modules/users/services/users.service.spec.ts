@@ -9,6 +9,9 @@ import {
   prehashPassword
 } from '../../../common/utils/password-hash';
 import { DataSource, IsNull, Not } from 'typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import { Role } from '../../auth/entities/role.entity';
 import { BCRYPT_SALT_ROUNDS, ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { UsersService } from './users.service';
@@ -52,6 +55,8 @@ describe('UsersService', () => {
     };
   };
   let mockDataSource: { transaction: jest.Mock };
+  // The roles are read on the settings data source.
+  let mockSettingsManager: { findOne: jest.Mock };
   let mockMailService: { sendEmailVerification: jest.Mock };
   let mockBreachedPasswordService: { assertNotBreached: jest.Mock };
   let mockAuditService: { log: jest.Mock; logFireAndForget: jest.Mock };
@@ -156,6 +161,7 @@ describe('UsersService', () => {
     mockBreachedPasswordService = {
       assertNotBreached: jest.fn().mockResolvedValue(undefined)
     };
+    mockSettingsManager = { findOne: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -167,6 +173,10 @@ describe('UsersService', () => {
         {
           provide: DataSource,
           useValue: mockDataSource
+        },
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: { manager: mockSettingsManager }
         },
         {
           provide: AuditService,
@@ -497,9 +507,12 @@ describe('UsersService', () => {
       );
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(21);
       expect(result.data).toEqual([mockUser]);
-      const [manager, listed] = jest.mocked(attachRoles).mock.lastCall ?? [];
+      const [managers, listed] = jest.mocked(attachRoles).mock.lastCall ?? [];
 
-      expect(manager).toBe(mockRepository.manager);
+      expect(managers).toEqual({
+        regional: mockRepository.manager,
+        settings: mockSettingsManager
+      });
       expect(listed).toEqual([mockUser]);
       expect(result.meta.hasMore).toBe(false);
       expect(result.meta.nextCursor).toBeNull();
@@ -530,14 +543,14 @@ describe('UsersService', () => {
     });
 
     it('filters by role through the membership rows of the role id', async () => {
-      mockRepository.findOne.mockResolvedValue({ id: 'role-admin' });
+      mockSettingsManager.findOne.mockResolvedValue({ id: 'role-admin' });
 
       await service.findCursorPaginated(
         { limit: 20, sortBy: 'createdAt', sortOrder: 'desc', role: 'admin' },
         SYSTEM_ABILITY
       );
 
-      expect(mockRepository.findOne).toHaveBeenCalledWith({
+      expect(mockSettingsManager.findOne).toHaveBeenCalledWith(Role, {
         where: { name: 'admin' }
       });
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
@@ -547,7 +560,7 @@ describe('UsersService', () => {
     });
 
     it('a role name that no role has matches no user', async () => {
-      mockRepository.findOne.mockResolvedValue(null);
+      mockSettingsManager.findOne.mockResolvedValue(null);
 
       await service.findCursorPaginated(
         { limit: 20, sortBy: 'createdAt', sortOrder: 'desc', role: 'ghost' },

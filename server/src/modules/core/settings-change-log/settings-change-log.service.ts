@@ -6,6 +6,8 @@ import type { Cache } from 'cache-manager';
 import { DataSource, EntityManager } from 'typeorm';
 import type { AuditLogParams, AuditService } from '../../audit/audit.service';
 import { isSharedCache } from '../../../common/utils/redis-client';
+import { SettingsCommittedError, inBothSources } from '../../../data-sources';
+import type { SourceManagers } from '../../../data-sources';
 import {
   POOL_LOCK_KEYS,
   runOncePerPool,
@@ -110,9 +112,13 @@ export interface SettingsWriteAudit {
   draft: AuditLogParams;
 }
 
-/** The body of a settings write; `recordAudit` sets its final audit row. */
+/**
+ * The body of a settings write. `settings` is the transaction that holds the
+ * log lock; `regional` is a transaction of the regional rows of the same
+ * write. `recordAudit` sets its final audit row.
+ */
 export type SettingsWrite<T> = (
-  em: EntityManager,
+  managers: SourceManagers,
   recordAudit: (params: AuditLogParams) => void
 ) => Promise<T>;
 
@@ -120,18 +126,17 @@ export type SettingsWrite<T> = (
 export const SETTINGS_AUDIT_ID_SETTING = 'nexus.audit_id';
 
 /**
- * The one form of a settings write of a service: `write` runs in a transaction
- * that first takes the log lock, and after the commit the change log is applied,
- * so the caller answers only when the caches of its pool no longer hold the old
+ * The one form of a settings write of a service: `write` runs in a settings
+ * transaction that first takes the log lock, beside a regional transaction
+ * (`inBothSources`), and after the commit the change log is applied, so the
+ * caller answers only when the caches of its pool no longer hold the old
  * settings. A failed write applies nothing. With `audit`, its row is committed
- * before the transaction, because after the split the row is in the regional
- * database and the write in the settings database, and a stop between the two
- * must not leave a change with no row.
+ * before the transactions, because the row is in the regional database and the
+ * write in the settings database, and a stop between the two must not leave a
+ * change with no row.
  */
 export async function writeSettings<T>(
-  manager: {
-    transaction<R>(run: (em: EntityManager) => Promise<R>): Promise<R>;
-  },
+  sources: { regional: DataSource; settings: DataSource },
   {
     log,
     audit
@@ -148,21 +153,41 @@ export async function writeSettings<T>(
   let result: T;
 
   try {
-    result = await manager.transaction(async (em) => {
-      await lockSettingsLog(em);
+    // The new settings rows commit before the regional rows that name them.
+    result = await inBothSources(
+      sources,
+      { commitFirst: 'settings' },
+      async (managers) => {
+        await lockSettingsLog(managers.settings);
 
-      if (auditId) {
-        await em.query('SELECT set_config($1, $2, true)', [
-          SETTINGS_AUDIT_ID_SETTING,
-          auditId
-        ]);
+        if (auditId) {
+          await managers.settings.query('SELECT set_config($1, $2, true)', [
+            SETTINGS_AUDIT_ID_SETTING,
+            auditId
+          ]);
+        }
+
+        return write(managers, (params) => {
+          recorded = params;
+        });
+      }
+    );
+  } catch (error) {
+    // The settings change is applied although the call fails: its row says
+    // so, and the caches drop it now.
+    if (error instanceof SettingsCommittedError) {
+      if (audit && auditId) {
+        await audit.trail.closeSettingsWrite(auditId, {
+          outcome: 'applied',
+          params: recorded ?? audit.draft
+        });
       }
 
-      return write(em, (params) => {
-        recorded = params;
-      });
-    });
-  } catch (error) {
+      await log.applyPending();
+
+      throw error.cause;
+    }
+
     // A refusal changed nothing, so it leaves no row; a fault leaves the row
     // as `not_applied`.
     if (audit && auditId && error instanceof HttpException) {

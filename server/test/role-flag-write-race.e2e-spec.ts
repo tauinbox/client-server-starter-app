@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, EntityManager } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
@@ -32,6 +33,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Role and flag writes under a race (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let roleService: RoleService;
   let token: string;
   const stamp = Date.now();
@@ -57,6 +59,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
     stopSettingsPoll(app);
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     roleService = app.get(RoleService);
     const usersService = app.get(UsersService);
 
@@ -64,7 +67,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
       { email: adminEmail, password, name: 'Write Race' },
       { ability: SYSTEM_ABILITY }
     );
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
 
@@ -87,13 +90,15 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
 
   afterAll(async () => {
     if (dataSource) {
-      await dataSource
+      await settingsDataSource
         .createQueryBuilder()
         .delete()
         .from(Role)
         .where('name LIKE :prefix', { prefix: `${prefix}%` })
         .execute();
-      await dataSource.getRepository(FeatureFlag).delete({ key: prefix });
+      await settingsDataSource
+        .getRepository(FeatureFlag)
+        .delete({ key: prefix });
       await dataSource.getRepository(User).delete({ email: adminEmail });
     }
 
@@ -191,7 +196,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
       { name: `${prefix}-granted` },
       { ability: SYSTEM_ABILITY }
     );
-    const [permission] = await dataSource
+    const [permission] = await settingsDataSource
       .getRepository(Permission)
       .find({ take: 1, order: { id: 'ASC' } });
     const barrier = holdTwoTransactions();
@@ -205,7 +210,7 @@ runWithInfra('Role and flag writes under a race (e2e)', () => {
 
     expect(barrier.held()).toBe(2);
     expect(responses.map((r) => r.status)).toEqual([200, 200]);
-    const grants = await dataSource
+    const grants = await settingsDataSource
       .getRepository(RolePermission)
       .findBy({ roleId: role.id });
 

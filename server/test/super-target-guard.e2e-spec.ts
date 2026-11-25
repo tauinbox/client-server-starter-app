@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { verifyPassword } from '../src/common/utils/password-hash';
 import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -28,6 +29,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('User writes on a super target (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let authService: AuthService;
   let usersService: UsersService;
   const stamp = Date.now();
@@ -58,6 +60,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
 
@@ -74,7 +77,9 @@ runWithInfra('User writes on a super target (e2e)', () => {
     }
 
     const roleService = app.get(RoleService);
-    const permissions = await dataSource.getRepository(Permission).find();
+    const permissions = await settingsDataSource
+      .getRepository(Permission)
+      .find();
     const grant = (action: string, subjectName = 'User') => {
       const found = permissions.find(
         (p) => p.action.name === action && p.resource.subject === subjectName
@@ -97,13 +102,15 @@ runWithInfra('User writes on a super target (e2e)', () => {
       { ability: SYSTEM_ABILITY }
     );
     userRoleId = (
-      await dataSource.getRepository(Role).findOneByOrFail({ name: 'user' })
+      await settingsDataSource
+        .getRepository(Role)
+        .findOneByOrFail({ name: 'user' })
     ).id;
     await roleService.assignRoleToUser(await userId(supportEmail), support.id, {
       ability: SYSTEM_ABILITY
     });
 
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
 
@@ -123,7 +130,7 @@ runWithInfra('User writes on a super target (e2e)', () => {
         { email: otherSuperEmail },
         { email: plainEmail }
       ]);
-    await dataSource
+    await settingsDataSource
       ?.getRepository(Role)
       .delete({ name: In([supportRoleName]) });
     await app?.close();

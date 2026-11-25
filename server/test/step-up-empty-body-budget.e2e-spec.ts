@@ -6,6 +6,7 @@ import request from 'supertest';
 import { Server } from 'http';
 import { randomBytes, randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys, MAX_FAILED_ATTEMPTS } from '@app/shared/constants';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -81,7 +82,7 @@ runWithInfra('A step-up request with no secret spends no budget (e2e)', () => {
 
     // The super role passes the permission check of the admin reset, so the
     // request reaches its step-up.
-    const superRole = await dataSource
+    const superRole = await settingsDataSourceOf(app)
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
 

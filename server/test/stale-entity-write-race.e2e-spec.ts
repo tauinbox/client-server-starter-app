@@ -8,6 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, EntityManager } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ApiValidationPipe } from '../src/common/pipes/api-validation.pipe';
@@ -46,6 +47,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let roleService: RoleService;
   let usersService: UsersService;
   let token: string;
@@ -72,6 +74,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     stopSettingsPoll(app);
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     roleService = app.get(RoleService);
     usersService = app.get(UsersService);
 
@@ -79,7 +82,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       { email: adminEmail, password, name: 'Stale Write' },
       { ability: SYSTEM_ABILITY }
     );
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
 
@@ -102,19 +105,19 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
 
   afterAll(async () => {
     if (dataSource) {
-      await dataSource
+      await settingsDataSource
         .createQueryBuilder()
         .delete()
         .from(FeatureFlag)
         .where('key LIKE :prefix', { prefix: `${prefix}%` })
         .execute();
-      await dataSource
+      await settingsDataSource
         .createQueryBuilder()
         .delete()
         .from(Role)
         .where('name LIKE :prefix', { prefix: `${prefix}%` })
         .execute();
-      await dataSource
+      await settingsDataSource
         .createQueryBuilder()
         .delete()
         .from(Resource)
@@ -250,7 +253,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       expect(patched.status).toBe(404);
       expect(errorKey(patched)).toBe(ErrorKeys.ROLES.NOT_FOUND);
       expect(
-        await dataSource.getRepository(Role).countBy({ id: role.id })
+        await settingsDataSource.getRepository(Role).countBy({ id: role.id })
       ).toBe(0);
       expect(await auditRows(AuditAction.ROLE_UPDATE, role.id)).toBe(0);
     },
@@ -258,7 +261,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
   );
 
   it('keeps a resource restore that lands before an edit of it', async () => {
-    const resources = dataSource.getRepository(Resource);
+    const resources = settingsDataSource.getRepository(Resource);
     const resource = await resources.save(
       resources.create({
         name: `${prefix}-resource`,
@@ -394,7 +397,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     const activeOnly = { conditions: { isActive: true } };
 
     it('refuses a non-super resource edit that read the row before a super narrowed it', async () => {
-      const resources = dataSource.getRepository(Resource);
+      const resources = settingsDataSource.getRepository(Resource);
       const resource = await resources.save(
         resources.create({
           name: `${prefix}-widen`,
@@ -496,9 +499,10 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
       expect(await assign).toBe(
         `403 ${ErrorKeys.GENERAL.INSUFFICIENT_PERMISSIONS}`
       );
-      const after = await findUserWithRolesOrFail(dataSource.manager, {
-        where: { id: user.id }
-      });
+      const after = await findUserWithRolesOrFail(
+        { regional: dataSource.manager, settings: settingsDataSource.manager },
+        { where: { id: user.id } }
+      );
 
       expect(after.roles.map((r) => r.id)).not.toContain(role.id);
     }, 30000);
@@ -524,7 +528,7 @@ runWithInfra('Writes of a loaded entity under a race (e2e)', () => {
     }
 
     async function ruleRoleNames(flagId: string): Promise<string[]> {
-      const [rule] = await dataSource
+      const [rule] = await settingsDataSource
         .getRepository(FeatureFlagRule)
         .findBy({ flagId });
 

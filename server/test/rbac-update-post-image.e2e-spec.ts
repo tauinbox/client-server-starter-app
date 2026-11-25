@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
   applyBodyParsers,
@@ -30,6 +31,7 @@ runWithInfra(
   () => {
     let app: INestApplication;
     let dataSource: DataSource;
+    let settingsDataSource: DataSource;
     let authService: AuthService;
     let usersService: UsersService;
     const stamp = Date.now();
@@ -60,6 +62,7 @@ runWithInfra(
       await app.init();
 
       dataSource = app.get(DataSource);
+      settingsDataSource = settingsDataSourceOf(app);
       authService = app.get(AuthService);
       usersService = app.get(UsersService);
 
@@ -83,7 +86,7 @@ runWithInfra(
         .expect(201);
 
       // A row of its own, so the grant scope touches no shared resource.
-      const resourceRepository = dataSource.getRepository(Resource);
+      const resourceRepository = settingsDataSource.getRepository(Resource);
 
       resource = await resourceRepository.save(
         resourceRepository.create({
@@ -97,7 +100,9 @@ runWithInfra(
       );
 
       const roleService = app.get(RoleService);
-      const permissions = await dataSource.getRepository(Permission).find();
+      const permissions = await settingsDataSource
+        .getRepository(Permission)
+        .find();
       const permissionId = (subject: string): string => {
         const found = permissions.find(
           (p) => p.action.name === 'update' && p.resource.subject === subject
@@ -141,10 +146,12 @@ runWithInfra(
 
     afterAll(async () => {
       if (resource) {
-        await dataSource?.getRepository(Resource).delete({ id: resource.id });
+        await settingsDataSource
+          ?.getRepository(Resource)
+          .delete({ id: resource.id });
       }
 
-      await dataSource
+      await settingsDataSource
         ?.getRepository(Role)
         .delete({ name: In([actorRoleName, teamA, teamB]) });
       await dataSource
@@ -186,7 +193,7 @@ runWithInfra(
     }
 
     async function roleId(name: string): Promise<string> {
-      const found = await dataSource
+      const found = await settingsDataSource
         .getRepository(Role)
         .findOneOrFail({ where: { name } });
 
@@ -224,7 +231,7 @@ runWithInfra(
         const res = await patch(`roles/${id}`, { name: teamB });
 
         expect(res.status).toBe(403);
-        const row = await dataSource
+        const row = await settingsDataSource
           .getRepository(Role)
           .findOneOrFail({ where: { id } });
 
@@ -247,7 +254,7 @@ runWithInfra(
         });
 
         expect(res.status).toBe(403);
-        const row = await dataSource
+        const row = await settingsDataSource
           .getRepository(Resource)
           .findOneOrFail({ where: { id: resource.id } });
 

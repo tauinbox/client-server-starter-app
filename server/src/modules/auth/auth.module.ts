@@ -17,6 +17,7 @@ import { CryptoModule } from '../../common/crypto/crypto.module';
 import { OAuthService } from './services/oauth.service';
 import { TokenGeneratorService } from './services/token-generator.service';
 import { PurposeTokenService } from './services/purpose-token.service';
+import { SETTINGS_DATA_SOURCE } from '../../data-sources';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { OAuthAccount } from './entities/oauth-account.entity';
 import { Role } from './entities/role.entity';
@@ -80,16 +81,11 @@ function conditionalProvider(
     // auth dependency of its own, so this edge is one-way.
     EntitlementsModule,
     PassportModule,
-    TypeOrmModule.forFeature([
-      RefreshToken,
-      OAuthAccount,
-      Role,
-      Permission,
-      RolePermission,
-      Resource,
-      Action,
-      User
-    ]),
+    TypeOrmModule.forFeature([RefreshToken, OAuthAccount, User]),
+    TypeOrmModule.forFeature(
+      [Role, Permission, RolePermission, Resource, Action],
+      SETTINGS_DATA_SOURCE
+    ),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

@@ -2,6 +2,7 @@ import { HttpException, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { subject } from '@casl/ability';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import type { PermissionCondition } from '@app/shared/types';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -33,6 +34,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let roleService: RoleService;
   let permissionService: PermissionService;
   let abilityFactory: CaslAbilityFactory;
@@ -104,6 +106,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);
     abilityFactory = app.get(CaslAbilityFactory);
@@ -113,7 +116,9 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       .spyOn(app.get(AuditService), 'logFireAndForget')
       .mockImplementation(() => undefined);
 
-    const permissions = await dataSource.getRepository(Permission).find();
+    const permissions = await settingsDataSource
+      .getRepository(Permission)
+      .find();
     const find = (action: string, resource: string): Permission => {
       const found = permissions.find(
         (p) => p.action.name === action && p.resource.subject === resource
@@ -170,7 +175,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
 
   afterAll(async () => {
     if (dataSource) {
-      await dataSource.getRepository(Role).delete({
+      await settingsDataSource.getRepository(Role).delete({
         name: In(
           ['admin', 'restrict', 'accomplice', 'blocker'].map(
             (n) => `${tag}-${n}`
@@ -224,7 +229,7 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       )
     ).toBe(liftRefused);
     expect(
-      await dataSource
+      await settingsDataSource
         .getRepository(RolePermission)
         .countBy({ roleId: restrictRole.id })
     ).toBe(1);
@@ -258,7 +263,9 @@ runWithInfra('Lifting a deny restriction (e2e)', () => {
       )
     ).toBe(liftRefused);
     expect(
-      await dataSource.getRepository(Role).countBy({ id: restrictRole.id })
+      await settingsDataSource
+        .getRepository(Role)
+        .countBy({ id: restrictRole.id })
     ).toBe(1);
   });
 

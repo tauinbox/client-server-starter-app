@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource, In, Repository } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { repositoryToken } from '../src/common/testing/repository-token';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -73,6 +74,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let plans: Repository<Plan>;
   let roleService: RoleService;
   let permissionService: PermissionService;
@@ -93,6 +95,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     plans = app.get(repositoryToken(Plan));
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);
@@ -107,9 +110,9 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
       .spyOn(app.get(ResourceRegistryService), 'isRegistered')
       .mockReturnValue(true);
 
-    const permission = (await dataSource.getRepository(Permission).find()).find(
-      (p) => p.action.name === 'delete' && p.resource.subject === 'Role'
-    );
+    const permission = (
+      await settingsDataSource.getRepository(Permission).find()
+    ).find((p) => p.action.name === 'delete' && p.resource.subject === 'Role');
 
     if (!permission) throw new Error('Permission delete:Role missing');
 
@@ -139,11 +142,15 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
     if (dataSource) {
       if (roleIds.length > 0) {
-        await dataSource.getRepository(Role).delete({ id: In(roleIds) });
+        await settingsDataSource
+          .getRepository(Role)
+          .delete({ id: In(roleIds) });
       }
 
       if (resourceId) {
-        await dataSource.getRepository(Resource).delete({ id: resourceId });
+        await settingsDataSource
+          .getRepository(Resource)
+          .delete({ id: resourceId });
       }
 
       // The customer and its subscription go with the user (CASCADE).
@@ -178,7 +185,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
 
     // The roles and their grants are the last read of the user's permissions.
     held = holdNextCall(
-      dataSource.manager,
+      settingsDataSource.manager,
       'find',
       (entity) => entity === Role
     );
@@ -205,7 +212,7 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
     const role = await grantDeleteRole();
 
     held = holdNextCall(
-      dataSource.manager,
+      settingsDataSource.manager,
       'find',
       (entity) => entity === Role
     );
@@ -225,12 +232,12 @@ runWithInfra('A cache read that races an invalidation (e2e)', () => {
   });
 
   it('keeps a narrowed action out of the subject maps', async () => {
-    const actions = await dataSource
+    const actions = await settingsDataSource
       .getRepository(Action)
       .findBy({ name: In(['read', 'delete']) });
 
     expect(actions).toHaveLength(2);
-    const resourceRepository = dataSource.getRepository(Resource);
+    const resourceRepository = settingsDataSource.getRepository(Resource);
     const resource = await resourceRepository.save(
       resourceRepository.create({
         name: tag,

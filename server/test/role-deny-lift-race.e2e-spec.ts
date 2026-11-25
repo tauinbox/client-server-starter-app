@@ -1,6 +1,7 @@
 import { HttpException, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource, EntityManager, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import type { PermissionCondition } from '@app/shared/types';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -24,6 +25,7 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
   const tag = `deny-lift-race-${Date.now()}`;
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let roleService: RoleService;
   let permissionService: PermissionService;
   let actor: User;
@@ -45,6 +47,7 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
     await app.init();
     stopSettingsPoll(app);
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);
     jest.spyOn(app.get(AuditService), 'log').mockResolvedValue(undefined);
@@ -52,7 +55,9 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
       .spyOn(app.get(AuditService), 'logFireAndForget')
       .mockImplementation(() => undefined);
 
-    const permissions = await dataSource.getRepository(Permission).find();
+    const permissions = await settingsDataSource
+      .getRepository(Permission)
+      .find();
     const find = (action: string, resource: string): Permission => {
       const found = permissions.find(
         (p) => p.action.name === action && p.resource.subject === resource
@@ -113,7 +118,7 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
 
   afterAll(async () => {
     if (dataSource) {
-      await dataSource
+      await settingsDataSource
         .createQueryBuilder()
         .delete()
         .from(Role)
@@ -225,9 +230,9 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
     expect(
       await outcome(roleService.delete(role.id, { ability, actorId: actor.id }))
     ).toBe(liftRefused);
-    expect(await dataSource.getRepository(Role).countBy({ id: role.id })).toBe(
-      1
-    );
+    expect(
+      await settingsDataSource.getRepository(Role).countBy({ id: role.id })
+    ).toBe(1);
   });
 
   it('refuses a grant removal when the grant became a deny after the check', async () => {

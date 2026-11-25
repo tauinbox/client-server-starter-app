@@ -1,5 +1,13 @@
+import type { DataSource, EntityManager } from 'typeorm';
 import { Product } from './modules/billing/entities/product.entity';
 import { Plan } from './modules/billing/entities/plan.entity';
+import { Action } from './modules/auth/entities/action.entity';
+import { Permission } from './modules/auth/entities/permission.entity';
+import { Resource } from './modules/auth/entities/resource.entity';
+import { RolePermission } from './modules/auth/entities/role-permission.entity';
+import { Role } from './modules/auth/entities/role.entity';
+import { FeatureFlagRule } from './modules/feature-flags/entities/feature-flag-rule.entity';
+import { FeatureFlag } from './modules/feature-flags/entities/feature-flag.entity';
 
 /**
  * The name of the TypeORM data source of the settings: the rows that every
@@ -14,7 +22,77 @@ export const SETTINGS_DATA_SOURCE = 'settings';
  * register them, so a regional manager that reads one of them fails with
  * "No metadata" instead of reading a database that will not hold it.
  */
-export const SETTINGS_ENTITIES: readonly NewableFunction[] = [Plan, Product];
+export const SETTINGS_ENTITIES: readonly NewableFunction[] = [
+  Plan,
+  Product,
+  Role,
+  Permission,
+  RolePermission,
+  Resource,
+  Action,
+  FeatureFlag,
+  FeatureFlagRule
+];
+
+/**
+ * The settings transaction committed and the regional one then failed: the
+ * settings change is applied. `cause` is the failure of the regional commit.
+ */
+export class SettingsCommittedError extends Error {
+  constructor(readonly cause: unknown) {
+    super('The settings commit applied, then the regional commit failed');
+  }
+}
+
+/** One manager of each data source. */
+export interface SourceManagers {
+  regional: EntityManager;
+  settings: EntityManager;
+}
+
+/**
+ * Runs `run` in a transaction of each data source. The regional connection is
+ * taken first, on every path that holds both: two requests that took the two
+ * pools in opposite orders could each wait for the other until the connection
+ * timeout. `commitFirst` names the transaction of the row that the other one
+ * points at: a new settings row commits before the regional rows that name it,
+ * else the apply of the change log can delete them as orphans in between; a
+ * locked settings row stays locked until the regional rows that name it commit.
+ */
+export async function inBothSources<T>(
+  sources: { regional: DataSource; settings: DataSource },
+  { commitFirst }: { commitFirst: keyof SourceManagers },
+  run: (managers: SourceManagers) => Promise<T>
+): Promise<T> {
+  const settings = sources.settings.createQueryRunner();
+  let settingsCommitted = false;
+
+  try {
+    // The regional transaction commits when its callback returns.
+    const result = await sources.regional.transaction(async (regional) => {
+      await settings.connect();
+      await settings.startTransaction();
+      const written = await run({ regional, settings: settings.manager });
+
+      if (commitFirst === 'settings') {
+        await settings.commitTransaction();
+        settingsCommitted = true;
+      }
+
+      return written;
+    });
+
+    if (commitFirst === 'regional') await settings.commitTransaction();
+
+    return result;
+  } catch (error) {
+    if (settings.isTransactionActive) await settings.rollbackTransaction();
+
+    throw settingsCommitted ? new SettingsCommittedError(error) : error;
+  } finally {
+    await settings.release();
+  }
+}
 
 /** The settings pool takes this share of `DB_POOL_MAX`, at least 1. */
 const SETTINGS_POOL_SHARE = 0.2;

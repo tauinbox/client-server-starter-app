@@ -5,7 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Cache } from 'cache-manager';
 import type { Request } from 'express';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import {
   anonymousEvaluationNeedsAnonId,
   evaluateFeatureFlag,
@@ -69,10 +70,11 @@ export class FeatureFlagResolverService {
     null;
 
   constructor(
-    @InjectRepository(FeatureFlag)
+    @InjectRepository(FeatureFlag, SETTINGS_DATA_SOURCE)
     private readonly flagRepo: Repository<FeatureFlag>,
-    @InjectRepository(FeatureFlagRule)
+    @InjectRepository(FeatureFlagRule, SETTINGS_DATA_SOURCE)
     private readonly ruleRepo: Repository<FeatureFlagRule>,
+    private readonly dataSource: DataSource,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly attributeRegistry: AttributeRegistryService,
     private readonly configService: ConfigService,
@@ -249,7 +251,7 @@ export class FeatureFlagResolverService {
       order: { createdAt: 'ASC', id: 'ASC' }
     });
 
-    await attachRuleMembers(this.ruleRepo.manager, rules);
+    await attachRuleMembers(this.dataSource.manager, rules);
     const rulesByFlag = new Map<string, typeof rules>();
 
     for (const r of rules) {

@@ -4,32 +4,33 @@ import type {
   FindOneOptions,
   FindOptionsRelations
 } from 'typeorm';
+import type { SourceManagers } from '../../../data-sources';
 import { Role } from '../../auth/entities/role.entity';
 import { User } from '../entities/user.entity';
 import { UserRole } from '../entities/user-role.entity';
 
 /**
- * Sets `roles` on each user in two reads: the membership rows, then the roles.
- * No query joins the two, because the roles are settings and the memberships
- * are personal data. The roles of one user are sorted by name in code-unit
- * order, as the mock server sorts them; an SQL order would follow the collation
- * of the database.
+ * Sets `roles` on each user in two reads: the membership rows on the regional
+ * manager, then the roles on the settings manager. No query joins the two,
+ * because the roles are settings and the memberships are personal data. The
+ * roles of one user are sorted by name in code-unit order, as the mock server
+ * sorts them; an SQL order would follow the collation of the database.
  */
 export async function attachRoles(
-  manager: EntityManager,
+  { regional, settings }: SourceManagers,
   users: User[],
   roleRelations?: FindOptionsRelations<Role>
 ): Promise<void> {
   if (users.length === 0) return;
 
-  const links = await manager.find(UserRole, {
+  const links = await regional.find(UserRole, {
     where: { userId: In(users.map(({ id }) => id)) }
   });
   const roleIds = [...new Set(links.map(({ roleId }) => roleId))];
   const found =
     roleIds.length === 0
       ? []
-      : await manager.find(Role, {
+      : await settings.find(Role, {
           where: { id: In(roleIds) },
           relations: roleRelations
         });
@@ -47,26 +48,26 @@ export async function attachRoles(
   }
 }
 
-/** `manager.findOne(User, options)` with `roles` set. */
+/** `managers.regional.findOne(User, options)` with `roles` set. */
 export async function findUserWithRoles(
-  manager: EntityManager,
+  managers: SourceManagers,
   options: FindOneOptions<User>
 ): Promise<User | null> {
-  const user = await manager.findOne(User, options);
+  const user = await managers.regional.findOne(User, options);
 
-  if (user) await attachRoles(manager, [user]);
+  if (user) await attachRoles(managers, [user]);
 
   return user;
 }
 
 /** `findUserWithRoles` that throws when no row matches, as `findOneOrFail`. */
 export async function findUserWithRolesOrFail(
-  manager: EntityManager,
+  managers: SourceManagers,
   options: FindOneOptions<User>
 ): Promise<User> {
-  const user = await manager.findOneOrFail(User, options);
+  const user = await managers.regional.findOneOrFail(User, options);
 
-  await attachRoles(manager, [user]);
+  await attachRoles(managers, [user]);
 
   return user;
 }

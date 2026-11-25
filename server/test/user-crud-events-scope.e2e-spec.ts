@@ -4,6 +4,7 @@ import type { AddressInfo } from 'net';
 import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import type { NotificationEvent } from '@app/shared/types';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -47,6 +48,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let authService: AuthService;
   let usersService: UsersService;
   let usersController: UsersController;
@@ -67,6 +69,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     port = ((app.getHttpServer() as Server).address() as AddressInfo).port;
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
     usersController = app.get(UsersController);
@@ -92,10 +95,12 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
         return push;
       });
 
-    const searchUser = await dataSource.getRepository(Permission).findOne({
-      where: { action: { name: 'search' }, resource: { subject: 'User' } },
-      relations: { action: true, resource: true }
-    });
+    const searchUser = await settingsDataSource
+      .getRepository(Permission)
+      .findOne({
+        where: { action: { name: 'search' }, resource: { subject: 'User' } },
+        relations: { action: true, resource: true }
+      });
 
     if (!searchUser) throw new Error('Permission search:User missing');
 
@@ -164,7 +169,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
       users.denied
     );
 
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
 
@@ -182,7 +187,7 @@ runWithInfra('user_crud_events follow the search:User grant (e2e)', () => {
     for (const req of requests) req.destroy();
 
     if (dataSource) {
-      await dataSource.getRepository(Role).delete({
+      await settingsDataSource.getRepository(Role).delete({
         name: In([
           `${tag}-scoped`,
           `${tag}-wide`,

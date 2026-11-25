@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import type { SourceManagers } from '../../../data-sources';
 import { ErrorKeys, FEATURE_FLAG_LIST_QUERY } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { changedFields, withChanges } from '@app/shared/utils/changed-fields';
@@ -101,11 +103,13 @@ export interface FlagAuditActor {
 @Injectable()
 export class FeatureFlagService {
   constructor(
-    @InjectRepository(FeatureFlag)
+    @InjectRepository(FeatureFlag, SETTINGS_DATA_SOURCE)
     private readonly flagRepo: Repository<FeatureFlag>,
-    @InjectRepository(FeatureFlagRule)
+    @InjectRepository(FeatureFlagRule, SETTINGS_DATA_SOURCE)
     private readonly ruleRepo: Repository<FeatureFlagRule>,
     private readonly dataSource: DataSource,
+    @InjectDataSource(SETTINGS_DATA_SOURCE)
+    private readonly settingsDataSource: DataSource,
     private readonly attributeRegistry: AttributeRegistryService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
@@ -121,11 +125,11 @@ export class FeatureFlagService {
    * known before the transaction.
    */
   #writeSettings<T>(
-    write: (em: EntityManager) => Promise<T>,
+    write: (managers: SourceManagers) => Promise<T>,
     audit: AuditLogParams
   ): Promise<T> {
     return writeSettings(
-      this.dataSource,
+      { regional: this.dataSource, settings: this.settingsDataSource },
       {
         log: this.settingsChangeLog,
         audit: { trail: this.auditService, draft: audit }
@@ -178,7 +182,7 @@ export class FeatureFlagService {
       order: { createdAt: 'ASC', id: 'ASC' }
     });
 
-    await attachRuleMembers(this.ruleRepo.manager, rules);
+    await attachRuleMembers(this.dataSource.manager, rules);
     const byFlag = new Map<string, FeatureFlagRule[]>();
 
     for (const r of rules) {
@@ -239,7 +243,7 @@ export class FeatureFlagService {
       where: { flagId: id },
       order: { createdAt: 'ASC', id: 'ASC' }
     });
-    await attachRuleMembers(this.ruleRepo.manager, flag.rules);
+    await attachRuleMembers(this.dataSource.manager, flag.rules);
 
     return flag;
   }
@@ -277,7 +281,9 @@ export class FeatureFlagService {
     const id = randomUUID();
 
     await this.#writeSettings(
-      async (em) => {
+      async (managers) => {
+        const { settings: em } = managers;
+
         // The check above races a concurrent create against
         // UQ_feature_flags_key. The loser gets a unique violation, which the
         // global filter would report as a generic conflict - map it to the
@@ -298,7 +304,7 @@ export class FeatureFlagService {
           throw error;
         }
 
-        if (rules) await this.#writeRules(em, id, rules);
+        if (rules) await this.#writeRules(managers, id, rules);
       },
       this.#auditRow(actor, {
         action: AuditAction.FEATURE_FLAG_CREATE,
@@ -341,8 +347,8 @@ export class FeatureFlagService {
     if (!ifMatchHolds(ifMatch, current.version)) throw versionConflict();
 
     await this.#writeSettings(
-      async (em) => {
-        const result = await em
+      async (managers) => {
+        const result = await managers.settings
           .createQueryBuilder()
           .update(FeatureFlag)
           .set({
@@ -365,7 +371,7 @@ export class FeatureFlagService {
 
         if (result.affected === 0) throw versionConflict();
 
-        if (rules) await this.#writeRules(em, id, rules);
+        if (rules) await this.#writeRules(managers, id, rules);
       },
       // Rule rows and rule DTOs do not compare field by field: count them.
       this.#auditRow(actor, {
@@ -398,7 +404,7 @@ export class FeatureFlagService {
     // Checked here to answer early, and again on the locked row.
     check(current);
     await this.#writeSettings(
-      async (em) => {
+      async ({ settings: em }) => {
         const locked = await em.findOne(FeatureFlag, {
           where: { id },
           lock: { mode: 'pessimistic_write' }
@@ -493,7 +499,7 @@ export class FeatureFlagService {
   }
 
   async #writeRules(
-    em: EntityManager,
+    { settings: em, regional }: SourceManagers,
     flagId: string,
     rules: FeatureFlagRuleDto[]
   ): Promise<void> {
@@ -513,7 +519,10 @@ export class FeatureFlagService {
       );
 
       if (r.payload.type === 'user') {
-        await writeRuleMembers(em, { ruleId, userIds: r.payload.userIds });
+        await writeRuleMembers(regional, {
+          ruleId,
+          userIds: r.payload.userIds
+        });
       }
     }
   }

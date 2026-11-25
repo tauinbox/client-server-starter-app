@@ -2,6 +2,7 @@ import { HttpException, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource, In, Repository } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -35,6 +36,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let resourceService: ResourceService;
   let roleService: RoleService;
   let permissionService: PermissionService;
@@ -92,6 +94,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     resourceService = app.get(ResourceService);
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);
@@ -105,7 +108,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
       .spyOn(app.get(ResourceRegistryService), 'isRegistered')
       .mockReturnValue(true);
 
-    const actions = await dataSource
+    const actions = await settingsDataSource
       .getRepository(Action)
       .findBy({ name: In(['read', 'delete']) });
     const action = (name: string): Action => {
@@ -116,7 +119,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
       return found;
     };
 
-    const resourceRepository = dataSource.getRepository(Resource);
+    const resourceRepository = settingsDataSource.getRepository(Resource);
 
     resource = await resourceRepository.save(
       resourceRepository.create({
@@ -130,7 +133,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
     );
     await resourceService.invalidateSubjectMapCache();
 
-    const permissionRepository = dataSource.getRepository(Permission);
+    const permissionRepository = settingsDataSource.getRepository(Permission);
     const deleteProbe = await permissionRepository.save(
       permissionRepository.create({
         resourceId: resource.id,
@@ -178,14 +181,18 @@ runWithInfra('Offering a resource action again (e2e)', () => {
 
   afterAll(async () => {
     if (dataSource) {
-      await dataSource.getRepository(Role).delete({ name: `${tag}-admin` });
+      await settingsDataSource
+        .getRepository(Role)
+        .delete({ name: `${tag}-admin` });
       await dataSource.getRepository(User).delete({ email: actorEmail });
 
       if (resource) {
-        await dataSource
+        await settingsDataSource
           .getRepository(Permission)
           .delete({ resourceId: resource.id });
-        await dataSource.getRepository(Resource).delete({ id: resource.id });
+        await settingsDataSource
+          .getRepository(Resource)
+          .delete({ id: resource.id });
       }
     }
 
@@ -250,7 +257,7 @@ runWithInfra('Offering a resource action again (e2e)', () => {
   });
 
   it('refuses the actor restoring the orphaned resource, and lets a super caller', async () => {
-    await dataSource
+    await settingsDataSource
       .getRepository(Resource)
       .update({ id: resource.id }, { isOrphaned: true });
     await resourceService.invalidateSubjectMapCache();
@@ -283,7 +290,9 @@ runWithInfra('Offering a resource action again (e2e)', () => {
           ([row]) => row.action === AuditAction.RESOURCE_RESTORE
         ).length;
     const usersResource = (): Promise<Resource> =>
-      dataSource.getRepository(Resource).findOneByOrFail({ name: 'users' });
+      settingsDataSource
+        .getRepository(Resource)
+        .findOneByOrFail({ name: 'users' });
     const audit = (id: string) => ({
       action: AuditAction.RESOURCE_RESTORE,
       targetId: id,

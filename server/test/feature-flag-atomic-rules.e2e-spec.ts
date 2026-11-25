@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -38,6 +39,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let flagService: FeatureFlagService;
 
   beforeAll(async () => {
@@ -49,6 +51,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     flagService = app.get(FeatureFlagService);
     jest.spyOn(app.get(AuditService), 'log').mockResolvedValue(undefined);
   }, 60000);
@@ -64,7 +67,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     jest.restoreAllMocks();
 
     if (dataSource) {
-      await dataSource
+      await settingsDataSource
         .getRepository(FeatureFlag)
         .createQueryBuilder()
         .delete()
@@ -96,7 +99,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   }
 
   async function percentsOf(flagId: string): Promise<number[]> {
-    const rules = await dataSource
+    const rules = await settingsDataSource
       .getRepository(FeatureFlagRule)
       .find({ where: { flagId }, order: { createdAt: 'ASC' } });
 
@@ -273,7 +276,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
     ).rejects.toThrow('rule insert failed');
 
     expect(
-      await dataSource.getRepository(FeatureFlag).findOneBy({ key })
+      await settingsDataSource.getRepository(FeatureFlag).findOneBy({ key })
     ).toBeNull();
   });
 });

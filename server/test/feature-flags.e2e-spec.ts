@@ -26,6 +26,9 @@ import request from 'supertest';
 import type { Server } from 'http';
 import { DataSource } from 'typeorm';
 import { repositoryToken } from '../src/common/testing/repository-token';
+import { dataSourceDouble } from '../src/common/testing/data-source.double';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-flag-rule.entity';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
@@ -336,13 +339,14 @@ function makeDataSourceMock(
     },
     createQueryBuilder: () => flagRepo.createQueryBuilder()
   };
+  // The regional and the settings transaction of a flag write share `em`.
   const dataSource = {
-    transaction: jest.fn((cb: (manager: typeof em) => Promise<unknown>) =>
-      cb(em)
-    )
+    ...dataSourceDouble(em),
+    // No member rows of a `user` rule are stored in this stand-in.
+    manager: { find: () => Promise.resolve([]) }
   };
 
-  // @ts-expect-error - partial DataSource fake: only transaction is used
+  // @ts-expect-error - partial DataSource fake: transactions and query runners only
   return dataSource;
 }
 
@@ -397,6 +401,10 @@ describe('Feature flags end-to-end', () => {
         { provide: repositoryToken(FeatureFlag), useValue: flagRepo },
         { provide: repositoryToken(FeatureFlagRule), useValue: ruleRepo },
         { provide: DataSource, useValue: dataSource },
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: dataSource
+        },
         { provide: CACHE_MANAGER, useValue: cache.manager },
         { provide: NotificationsService, useValue: notifications },
         {
@@ -990,6 +998,7 @@ describe('GET /feature-flags anonymous rollout id', () => {
   beforeEach(async () => {
     const stores = createStores();
     const flagRepo = makeFlagRepoMock(stores);
+    const flagSource = makeDataSourceMock(stores, flagRepo);
     const moduleRef = await Test.createTestingModule({
       controllers: [FeatureFlagsController, TestFeatureController],
       providers: [
@@ -1007,9 +1016,10 @@ describe('GET /feature-flags anonymous rollout id', () => {
           provide: repositoryToken(FeatureFlagRule),
           useValue: makeRuleRepoMock(stores)
         },
+        { provide: DataSource, useValue: flagSource },
         {
-          provide: DataSource,
-          useValue: makeDataSourceMock(stores, flagRepo)
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: flagSource
         },
         { provide: CACHE_MANAGER, useValue: makeCacheMock().manager },
         {

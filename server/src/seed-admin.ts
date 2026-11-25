@@ -27,9 +27,11 @@ export async function seedAdmin(dataSource: DataSource): Promise<void> {
 
   const roleRepo = dataSource.getRepository(Role);
 
-  const existing = await findUserWithRoles(dataSource.manager, {
-    where: { email }
-  });
+  // The boot steps run on one data source that holds every entity.
+  const existing = await findUserWithRoles(
+    { regional: dataSource.manager, settings: dataSource.manager },
+    { where: { email } }
+  );
 
   if (existing) {
     if (existing.roles.some((r) => r.name === 'admin')) {
