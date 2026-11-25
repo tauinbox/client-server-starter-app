@@ -7,9 +7,10 @@ import {
   Unique,
   UpdateDateColumn
 } from 'typeorm';
+import { SETTINGS_SCHEMA } from '../../../database-roles';
 import { FeatureFlagRule } from './feature-flag-rule.entity';
 
-@Entity('feature_flags')
+@Entity({ name: 'feature_flags', schema: SETTINGS_SCHEMA })
 @Unique('UQ_feature_flags_key', ['key'])
 export class FeatureFlag {
   @PrimaryGeneratedColumn('uuid')

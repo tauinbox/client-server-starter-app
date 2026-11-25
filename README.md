@@ -1148,8 +1148,10 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `my-db` | Database name |
-| `DB_USER` | `postgres` | Database user |
-| `DB_PASSWORD` | `password` | Database password |
+| `DB_USER` | `postgres` | The administrator login of the database. Only the boot steps use it: the migrations, the seeders and the roles below |
+| `DB_PASSWORD` | `password` | The password of `DB_USER`. The container entrypoint starts the server without it |
+| `DB_REGIONAL_PASSWORD` | `regional-password` | Necessary. The password of the login role `app_regional` of the regional data source, which reads and writes only the regional schema. The boot steps create the role and set the password on each start |
+| `DB_SETTINGS_PASSWORD` | `settings-password` | Necessary. The password of the login role `app_settings` of the settings data source, which reads and writes only the `settings` schema |
 | `DATA_REGION` | `intl` | Necessary. The data region of this deployment: `intl` or `ru`. Another value aborts the boot. It is part of the JWT issuer, so a deployment refuses a token of another region. A set key of an integration that may not run in the region also aborts the boot: Paddle, Turnstile, Google and Facebook only in `intl`, YooKassa only in `ru`, VK in both |
 | `PEER_REGIONS` | `{}` | JSON object of the other regions: region to public `https` URL. The own region aborts the boot |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
@@ -1688,6 +1690,7 @@ the script is the authoritative reference for the key list.
 | `ALERT_WEBHOOK_URL` | deploy, rebuild | root `.env`, then `docker-compose.yml` `${}` | The address to which Grafana POSTs a firing alert. An empty value stops the deploy, because Grafana exits at startup when a provisioned webhook has no URL. Treat the URL as a capability: a person who can POST to it can inject false alerts. |
 | `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` | deploy, rebuild, rotate-keys | `server/.env` | The RS256 keypair, as base64 PEM |
 | `DB_PASSWORD` | deploy, rebuild | `server/.env` and root `.env` | It must be equal to the password of the postgres volume. Refer to the caution below |
+| `DB_REGIONAL_PASSWORD`, `DB_SETTINGS_PASSWORD` | deploy, rebuild | `server/.env` | The passwords of the login roles of the server (`app_regional`, `app_settings`). The boot steps set them in Postgres on each start, so a change of the secret takes effect on the next deploy. An empty value stops the boot |
 | `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_SECRET`, `VK_CLIENT_SECRET` | deploy, rebuild | `server/.env` | The OAuth client secrets |
 | `ADMIN_PASSWORD` | deploy, rebuild | `server/.env` | The password of the initial administrator |
 | `MFA_ENCRYPTION_KEY` | deploy, rebuild | `server/.env` | The AES-256-GCM key of the two-factor secret column. It is not stored with the data it protects. While the secret is empty, two-factor enrolment answers HTTP 501 and nothing else changes |

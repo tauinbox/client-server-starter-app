@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import { DATA_REGIONS, HOME_DATA_REGION } from '@app/shared/constants';
+import { SETTINGS_SCHEMA } from '../src/database-roles';
 import { postgresConfig } from '../src/postgres.config';
 import RbacSeeder from '../src/seeders/rbac.seeder';
 import FeatureFlagsSeeder from '../src/seeders/feature-flags.seeder';
@@ -16,9 +17,11 @@ import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-f
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
-// Own schema, built by synchronize: the seeders write the canonical rows, which
-// would collide with whatever the shared e2e schema holds.
-const SCHEMA = 'seeder_idempotency_e2e';
+// Own database, built by synchronize: the seeders write the canonical rows,
+// which would collide with whatever the shared e2e database holds. A schema
+// of its own is not enough: the settings entities name the settings schema,
+// so synchronize would change the settings tables of the shared database.
+const DATABASE = `seeder_idempotency_e2e_${process.pid}`;
 
 const seeders = () => [
   new RbacSeeder(),
@@ -31,8 +34,15 @@ runWithInfra('seeder idempotency (e2e)', () => {
   const ENV = process.env;
   let ds: DataSource;
 
-  const withAdminConnection = async (statements: string[]) => {
-    const admin = new DataSource({ ...postgresConfig(), logging: false });
+  const withAdminConnection = async (
+    statements: string[],
+    database?: string
+  ) => {
+    const admin = new DataSource({
+      ...postgresConfig(),
+      ...(database && { database }),
+      logging: false
+    });
 
     await admin.initialize();
 
@@ -43,8 +53,8 @@ runWithInfra('seeder idempotency (e2e)', () => {
     }
   };
 
-  const dropSchema = () =>
-    withAdminConnection([`DROP SCHEMA IF EXISTS "${SCHEMA}" CASCADE`]);
+  const dropDatabase = () =>
+    withAdminConnection([`DROP DATABASE IF EXISTS "${DATABASE}"`]);
 
   const counts = async () => ({
     resources: await ds.getRepository(Resource).count(),
@@ -62,13 +72,19 @@ runWithInfra('seeder idempotency (e2e)', () => {
 
   beforeAll(async () => {
     process.env = { ...ENV, DATA_REGION: HOME_DATA_REGION };
-    await withAdminConnection([
-      `DROP SCHEMA IF EXISTS "${SCHEMA}" CASCADE`,
-      `CREATE SCHEMA "${SCHEMA}"`
-    ]);
+    await dropDatabase();
+    await withAdminConnection([`CREATE DATABASE "${DATABASE}"`]);
+    await withAdminConnection(
+      [
+        `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`,
+        `CREATE SCHEMA "${SETTINGS_SCHEMA}"`
+      ],
+      DATABASE
+    );
     ds = new DataSource({
       ...postgresConfig(),
-      schema: SCHEMA,
+      database: DATABASE,
+      // eslint-disable-next-line no-restricted-syntax -- runs on DATABASE, a database of this suite only
       synchronize: true,
       logging: false
     });
@@ -80,7 +96,7 @@ runWithInfra('seeder idempotency (e2e)', () => {
 
     if (ds?.isInitialized) await ds.destroy();
 
-    await dropSchema();
+    await dropDatabase();
   });
 
   it('writes nothing on a pool that does not write the settings', async () => {
@@ -127,7 +143,7 @@ runWithInfra('seeder idempotency (e2e)', () => {
     // Resources and roles survive; everything hanging off the actions and the
     // flags goes, leaving a half-seeded database.
     await ds.query(
-      `TRUNCATE "${SCHEMA}"."actions", "${SCHEMA}"."feature_flags" CASCADE`
+      `TRUNCATE "${SETTINGS_SCHEMA}"."actions", "${SETTINGS_SCHEMA}"."feature_flags" CASCADE`
     );
 
     for (const seeder of seeders()) await seeder.run(ds);

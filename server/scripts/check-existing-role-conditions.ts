@@ -182,7 +182,9 @@ async function main(): Promise<void> {
     entities: [],
     migrations: [],
     synchronize: false,
-    logging: false
+    logging: false,
+    // The administrator login reads the settings tables in their own schema.
+    extra: { options: '-c search_path=settings,public' }
   });
 
   await ds.initialize();

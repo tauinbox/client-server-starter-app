@@ -58,7 +58,7 @@ runWithInfra('Settings write audit row (e2e)', () => {
   const logEntriesOf = (
     auditId: string
   ): Promise<Array<{ table_name: string }>> =>
-    dataSource.query(
+    settingsDataSource.query(
       `SELECT "table_name" FROM "settings_change_log" WHERE "audit_id" = $1`,
       [auditId]
     );
@@ -93,7 +93,7 @@ runWithInfra('Settings write audit row (e2e)', () => {
     await dataSource.query(`DELETE FROM "audit_logs" WHERE "request_id" = $1`, [
       tag
     ]);
-    await dataSource.query(`DELETE FROM "roles" WHERE "name" LIKE $1`, [
+    await settingsDataSource.query(`DELETE FROM "roles" WHERE "name" LIKE $1`, [
       `${tag}%`
     ]);
   });
@@ -219,11 +219,12 @@ runWithInfra('Settings write audit row (e2e)', () => {
 
     expect(new Set(pids).size).toBe(1);
 
-    const [{ id: second }] = await dataSource.query<Array<{ id: string }>>(
-      `SELECT "id" FROM "roles" WHERE "name" = $1`,
-      [`${tag}-second`]
-    );
-    const entries = await dataSource.query<Array<{ audit_id: string | null }>>(
+    const [{ id: second }] = await settingsDataSource.query<
+      Array<{ id: string }>
+    >(`SELECT "id" FROM "roles" WHERE "name" = $1`, [`${tag}-second`]);
+    const entries = await settingsDataSource.query<
+      Array<{ audit_id: string | null }>
+    >(
       `SELECT "audit_id" FROM "settings_change_log"
        WHERE "table_name" = 'roles' AND "keys" @> $1::jsonb`,
       [JSON.stringify([second])]

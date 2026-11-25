@@ -10,6 +10,7 @@ import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.
 import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-flag-rule.entity';
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
 import { flagAuditActor } from './flag-audit-actor';
+import { withAdminDataSource } from './admin-data-source';
 import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
 import type { IfMatchCondition } from '@app/shared/utils/if-match';
 
@@ -57,10 +58,12 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   }, 60000);
 
   afterEach(async () => {
-    await dataSource.query(
-      `DROP TRIGGER IF EXISTS ${trigger} ON feature_flag_rules`
-    );
-    await dataSource.query(`DROP FUNCTION IF EXISTS ${trigger}()`);
+    await withAdminDataSource(async (admin) => {
+      await admin.query(
+        `DROP TRIGGER IF EXISTS ${trigger} ON feature_flag_rules`
+      );
+      await admin.query(`DROP FUNCTION IF EXISTS ${trigger}()`);
+    });
   });
 
   afterAll(async () => {
@@ -81,7 +84,11 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   // The flag row written earlier in the same transaction is visible to the
   // trigger, so a create fails here as well as an update.
   async function failRuleInserts(): Promise<void> {
-    await dataSource.query(`
+    await withAdminDataSource((admin) => createFailingTrigger(admin));
+  }
+
+  async function createFailingTrigger(admin: DataSource): Promise<void> {
+    await admin.query(`
       CREATE FUNCTION ${trigger}() RETURNS trigger AS $$
       BEGIN
         IF NEW.payload->>'percent' = '${FAILING_PERCENT}' AND EXISTS (
@@ -93,7 +100,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
         RETURN NEW;
       END
       $$ LANGUAGE plpgsql`);
-    await dataSource.query(`
+    await admin.query(`
       CREATE TRIGGER ${trigger} BEFORE INSERT ON feature_flag_rules
       FOR EACH ROW EXECUTE FUNCTION ${trigger}()`);
   }

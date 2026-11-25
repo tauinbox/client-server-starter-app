@@ -56,7 +56,7 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
     }> = await ds.query(
       `SELECT table_name, column_name, data_type
          FROM information_schema.columns
-        WHERE table_schema = 'public'
+        WHERE table_schema = ANY(current_schemas(false))
           AND data_type LIKE 'timestamp%'
         ORDER BY table_name, column_name`
     );
@@ -81,7 +81,7 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
     }> = await ds.query(
       `SELECT table_name, column_name, datetime_precision
          FROM information_schema.columns
-        WHERE table_schema = 'public'
+        WHERE table_schema = ANY(current_schemas(false))
           AND data_type LIKE 'timestamp%'`
     );
 

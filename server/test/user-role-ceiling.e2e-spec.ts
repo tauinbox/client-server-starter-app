@@ -124,7 +124,7 @@ runWithInfra('The permission ceiling of the user role (e2e)', () => {
   // A refused write leaves nothing, but a regression would leave the grant on
   // the role that every account holds.
   afterEach(async () => {
-    await dataSource?.query(
+    await settingsDataSource?.query(
       'DELETE FROM role_permissions WHERE role_id = $1 AND permission_id = $2',
       [userRole.id, searchUser.id]
     );
@@ -147,7 +147,7 @@ runWithInfra('The permission ceiling of the user role (e2e)', () => {
 
     // The row reaches every account for the moment it exists, so it is
     // removed in the same test whatever the assertion gives.
-    await dataSource.query(
+    await settingsDataSource.query(
       'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)',
       [userRole.id, searchUser.id]
     );
@@ -158,7 +158,7 @@ runWithInfra('The permission ceiling of the user role (e2e)', () => {
       expect(ability.can('search', 'User')).toBe(false);
       expect(ability.can('update', 'Profile')).toBe(true);
     } finally {
-      await dataSource.query(
+      await settingsDataSource.query(
         'DELETE FROM role_permissions WHERE role_id = $1 AND permission_id = $2',
         [userRole.id, searchUser.id]
       );

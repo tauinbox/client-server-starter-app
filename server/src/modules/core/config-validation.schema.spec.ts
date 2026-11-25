@@ -13,8 +13,8 @@ const validEnv = {
   DATA_REGION: 'intl',
   DB_HOST: 'localhost',
   DB_NAME: 'db',
-  DB_USER: 'user',
-  DB_PASSWORD: 'pass',
+  DB_REGIONAL_PASSWORD: 'regional-pass',
+  DB_SETTINGS_PASSWORD: 'settings-pass',
   JWT_SECRET: 'a-jwt-secret-of-thirty-two-chars',
   JWT_EXPIRATION: '3600',
   JWT_REFRESH_EXPIRATION: '604800'

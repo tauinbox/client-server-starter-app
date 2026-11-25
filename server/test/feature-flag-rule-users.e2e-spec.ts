@@ -120,7 +120,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
     const member = await saveUser('rows-only');
     const flag = await createFlag('rows-only', [userRule([member.id])]);
 
-    await dataSource.query(
+    await settingsDataSource.query(
       `UPDATE "feature_flag_rules" SET "payload" = '{"type":"user","userIds":[]}' WHERE "flag_id" = $1`,
       [flag.id]
     );

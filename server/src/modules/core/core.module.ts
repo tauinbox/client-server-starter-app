@@ -17,6 +17,7 @@ import {
   splitPoolMax
 } from '../../data-sources';
 import type { PoolSizes } from '../../data-sources';
+import { SETTINGS_SCHEMA, sourceLogin } from '../../database-roles';
 import { UsersModule } from '../users/users.module';
 import { UsersApiModule } from '../users/users-api.module';
 import { AuthModule } from '../auth/auth.module';
@@ -100,6 +101,7 @@ export class CoreModule implements NestModule {
           inject: [ConfigService],
           useFactory: (config: ConfigService) => ({
             ...postgresConfig(),
+            ...sourceLogin('regional', (key) => config.get<string>(key)),
             entities: regionalEntities(loadEntities()),
             extra: poolOptions(config, 'regional')
           })
@@ -109,6 +111,8 @@ export class CoreModule implements NestModule {
           inject: [ConfigService],
           useFactory: (config: ConfigService) => ({
             ...postgresConfig(),
+            ...sourceLogin('settings', (key) => config.get<string>(key)),
+            schema: SETTINGS_SCHEMA,
             entities: [...SETTINGS_ENTITIES],
             migrations: [],
             extra: poolOptions(config, 'settings')

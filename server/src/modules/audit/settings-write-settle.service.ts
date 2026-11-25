@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../data-sources';
 import {
   POOL_LOCK_KEYS,
   runOncePerPool
@@ -25,7 +27,11 @@ const SETTLE_BATCH = 500;
 export class SettingsWriteSettleService {
   private readonly logger = new Logger(SettingsWriteSettleService.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    @InjectDataSource(SETTINGS_DATA_SOURCE)
+    private readonly settingsDataSource: DataSource
+  ) {}
 
   @Cron(CronExpression.EVERY_MINUTE, { name: SETTINGS_WRITE_SETTLE_CRON_NAME })
   async handleSettle(): Promise<void> {
@@ -52,7 +58,9 @@ export class SettingsWriteSettleService {
     if (pending.length === 0) return;
 
     const ids = pending.map(({ id }) => id);
-    const logged = await this.dataSource.query<Array<{ audit_id: string }>>(
+    const logged = await this.settingsDataSource.query<
+      Array<{ audit_id: string }>
+    >(
       `SELECT DISTINCT "audit_id" FROM "settings_change_log"
        WHERE "audit_id" = ANY($1::uuid[])`,
       [ids]

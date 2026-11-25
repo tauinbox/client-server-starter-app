@@ -18,7 +18,8 @@ runWithInfra('schema hardening constraints (e2e)', () => {
 
   async function indexNames(table: string): Promise<string[]> {
     const rows: Array<{ indexname: string }> = await ds.query(
-      `SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = $1`,
+      // The search path of the administrator holds both schemas.
+      `SELECT indexname FROM pg_indexes WHERE schemaname = ANY(current_schemas(false)) AND tablename = $1`,
       [table]
     );
 

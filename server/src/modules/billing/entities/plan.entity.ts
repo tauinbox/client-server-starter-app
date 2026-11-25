@@ -13,8 +13,9 @@ import type {
   PlanInterval,
   PlanPrice
 } from '@app/shared/types';
+import { SETTINGS_SCHEMA } from '../../../database-roles';
 
-@Entity('plans')
+@Entity({ name: 'plans', schema: SETTINGS_SCHEMA })
 @Unique('UQ_plans_key', ['key'])
 export class Plan {
   @PrimaryGeneratedColumn('uuid')

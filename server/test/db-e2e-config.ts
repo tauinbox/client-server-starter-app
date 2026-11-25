@@ -16,6 +16,8 @@ export const E2E_ENV_KEYS = [
   'DB_NAME',
   'DB_USER',
   'DB_PASSWORD',
+  'DB_REGIONAL_PASSWORD',
+  'DB_SETTINGS_PASSWORD',
   'DB_SCHEMA',
   'SMTP_HOST',
   'SMTP_PORT',

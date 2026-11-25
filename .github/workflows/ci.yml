@@ -130,6 +130,9 @@ jobs:
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: postgres
+      # The login roles of the server; `npm run migrations:run` creates them.
+      DB_REGIONAL_PASSWORD: ci-regional-only-not-a-real-secret
+      DB_SETTINGS_PASSWORD: ci-settings-only-not-a-real-secret
       DB_NAME: testdb
       DB_SCHEMA: public
       # Fallback literal keeps CI green on Dependabot/fork PRs, which don't receive
