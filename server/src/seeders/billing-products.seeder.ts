@@ -7,6 +7,7 @@ import type {
   ProductType
 } from '@app/shared/types';
 import { Product } from '../modules/billing/entities/product.entity';
+import { assertSettingsWriter } from '../migration-sets';
 
 type SeedProduct = {
   key: string;
@@ -91,6 +92,7 @@ const PRODUCTS: SeedProduct[] = [
 
 export default class BillingProductsSeeder extends Seeder {
   async run(dataSource: DataSource): Promise<void> {
+    assertSettingsWriter();
     const productRepo = dataSource.getRepository(Product);
 
     const existingKeys = new Set(

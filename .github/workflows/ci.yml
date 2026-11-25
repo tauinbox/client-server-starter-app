@@ -87,6 +87,8 @@ jobs:
       # Reads client/src and mock-server/src as text only: no install needed.
       - run: npm run check:duplicate-functions -- --self-test
       - run: npm run check:duplicate-functions
+      - run: npm run check:migration-sets -- --self-test
+      - run: npm run check:migration-sets
       # It walks all four source roots. No ESLint
       # run checks import cycles in `shared/`: `lint:shared` has no type-aware
       # or import rules. The self-test runs first so a check that has stopped

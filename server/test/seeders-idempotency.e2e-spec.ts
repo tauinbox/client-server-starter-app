@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { DATA_REGIONS, HOME_DATA_REGION } from '@app/shared/constants';
 import { postgresConfig } from '../src/postgres.config';
 import RbacSeeder from '../src/seeders/rbac.seeder';
 import FeatureFlagsSeeder from '../src/seeders/feature-flags.seeder';
@@ -27,6 +28,7 @@ const seeders = () => [
 ];
 
 runWithInfra('seeder idempotency (e2e)', () => {
+  const ENV = process.env;
   let ds: DataSource;
 
   const withAdminConnection = async (statements: string[]) => {
@@ -59,6 +61,7 @@ runWithInfra('seeder idempotency (e2e)', () => {
   });
 
   beforeAll(async () => {
+    process.env = { ...ENV, DATA_REGION: HOME_DATA_REGION };
     await withAdminConnection([
       `DROP SCHEMA IF EXISTS "${SCHEMA}" CASCADE`,
       `CREATE SCHEMA "${SCHEMA}"`
@@ -73,9 +76,32 @@ runWithInfra('seeder idempotency (e2e)', () => {
   }, 60000);
 
   afterAll(async () => {
+    process.env = ENV;
+
     if (ds?.isInitialized) await ds.destroy();
 
     await dropSchema();
+  });
+
+  it('writes nothing on a pool that does not write the settings', async () => {
+    const otherRegion = DATA_REGIONS.find(
+      (region) => region !== HOME_DATA_REGION
+    );
+    const before = await counts();
+
+    process.env = { ...ENV, DATA_REGION: otherRegion };
+
+    try {
+      for (const seeder of seeders()) {
+        await expect(seeder.run(ds)).rejects.toThrow(
+          `Settings are written only on the ${HOME_DATA_REGION} pool`
+        );
+      }
+    } finally {
+      process.env = { ...ENV, DATA_REGION: HOME_DATA_REGION };
+    }
+
+    expect(await counts()).toEqual(before);
   });
 
   it('leaves the database unchanged when re-run', async () => {

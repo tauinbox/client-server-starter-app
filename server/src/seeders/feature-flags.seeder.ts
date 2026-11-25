@@ -10,6 +10,7 @@ import {
 import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { FeatureFlag } from '../modules/feature-flags/entities/feature-flag.entity';
 import { FeatureFlagRule } from '../modules/feature-flags/entities/feature-flag-rule.entity';
+import { assertSettingsWriter } from '../migration-sets';
 
 type FlagSeed = {
   key: string;
@@ -104,6 +105,7 @@ export default class FeatureFlagsSeeder extends Seeder {
   // seeded only for flags created by this run — an existing flag whose rule an
   // admin deleted must not have it resurrected.
   async run(dataSource: DataSource): Promise<void> {
+    assertSettingsWriter();
     const flagRepo = dataSource.getRepository(FeatureFlag);
     const ruleRepo = dataSource.getRepository(FeatureFlagRule);
 

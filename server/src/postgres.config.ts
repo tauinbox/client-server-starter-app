@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { DataSourceOptions, LoggerOptions } from 'typeorm';
 import { loadExportedClasses } from './load-exported-classes';
@@ -46,12 +47,31 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
   migrationsRun: false, // automatically run migrations on startup
   synchronize: false, // always false — run 'npm run build && npm run migrations:run' manually
   entities: loadEntities(),
-  migrations: loadExportedClasses(
-    join(__dirname, 'migrations'),
-    MIGRATION_FILE
-  ),
+  migrations: regionalMigrations(),
   applicationName: 'Starter Project'
 });
+
+/**
+ * The migrations of the regional data source: the frozen history in
+ * `migrations/` (written while one database held every table), then
+ * `migrations/regional/`.
+ */
+export function regionalMigrations(): NewableFunction[] {
+  return [...loadMigrations(''), ...loadMigrations('regional')];
+}
+
+/** The migrations of the settings data source, `migrations/settings/`. */
+export function settingsMigrations(): NewableFunction[] {
+  return loadMigrations('settings');
+}
+
+// The build has no folder for a set with no migration yet. The file name
+// pattern has no folder part, so the top level does not load a subfolder.
+function loadMigrations(subdir: string): NewableFunction[] {
+  const dir = join(__dirname, 'migrations', subdir);
+
+  return existsSync(dir) ? loadExportedClasses(dir, MIGRATION_FILE) : [];
+}
 
 /** Every entity class of `modules/`, of both data sources. */
 export function loadEntities(): NewableFunction[] {

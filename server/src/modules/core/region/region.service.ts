@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ErrorKeys,
-  HOME_DATA_REGION,
   regionForCountry,
+  writesSettings,
   type CountryCode,
   type DataRegion,
   type PeerRegions
@@ -25,7 +25,7 @@ export class RegionService {
   constructor(configService: ConfigService) {
     this.region = configService.getOrThrow<DataRegion>('DATA_REGION');
     this.peers = configService.get<PeerRegions>('PEER_REGIONS') ?? {};
-    this.writesSettings = this.region === HOME_DATA_REGION;
+    this.writesSettings = writesSettings(this.region);
   }
 
   config(): RegionConfigResponse {
