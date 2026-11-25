@@ -51,13 +51,9 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
   applicationName: 'Starter Project'
 });
 
-/**
- * The migrations of the regional data source: the frozen history in
- * `migrations/` (written while one database held every table), then
- * `migrations/regional/`.
- */
+/** The migrations of the regional data source, `migrations/regional/`. */
 export function regionalMigrations(): NewableFunction[] {
-  return [...loadMigrations(''), ...loadMigrations('regional')];
+  return loadMigrations('regional');
 }
 
 /** The migrations of the settings data source, `migrations/settings/`. */
@@ -65,12 +61,16 @@ export function settingsMigrations(): NewableFunction[] {
   return loadMigrations('settings');
 }
 
-// The build has no folder for a set with no migration yet. The file name
-// pattern has no folder part, so the top level does not load a subfolder.
-function loadMigrations(subdir: string): NewableFunction[] {
-  const dir = join(__dirname, 'migrations', subdir);
+function loadMigrations(set: 'regional' | 'settings'): NewableFunction[] {
+  const dir = join(__dirname, 'migrations', set);
 
-  return existsSync(dir) ? loadExportedClasses(dir, MIGRATION_FILE) : [];
+  if (!existsSync(dir)) {
+    throw new Error(
+      `The migrations folder of the ${set} set is missing: ${dir}`
+    );
+  }
+
+  return loadExportedClasses(dir, MIGRATION_FILE);
 }
 
 /** Every entity class of `modules/`, of both data sources. */

@@ -41,7 +41,13 @@ export async function migrateAndReport(
   sources: MigrationSources,
   region: DataRegion
 ): Promise<void> {
-  const applied = await runMigrationSets(sources, region);
+  const { applied, recorded } = await runMigrationSets(sources, region);
+
+  if (recorded.length > 0) {
+    console.log(
+      `Recorded the baselines of the frozen history with no run: ${recorded.join(', ')}`
+    );
+  }
 
   console.log(
     applied.length === 0
