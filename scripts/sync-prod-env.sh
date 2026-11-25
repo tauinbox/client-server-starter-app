@@ -60,6 +60,10 @@ fi
 upsert JWT_PRIVATE_KEY        "${JWT_PRIVATE_KEY:-}"        "$SERVER_ENV"
 upsert JWT_PUBLIC_KEY         "${JWT_PUBLIC_KEY:-}"         "$SERVER_ENV"
 upsert DB_PASSWORD            "${DB_PASSWORD:-}"            "$SERVER_ENV"
+# The passwords of the login roles of the server. The boot steps set them on
+# each start, so a change of the secret takes effect on the next deploy.
+upsert DB_REGIONAL_PASSWORD   "${DB_REGIONAL_PASSWORD:-}"   "$SERVER_ENV"
+upsert DB_SETTINGS_PASSWORD   "${DB_SETTINGS_PASSWORD:-}"   "$SERVER_ENV"
 upsert GOOGLE_CLIENT_SECRET   "${GOOGLE_CLIENT_SECRET:-}"   "$SERVER_ENV"
 upsert FACEBOOK_CLIENT_SECRET "${FACEBOOK_CLIENT_SECRET:-}" "$SERVER_ENV"
 upsert VK_CLIENT_SECRET       "${VK_CLIENT_SECRET:-}"       "$SERVER_ENV"

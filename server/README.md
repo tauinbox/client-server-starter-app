@@ -109,9 +109,11 @@ Copy `.env.example` to `.env`, and then configure it:
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `my-db` | Database name |
-| `DB_USER` | `postgres` | Database user |
-| `DB_PASSWORD` | `password` | Database password |
-| `DB_SCHEMA` | `public` | Database schema |
+| `DB_USER` | `postgres` | The administrator login of the database. Only the boot steps use it: the migrations, the seeders and the roles below |
+| `DB_PASSWORD` | `password` | The password of `DB_USER`. The container entrypoint starts the server without it |
+| `DB_REGIONAL_PASSWORD` | `regional-password` | Necessary. The password of the login role `app_regional` of the regional data source, which reads and writes only the regional schema. The boot steps (and `npm run migrations:run`) create the role and set the password |
+| `DB_SETTINGS_PASSWORD` | `settings-password` | Necessary. The password of the login role `app_settings` of the settings data source, which reads and writes only the `settings` schema |
+| `DB_SCHEMA` | `public` | The schema of the regional tables. The settings tables are in the `settings` schema |
 | `DB_LOGGING` | `["warn","error","slow"]` | TypeORM logging levels. The value `"slow"` logs a query that takes more than `DB_SLOW_QUERY_THRESHOLD` |
 | `DB_SLOW_QUERY_THRESHOLD` | `200` | Slow query threshold in milliseconds |
 | `DB_LOGGER` | - | TypeORM logger type, for example `advanced-console` or `file`. A value replaces the default logger |

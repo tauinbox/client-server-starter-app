@@ -21,6 +21,8 @@ import { waitsOnLock } from './lock-wait';
 import { waitUntil } from './eventually';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { isSharedCache } from '../src/common/utils/redis-client';
+import { SETTINGS_SCHEMA, sourceSchema } from '../src/database-roles';
+import { withAdminDataSource } from './admin-data-source';
 
 // The settings change log on real Postgres: the triggers, the order of the
 // versions, the apply after a write and after a direct SQL write, and the
@@ -68,6 +70,7 @@ runWithInfra('Settings change log (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settings: DataSource;
   let roleService: RoleService;
   let permissionService: PermissionService;
   let settingsChangeLog: SettingsChangeLogService;
@@ -76,6 +79,7 @@ runWithInfra('Settings change log (e2e)', () => {
   beforeAll(async () => {
     app = await bootApp();
     dataSource = app.get(DataSource);
+    settings = settingsDataSourceOf(app);
     roleService = app.get(RoleService);
     permissionService = app.get(PermissionService);
     settingsChangeLog = app.get(SettingsChangeLogService);
@@ -97,7 +101,7 @@ runWithInfra('Settings change log (e2e)', () => {
 
     if (dataSource) {
       await dataSource.getRepository(User).delete({ email });
-      await dataSource.query(`DELETE FROM "roles" WHERE "name" LIKE $1`, [
+      await settings.query(`DELETE FROM "roles" WHERE "name" LIKE $1`, [
         `${tag}%`
       ]);
     }
@@ -122,7 +126,8 @@ runWithInfra('Settings change log (e2e)', () => {
   }
 
   it('has a row trigger and a TRUNCATE trigger on each settings table and on no other table', async () => {
-    const rows = await dataSource.query<
+    // Both schemas: a regional table must have no trigger of the log.
+    const rows = await settings.query<
       Array<{ table_name: string; trigger_name: string }>
     >(
       `SELECT c.relname AS table_name, t.tgname AS trigger_name
@@ -130,8 +135,9 @@ runWithInfra('Settings change log (e2e)', () => {
        JOIN pg_class c ON c.oid = t.tgrelid
        JOIN pg_namespace n ON n.oid = c.relnamespace
        WHERE NOT t.tgisinternal
-         AND n.nspname = current_schema()
-         AND pg_get_triggerdef(t.oid) LIKE '%settings_change_log_write%'`
+         AND n.nspname IN ($1, $2)
+         AND pg_get_triggerdef(t.oid) LIKE '%settings_change_log_write%'`,
+      [SETTINGS_SCHEMA, sourceSchema(dataSource)]
     );
     const triggersOf = (kind: string) =>
       rows
@@ -155,80 +161,83 @@ runWithInfra('Settings change log (e2e)', () => {
     );
 
     expect(
-      (await entriesFor(dataSource, { table: 'roles', key: role.id })).map(
+      (await entriesFor(settings, { table: 'roles', key: role.id })).map(
         ({ operation }) => operation
       )
     ).toEqual(['INSERT']);
 
-    await dataSource.query(
+    await settings.query(
       `UPDATE "roles" SET "description" = "description" WHERE "id" = $1`,
       [role.id]
     );
-    await dataSource.query(
+    await settings.query(
       `UPDATE "roles" SET "updated_at" = now() WHERE "id" = $1`,
       [role.id]
     );
     expect(
-      await entriesFor(dataSource, { table: 'roles', key: role.id })
+      await entriesFor(settings, { table: 'roles', key: role.id })
     ).toHaveLength(1);
 
-    await dataSource.query(
+    await settings.query(
       `UPDATE "roles" SET "description" = 'changed' WHERE "id" = $1`,
       [role.id]
     );
     expect(
-      (await entriesFor(dataSource, { table: 'roles', key: role.id })).map(
+      (await entriesFor(settings, { table: 'roles', key: role.id })).map(
         ({ operation }) => operation
       )
     ).toEqual(['INSERT', 'UPDATE']);
   });
 
-  it('orders the versions by commit: a write waits for the log lock of an open settings write', async () => {
-    const first = dataSource.createQueryRunner();
-    const second = dataSource.createQueryRunner();
+  // Two direct SQL writers and a watcher: more connections than the settings
+  // pool of the app holds, so they use the administrator login.
+  it('orders the versions by commit: a write waits for the log lock of an open settings write', () =>
+    withAdminDataSource(async (admin) => {
+      const first = admin.createQueryRunner();
+      const second = admin.createQueryRunner();
 
-    await first.connect();
-    await second.connect();
+      await first.connect();
+      await second.connect();
 
-    try {
-      await first.startTransaction();
-      await lockSettingsLog(first.manager);
-      await first.query(
-        `INSERT INTO "roles" ("name", "is_system", "is_super") VALUES ($1, false, false)`,
-        [`${tag}-first`]
-      );
+      try {
+        await first.startTransaction();
+        await lockSettingsLog(first.manager);
+        await first.query(
+          `INSERT INTO "roles" ("name", "is_system", "is_super") VALUES ($1, false, false)`,
+          [`${tag}-first`]
+        );
 
-      // A direct SQL write: only the trigger takes the lock.
-      const secondInsert = second.query(
-        `INSERT INTO "roles" ("name", "is_system", "is_super") VALUES ($1, false, false)`,
-        [`${tag}-second`]
-      );
+        // A direct SQL write: only the trigger takes the lock.
+        const secondInsert = second.query(
+          `INSERT INTO "roles" ("name", "is_system", "is_super") VALUES ($1, false, false)`,
+          [`${tag}-second`]
+        );
 
-      expect(await waitsOnLock(dataSource, '%INSERT INTO "roles"%')).toBe(true);
-      await first.commitTransaction();
-      await secondInsert;
+        expect(await waitsOnLock(admin, '%INSERT INTO "roles"%')).toBe(true);
+        await first.commitTransaction();
+        await secondInsert;
 
-      const versions = await dataSource.query<
-        Array<{ name: string; version: string }>
-      >(
-        `SELECT r."name", l."version" FROM "settings_change_log" l
+        const versions = await admin.query<
+          Array<{ name: string; version: string }>
+        >(
+          `SELECT r."name", l."version" FROM "settings_change_log" l
          JOIN "roles" r ON l."keys" @> to_jsonb(ARRAY[r."id"::text])
          WHERE l."table_name" = 'roles' AND r."name" = ANY($1)
          ORDER BY l."version"`,
-        [[`${tag}-first`, `${tag}-second`]]
-      );
+          [[`${tag}-first`, `${tag}-second`]]
+        );
 
-      expect(versions.map(({ name }) => name)).toEqual([
-        `${tag}-first`,
-        `${tag}-second`
-      ]);
-    } finally {
-      if (first.isTransactionActive) await first.rollbackTransaction();
+        expect(versions.map(({ name }) => name)).toEqual([
+          `${tag}-first`,
+          `${tag}-second`
+        ]);
+      } finally {
+        if (first.isTransactionActive) await first.rollbackTransaction();
 
-      await first.release();
-      await second.release();
-    }
-  });
+        await first.release();
+        await second.release();
+      }
+    }));
 
   async function heldRole(suffix: string): Promise<string> {
     const role = await roleService.create(
@@ -310,7 +319,7 @@ runWithInfra('Settings change log (e2e)', () => {
     const before = await permissionService.getPermissionsForUser(holder.id);
     const readRole = await permissionId('read', 'Role');
 
-    await dataSource.query(
+    await settings.query(
       `INSERT INTO "role_permissions" ("role_id", "permission_id") VALUES ($1, $2)`,
       [role.id, readRole]
     );
@@ -346,23 +355,18 @@ runWithInfra('Settings change log (e2e)', () => {
       (await permissionService.getRolesForUser(holder.id)).map((r) => r.name)
     ).toContain(`${tag}-restored`);
 
-    // A row that a restored dump brings back: written with no log entry.
-    const runner = dataSource.createQueryRunner();
-
-    await runner.connect();
-
-    try {
-      await runner.query(`SET session_replication_role = replica`);
-      await runner.query(`UPDATE "roles" SET "name" = $1 WHERE "id" = $2`, [
-        `${tag}-from-dump`,
-        role.id
-      ]);
-    } finally {
-      await runner.query(`SET session_replication_role = DEFAULT`);
-      await runner.release();
-    }
-
-    await dataSource.query(RENEW_EPOCH_SQL);
+    // A row that a restored dump brings back: written with no log entry. Only
+    // the administrator, who runs the restore, can turn the triggers off.
+    await withAdminDataSource(async (admin) => {
+      await admin.transaction(async (em) => {
+        await em.query(`SET LOCAL session_replication_role = replica`);
+        await em.query(`UPDATE "roles" SET "name" = $1 WHERE "id" = $2`, [
+          `${tag}-from-dump`,
+          role.id
+        ]);
+      });
+      await admin.query(RENEW_EPOCH_SQL);
+    });
 
     // Any node of the pool can take the rebase; the cache is shared.
     const names = await waitUntil(
@@ -402,7 +406,7 @@ runWithRedis('Settings change log with the cache in Redis (e2e)', () => {
 
   it('applies on the connection of the pool lock, so waiters that hold every other connection cannot starve it', async () => {
     const settingsChangeLog = app.get(SettingsChangeLogService);
-    const dataSource = app.get(DataSource);
+    const dataSource = settingsDataSourceOf(app);
     const tag = `settings-log-redis-${Date.now()}`;
 
     try {

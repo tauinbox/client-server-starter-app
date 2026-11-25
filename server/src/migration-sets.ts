@@ -9,6 +9,12 @@ import {
   BASELINE_MIGRATIONS,
   FROZEN_MIGRATIONS
 } from './frozen-migration-history';
+import {
+  FROZEN_HISTORY_SCHEMA,
+  prepareSettingsSchema,
+  SETTINGS_SCHEMA,
+  sourceSchema
+} from './database-roles';
 import { postgresConfig, settingsMigrations } from './postgres.config';
 
 /**
@@ -25,15 +31,21 @@ export interface MigrationSources {
 }
 
 /**
- * The options of the data source that runs the settings set. Both sets point
- * at one database until the settings move to their own database.
+ * The options of the data source that runs the settings set, on the login of
+ * the administrator. Both sets point at one database until the settings move
+ * to their own database. A new settings table goes into the settings schema;
+ * `public` stays on the path for the functions of the extensions.
  */
 export function settingsMigrationOptions(): ReturnType<typeof postgresConfig> {
   return {
     ...postgresConfig(),
+    schema: SETTINGS_SCHEMA,
     entities: [],
     migrations: settingsMigrations(),
-    migrationsTableName: SETTINGS_MIGRATIONS_TABLE
+    migrationsTableName: SETTINGS_MIGRATIONS_TABLE,
+    extra: {
+      options: `-c search_path=${SETTINGS_SCHEMA},${FROZEN_HISTORY_SCHEMA}`
+    }
   };
 }
 
@@ -72,15 +84,18 @@ export interface MigrationSetsResult {
 }
 
 /**
- * Records the baselines, then runs the regional set, then the settings set on
- * the home pool only, then refuses a settings schema that is older than this
- * build. A non-home pool reads the settings schema that the home pool
- * migrated, so the home pool deploys first.
+ * Prepares the settings schema, records the baselines, then runs the
+ * regional set, then the settings set on the home pool only, then refuses a
+ * settings schema that is older than this build. A non-home pool reads the
+ * settings schema that the home pool migrated, so the home pool deploys
+ * first.
  */
 export async function runMigrationSets(
   sources: MigrationSources,
   region: DataRegion
 ): Promise<MigrationSetsResult> {
+  await prepareSettingsSchema(sources.settings, SETTINGS_MIGRATIONS_TABLE);
+
   const recorded = await recordFrozenHistoryBaselines(sources, region);
   const applied = await sources.regional.runMigrations();
 
@@ -175,12 +190,7 @@ export async function assertSettingsSchemaCurrent(
 
   if (needed.length === 0) return;
 
-  const { options } = settings;
-  const schema = 'schema' in options ? options.schema : undefined;
-  const table = [schema, options.migrationsTableName ?? 'migrations']
-    .filter(Boolean)
-    .map((part) => `"${part}"`)
-    .join('.');
+  const table = `"${sourceSchema(settings)}"."${settings.options.migrationsTableName ?? 'migrations'}"`;
   const [{ found }] = await settings.query<Array<{ found: string | null }>>(
     'SELECT to_regclass($1) AS "found"',
     [table]

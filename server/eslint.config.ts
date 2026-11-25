@@ -13,9 +13,17 @@ type RestrictedSyntax = { selector: string; message: string };
 
 // Flat config replaces rule options, so the base selectors are re-added.
 const [, ...baseRestrictedSyntax] = baseRules['no-restricted-syntax'];
+// synchronize changes every schema that an entity names, the settings schema
+// of a shared database included, and drops each index that no entity declares.
+const synchronizeSyntax: RestrictedSyntax = {
+  selector: "Property[key.name='synchronize'][value.value=true]",
+  message:
+    'Change the schema with a migration. A test that needs synchronize runs it on a database of its own: disable this line and name that database.'
+};
 const restrictedSyntax: RestrictedSyntax[] = [
   ...baseRestrictedSyntax,
   errorKeyLiteralSyntax,
+  synchronizeSyntax,
   {
     selector: "CallExpression[callee.name='forwardRef']",
     message:
@@ -200,7 +208,8 @@ export default defineConfig(
         'error',
         ...baseRestrictedSyntax,
         errorKeyLiteralSyntax,
-        ...isolatedConfigSyntax
+        ...isolatedConfigSyntax,
+        synchronizeSyntax
       ]
     }
   },

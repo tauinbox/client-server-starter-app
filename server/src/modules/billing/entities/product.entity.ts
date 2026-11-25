@@ -12,8 +12,9 @@ import type {
   ProductPrice,
   ProductType
 } from '@app/shared/types';
+import { SETTINGS_SCHEMA } from '../../../database-roles';
 
-@Entity('billing_products')
+@Entity({ name: 'billing_products', schema: SETTINGS_SCHEMA })
 @Unique('UQ_billing_products_key', ['key'])
 export class Product {
   @PrimaryGeneratedColumn('uuid')

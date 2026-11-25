@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { DataSourceOptions, LoggerOptions } from 'typeorm';
+import { SETTINGS_SCHEMA } from './database-roles';
 import { loadExportedClasses } from './load-exported-classes';
 
 const ENTITY_FILE = /\.entity\.(ts|js)$/;
@@ -44,6 +45,12 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
   maxQueryExecutionTime: process.env['DB_SLOW_QUERY_THRESHOLD']
     ? Number(process.env['DB_SLOW_QUERY_THRESHOLD'])
     : undefined,
+  // The login of the administrator (migrations, seeders, tests) reads both
+  // schemas. The server replaces `extra` and logs in with the role of each
+  // data source, whose search path is its own schema only.
+  extra: {
+    options: `-c search_path=${process.env['DB_SCHEMA'] || localConfig.schema},${SETTINGS_SCHEMA}`
+  },
   migrationsRun: false, // automatically run migrations on startup
   synchronize: false, // always false — run 'npm run build && npm run migrations:run' manually
   entities: loadEntities(),

@@ -185,8 +185,11 @@ export const configValidationSchema = Joi.object({
   DB_HOST: Joi.string().required(),
   DB_PORT: Joi.number().default(5432),
   DB_NAME: Joi.string().required(),
-  DB_USER: Joi.string().required(),
-  DB_PASSWORD: Joi.string().required(),
+  // The server logs in with the role of each data source. DB_USER and
+  // DB_PASSWORD are the administrator login of the boot steps only: the
+  // entrypoint starts the server without DB_PASSWORD.
+  DB_REGIONAL_PASSWORD: Joi.string().required(),
+  DB_SETTINGS_PASSWORD: Joi.string().required(),
   JWT_ALGORITHM: Joi.string().valid('HS256', 'RS256').default('HS256'),
   JWT_SECRET: Joi.string().when('JWT_ALGORITHM', {
     is: 'RS256',

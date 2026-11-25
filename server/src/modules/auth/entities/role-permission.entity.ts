@@ -9,8 +9,9 @@ import {
 import { Role } from './role.entity';
 import { Permission } from './permission.entity';
 import { PermissionCondition } from '@app/shared/types';
+import { SETTINGS_SCHEMA } from '../../../database-roles';
 
-@Entity('role_permissions')
+@Entity({ name: 'role_permissions', schema: SETTINGS_SCHEMA })
 @Unique('UQ_role_permissions_role_permission', ['roleId', 'permissionId'])
 export class RolePermission {
   @PrimaryGeneratedColumn('uuid')

@@ -5,9 +5,10 @@ import {
   OneToMany,
   PrimaryGeneratedColumn
 } from 'typeorm';
+import { SETTINGS_SCHEMA } from '../../../database-roles';
 import { Permission } from './permission.entity';
 
-@Entity('resources')
+@Entity({ name: 'resources', schema: SETTINGS_SCHEMA })
 export class Resource {
   @PrimaryGeneratedColumn('uuid')
   id: string;

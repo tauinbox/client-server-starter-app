@@ -12,6 +12,8 @@ import {
 } from '../src/migration-sets';
 import { RegionalBaseline1795600000000 } from '../src/migrations/regional/1795600000000-regional-baseline';
 import { SettingsBaseline1795600000000 } from '../src/migrations/settings/1795600000000-settings-baseline';
+import { FROZEN_HISTORY_SCHEMA, SETTINGS_SCHEMA } from '../src/database-roles';
+import { migrateAndReport } from '../src/run-boot-steps';
 import { postgresConfig } from '../src/postgres.config';
 import { catalogDigest, describeSchema } from './schema-catalog';
 
@@ -120,6 +122,13 @@ runWithInfra('the baselines of the two migration sets (e2e)', () => {
   const probe = { database: PROBE_DATABASE, logging: false } as const;
   const regionalOptions = { ...postgresConfig(), ...probe };
   const settingsOptions = { ...settingsMigrationOptions(), ...probe };
+  // The frozen history kept every table, its migrations table included, in
+  // one schema.
+  const oneSchemaSettingsOptions = {
+    ...settingsOptions,
+    schema: FROZEN_HISTORY_SCHEMA,
+    extra: { options: `-c search_path=${FROZEN_HISTORY_SCHEMA}` }
+  };
 
   let admin: DataSource;
   let sources: MigrationSources;
@@ -169,6 +178,26 @@ runWithInfra('the baselines of the two migration sets (e2e)', () => {
     return rows.map(({ name }) => name);
   }
 
+  it('stops the migration step before the first migration when a role password is missing', async () => {
+    await expect(
+      migrateAndReport(sources, HOME_DATA_REGION, {
+        DB_SETTINGS_PASSWORD: 'settings-password'
+      })
+    ).rejects.toThrow('DB_REGIONAL_PASSWORD must be set');
+
+    const [{ migrations, settings }] = await sources.regional.query<
+      Array<{ migrations: string | null; settings: string | null }>
+    >(
+      `SELECT to_regclass('"migrations"') AS "migrations",
+              to_regnamespace('${SETTINGS_SCHEMA}') AS "settings"`
+    );
+
+    expect({ migrations, settings }).toEqual({
+      migrations: null,
+      settings: null
+    });
+  });
+
   it('builds the schema and the rows of the frozen history', async () => {
     const migrate = async (
       options: typeof regionalOptions,
@@ -186,12 +215,81 @@ runWithInfra('the baselines of the two migration sets (e2e)', () => {
     };
 
     await migrate(regionalOptions, RegionalBaseline1795600000000);
-    await migrate(settingsOptions, SettingsBaseline1795600000000);
+    await migrate(oneSchemaSettingsOptions, SettingsBaseline1795600000000);
 
     expect(catalogDigest(await describeSchema(sources.regional))).toEqual(
       FROZEN_HISTORY_DIGEST
     );
   }, 60000);
+
+  it('gives a database of one schema the same two schemas as a new database', async () => {
+    const databases = [`${PROBE_DATABASE}_moved`, `${PROBE_DATABASE}_new`];
+    const open = (database: string) => ({
+      regional: new DataSource({ ...regionalOptions, database }),
+      settings: new DataSource({ ...settingsOptions, database })
+    });
+    const catalogs: Array<{
+      regional: Record<string, string>;
+      settings: Record<string, string>;
+    }> = [];
+
+    try {
+      for (const database of databases) {
+        await admin.query(`CREATE DATABASE "${database}"`);
+      }
+
+      // The schema that the frozen history left: every table in one schema.
+      const oneSchema = new DataSource({
+        ...oneSchemaSettingsOptions,
+        database: databases[0]
+      });
+      const historyRegional = new DataSource({
+        ...regionalOptions,
+        database: databases[0]
+      });
+
+      for (const [source, migration] of [
+        [historyRegional, RegionalBaseline1795600000000],
+        [oneSchema, SettingsBaseline1795600000000]
+      ] as const) {
+        const only = new DataSource({
+          ...source.options,
+          migrations: [migration]
+        });
+
+        await only.initialize();
+        await only.runMigrations();
+        await only.destroy();
+      }
+
+      for (const database of databases) {
+        const pair = open(database);
+
+        await pair.regional.initialize();
+        await pair.settings.initialize();
+
+        try {
+          await runMigrationSets(pair, HOME_DATA_REGION);
+          catalogs.push({
+            regional: catalogDigest(await describeSchema(pair.regional)),
+            settings: catalogDigest(await describeSchema(pair.settings))
+          });
+        } finally {
+          await pair.settings.destroy();
+          await pair.regional.destroy();
+        }
+      }
+    } finally {
+      for (const database of databases) {
+        await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
+      }
+    }
+
+    const [moved, created] = catalogs;
+
+    expect(moved.settings['table names']).toBeDefined();
+    expect(moved).toEqual(created);
+  }, 120000);
 
   it('records both baselines with no run on the home pool of a database of the frozen history, once', async () => {
     await leaveFrozenHistory(FROZEN_MIGRATIONS);

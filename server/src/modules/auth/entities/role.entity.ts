@@ -7,9 +7,10 @@ import {
   UpdateDateColumn
 } from 'typeorm';
 import { Expose } from 'class-transformer';
+import { SETTINGS_SCHEMA } from '../../../database-roles';
 import { RolePermission } from './role-permission.entity';
 
-@Entity('roles')
+@Entity({ name: 'roles', schema: SETTINGS_SCHEMA })
 export class Role {
   @PrimaryGeneratedColumn('uuid')
   id: string;

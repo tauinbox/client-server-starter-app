@@ -140,7 +140,7 @@ flowchart LR
   b_server_ctx -->|"COPY server/docker-entrypoint.sh"| b_server_runner
   b_server_image["image of service server<br/>compose: ${SERVER_IMAGE:-nexus-server:latest}<br/>pushed to ghcr.io/#lt;OWNER#gt;/nexus-server<br/>runs as node"]
   b_server_runner --> b_server_image
-  b_server_image_entry["entrypoint at container start<br/>1. node dist/server/src/run-boot-steps.js<br/>2. exec node dist/server/src/main"]
+  b_server_image_entry["entrypoint at container start<br/>1. node dist/server/src/run-boot-steps.js<br/>2. exec env -u DB_PASSWORD node dist/server/src/main"]
   b_server_image -.-> b_server_image_entry
   b_client_ctx[/"build context .<br/>Dockerfile client/Dockerfile"/]
   subgraph b_client["client/Dockerfile"]

@@ -8,9 +8,10 @@ import {
 } from 'typeorm';
 import type { FeatureFlagRuleEffect } from '@app/shared/constants';
 import type { FeatureFlagRulePayload } from '@app/shared/types';
+import { SETTINGS_SCHEMA } from '../../../database-roles';
 import { FeatureFlag } from './feature-flag.entity';
 
-@Entity('feature_flag_rules')
+@Entity({ name: 'feature_flag_rules', schema: SETTINGS_SCHEMA })
 export class FeatureFlagRule {
   @PrimaryGeneratedColumn('uuid')
   id: string;

@@ -11,8 +11,9 @@ import {
 import { RolePermission } from './role-permission.entity';
 import { Resource } from './resource.entity';
 import { Action } from './action.entity';
+import { SETTINGS_SCHEMA } from '../../../database-roles';
 
-@Entity('permissions')
+@Entity({ name: 'permissions', schema: SETTINGS_SCHEMA })
 @Unique('UQ_permissions_resource_action', ['resourceId', 'actionId'])
 export class Permission {
   @PrimaryGeneratedColumn('uuid')

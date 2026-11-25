@@ -5,6 +5,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource, QueryRunner } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';
+import { postgresConfig } from '../src/postgres.config';
 import { RefreshTokenService } from '../src/modules/auth/services/refresh-token.service';
 import { RefreshToken } from '../src/modules/auth/entities/refresh-token.entity';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -22,6 +23,7 @@ const SQL = readFileSync(
 runWithInfra('The restore ends the sessions of the dump (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let admin: DataSource | undefined;
   let runner: QueryRunner;
   const schema = `restore_probe_${randomUUID().replaceAll('-', '')}`;
   const stamp = Date.now();
@@ -84,7 +86,15 @@ runWithInfra('The restore ends the sessions of the dump (e2e)', () => {
       });
     }
 
-    runner = dataSource.createQueryRunner();
+    // The restore runs as the administrator of the database, as here.
+    admin = new DataSource({
+      ...postgresConfig(),
+      entities: [],
+      migrations: [],
+      logging: false
+    });
+    await admin.initialize();
+    runner = admin.createQueryRunner();
     await runner.connect();
     await runner.query(`create schema "${schema}"`);
     await runner.query(
@@ -109,6 +119,8 @@ runWithInfra('The restore ends the sessions of the dump (e2e)', () => {
       await runner.query(`drop schema if exists "${schema}" cascade`);
       await runner.release();
     }
+
+    await admin?.destroy();
 
     await dataSource
       ?.getRepository(User)

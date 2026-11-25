@@ -196,7 +196,7 @@ runWithInfra('Role writes against a concurrent grant change (e2e)', () => {
   }
 
   async function denyCount(roleId: string): Promise<number> {
-    const rows: { n: number }[] = await dataSource.query(
+    const rows: { n: number }[] = await settingsDataSource.query(
       "SELECT count(*)::int AS n FROM role_permissions WHERE role_id = $1 AND conditions->>'effect' = 'deny'",
       [roleId]
     );
