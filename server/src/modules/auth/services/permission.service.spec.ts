@@ -2,6 +2,8 @@ import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { repositoryToken } from '../../../common/testing/repository-token';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { PermissionService } from './permission.service';
 import { User } from '../../users/entities/user.entity';
 import { MetricsService } from '../../core/metrics/metrics.service';
@@ -16,6 +18,8 @@ jest.mock('../../users/utils/user-roles', () =>
 );
 
 describe('PermissionService', () => {
+  // The roles are read on the settings data source; the double reads none.
+  const settingsManager = {};
   let service: PermissionService;
   let mockUserRepository: {
     findOne: jest.Mock;
@@ -95,6 +99,10 @@ describe('PermissionService', () => {
         {
           provide: repositoryToken(User),
           useValue: mockUserRepository
+        },
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: { manager: settingsManager }
         },
         {
           provide: CACHE_MANAGER,
@@ -178,7 +186,7 @@ describe('PermissionService', () => {
         }
       ]);
       expect(attachRoles).toHaveBeenCalledWith(
-        mockUserRepository.manager,
+        { regional: mockUserRepository.manager, settings: settingsManager },
         [mockUser],
         { rolePermissions: { permission: { resource: true, action: true } } }
       );

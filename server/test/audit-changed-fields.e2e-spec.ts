@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { versionEtag } from '@app/shared/utils/if-match';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -31,6 +32,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let token: string;
   const stamp = Date.now();
   const adminEmail = `audit-fields-admin-${stamp}@example.com`;
@@ -57,6 +59,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
 
     for (const email of [adminEmail, targetEmail]) {
       await request(http())
@@ -65,7 +68,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
         .expect(201);
     }
 
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     const usersService = app.get(UsersService);
@@ -86,13 +89,17 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
 
   afterAll(async () => {
     if (resourceRestore) {
-      await dataSource?.getRepository(Resource).update(resourceRestore.id, {
-        description: resourceRestore.description
-      });
+      await settingsDataSource
+        ?.getRepository(Resource)
+        .update(resourceRestore.id, {
+          description: resourceRestore.description
+        });
     }
 
-    await dataSource?.getRepository(FeatureFlag).delete({ key: flagKey });
-    await dataSource?.getRepository(Role).delete({ name: roleName });
+    await settingsDataSource
+      ?.getRepository(FeatureFlag)
+      .delete({ key: flagKey });
+    await settingsDataSource?.getRepository(Role).delete({ name: roleName });
     await dataSource
       ?.getRepository(User)
       .delete([{ email: adminEmail }, { email: targetEmail }]);
@@ -187,7 +194,7 @@ runWithInfra('Audit changedFields of the admin edit routes (e2e)', () => {
   });
 
   it('resource: a resubmit logs [] and a description edit logs ["description"]', async () => {
-    const resource = await dataSource
+    const resource = await settingsDataSource
       .getRepository(Resource)
       .findOneByOrFail({ name: 'users' });
 

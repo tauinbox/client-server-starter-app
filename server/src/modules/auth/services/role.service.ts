@@ -4,8 +4,10 @@ import {
   InternalServerErrorException,
   Logger
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE, inBothSources } from '../../../data-sources';
+import type { SourceManagers } from '../../../data-sources';
 import { subject } from '@casl/ability';
 import { Role } from '../entities/role.entity';
 import { ApiError } from '../../../common/errors/api-error';
@@ -81,12 +83,15 @@ export class RoleService {
   private readonly logger = new Logger(RoleService.name);
 
   constructor(
-    @InjectRepository(Role)
+    @InjectRepository(Role, SETTINGS_DATA_SOURCE)
     private readonly roleRepository: Repository<Role>,
-    @InjectRepository(Permission)
+    @InjectRepository(Permission, SETTINGS_DATA_SOURCE)
     private readonly permissionRepository: Repository<Permission>,
-    @InjectRepository(RolePermission)
+    @InjectRepository(RolePermission, SETTINGS_DATA_SOURCE)
     private readonly rolePermissionRepository: Repository<RolePermission>,
+    private readonly dataSource: DataSource,
+    @InjectDataSource(SETTINGS_DATA_SOURCE)
+    private readonly settingsDataSource: DataSource,
     private readonly permissionService: PermissionService,
     private readonly auditService: AuditService,
     private readonly accessRefusals: AccessRefusalService,
@@ -94,12 +99,29 @@ export class RoleService {
     private readonly settingsChangeLog: SettingsChangeLogService
   ) {}
 
+  get #sources(): { regional: DataSource; settings: DataSource } {
+    return { regional: this.dataSource, settings: this.settingsDataSource };
+  }
+
+  /** The managers for a read outside a transaction. */
+  get #managers(): SourceManagers {
+    return {
+      regional: this.dataSource.manager,
+      settings: this.settingsDataSource.manager
+    };
+  }
+
+  /**
+   * Reads on `manager`, so a check inside a transaction takes no second
+   * connection of the settings pool.
+   */
   private async resolveGrantItems(
+    manager: EntityManager,
     items: GrantItem[]
   ): Promise<GrantScopeItem[]> {
     if (items.length === 0) return [];
 
-    const permissions = await this.permissionRepository.find({
+    const permissions = await manager.find(Permission, {
       where: items.map((i) => ({ id: i.permissionId }))
     });
     const byId = new Map(permissions.map((p) => [p.id, p]));
@@ -126,13 +148,13 @@ export class RoleService {
   private async assertGrantAllowed(
     ability: AbilityOrSystem,
     items: GrantItem[],
-    context: { actorId?: string; roleId: string }
+    context: { actorId?: string; roleId: string; manager: EntityManager }
   ): Promise<void> {
     if (ability === SYSTEM_ABILITY) return;
 
     // Resolve before the super bypass so unknown permission ids fail with a
     // clean `UNKNOWN_PERMISSION` for every caller, not a foreign-key error.
-    const resolved = await this.resolveGrantItems(items);
+    const resolved = await this.resolveGrantItems(context.manager, items);
 
     if (ability.can('manage', 'all')) return;
 
@@ -152,7 +174,7 @@ export class RoleService {
   private async assertDenyLiftAllowed(
     ability: AbilityOrSystem,
     rows: { permissionId: string; conditions: PermissionCondition | null }[],
-    context: { actorId?: string; roleId: string }
+    context: { actorId?: string; roleId: string; manager: EntityManager }
   ): Promise<void> {
     if (!this.isScopeChecked(ability)) return;
 
@@ -160,7 +182,7 @@ export class RoleService {
 
     if (denies.length === 0) return;
 
-    const resolved = await this.resolveGrantItems(denies);
+    const resolved = await this.resolveGrantItems(context.manager, denies);
     const refusal = liftRefusalOf(ability, resolved);
 
     if (refusal) this.refuseGrant(refusal, ability, context);
@@ -216,7 +238,8 @@ export class RoleService {
 
     await this.assertDenyLiftAllowed(ability, lifted(rows), {
       actorId,
-      roleId
+      roleId,
+      manager: em
     });
 
     return locked;
@@ -593,7 +616,7 @@ export class RoleService {
       isSuper: false
     });
 
-    return this.writeSettings(async (em, recordAudit) => {
+    return this.writeSettings(async ({ settings: em }, recordAudit) => {
       const saved = await this.saveRole(em, role);
 
       if (audit) recordAudit(audit(saved));
@@ -721,21 +744,25 @@ export class RoleService {
   }
 
   /**
-   * Runs `write` and the audit row of the change in one transaction, so a
-   * failed row rolls the write back.
+   * Runs a membership write and its audit row in one regional transaction, so
+   * a failed row rolls the write back. The role is locked in the settings
+   * transaction beside it, and stays locked until the regional commit.
    */
-  private writeAudited<T>(
-    manager: EntityManager,
-    write: (em: EntityManager) => Promise<T>,
+  private writeMembership<T>(
+    write: (managers: SourceManagers) => Promise<T>,
     audit?: AuditLogParams
   ): Promise<T> {
-    return manager.transaction(async (em) => {
-      const written = await write(em);
+    return inBothSources(
+      this.#sources,
+      { commitFirst: 'regional' },
+      async (managers) => {
+        const written = await write(managers);
 
-      if (audit) await this.auditService.log(audit, em);
+        if (audit) await this.auditService.log(audit, managers.regional);
 
-      return written;
-    });
+        return written;
+      }
+    );
   }
 
   /**
@@ -749,7 +776,7 @@ export class RoleService {
     audit?: AuditLogParams
   ): Promise<T> {
     return writeSettings(
-      this.roleRepository.manager,
+      this.#sources,
       {
         log: this.settingsChangeLog,
         audit: audit && { trail: this.auditService, draft: audit }
@@ -772,7 +799,7 @@ export class RoleService {
     }>,
     draft?: AuditLogParams
   ): Promise<T> {
-    return this.writeSettings(async (em, recordAudit) => {
+    return this.writeSettings(async ({ settings: em }, recordAudit) => {
       const change = await write(em);
 
       if (change.event) {
@@ -799,7 +826,7 @@ export class RoleService {
    * UsersService.update) - restore the account first.
    */
   private async loadRoleAssignmentTarget(userId: string): Promise<User> {
-    const targetUser = await findUserWithRoles(this.roleRepository.manager, {
+    const targetUser = await findUserWithRoles(this.#managers, {
       where: { id: userId }
     });
 
@@ -810,10 +837,10 @@ export class RoleService {
 
   /** The user is locked before the role, on every path that locks both. */
   private async lockRoleAssignmentTarget(
-    em: EntityManager,
+    managers: SourceManagers,
     userId: string
   ): Promise<User> {
-    const targetUser = await lockUserWithRoles(em, { id: userId });
+    const targetUser = await lockUserWithRoles(managers, { id: userId });
 
     if (!targetUser) throw userNotFound(userId);
 
@@ -853,7 +880,8 @@ export class RoleService {
 
     await this.assertGrantAllowed(ability, grantItems, {
       actorId,
-      roleId: role.id
+      roleId: role.id,
+      manager: em
     });
   }
 
@@ -878,23 +906,19 @@ export class RoleService {
       actorId
     });
 
-    await this.writeAudited(
-      this.roleRepository.manager,
-      async (em) => {
-        const user = await this.lockRoleAssignmentTarget(em, userId);
-        const locked = await this.lockRole(em, roleId);
+    await this.writeMembership(async (managers) => {
+      const user = await this.lockRoleAssignmentTarget(managers, userId);
+      const locked = await this.lockRole(managers.settings, roleId);
 
-        if (!locked) throw this.unknownRole();
+      if (!locked) throw this.unknownRole();
 
-        await this.assertCanAssignRole(em, ability, {
-          user,
-          role: locked,
-          actorId
-        });
-        await addUserRole(em, { userId, roleId });
-      },
-      audit
-    );
+      await this.assertCanAssignRole(managers.settings, ability, {
+        user,
+        role: locked,
+        actorId
+      });
+      await addUserRole(managers.regional, { userId, roleId });
+    }, audit);
     await this.permissionService.invalidateUserCache(userId);
   }
 
@@ -918,32 +942,28 @@ export class RoleService {
 
     // The delete is the existence check, so a concurrent removal cannot
     // pass a separate read and still audit and end the sessions twice.
-    await this.writeAudited(
-      this.roleRepository.manager,
-      async (em) => {
-        const user = await this.lockRoleAssignmentTarget(em, userId);
+    await this.writeMembership(async (managers) => {
+      const user = await this.lockRoleAssignmentTarget(managers, userId);
 
-        await this.lockRoleForLift(em, ability, {
-          roleId,
-          actorId,
-          check: (locked) => check(user, locked)
-        });
-        const { affected } = await em
-          .createQueryBuilder()
-          .delete()
-          .from('user_roles')
-          .where('user_id = :userId AND role_id = :roleId', { userId, roleId })
-          .execute();
+      await this.lockRoleForLift(managers.settings, ability, {
+        roleId,
+        actorId,
+        check: (locked) => check(user, locked)
+      });
+      const { affected } = await managers.regional
+        .createQueryBuilder()
+        .delete()
+        .from('user_roles')
+        .where('user_id = :userId AND role_id = :roleId', { userId, roleId })
+        .execute();
 
-        if (!affected) {
-          throw new ApiError(
-            ErrorKeys.ROLES.ROLE_NOT_ASSIGNED,
-            'The user does not hold this role'
-          );
-        }
-      },
-      audit
-    );
+      if (!affected) {
+        throw new ApiError(
+          ErrorKeys.ROLES.ROLE_NOT_ASSIGNED,
+          'The user does not hold this role'
+        );
+      }
+    }, audit);
     await this.permissionService.invalidateUserCache(userId);
   }
 
@@ -973,8 +993,12 @@ export class RoleService {
     // Checked here to answer early, and again on the locked row.
     check(role);
     await this.assertGrantsApplicable(role, items);
-    await this.assertGrantAllowed(ability, items, { actorId, roleId });
-    await this.writeSettings(async (em) => {
+    await this.assertGrantAllowed(ability, items, {
+      actorId,
+      roleId,
+      manager: this.roleRepository.manager
+    });
+    await this.writeSettings(async ({ settings: em }) => {
       // The lock also makes two replaces of one role run one after the
       // other: else both delete the old rows, and the second insert breaks
       // the unique index of the grant. A deny row survives a replace only
@@ -1030,7 +1054,11 @@ export class RoleService {
     }));
 
     await this.assertGrantsApplicable(role, items);
-    await this.assertGrantAllowed(ability, items, { actorId, roleId });
+    await this.assertGrantAllowed(ability, items, {
+      actorId,
+      roleId,
+      manager: this.roleRepository.manager
+    });
     const rolePermissions = permissionIds.map((permissionId) =>
       this.rolePermissionRepository.create({
         roleId,
@@ -1039,7 +1067,7 @@ export class RoleService {
       })
     );
 
-    await this.writeSettings(async (em) => {
+    await this.writeSettings(async ({ settings: em }) => {
       // An add lifts no stored row.
       await this.lockRoleForLift(em, ability, {
         roleId,
@@ -1061,7 +1089,7 @@ export class RoleService {
 
     // Checked here to answer early, and again on the locked row.
     check(await this.loadRole(roleId));
-    await this.writeSettings(async (em) => {
+    await this.writeSettings(async ({ settings: em }) => {
       await this.lockRoleForLift(em, ability, {
         roleId,
         actorId,

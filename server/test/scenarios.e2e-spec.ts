@@ -239,13 +239,13 @@ runWithInfra('Request scenarios (e2e)', () => {
     refreshCookieName = secure ? '__Host-refresh_token' : 'refresh_token';
     oauthDataCookieName = secure ? '__Host-oauth_data' : 'oauth_data';
     oauthSignupCookieName = secure ? '__Host-oauth_signup' : 'oauth_signup';
-    const roles = dataSource.getRepository(Role);
+    const roles = settingsDataSource.getRepository(Role);
 
     userRole = await roles.findOneByOrFail({ name: 'user' });
     superRole = await roles.findOneByOrFail({ isSuper: true });
     // The resource sync of the bootstrap creates it, also on CI.
     permissionId = (
-      await dataSource.getRepository(Permission).findOneOrFail({
+      await settingsDataSource.getRepository(Permission).findOneOrFail({
         where: { resource: { name: 'roles' }, action: { name: 'read' } }
       })
     ).id;
@@ -353,19 +353,19 @@ runWithInfra('Request scenarios (e2e)', () => {
           .execute();
       }
 
-      await dataSource
+      await settingsDataSource
         .getRepository(Role)
         .createQueryBuilder()
         .delete()
         .where('name LIKE :prefix', { prefix: `${emailPrefix}%` })
         .execute();
-      await dataSource
+      await settingsDataSource
         .getRepository(Resource)
         .createQueryBuilder()
         .delete()
         .where('name LIKE :prefix', { prefix: `${emailPrefix}%` })
         .execute();
-      await dataSource
+      await settingsDataSource
         .getRepository(FeatureFlag)
         .createQueryBuilder()
         .delete()
@@ -653,14 +653,14 @@ runWithInfra('Request scenarios (e2e)', () => {
         .update(ctx.actor!.user.id, { residenceCountry: 'DE' });
     },
     'custom-role': async (ctx) => {
-      const role = await dataSource
+      const role = await settingsDataSource
         .getRepository(Role)
         .save({ name: ctx.values.$roleName!, description: null });
 
       ctx.values.$roleId = role.id;
     },
     'role-permission': async (ctx) => {
-      await dataSource.getRepository(RolePermission).save({
+      await settingsDataSource.getRepository(RolePermission).save({
         roleId: ctx.values.$roleId!,
         permissionId,
         conditions: null
@@ -675,7 +675,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     resource: async (ctx) => {
       sequence += 1;
       const name = `${emailPrefix}resource-${sequence}`;
-      const resource = await dataSource.getRepository(Resource).save({
+      const resource = await settingsDataSource.getRepository(Resource).save({
         name,
         subject: `Scenario${stamp.replaceAll(/\W/g, '')}R${sequence}`,
         displayName: 'Scenario resource',
@@ -690,7 +690,7 @@ runWithInfra('Request scenarios (e2e)', () => {
       ctx.values.$resourceId = resource.id;
     },
     'orphaned-resource': async (ctx) => {
-      await dataSource
+      await settingsDataSource
         .getRepository(Resource)
         .update(ctx.values.$resourceId!, { isOrphaned: true });
     },
@@ -709,7 +709,7 @@ runWithInfra('Request scenarios (e2e)', () => {
     'unverified-actor': actorState('unverified-actor'),
     'passwordless-actor': actorState('passwordless-actor'),
     'feature-flag': async (ctx) => {
-      const flag = await dataSource.getRepository(FeatureFlag).save({
+      const flag = await settingsDataSource.getRepository(FeatureFlag).save({
         key: ctx.values.$flagKey!,
         description: null,
         enabled: false,

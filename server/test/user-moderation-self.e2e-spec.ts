@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
@@ -29,6 +30,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let authService: AuthService;
   let usersService: UsersService;
   const stamp = Date.now();
@@ -55,6 +57,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
 
@@ -66,9 +69,9 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
     }
 
     const roleService = app.get(RoleService);
-    const updateUser = (await dataSource.getRepository(Permission).find()).find(
-      (p) => p.action.name === 'update' && p.resource.subject === 'User'
-    );
+    const updateUser = (
+      await settingsDataSource.getRepository(Permission).find()
+    ).find((p) => p.action.name === 'update' && p.resource.subject === 'User');
 
     if (!updateUser) throw new Error('Permission update:User missing');
 
@@ -110,7 +113,7 @@ runWithInfra('PATCH /users/:id moderation of the own record (e2e)', () => {
   }, 60000);
 
   afterAll(async () => {
-    await dataSource
+    await settingsDataSource
       ?.getRepository(Role)
       .delete({ name: In([selfEditRoleName, moderatorRoleName]) });
     await dataSource

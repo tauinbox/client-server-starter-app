@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SETTINGS_DATA_SOURCE } from '../../data-sources';
 import { FeatureFlag } from './entities/feature-flag.entity';
 import { FeatureFlagRule } from './entities/feature-flag-rule.entity';
 import { FeatureFlagService } from './services/feature-flag.service';
@@ -17,7 +18,10 @@ import { SettingsChangeLogModule } from '../core/settings-change-log/settings-ch
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([FeatureFlag, FeatureFlagRule]),
+    TypeOrmModule.forFeature(
+      [FeatureFlag, FeatureFlagRule],
+      SETTINGS_DATA_SOURCE
+    ),
     AuthModule,
     UsersModule,
     NotificationsModule,

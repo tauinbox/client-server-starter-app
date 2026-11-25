@@ -2,6 +2,7 @@ import { INestApplication, Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { subject } from '@casl/ability';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
   AbilityBuilder,
@@ -37,7 +38,7 @@ runWithInfra('Feature flag list filtered by the ability (e2e)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    dataSource = app.get(DataSource);
+    dataSource = settingsDataSourceOf(app);
     flagService = app.get(FeatureFlagService);
     const repo = dataSource.getRepository(FeatureFlag);
 

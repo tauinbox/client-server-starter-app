@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { ApiError } from '../../../common/errors/api-error';
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import type { QueryDeepPartialEntity } from 'typeorm';
 import { keyedUpdate } from '../../../common/utils/keyed-update.util';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -71,8 +72,11 @@ export class ResourceService {
   readonly #subjectMapVersion: CacheVersionCounter;
 
   constructor(
-    @InjectRepository(Resource)
+    @InjectRepository(Resource, SETTINGS_DATA_SOURCE)
     private readonly resourceRepository: Repository<Resource>,
+    private readonly dataSource: DataSource,
+    @InjectDataSource(SETTINGS_DATA_SOURCE)
+    private readonly settingsDataSource: DataSource,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
     private readonly registry: ResourceRegistryService,
@@ -266,7 +270,7 @@ export class ResourceService {
     audit?: AuditLogParams
   ): Promise<T> {
     return writeSettings(
-      this.resourceRepository.manager,
+      { regional: this.dataSource, settings: this.settingsDataSource },
       {
         log: this.settingsChangeLog,
         audit: audit && { trail: this.auditService, draft: audit }
@@ -295,7 +299,7 @@ export class ResourceService {
     }
   ): Promise<{ before: Resource; saved: Resource }> {
     return this.#writeSettings(
-      async (em, recordAudit) => {
+      async ({ settings: em }, recordAudit) => {
         const before = await this.lockResource(em, id);
 
         check(before);
@@ -355,7 +359,7 @@ export class ResourceService {
     this.assertCanRestore(ability, await this.loadResource(id), actorId);
     // Keyed on the orphaned state, so of two concurrent restores one writes
     // and audits and the other is refused.
-    const resource = await this.#writeSettings(async (em) => {
+    const resource = await this.#writeSettings(async ({ settings: em }) => {
       const locked = await this.lockResource(em, id);
 
       this.assertCanRestore(ability, locked, actorId);

@@ -3,7 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import { ErrorKeys } from '@app/shared/constants';
 import { expectApiRejection } from '../src/common/testing/api-error.expect';
 import { Test } from '@nestjs/testing';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { BillingService } from '../src/modules/billing/billing.service';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
@@ -42,7 +43,7 @@ runWithInfra('Billing provider kill switch evaluation (e2e)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    flags = app.get(DataSource).getRepository(FeatureFlag);
+    flags = settingsDataSourceOf(app).getRepository(FeatureFlag);
     billing = app.get(BillingService);
     resolver = app.get(FeatureFlagResolverService);
     original = await flags.findOneByOrFail({ key: 'billing-paddle' });

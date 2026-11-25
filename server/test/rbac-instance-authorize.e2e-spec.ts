@@ -12,6 +12,9 @@ import {
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { repositoryToken } from '../src/common/testing/repository-token';
+import { dataSourceDouble } from '../src/common/testing/data-source.double';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { DataSource } from 'typeorm';
 import type { Subjects } from '../src/modules/auth/casl/app-ability';
@@ -89,7 +92,35 @@ class TestPermissionsGuard implements CanActivate {
 /** Rows that the stubbed `findOne` of a repository answers, by id. */
 type Rows = Map<string, Record<string, unknown>>;
 
-function repositoryOf(rows: Rows, write: jest.Mock) {
+/** The manager of a write transaction over `rows`. */
+function transactionManager(rows: Pick<Rows, 'get' | 'has'>, write: jest.Mock) {
+  return {
+    // The settings log lock.
+    query: (): Promise<never[]> => Promise.resolve([]),
+    find: (): Promise<never[]> => Promise.resolve([]),
+    save: (...args: unknown[]): unknown => write(args.at(-1)),
+    // A keyed update is recorded as the row key with the written columns.
+    update: (
+      _target: unknown,
+      where: { id: string },
+      set: Record<string, unknown>
+    ) => {
+      write({ ...where, ...set });
+
+      return Promise.resolve({ affected: rows.has(where.id) ? 1 : 0 });
+    },
+    findOneByOrFail: (_target: unknown, where: { id: string }) =>
+      Promise.resolve({ ...rows.get(where.id) }),
+    // The row lock of the instance check is not modelled.
+    findOne: (_target: unknown, { where }: { where: { id: string } }) => {
+      const row = rows.get(where.id);
+
+      return Promise.resolve(row ? { ...row } : null);
+    }
+  };
+}
+
+function repositoryOf(rows: Rows) {
   return {
     findOne: jest.fn(({ where }: { where: { id: string } }) =>
       Promise.resolve(rows.get(where.id) ?? null)
@@ -99,33 +130,7 @@ function repositoryOf(rows: Rows, write: jest.Mock) {
         Promise.resolve(rows.get(where.id) ?? null),
       // The roles of a user are read in a second query; the rows of this
       // suite hold none.
-      find: (): Promise<never[]> => Promise.resolve([]),
-      transaction: jest.fn((work: (em: unknown) => Promise<unknown>) =>
-        work({
-          // The settings log lock.
-          query: (): Promise<never[]> => Promise.resolve([]),
-          find: (): Promise<never[]> => Promise.resolve([]),
-          save: (...args: unknown[]): unknown => write(args.at(-1)),
-          // A keyed update is recorded as the row key with the written columns.
-          update: (
-            _target: unknown,
-            where: { id: string },
-            set: Record<string, unknown>
-          ) => {
-            write({ ...where, ...set });
-
-            return Promise.resolve({ affected: rows.has(where.id) ? 1 : 0 });
-          },
-          findOneByOrFail: (_target: unknown, where: { id: string }) =>
-            Promise.resolve({ ...rows.get(where.id) }),
-          // The row lock of the instance check is not modelled.
-          findOne: (_target: unknown, { where }: { where: { id: string } }) => {
-            const row = rows.get(where.id);
-
-            return Promise.resolve(row ? { ...row } : null);
-          }
-        })
-      )
+      find: (): Promise<never[]> => Promise.resolve([])
     }
   };
 }
@@ -139,6 +144,14 @@ describe('Instance-level @Authorize re-check', () => {
   // Every write of the three services goes through the transaction manager
   // above, so one spy shows whether a refused request wrote anything.
   const write = jest.fn((entity: unknown) => Promise.resolve(entity));
+  const settingsRows: Pick<Rows, 'get' | 'has'> = {
+    get: (id) => roleRows.get(id) ?? resourceRows.get(id),
+    has: (id) => roleRows.has(id) || resourceRows.has(id)
+  };
+  const settingsWrites = {
+    ...dataSourceDouble(transactionManager(settingsRows, write)),
+    manager: { find: (): Promise<never[]> => Promise.resolve([]) }
+  };
 
   beforeAll(async () => {
     holder = new AbilityHolder();
@@ -156,21 +169,21 @@ describe('Instance-level @Authorize re-check', () => {
         { provide: AbilityHolder, useValue: holder },
         { provide: APP_GUARD, useClass: TestJwtAuthGuard },
         { provide: APP_GUARD, useClass: TestPermissionsGuard },
-        {
-          provide: repositoryToken(User),
-          useValue: repositoryOf(userRows, write)
-        },
-        {
-          provide: repositoryToken(Role),
-          useValue: repositoryOf(roleRows, write)
-        },
+        { provide: repositoryToken(User), useValue: repositoryOf(userRows) },
+        { provide: repositoryToken(Role), useValue: repositoryOf(roleRows) },
         {
           provide: repositoryToken(Resource),
-          useValue: repositoryOf(resourceRows, write)
+          useValue: repositoryOf(resourceRows)
         },
         { provide: repositoryToken(Permission), useValue: {} },
         { provide: repositoryToken(RolePermission), useValue: {} },
-        { provide: DataSource, useValue: {} },
+        // A role or resource write runs in a regional and a settings
+        // transaction; both see the role and the resource rows.
+        { provide: DataSource, useValue: settingsWrites },
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: settingsWrites
+        },
         { provide: BreachedPasswordService, useValue: {} },
         {
           provide: ResourceRegistryService,

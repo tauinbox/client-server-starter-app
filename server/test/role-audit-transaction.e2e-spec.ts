@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
   applyBodyParsers,
@@ -38,6 +39,7 @@ runWithInfra(
   () => {
     let app: INestApplication;
     let dataSource: DataSource;
+    let settingsDataSource: DataSource;
     let usersService: UsersService;
     let authService: AuthService;
     let roleService: RoleService;
@@ -73,6 +75,7 @@ runWithInfra(
       await app.init();
 
       dataSource = app.get(DataSource);
+      settingsDataSource = settingsDataSourceOf(app);
       usersService = app.get(UsersService);
       authService = app.get(AuthService);
       roleService = app.get(RoleService);
@@ -90,7 +93,7 @@ runWithInfra(
         )
       ).id;
 
-      const superRole = await dataSource
+      const superRole = await settingsDataSource
         .getRepository(Role)
         .findOneByOrFail({ isSuper: true });
 
@@ -99,7 +102,9 @@ runWithInfra(
       });
       token = await sessionOf(admin.id);
 
-      const permissions = await dataSource.getRepository(Permission).find();
+      const permissions = await settingsDataSource
+        .getRepository(Permission)
+        .find();
       const readOf = (subject: string) =>
         permissions.find(
           (p) => p.resource.subject === subject && p.action.name === 'read'
@@ -126,7 +131,7 @@ runWithInfra(
       });
 
       resourceId = (
-        await dataSource.getRepository(Resource).save({
+        await settingsDataSource.getRepository(Resource).save({
           name: resourceName,
           subject: `RoleAuditTx${stamp}`,
           displayName: 'Role audit tx',
@@ -159,13 +164,15 @@ runWithInfra(
         await dataSource
           .getRepository(User)
           .delete([{ email: adminEmail }, { email: targetEmail }]);
-        await dataSource
+        await settingsDataSource
           .createQueryBuilder()
           .delete()
           .from(Role)
           .where('name LIKE :prefix', { prefix: `${prefix}%` })
           .execute();
-        await dataSource.getRepository(Resource).delete({ name: resourceName });
+        await settingsDataSource
+          .getRepository(Resource)
+          .delete({ name: resourceName });
         await app.get(ResourceService).invalidateSubjectMapCache();
       }
 
@@ -204,11 +211,11 @@ runWithInfra(
     }
 
     function role(id: string): Promise<Role | null> {
-      return dataSource.getRepository(Role).findOneBy({ id });
+      return settingsDataSource.getRepository(Role).findOneBy({ id });
     }
 
     async function grantedIds(roleId: string): Promise<string[]> {
-      const rows = await dataSource
+      const rows = await settingsDataSource
         .getRepository(RolePermission)
         .findBy({ roleId });
 
@@ -231,7 +238,7 @@ runWithInfra(
     }
 
     function resource(): Promise<Resource> {
-      return dataSource.getRepository(Resource).findOneByOrFail({
+      return settingsDataSource.getRepository(Resource).findOneByOrFail({
         id: resourceId
       });
     }
@@ -241,7 +248,9 @@ runWithInfra(
 
       await api().post('/roles').send({ name }).expect(500);
 
-      expect(await dataSource.getRepository(Role).countBy({ name })).toBe(0);
+      expect(
+        await settingsDataSource.getRepository(Role).countBy({ name })
+      ).toBe(0);
     });
 
     it('an update answers 500 and keeps the description', async () => {

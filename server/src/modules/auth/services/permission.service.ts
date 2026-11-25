@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, EntityManager, Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { Brackets, DataSource, EntityManager, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import type { SourceManagers } from '../../../data-sources';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../../users/entities/user.entity';
@@ -58,6 +60,8 @@ export class PermissionService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectDataSource(SETTINGS_DATA_SOURCE)
+    private readonly settingsDataSource: DataSource,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
     private readonly metrics: MetricsService
@@ -86,6 +90,13 @@ export class PermissionService {
    * drop writes an entry that nobody reads again. `load` answers null for a
    * result that must not be cached.
    */
+  get #managers(): SourceManagers {
+    return {
+      regional: this.userRepository.manager,
+      settings: this.settingsDataSource.manager
+    };
+  }
+
   async #readThrough<T>(
     userId: string,
     {
@@ -144,7 +155,7 @@ export class PermissionService {
       return null;
     }
 
-    await attachRoles(this.userRepository.manager, [user], {
+    await attachRoles(this.#managers, [user], {
       rolePermissions: { permission: { resource: true, action: true } }
     });
 
@@ -195,7 +206,7 @@ export class PermissionService {
       metric: 'roles',
       key: rolesCacheKey,
       load: async () => {
-        const user = await findUserWithRoles(this.userRepository.manager, {
+        const user = await findUserWithRoles(this.#managers, {
           where: { id: userId }
         });
 
@@ -248,7 +259,7 @@ export class PermissionService {
       return [];
     }
 
-    const allowing = await manager
+    const allowing = await this.settingsDataSource.manager
       .createQueryBuilder(Role, 'role')
       .select('role.id', 'id')
       .distinct(true)

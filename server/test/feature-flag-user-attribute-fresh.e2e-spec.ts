@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
@@ -56,7 +57,9 @@ runWithInfra('Feature-flag gate sees a changed user attribute (e2e)', () => {
     jest.restoreAllMocks();
 
     if (dataSource) {
-      await dataSource.getRepository(FeatureFlag).delete({ key });
+      await settingsDataSourceOf(app)
+        .getRepository(FeatureFlag)
+        .delete({ key });
       await dataSource.getRepository(User).delete({ id: userId });
     }
 

@@ -6,6 +6,7 @@ import { repositoryToken } from '../src/common/testing/repository-token';
 import type { Cache } from 'cache-manager';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
@@ -38,6 +39,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   const ability = (() => {
     const builder = new AbilityBuilder<AppAbility>(createMongoAbility);
 
@@ -54,6 +56,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
 
     jest.spyOn(app.get(AuditService), 'log').mockResolvedValue(undefined);
     jest
@@ -65,13 +68,13 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
     jest.restoreAllMocks();
 
     if (dataSource) {
-      await dataSource
+      await settingsDataSource
         .getRepository(FeatureFlag)
         .createQueryBuilder()
         .delete()
         .where('key LIKE :prefix', { prefix: `${tag}%` })
         .execute();
-      await dataSource
+      await settingsDataSource
         .getRepository(Role)
         .createQueryBuilder()
         .delete()
@@ -109,6 +112,7 @@ runWithInfra('Feature flag cache across instances (e2e)', () => {
     const resolver = new FeatureFlagResolverService(
       app.get(repositoryToken(FeatureFlag)),
       app.get(repositoryToken(FeatureFlagRule)),
+      app.get(DataSource),
       // @ts-expect-error - partial Cache: the resolver uses get/set/del and stores
       gatedCache,
       app.get(AttributeRegistryService),

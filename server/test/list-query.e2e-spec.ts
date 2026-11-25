@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, Like } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
   applyBodyParsers,
@@ -29,6 +30,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('List search and filters (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let token: string;
   const stamp = `lq${Date.now()}`;
   const password = 'Lantern-Orchard-47';
@@ -52,9 +54,10 @@ runWithInfra('List search and filters (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
 
     await register(adminEmail);
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     const usersService = app.get(UsersService);
@@ -74,11 +77,13 @@ runWithInfra('List search and filters (e2e)', () => {
   }, 60000);
 
   afterAll(async () => {
-    await dataSource
+    await settingsDataSource
       ?.getRepository(FeatureFlag)
       .delete({ key: Like(`${stamp}%`) });
-    await dataSource?.getRepository(Role).delete({ name: Like(`${stamp}%`) });
-    await dataSource
+    await settingsDataSource
+      ?.getRepository(Role)
+      .delete({ name: Like(`${stamp}%`) });
+    await settingsDataSource
       ?.getRepository(Resource)
       .delete({ name: Like(`${stamp}%`) });
     await dataSource?.getRepository(User).delete({ email: Like(`${stamp}%`) });
@@ -216,7 +221,7 @@ runWithInfra('List search and filters (e2e)', () => {
     const names = { plain: `${stamp}-plain`, described: `${stamp}-described` };
 
     beforeAll(async () => {
-      await dataSource.getRepository(Role).save([
+      await settingsDataSource.getRepository(Role).save([
         { name: names.plain, description: null },
         { name: names.described, description: `Auditors ${stamp}` }
       ]);
@@ -252,7 +257,7 @@ runWithInfra('List search and filters (e2e)', () => {
     // here as not orphaned does not stay so. `roles` (RolesController) is
     // registered by every app that runs the sync, so it is never orphaned.
     beforeAll(async () => {
-      await dataSource.getRepository(Resource).save({
+      await settingsDataSource.getRepository(Resource).save({
         name: orphaned,
         subject: `Lq${stamp}Orphaned`,
         displayName: 'List query orphaned',

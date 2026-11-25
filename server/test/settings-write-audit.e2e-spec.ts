@@ -1,6 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
+import { SETTINGS_ENTITIES } from '../src/data-sources';
+import { postgresConfig } from '../src/postgres.config';
+import { settingsDataSourceOf } from './settings-data-source';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -33,6 +36,7 @@ runWithInfra('Settings write audit row (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let auditService: AuditService;
   let roleService: RoleService;
   let settingsChangeLog: SettingsChangeLogService;
@@ -63,10 +67,10 @@ runWithInfra('Settings write audit row (e2e)', () => {
   const audited = <T>(
     draft: AuditLogParams,
     write: SettingsWrite<T>,
-    manager: { transaction: DataSource['transaction'] } = dataSource
+    settings: DataSource = settingsDataSource
   ) =>
     writeSettings(
-      manager,
+      { regional: dataSource, settings },
       { log: settingsChangeLog, audit: { trail: auditService, draft } },
       write
     );
@@ -79,6 +83,7 @@ runWithInfra('Settings write audit row (e2e)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     auditService = app.get(AuditService);
     roleService = app.get(RoleService);
     settingsChangeLog = app.get(SettingsChangeLogService);
@@ -120,7 +125,7 @@ runWithInfra('Settings write audit row (e2e)', () => {
 
     await audited(
       { ...params(name), details: { phase: 'draft', stale: true } },
-      async (em, recordAudit) => {
+      async ({ settings: em }, recordAudit) => {
         await em.insert(Role, { name, isSuper: false });
         recordAudit({ ...params(name), details: { phase: 'final' } });
       }
@@ -143,7 +148,7 @@ runWithInfra('Settings write audit row (e2e)', () => {
     const name = `${tag}-failed`;
 
     await expect(
-      audited(params(name), async (em) => {
+      audited(params(name), async ({ settings: em }) => {
         await em.insert(Role, { name, isSuper: false });
 
         throw new Error('fault after the insert');
@@ -154,7 +159,9 @@ runWithInfra('Settings write audit row (e2e)', () => {
 
     expect(row.settings_outcome).toBe('not_applied');
     expect(await logEntriesOf(row.id)).toEqual([]);
-    expect(await dataSource.getRepository(Role).countBy({ name })).toBe(0);
+    expect(await settingsDataSource.getRepository(Role).countBy({ name })).toBe(
+      0
+    );
   });
 
   it('a refused write deletes its row', async () => {
@@ -170,24 +177,47 @@ runWithInfra('Settings write audit row (e2e)', () => {
   });
 
   it('a later write on the same connection carries no audit id', async () => {
-    const runner = dataSource.createQueryRunner();
+    // A pool of one connection gives both writes the same Postgres session.
+    const single = new DataSource({
+      ...postgresConfig(),
+      entities: [...SETTINGS_ENTITIES],
+      migrations: [],
+      logging: false,
+      extra: { max: 1 }
+    });
+    const backendPid = async (em: EntityManager): Promise<number> => {
+      const [{ pid }] = await em.query<Array<{ pid: number }>>(
+        'SELECT pg_backend_pid() AS "pid"'
+      );
+
+      return pid;
+    };
+    const pids: number[] = [];
+
+    await single.initialize();
 
     try {
-      const { manager } = runner;
-
       await audited(
         params(`${tag}-first`),
-        async (em) => {
+        async ({ settings: em }) => {
+          pids.push(await backendPid(em));
           await em.insert(Role, { name: `${tag}-first`, isSuper: false });
         },
-        manager
+        single
       );
-      await writeSettings(manager, { log: settingsChangeLog }, async (em) => {
-        await em.insert(Role, { name: `${tag}-second`, isSuper: false });
-      });
+      await writeSettings(
+        { regional: dataSource, settings: single },
+        { log: settingsChangeLog },
+        async ({ settings: em }) => {
+          pids.push(await backendPid(em));
+          await em.insert(Role, { name: `${tag}-second`, isSuper: false });
+        }
+      );
     } finally {
-      await runner.release();
+      await single.destroy();
     }
+
+    expect(new Set(pids).size).toBe(1);
 
     const [{ id: second }] = await dataSource.query<Array<{ id: string }>>(
       `SELECT "id" FROM "roles" WHERE "name" = $1`,

@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
@@ -31,6 +32,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let controller: RolesController;
   let roleService: RoleService;
   let flagService: FeatureFlagService;
@@ -55,6 +57,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     controller = app.get(RolesController);
     roleService = app.get(RoleService);
     flagService = app.get(FeatureFlagService);
@@ -82,13 +85,13 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
     jest.restoreAllMocks();
 
     if (dataSource) {
-      await dataSource
+      await settingsDataSource
         .getRepository(FeatureFlag)
         .createQueryBuilder()
         .delete()
         .where('key LIKE :prefix', { prefix: `${tag}%` })
         .execute();
-      await dataSource
+      await settingsDataSource
         .getRepository(Role)
         .createQueryBuilder()
         .delete()
@@ -101,7 +104,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
   });
 
   async function roleNamesOf(flagId: string): Promise<string[][]> {
-    const rules = await dataSource
+    const rules = await settingsDataSource
       .getRepository(FeatureFlagRule)
       .find({ where: { flagId }, order: { createdAt: 'ASC' } });
 
@@ -234,7 +237,7 @@ runWithInfra('Role rename and delete rewrite flag role rules (e2e)', () => {
     const rewrite = jest
       .spyOn(flagService, 'rewriteRoleName')
       .mockRejectedValue(new Error('rewrite failed'));
-    const roles = dataSource.getRepository(Role);
+    const roles = settingsDataSource.getRepository(Role);
 
     await expect(
       controller.update(role.id, { name: `${name}-2` }, req, ability)

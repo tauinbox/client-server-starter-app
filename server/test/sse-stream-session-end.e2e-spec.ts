@@ -5,6 +5,7 @@ import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { decode } from 'jsonwebtoken';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { AuthService } from '../src/modules/auth/services/auth.service';
@@ -107,7 +108,13 @@ runWithInfra('An SSE stream ends with its session (e2e)', () => {
 
   afterAll(async () => {
     await dataSource?.getRepository(User).delete({ email });
-    await dataSource?.getRepository(Role).delete({ name: roleName });
+
+    if (app) {
+      await settingsDataSourceOf(app)
+        .getRepository(Role)
+        .delete({ name: roleName });
+    }
+
     await app?.close();
   });
 

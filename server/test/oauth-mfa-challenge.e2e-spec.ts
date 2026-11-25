@@ -88,7 +88,10 @@ runWithInfra('Provider sign-in with a second factor (e2e)', () => {
           // `roles` hydrated exactly as the real service returns it.
           useValue: {
             findById: (id: string) =>
-              findUserWithRoles(ds.manager, { where: { id } })
+              findUserWithRoles(
+                { regional: ds.manager, settings: ds.manager },
+                { where: { id } }
+              )
           }
         },
         {

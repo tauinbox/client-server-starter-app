@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { ApiError } from '../../../common/errors/api-error';
 import { DataSource, EntityManager, IsNull, Not, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
+import type { SourceManagers } from '../../../data-sources';
 import type { QueryDeepPartialEntity } from 'typeorm';
 import { subject } from '@casl/ability';
 import { withTransaction } from '../../../common/utils/with-transaction.util';
@@ -116,11 +118,20 @@ export class UsersService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private dataSource: DataSource,
+    @InjectDataSource(SETTINGS_DATA_SOURCE)
+    private settingsDataSource: DataSource,
     private auditService: AuditService,
     private accessRefusals: AccessRefusalService,
     private mailService: MailService,
     private breachedPasswordService: BreachedPasswordService
   ) {}
+
+  /** The roles are read on the settings data source, after `regional`. */
+  #roleSources(
+    regional: EntityManager = this.userRepository.manager
+  ): SourceManagers {
+    return { regional, settings: this.settingsDataSource.manager };
+  }
 
   // race-checked: no stored row exists before the insert
   async create(
@@ -196,7 +207,6 @@ export class UsersService {
     query: SearchUsersCursorQueryDto,
     ability: AbilityOrSystem
   ): Promise<CursorPaginatedResponseDto<User>> {
-    const { manager } = this.userRepository;
     const qb = this.userRepository.createQueryBuilder('user');
 
     if (query.includeDeleted) {
@@ -210,7 +220,7 @@ export class UsersService {
     if (query.role) {
       // The role is a settings row: resolve its id first, then filter the
       // membership rows. An unknown name matches no user.
-      const role = await manager.findOne(Role, {
+      const role = await this.settingsDataSource.manager.findOne(Role, {
         where: { name: query.role }
       });
 
@@ -226,7 +236,7 @@ export class UsersService {
       query
     );
 
-    await attachRoles(manager, page.data);
+    await attachRoles(this.#roleSources(), page.data);
 
     return page;
   }
@@ -258,7 +268,7 @@ export class UsersService {
       throw new ApiError(ErrorKeys.USERS.NOT_FOUND, 'User id is required');
     }
 
-    const user = await findUserWithRoles(this.userRepository.manager, {
+    const user = await findUserWithRoles(this.#roleSources(), {
       where: { id }
     });
 
@@ -276,7 +286,7 @@ export class UsersService {
   async findById(id: string): Promise<User | null> {
     if (!id) return null;
 
-    return findUserWithRoles(this.userRepository.manager, { where: { id } });
+    return findUserWithRoles(this.#roleSources(), { where: { id } });
   }
 
   /** `findById` that also returns a soft-deleted account. */
@@ -287,7 +297,7 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return findUserWithRoles(this.userRepository.manager, { where: { email } });
+    return findUserWithRoles(this.#roleSources(), { where: { email } });
   }
 
   /**
@@ -423,7 +433,9 @@ export class UsersService {
     try {
       saved = await withTransaction(this.dataSource, async (manager) => {
         if (ability !== SYSTEM_ABILITY) {
-          const locked = await lockUserWithRoles(manager, { id });
+          const locked = await lockUserWithRoles(this.#roleSources(manager), {
+            id
+          });
 
           if (!locked) throw userNotFound(id);
 
@@ -451,9 +463,10 @@ export class UsersService {
           throw userNotFound(id);
         }
 
-        const written = await findUserWithRolesOrFail(manager, {
-          where: { id: user.id }
-        });
+        const written = await findUserWithRolesOrFail(
+          this.#roleSources(manager),
+          { where: { id: user.id } }
+        );
 
         await this.writeAudit(manager, audit, written);
 
@@ -512,7 +525,10 @@ export class UsersService {
         throw userNotFound(id);
       }
 
-      const written = await findUserWithRolesOrFail(manager, { where: { id } });
+      const written = await findUserWithRolesOrFail(
+        this.#roleSources(manager),
+        { where: { id } }
+      );
 
       await this.writeAudit(manager, audit, written);
 
@@ -700,7 +716,9 @@ export class UsersService {
     // of two concurrent deletes one writes and audits and the other answers
     // not found.
     await withTransaction(this.dataSource, async (manager) => {
-      const locked = await lockUserWithRoles(manager, { id });
+      const locked = await lockUserWithRoles(this.#roleSources(manager), {
+        id
+      });
 
       if (!locked) throw userNotFound(id);
 
@@ -733,7 +751,7 @@ export class UsersService {
     id: string,
     { ability, actorId, audit }: UserWriteOptions
   ): Promise<User> {
-    const user = await findUserWithRoles(this.userRepository.manager, {
+    const user = await findUserWithRoles(this.#roleSources(), {
       where: { id },
       withDeleted: true
     });
@@ -753,7 +771,7 @@ export class UsersService {
     // Keyed on the deleted state, so of two concurrent restores one writes
     // and audits and the other is refused.
     await withTransaction(this.dataSource, async (manager) => {
-      const locked = await lockUserWithRoles(manager, {
+      const locked = await lockUserWithRoles(this.#roleSources(manager), {
         id,
         withDeleted: true
       });

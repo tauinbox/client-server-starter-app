@@ -1,8 +1,12 @@
 import type { Cache } from 'cache-manager';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
+import { AuditAction } from '@app/shared/enums/audit-action.enum';
+import { dataSourceDouble } from '../../../common/testing/data-source.double';
+import type { AuditLogParams } from '../../audit/audit.service';
 import {
   SettingsChangeLogService,
-  summarizeSettingsChanges
+  summarizeSettingsChanges,
+  writeSettings
 } from './settings-change-log.service';
 import type { SettingsChangedEvent } from './settings-changed.event';
 
@@ -21,6 +25,67 @@ const row = (
   table_name: table,
   operation,
   keys: keys.length > 0 ? keys : null
+});
+
+describe('writeSettings', () => {
+  const draft: AuditLogParams = {
+    action: AuditAction.ROLE_CREATE,
+    targetType: 'Role'
+  };
+
+  function setup(regionalCommit: () => Promise<void>) {
+    const settings = dataSourceDouble({ query: jest.fn() });
+    const regional = {
+      transaction: jest.fn(async (run: (em: object) => Promise<unknown>) => {
+        const result = await run({});
+
+        await regionalCommit();
+
+        return result;
+      })
+    };
+    const trail = {
+      openSettingsWrite: jest.fn().mockResolvedValue('audit-1'),
+      closeSettingsWrite: jest.fn().mockResolvedValue(undefined),
+      discardSettingsWrite: jest.fn().mockResolvedValue(undefined)
+    };
+    const log = { applyPending: jest.fn().mockResolvedValue(undefined) };
+
+    return {
+      trail,
+      log,
+      run: () =>
+        writeSettings(
+          // @ts-expect-error - partial DataSource doubles: transaction and query runners only
+          { regional, settings },
+          { log, audit: { trail, draft } },
+          () => Promise.resolve('written')
+        )
+    };
+  }
+
+  it('records an applied change and drops the caches when only the regional commit fails', async () => {
+    const lost = new Error('regional commit lost');
+    const { trail, log, run } = setup(() => Promise.reject(lost));
+
+    await expect(run()).rejects.toBe(lost);
+    expect(trail.closeSettingsWrite).toHaveBeenCalledWith('audit-1', {
+      outcome: 'applied',
+      params: draft
+    });
+    expect(log.applyPending).toHaveBeenCalledTimes(1);
+  });
+
+  it('records an applied change after both commits', async () => {
+    const { trail, log, run } = setup(() => Promise.resolve());
+
+    await expect(run()).resolves.toBe('written');
+    expect(trail.closeSettingsWrite).toHaveBeenCalledWith('audit-1', {
+      outcome: 'applied',
+      params: draft
+    });
+    expect(log.applyPending).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('summarizeSettingsChanges', () => {

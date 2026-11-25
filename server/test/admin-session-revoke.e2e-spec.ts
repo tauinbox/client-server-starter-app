@@ -10,6 +10,7 @@ import request from 'supertest';
 import { Server } from 'http';
 import { randomUUID } from 'crypto';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -37,6 +38,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
   let usersService: UsersService;
@@ -64,6 +66,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
@@ -81,9 +84,9 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
     }
 
     const roleService = app.get(RoleService);
-    const updateUser = (await dataSource.getRepository(Permission).find()).find(
-      (p) => p.action.name === 'update' && p.resource.subject === 'User'
-    );
+    const updateUser = (
+      await settingsDataSource.getRepository(Permission).find()
+    ).find((p) => p.action.name === 'update' && p.resource.subject === 'User');
 
     if (!updateUser) throw new Error('Permission update:User missing');
 
@@ -101,7 +104,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
       ability: SYSTEM_ABILITY
     });
 
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
 
@@ -118,7 +121,7 @@ runWithInfra('POST /users/:id/sessions/revoke (e2e)', () => {
         { email: ownerEmail },
         { email: superEmail }
       ]);
-    await dataSource
+    await settingsDataSource
       ?.getRepository(Role)
       .delete({ name: In([supportRoleName]) });
     await app?.close();

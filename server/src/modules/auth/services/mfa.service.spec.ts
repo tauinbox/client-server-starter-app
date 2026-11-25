@@ -4,6 +4,8 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, IsNull, Not } from 'typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { randomBytes } from 'crypto';
 import { ScureBase32Plugin, generateSync } from 'otplib';
 import {
@@ -166,6 +168,11 @@ describe('MfaService', () => {
                 )
               })
           }
+        },
+        // The roles are read on the settings data source; the double reads none.
+        {
+          provide: getDataSourceToken(SETTINGS_DATA_SOURCE),
+          useValue: { manager: {} }
         },
         { provide: JwtService, useValue: jwtService },
         { provide: AuditService, useValue: auditService },

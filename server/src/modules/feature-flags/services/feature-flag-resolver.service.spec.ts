@@ -2,6 +2,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { repositoryToken } from '../../../common/testing/repository-token';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { percentageBucket } from '@app/shared/utils/feature-flag-evaluator';
@@ -65,6 +66,11 @@ describe('FeatureFlagResolverService', () => {
         FeatureFlagResolverService,
         { provide: repositoryToken(FeatureFlag), useValue: flagRepo },
         { provide: repositoryToken(FeatureFlagRule), useValue: ruleRepo },
+        // The member rows of a `user` rule are read on the regional manager.
+        {
+          provide: DataSource,
+          useValue: { manager: { find: jest.fn().mockResolvedValue([]) } }
+        },
         { provide: CACHE_MANAGER, useValue: cacheManager },
         {
           provide: AttributeRegistryService,

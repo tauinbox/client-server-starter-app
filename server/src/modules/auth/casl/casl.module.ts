@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import { User } from '../../users/entities/user.entity';
 import { Resource } from '../entities/resource.entity';
 import { Action } from '../entities/action.entity';
@@ -30,13 +31,11 @@ import { RbacSettingsChangedListener } from '../listeners/rbac-settings-changed.
     CryptoModule,
     DiscoveryModule,
     SettingsChangeLogModule,
-    TypeOrmModule.forFeature([
-      User,
-      Resource,
-      Action,
-      Permission,
-      RolePermission
-    ])
+    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature(
+      [Resource, Action, Permission, RolePermission],
+      SETTINGS_DATA_SOURCE
+    )
   ],
   providers: [
     PermissionService,

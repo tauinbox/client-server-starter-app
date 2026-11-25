@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import {
   applyBodyParsers,
@@ -37,6 +38,7 @@ const RULE_KEYS = [
 runWithInfra('Feature flag rule response shape (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let token: string;
   const stamp = Date.now();
   const adminEmail = `flag-rule-shape-${stamp}@example.com`;
@@ -64,6 +66,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
 
     await request(http())
       .post('/api/v1/auth/register')
@@ -74,7 +77,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
         residenceCountry: 'DE'
       })
       .expect(201);
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
     const admin = await dataSource
@@ -95,7 +98,7 @@ runWithInfra('Feature flag rule response shape (e2e)', () => {
   }, 60000);
 
   afterAll(async () => {
-    await dataSource
+    await settingsDataSource
       ?.getRepository(FeatureFlag)
       .delete([{ key: flagKey }, { key: `${flagKey}-typed` }]);
     await dataSource?.getRepository(User).delete({ email: adminEmail });

@@ -5,6 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { verifyPassword } from '../src/common/utils/password-hash';
 import { ErrorKeys, STEP_UP_OPERATION } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
@@ -35,6 +36,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let auditWrites: ReturnType<typeof trackAuditWrites>;
   let authService: AuthService;
   let usersService: UsersService;
@@ -65,6 +67,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     auditWrites = trackAuditWrites(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
@@ -78,9 +81,9 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
 
     // The seeded grant of the `user` role: update, on the own record only.
     const roleService = app.get(RoleService);
-    const updateUser = (await dataSource.getRepository(Permission).find()).find(
-      (p) => p.action.name === 'update' && p.resource.subject === 'User'
-    );
+    const updateUser = (
+      await settingsDataSource.getRepository(Permission).find()
+    ).find((p) => p.action.name === 'update' && p.resource.subject === 'User');
 
     if (!updateUser) throw new Error('Permission update:User missing');
 
@@ -122,7 +125,7 @@ runWithInfra('PATCH /users/:id credential step-up (e2e)', () => {
   }, 60000);
 
   afterAll(async () => {
-    await dataSource
+    await settingsDataSource
       ?.getRepository(Role)
       .delete({ name: In([selfEditRoleName, adminEditRoleName]) });
     await dataSource

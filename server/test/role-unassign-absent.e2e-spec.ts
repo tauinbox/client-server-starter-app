@@ -9,6 +9,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { Server } from 'http';
 import { DataSource, In } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { CoreModule } from '../src/modules/core/core.module';
@@ -33,6 +34,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 runWithInfra('Removing an absent role or permission (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let authService: AuthService;
   let usersService: UsersService;
   let roleService: RoleService;
@@ -61,6 +63,7 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
     await app.init();
 
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     authService = app.get(AuthService);
     usersService = app.get(UsersService);
     roleService = app.get(RoleService);
@@ -77,7 +80,7 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
         .expect(201);
     }
 
-    const superRole = await dataSource
+    const superRole = await settingsDataSource
       .getRepository(Role)
       .findOneByOrFail({ isSuper: true });
 
@@ -85,9 +88,9 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
       ability: SYSTEM_ABILITY
     });
 
-    const readUser = (await dataSource.getRepository(Permission).find()).find(
-      (p) => p.action.name === 'read' && p.resource.subject === 'User'
-    );
+    const readUser = (
+      await settingsDataSource.getRepository(Permission).find()
+    ).find((p) => p.action.name === 'read' && p.resource.subject === 'User');
 
     if (!readUser) throw new Error('Permission read:User missing');
 
@@ -104,7 +107,7 @@ runWithInfra('Removing an absent role or permission (e2e)', () => {
     await dataSource
       ?.getRepository(User)
       .delete([{ email: adminEmail }, { email: targetEmail }]);
-    await dataSource
+    await settingsDataSource
       ?.getRepository(Role)
       .delete({ name: In([customRoleName]) });
     await app?.close();

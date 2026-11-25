@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { DiscoveryService, Reflector } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
 import {
   POOL_LOCK_KEYS,
   runSerializedInPool
@@ -27,11 +28,11 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     private readonly reflector: Reflector,
     private readonly resourceService: ResourceService,
     private readonly resourceRegistry: ResourceRegistryService,
-    @InjectRepository(Resource)
+    @InjectRepository(Resource, SETTINGS_DATA_SOURCE)
     private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(Permission)
+    @InjectRepository(Permission, SETTINGS_DATA_SOURCE)
     private readonly permissionRepository: Repository<Permission>,
-    @InjectRepository(Action)
+    @InjectRepository(Action, SETTINGS_DATA_SOURCE)
     private readonly actionRepository: Repository<Action>,
     private readonly dataSource: DataSource,
     private readonly settingsChangeLog: SettingsChangeLogService

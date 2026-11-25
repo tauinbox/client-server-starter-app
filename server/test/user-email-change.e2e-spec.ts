@@ -10,6 +10,8 @@ import { HttpStatus, HttpException } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { repositoryToken } from '../src/common/testing/repository-token';
+import { getDataSourceToken } from '@nestjs/typeorm';
+import { SETTINGS_DATA_SOURCE } from '../src/data-sources';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { MfaService } from '../src/modules/auth/services/mfa.service';
 import { UsersController } from '../src/modules/users/controllers/users.controller';
@@ -164,6 +166,8 @@ describe('UsersService.update — email change side effects', () => {
         UsersService,
         { provide: repositoryToken(User), useValue: repo },
         { provide: DataSource, useValue: transactionOver(store) },
+        // No user of this suite holds a role, so no role is read.
+        { provide: getDataSourceToken(SETTINGS_DATA_SOURCE), useValue: {} },
         { provide: AuditService, useValue: { logFireAndForget: jest.fn() } },
         {
           provide: MetricsService,
@@ -388,6 +392,7 @@ describe('Admin email change - session revocation through the real event bus', (
         SessionRevocationListener,
         { provide: repositoryToken(User), useValue: userRepo },
         { provide: DataSource, useValue: dataSource },
+        { provide: getDataSourceToken(SETTINGS_DATA_SOURCE), useValue: {} },
         { provide: RefreshTokenService, useValue: refreshTokenService },
         { provide: AuditService, useValue: auditService },
         {

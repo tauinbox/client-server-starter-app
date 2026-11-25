@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { ErrorKeys } from '@app/shared/constants';
 import { CoreModule } from '../src/modules/core/core.module';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
@@ -30,6 +31,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
 
   let app: INestApplication;
   let dataSource: DataSource;
+  let settingsDataSource: DataSource;
   let flags: FeatureFlagService;
   let resolver: FeatureFlagResolverService;
   let settingsLog: SettingsChangeLogService;
@@ -75,6 +77,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+    settingsDataSource = settingsDataSourceOf(app);
     flags = app.get(FeatureFlagService);
     resolver = app.get(FeatureFlagResolverService);
     settingsLog = app.get(SettingsChangeLogService);
@@ -82,7 +85,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
 
   afterAll(async () => {
     if (dataSource) {
-      await dataSource
+      await settingsDataSource
         .getRepository(FeatureFlag)
         .createQueryBuilder()
         .delete()
@@ -156,7 +159,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
       errorKey: ErrorKeys.FEATURE_FLAGS.UNKNOWN_RULE_USER
     });
     expect(
-      await dataSource
+      await settingsDataSource
         .getRepository(FeatureFlag)
         .countBy({ key: `${tag}-unknown-create` })
     ).toBe(0);

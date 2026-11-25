@@ -3,6 +3,7 @@ import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
+import { settingsDataSourceOf } from './settings-data-source';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { Permission } from '../src/modules/auth/entities/permission.entity';
@@ -108,7 +109,9 @@ runWithInfra('Settings change log (e2e)', () => {
     action: string,
     subject: string
   ): Promise<string> {
-    const permissions = await dataSource.getRepository(Permission).find();
+    const permissions = await settingsDataSourceOf(app)
+      .getRepository(Permission)
+      .find();
     const found = permissions.find(
       (p) => p.action.name === action && p.resource.subject === subject
     );
