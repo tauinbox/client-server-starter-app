@@ -18,6 +18,7 @@ describe('RbacSettingsChangedListener', () => {
   let resourceService: { invalidateSubjectMapCache: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
   let manager: { delete: jest.Mock; query: jest.Mock };
+  let settings: { query: jest.Mock };
   let listener: RbacSettingsChangedListener;
 
   beforeEach(() => {
@@ -34,6 +35,7 @@ describe('RbacSettingsChangedListener', () => {
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
       query: jest.fn().mockResolvedValue([])
     };
+    settings = { query: jest.fn().mockResolvedValue([]) };
     listener = new RbacSettingsChangedListener(
       // @ts-expect-error partial mock: only the methods the listener calls
       permissionService as PermissionService,
@@ -50,13 +52,17 @@ describe('RbacSettingsChangedListener', () => {
   ) =>
     listener.handleSettingsChanged(
       settingsChangedEvent(change, {
-        // @ts-expect-error partial mock: only `delete` and `query`
-        manager: manager as EntityManager,
+        managers: {
+          // @ts-expect-error partial mock: only `delete` and `query`
+          regional: manager as EntityManager,
+          // @ts-expect-error partial mock: only `query`
+          settings: settings as EntityManager
+        },
         scope
       })
     );
 
-  it('drops the lists of each holder of a changed role, read on the apply manager, and pushes to them', async () => {
+  it('drops the lists of each holder of a changed role, read on the regional apply manager, and pushes to them', async () => {
     await run({ tables: ['role_permissions'], roleIds: ['r-1'] });
 
     expect(permissionService.findHolderIds).toHaveBeenCalledWith(manager, [
@@ -97,6 +103,7 @@ describe('RbacSettingsChangedListener', () => {
     expect(permissionService.invalidateUserCache).toHaveBeenCalledTimes(2);
     expect(manager.delete).not.toHaveBeenCalled();
     expect(manager.query).not.toHaveBeenCalled();
+    expect(settings.query).not.toHaveBeenCalled();
   });
 
   it('pushes nothing when a changed role has no holder', async () => {
@@ -120,13 +127,25 @@ describe('RbacSettingsChangedListener', () => {
     }
   );
 
-  it('on a rebase drops every list and the subject map, and deletes the orphan membership rows', async () => {
+  it('on a rebase drops every list and the subject map, and deletes the membership rows of missing roles', async () => {
+    manager.query.mockImplementation((sql: string) =>
+      Promise.resolve(
+        sql.startsWith('SELECT') ? [{ id: 'r-live' }, { id: 'r-gone' }] : []
+      )
+    );
+    settings.query.mockResolvedValue([{ id: 'r-live' }]);
+
     await run({ all: true });
 
     expect(permissionService.invalidateAll).toHaveBeenCalledTimes(1);
     expect(resourceService.invalidateSubjectMapCache).toHaveBeenCalledTimes(1);
-    expect(manager.query).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM "user_roles"')
+    expect(settings.query).toHaveBeenCalledWith(
+      expect.stringContaining('FROM "roles"'),
+      [['r-live', 'r-gone']]
+    );
+    expect(manager.query).toHaveBeenLastCalledWith(
+      expect.stringContaining('DELETE FROM "user_roles"'),
+      [['r-gone']]
     );
     expect(permissionService.findHolderIds).not.toHaveBeenCalled();
   });

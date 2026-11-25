@@ -4,7 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { DataSource, In } from 'typeorm';
 import type { IfMatchCondition } from '@app/shared/utils/if-match';
-import { splitPoolMax } from '../src/data-sources';
+import { deleteOrphanRows, splitPoolMax } from '../src/data-sources';
 import { CoreModule } from '../src/modules/core/core.module';
 import { AuditService } from '../src/modules/audit/audit.service';
 import type { AppAbility } from '../src/modules/auth/casl/app-ability';
@@ -218,6 +218,44 @@ runWithInfra('Settings pool of one connection (e2e)', () => {
     );
     await roleService.delete(role.id, { ability: SYSTEM_ABILITY });
     await flags.delete(flag.id, SYSTEM_ABILITY, actor);
+  }, 60000);
+
+  it('deletes the regional rows of missing settings rows in the transaction of the apply', async () => {
+    const live = await roleService.create(
+      { name: `${tag}-live` },
+      { ability: SYSTEM_ABILITY }
+    );
+    const [goneRole, goneRule] = [randomUUID(), randomUUID()];
+
+    await dataSource.query(
+      'INSERT INTO "user_roles" ("user_id", "role_id") VALUES ($1, $2), ($1, $3)',
+      [user.id, live.id, goneRole]
+    );
+    await dataSource.query(
+      'INSERT INTO "feature_flag_rule_users" ("rule_id", "user_id") VALUES ($1, $2)',
+      [goneRule, user.id]
+    );
+    // The apply holds its regional transaction and reads the settings rows
+    // through the settings pool, one statement at a time.
+    await dataSource.transaction(async (regional) => {
+      const managers = { regional, settings: settingsDataSource.manager };
+
+      await deleteOrphanRows(managers, 'roleMembers');
+      await deleteOrphanRows(managers, 'ruleMembers');
+    });
+
+    const roles = await dataSource.query<Array<{ role_id: string }>>(
+      'SELECT "role_id" FROM "user_roles" WHERE "user_id" = $1',
+      [user.id]
+    );
+    const members = await dataSource.query<unknown[]>(
+      'SELECT 1 FROM "feature_flag_rule_users" WHERE "rule_id" = $1',
+      [goneRule]
+    );
+
+    expect(roles.map(({ role_id: id }) => id)).toEqual([live.id]);
+    expect(members).toEqual([]);
+    await roleService.delete(live.id, { ability: SYSTEM_ABILITY });
   }, 60000);
 
   it('updates and restores a resource', async () => {

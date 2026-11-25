@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { In } from 'typeorm';
+import { deleteOrphanRows } from '../../../data-sources';
 import { SettingsChangedEvent } from '../../core/settings-change-log/settings-changed.event';
 import { touches } from '../../core/settings-change-log/settings-change.types';
 import { UserRole } from '../../users/entities/user-role.entity';
@@ -28,10 +29,11 @@ export class RbacSettingsChangedListener {
   @OnEvent(SettingsChangedEvent.name, { suppressErrors: false })
   async handleSettingsChanged({
     change,
-    manager,
+    managers,
     scope
   }: SettingsChangedEvent): Promise<void> {
     const ownsMembershipRows = scope === 'pool';
+    const { regional } = managers;
 
     if (touches(change, 'resources', 'permissions', 'actions')) {
       await this.resourceService.invalidateSubjectMapCache();
@@ -41,22 +43,18 @@ export class RbacSettingsChangedListener {
       await this.permissionService.invalidateAll();
 
       // A role deleted before a rebase left its membership rows.
-      if (ownsMembershipRows) {
-        await manager.query(
-          `DELETE FROM "user_roles" ur WHERE NOT EXISTS (SELECT 1 FROM "roles" r WHERE r."id" = ur."role_id")`
-        );
-      }
+      if (ownsMembershipRows) await deleteOrphanRows(managers, 'roleMembers');
 
       return;
     }
 
     const holderIds = await this.permissionService.findHolderIds(
-      manager,
+      regional,
       change.roleIds
     );
 
     if (ownsMembershipRows && change.deletedRoleIds.length > 0) {
-      await manager.delete(UserRole, {
+      await regional.delete(UserRole, {
         roleId: In([...change.deletedRoleIds])
       });
     }

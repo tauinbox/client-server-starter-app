@@ -1,9 +1,11 @@
 import {
   SETTINGS_ENTITIES,
+  deleteOrphanRows,
   inBothSources,
   regionalEntities,
   splitPoolMax
 } from './data-sources';
+import type { SourceManagers } from './data-sources';
 import { dataSourceDouble } from './common/testing/data-source.double';
 import { Plan } from './modules/billing/entities/plan.entity';
 import { Product } from './modules/billing/entities/product.entity';
@@ -115,6 +117,90 @@ describe('data sources', () => {
       ).rejects.toThrow('write failed');
       expect(events).toEqual(['regional rollback', 'settings rollback']);
       expect(runner().release).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('deleteOrphanRows', () => {
+    const SETTINGS_TABLE_NAMES = ['"roles"', '"feature_flag_rules"'];
+
+    interface IdRow {
+      id: string;
+    }
+
+    /** Managers that answer the regional ids and the settings ids found. */
+    function managers({ named, found }: { named: string[]; found: string[] }) {
+      const regional = {
+        query: jest.fn<Promise<IdRow[]>, [string, unknown[]?]>((sql) =>
+          Promise.resolve(
+            sql.startsWith('SELECT') ? named.map((id) => ({ id })) : []
+          )
+        )
+      };
+      const settings = {
+        query: jest.fn<Promise<IdRow[]>, [string, unknown[]?]>(() =>
+          Promise.resolve(found.map((id) => ({ id })))
+        )
+      };
+      const pair: SourceManagers = {
+        // @ts-expect-error - partial manager: `deleteOrphanRows` calls only `query`
+        regional,
+        // @ts-expect-error - partial manager: `deleteOrphanRows` calls only `query`
+        settings
+      };
+
+      return { regional, settings, pair };
+    }
+
+    it.each([
+      ['roleMembers', '"user_roles"', '"roles"'],
+      ['ruleMembers', '"feature_flag_rule_users"', '"feature_flag_rules"']
+    ] as const)(
+      'for %s reads the regional ids, checks them in the settings and deletes only the missing ones',
+      async (kind, table, parent) => {
+        const { regional, settings, pair } = managers({
+          named: ['a', 'b', 'c'],
+          found: ['b']
+        });
+
+        await deleteOrphanRows(pair, kind);
+
+        const regionalSql = regional.query.mock.calls.map(([sql]) => sql);
+        const [, [, deleted]] = regional.query.mock.calls;
+        const [[settingsSql, settingsParams]] = settings.query.mock.calls;
+
+        expect(regionalSql).toEqual([
+          expect.stringContaining(`FROM ${table}`),
+          expect.stringContaining(`DELETE FROM ${table}`)
+        ]);
+        expect(deleted).toEqual([['a', 'c']]);
+        expect(settingsSql).toContain(`FROM ${parent}`);
+        expect(settingsParams).toEqual([['a', 'b', 'c']]);
+        // No statement joins a table of the other data source.
+        expect(
+          regionalSql.filter((sql) =>
+            SETTINGS_TABLE_NAMES.some((name) => sql.includes(name))
+          )
+        ).toEqual([]);
+        expect(regional.query.mock.invocationCallOrder[0]).toBeLessThan(
+          settings.query.mock.invocationCallOrder[0]
+        );
+      }
+    );
+
+    it('deletes nothing when every settings row exists', async () => {
+      const { regional, pair } = managers({ named: ['a'], found: ['a'] });
+
+      await deleteOrphanRows(pair, 'roleMembers');
+
+      expect(regional.query).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads no settings row when no regional row names one', async () => {
+      const { settings, pair } = managers({ named: [], found: [] });
+
+      await deleteOrphanRows(pair, 'ruleMembers');
+
+      expect(settings.query).not.toHaveBeenCalled();
     });
   });
 

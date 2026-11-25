@@ -115,6 +115,8 @@ const restrictedSyntax = [
 
 export default tseslint.config(
   {
+    // `basePath`: the pre-commit run starts in the repository root.
+    basePath: import.meta.dirname,
     ignores: ['src/index.html']
   },
   {

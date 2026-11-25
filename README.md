@@ -1993,6 +1993,7 @@ TypeORM migrations manage 24 tables. The core tables are below. The billing tabl
 | dependency-cruiser | `npm run graph` from `server/`. Draws the import graph of the workspaces and modules into `architecture/dependency-graph.md`; `--html` writes interactive pages into the gitignored `architecture/html/` (needs Graphviz). CI runs `graph:check` | `server/scripts/dependency-graph.mjs` |
 | Docker graph | The same `npm run graph` also draws the Docker layout into `architecture/docker-graph.md`: the production connections, start order, volumes, services and cell names, the image build stages, the delivery workflow, and the development and CI containers. It reads the compose files, the Dockerfiles, the configs that name another container, the workflows and the egress lists of `shared/` | `server/scripts/docker-graph.mjs` |
 | check-workspace-versions | `npm run check:versions` from any workspace. A package that two or more workspaces declare has the same range and the same locked version. A workspace that uses a package declares it, because the check does not see a transitive copy | `scripts/check-workspace-versions.mjs` |
+| check-lint-staged | `node scripts/check-lint-staged.mjs`. Each tracked file that a `lint`, `lint:styles`, `lint:shared`, `lint:scripts` or `format:check` script reads has an entry in `.lintstagedrc.mjs` that runs the same tool, so the pre-commit hook finds what CI finds. `--eslint <workspace>` checks that ESLint gives each of these files the same rules from the repository root (the hook) as from the directory of its gate: a config block with a relative `files` or `ignores` pattern needs `basePath`. CI runs the default mode and `--self-test` in `Repo - Checks`, and `--eslint` in the job of each workspace | `scripts/check-lint-staged.mjs` |
 
 ### Import hygiene and barrels
 
@@ -2063,13 +2064,19 @@ commit. It applies auto-fix linting to the staged files only:
 | `client/{src,e2e}/**/*.ts` | Prettier + ESLint (angular-eslint) |
 | `client/src/**/*.html` | Prettier + ESLint (angular-eslint templates) |
 | `client/src/**/*.scss` | Prettier + Stylelint |
-| `server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
+| `server/{src,test}/**/*.ts`, `server/scripts/**/*.{ts,mjs}` | Prettier + ESLint (@typescript-eslint) |
+| `scripts/*.mjs` | Prettier + ESLint (the server config, as `npm run lint:scripts`) |
 | `mock-server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
 | `client/{*.{ts,mjs},scripts/*.mjs}` | Prettier |
-| `server/{*.ts,scripts/*.ts}` | Prettier |
+| `server/*.ts` | Prettier |
 | `mock-server/*.ts` | Prettier |
-| `shared/src/**/*.ts` | Prettier |
+| `shared/src/**/*.ts` | Prettier + ESLint (`server/eslint.shared.config.ts`) |
 | `{.lintstagedrc.mjs,eslint.base.config.mjs,eslint.base.config.d.mts}` | Prettier |
+
+`scripts/check-lint-staged.mjs` (CI) fails when a file that a lint or format gate reads matches no
+glob of this table with the same tool, or when ESLint gives it other rules from the repository root
+(where the hook runs) than from its workspace. A config block with a relative `files` or `ignores`
+pattern therefore has `basePath`.
 
 A commit-msg hook (`client/.husky/commit-msg`) also runs **commitlint**. It enforces the
 [Conventional Commits](https://www.conventionalcommits.org/) format. It also rejects a bare `@name`
@@ -2082,8 +2089,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3480 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 1062 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 1024 pass and 38 skip. CI then runs the Redis suites and the mail suite with Redis: 58 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3484 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 1063 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 1025 pass and 38 skip. CI then runs the Redis suites and the mail suite with Redis: 58 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1869 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 369 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1536 tests pass |

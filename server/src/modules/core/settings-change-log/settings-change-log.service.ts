@@ -3,10 +3,15 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression, Interval } from '@nestjs/schedule';
 import type { Cache } from 'cache-manager';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import type { AuditLogParams, AuditService } from '../../audit/audit.service';
 import { isSharedCache } from '../../../common/utils/redis-client';
-import { SettingsCommittedError, inBothSources } from '../../../data-sources';
+import {
+  SETTINGS_DATA_SOURCE,
+  SettingsCommittedError,
+  inBothSources
+} from '../../../data-sources';
 import type { SourceManagers } from '../../../data-sources';
 import {
   POOL_LOCK_KEYS,
@@ -219,7 +224,9 @@ export async function writeSettings<T>(
  * apply is the scope of the cache store: with Redis every node of the pool
  * reads the same entries, so one node applies each entry and the applied
  * version is a row of the regional database; with the in-memory store each
- * process applies every entry for itself.
+ * process applies every entry for itself. The log and its epoch are settings
+ * rows: they are read through the settings data source, one statement at a
+ * time, so the apply holds no settings connection while it waits.
  */
 @Injectable()
 export class SettingsChangeLogService {
@@ -229,6 +236,8 @@ export class SettingsChangeLogService {
 
   constructor(
     private readonly dataSource: DataSource,
+    @InjectDataSource(SETTINGS_DATA_SOURCE)
+    private readonly settingsDataSource: DataSource,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly eventEmitter: EventEmitter2
   ) {}
@@ -278,8 +287,8 @@ export class SettingsChangeLogService {
       await runOncePerPool(
         this.dataSource,
         POOL_LOCK_KEYS.settingsChangeLogCleanup,
-        async (manager) => {
-          await manager.query(
+        async () => {
+          await this.settingsDataSource.query(
             `DELETE FROM "settings_change_log" WHERE "created_at" < now() - make_interval(days => $1)`,
             [RETENTION_DAYS]
           );
@@ -290,19 +299,21 @@ export class SettingsChangeLogService {
     }
   }
 
-  async #applyForPool(manager: EntityManager): Promise<void> {
-    const rows = await manager.query<Array<{ epoch: string; version: string }>>(
+  async #applyForPool(regional: EntityManager): Promise<void> {
+    const rows = await regional.query<
+      Array<{ epoch: string; version: string }>
+    >(
       'SELECT "epoch", "version" FROM "settings_change_applied" WHERE "id" = 1'
     );
     const applied =
       rows.length > 0
         ? { epoch: rows[0].epoch, version: Number(rows[0].version) }
         : null;
-    const next = await this.#apply(manager, { applied, scope: 'pool' });
+    const next = await this.#apply(regional, { applied, scope: 'pool' });
 
     if (next === applied) return;
 
-    await manager.query(
+    await regional.query(
       `INSERT INTO "settings_change_applied" ("id", "epoch", "version", "applied_at")
        VALUES (1, $1, $2, now())
        ON CONFLICT ("id") DO UPDATE
@@ -314,8 +325,8 @@ export class SettingsChangeLogService {
   /** One apply at a time in this process; the state moves after the commit. */
   #applyForProcess(): Promise<void> {
     const run = this.#processQueue.then(async () => {
-      this.#processState = await this.dataSource.transaction((manager) =>
-        this.#apply(manager, {
+      this.#processState = await this.dataSource.transaction((regional) =>
+        this.#apply(regional, {
           applied: this.#processState,
           scope: 'process'
         })
@@ -329,24 +340,26 @@ export class SettingsChangeLogService {
 
   /**
    * Applies each entry after `applied` and returns the new state; returns
-   * `applied` itself when nothing was new.
+   * `applied` itself when nothing was new. `regional` is the transaction of
+   * the apply.
    */
   async #apply(
-    manager: EntityManager,
+    regional: EntityManager,
     {
       applied,
       scope
     }: { applied: AppliedState | null; scope: SettingsApplyScope }
   ): Promise<AppliedState> {
+    const { manager: settings } = this.settingsDataSource;
     const emit = (change: SettingsChange) =>
       this.eventEmitter.emitAsync(
         SettingsChangedEvent.name,
-        new SettingsChangedEvent(change, manager, scope)
+        new SettingsChangedEvent(change, { regional, settings }, scope)
       );
-    const [{ epoch }] = await manager.query<Array<{ epoch: string }>>(
+    const [{ epoch }] = await settings.query<Array<{ epoch: string }>>(
       'SELECT "epoch" FROM "settings_change_epoch" WHERE "id" = 1'
     );
-    const [bounds] = await manager.query<
+    const [bounds] = await settings.query<
       Array<{ first: string | null; last: string | null }>
     >(
       'SELECT min("version") AS "first", max("version") AS "last" FROM "settings_change_log"'
@@ -368,7 +381,7 @@ export class SettingsChangeLogService {
     let { version } = applied;
 
     for (;;) {
-      const entries = await manager.query<LogRow[]>(
+      const entries = await settings.query<LogRow[]>(
         `SELECT "version", "table_name", "operation", "keys"
          FROM "settings_change_log" WHERE "version" > $1
          ORDER BY "version" LIMIT $2`,

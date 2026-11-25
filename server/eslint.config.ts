@@ -91,6 +91,8 @@ export default defineConfig(
     }
   },
   {
+    // `basePath` for the pre-commit run from the repository root (see below).
+    basePath: __dirname,
     files: ['**/*.spec.ts', 'test/**/*.ts'],
     // The Express mock helpers return `Response & T`, so a mocked member carries
     // both the jest.Mock property and the original method declaration, and

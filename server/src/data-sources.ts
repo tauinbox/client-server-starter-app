@@ -94,6 +94,55 @@ export async function inBothSources<T>(
   }
 }
 
+/**
+ * The regional rows that point at a settings row by a plain id, with no
+ * foreign key: the apply of the settings change log deletes the rows whose
+ * settings row is gone. One closed list, because each name goes into SQL.
+ */
+const REGIONAL_CHILD_ROWS = {
+  roleMembers: { table: 'user_roles', column: 'role_id', parent: 'roles' },
+  ruleMembers: {
+    table: 'feature_flag_rule_users',
+    column: 'rule_id',
+    parent: 'feature_flag_rules'
+  }
+} as const;
+
+/**
+ * Deletes the regional rows of `kind` whose settings row does not exist. The
+ * regional ids are read first and checked in the settings second: a settings
+ * write commits its new row before the regional rows that name it
+ * (`writeSettings`), so each row that the first read sees names a committed
+ * settings row. The reverse order could miss a new settings row and delete
+ * its new regional rows.
+ */
+export async function deleteOrphanRows(
+  { regional, settings }: SourceManagers,
+  kind: keyof typeof REGIONAL_CHILD_ROWS
+): Promise<void> {
+  const { table, column, parent } = REGIONAL_CHILD_ROWS[kind];
+  const named = await regional.query<Array<{ id: string }>>(
+    `SELECT DISTINCT "${column}" AS "id" FROM "${table}"`
+  );
+
+  if (named.length === 0) return;
+
+  const ids = named.map(({ id }) => id);
+  const found = await settings.query<Array<{ id: string }>>(
+    `SELECT "id" FROM "${parent}" WHERE "id" = ANY($1::uuid[])`,
+    [ids]
+  );
+  const live = new Set(found.map(({ id }) => id));
+  const missing = ids.filter((id) => !live.has(id));
+
+  if (missing.length === 0) return;
+
+  await regional.query(
+    `DELETE FROM "${table}" WHERE "${column}" = ANY($1::uuid[])`,
+    [missing]
+  );
+}
+
 /** The settings pool takes this share of `DB_POOL_MAX`, at least 1. */
 const SETTINGS_POOL_SHARE = 0.2;
 
