@@ -35,7 +35,14 @@ export default {
       `${clientBin('stylelint')} --fix --config ${stylelintConfig} ${files.join(' ')}`
     ];
   },
-  'server/src/**/*.ts': (files) => {
+  '{server/{src,test}/**/*.ts,server/scripts/**/*.{ts,mjs}}': (files) => {
+    return [
+      `${serverBin('prettier')} --write ${files.join(' ')}`,
+      `${serverBin('eslint')} --fix -c ${serverEslintConfig} ${files.join(' ')}`
+    ];
+  },
+  // `npm run lint:scripts` lints them with the server config.
+  'scripts/*.mjs': (files) => {
     return [
       `${serverBin('prettier')} --write ${files.join(' ')}`,
       `${serverBin('eslint')} --fix -c ${serverEslintConfig} ${files.join(' ')}`
@@ -50,7 +57,7 @@ export default {
   'client/{*.{ts,mjs},scripts/*.mjs}': (files) => {
     return `${clientBin('prettier')} --write ${files.join(' ')}`;
   },
-  'server/{*.ts,scripts/**/*.ts}': (files) => {
+  'server/*.ts': (files) => {
     return `${serverBin('prettier')} --write ${files.join(' ')}`;
   },
   'mock-server/*.ts': (files) => {

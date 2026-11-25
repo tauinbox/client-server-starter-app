@@ -102,6 +102,12 @@ jobs:
       # install is enough.
       - run: node ../scripts/check-workspace-versions.mjs --self-test
       - run: npm run check:versions
+      # The pre-commit hook passes each file that a lint or format gate reads
+      # to the same tool, and ESLint gives it the same rules from the root as
+      # from its gate. Each job checks the ESLint config of its own install.
+      - run: node ../scripts/check-lint-staged.mjs --self-test
+      - run: node ../scripts/check-lint-staged.mjs
+      - run: node ../scripts/check-lint-staged.mjs --eslint server
       # The deploy writes the production secrets with this script.
       - run: bash ../scripts/sync-prod-env.sh --self-test
       # The guard that stops a cell env file from composing another cell.
@@ -266,6 +272,7 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
+      - run: node ../scripts/check-lint-staged.mjs --eslint mock-server
       - run: npm run typecheck
       - run: npm test
 
@@ -293,6 +300,7 @@ jobs:
       - run: npm run audit:ci
       - run: npm run lint
       - run: npm run format:check
+      - run: node ../scripts/check-lint-staged.mjs --eslint client
       # The self-test runs first so a check that has stopped detecting
       # anything fails loudly instead of passing.
       - run: node scripts/check-nginx-log-redaction.mjs --self-test
