@@ -2624,7 +2624,9 @@ exec node dist/server/src/main           # Start NestJS
 
 `src/run-boot-steps.ts` runs the boot steps under a Postgres advisory lock (`runSerializedInPool`,
 `src/common/utils/pool-lock.util.ts`). The migration step (`runMigrationSets`,
-`src/migration-sets.ts`) runs the regional set, then the settings set, but only on the pool of the
+`src/migration-sets.ts`) first records the baseline of each set with no run when `migrations` holds
+the whole old history of one database (`recordFrozenHistoryBaselines`; part of that history stops
+the step). It then runs the regional set, then the settings set, but only on the pool of the
 home region (`DATA_REGION`). Then every pool checks that each settings migration of its build is in
 `settings_migrations`; when one is missing, the step fails and the node does not start, because the
 home pool must deploy first. `npm run migrations:run` runs the same migration step with no admin
