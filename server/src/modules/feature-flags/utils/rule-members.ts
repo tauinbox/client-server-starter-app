@@ -69,12 +69,3 @@ export async function writeRuleMembers(
     );
   }
 }
-
-/** Deletes the member rows of rules that no longer exist. */
-export async function deleteOrphanRuleMembers(
-  manager: EntityManager
-): Promise<void> {
-  await manager.query(
-    `DELETE FROM "feature_flag_rule_users" m WHERE NOT EXISTS (SELECT 1 FROM "feature_flag_rules" r WHERE r."id" = m."rule_id")`
-  );
-}

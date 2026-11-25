@@ -117,8 +117,9 @@ describe('summarizeSettingsChanges', () => {
 });
 
 /**
- * A manager that answers the queries of an apply from a fixed log: the epoch,
- * the bounds of the log and the entries after a version.
+ * The settings data source answers the queries of an apply from a fixed log:
+ * the epoch, the bounds of the log and the entries after a version. The
+ * regional data source gives the transaction of the apply, which reads no log.
  */
 function fakeLog(state: { epoch: string; entries: Row[] }) {
   const query = jest.fn((sql: string, params: unknown[] = []) => {
@@ -149,13 +150,19 @@ function fakeLog(state: { epoch: string; entries: Row[] }) {
 
     return Promise.resolve([]);
   });
-  const dataSource = {
-    transaction: jest.fn((work: (m: { query: typeof query }) => unknown) =>
-      work({ query })
+  // The log is a settings table: a read of it on the regional side fails.
+  const regionalQuery = jest.fn(() =>
+    Promise.reject(new Error('the regional side holds no settings log'))
+  );
+  const regional = {
+    transaction: jest.fn(
+      (work: (m: { query: typeof regionalQuery }) => unknown) =>
+        work({ query: regionalQuery })
     )
   };
+  const settings = { manager: { query } };
 
-  return { query, dataSource };
+  return { regional, settings };
 }
 
 describe('SettingsChangeLogService with the memory cache (process scope)', () => {
@@ -174,12 +181,13 @@ describe('SettingsChangeLogService with the memory cache (process scope)', () =>
   });
 
   function service(state: { epoch: string; entries: Row[] }) {
-    const { dataSource } = fakeLog(state);
+    const { regional, settings } = fakeLog(state);
     const emitter: Pick<EventEmitter2, 'emitAsync'> = { emitAsync };
 
     return new SettingsChangeLogService(
-      // @ts-expect-error partial mock: only `transaction`
-      dataSource,
+      // @ts-expect-error partial mocks: `transaction` of the regional source, `manager.query` of the settings source
+      regional,
+      settings,
       cache,
       emitter
     );

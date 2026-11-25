@@ -12,13 +12,15 @@ describe('FeatureFlagChangedListener', () => {
   let resolver: { invalidateAll: jest.Mock };
   let notifications: { pushToAll: jest.Mock };
   let manager: { query: jest.Mock };
+  let settings: { query: jest.Mock };
   const event = (change: Parameters<typeof settingsChangedEvent>[0]) =>
-    // @ts-expect-error the listener calls only `query` of the manager
-    settingsChangedEvent(change, { manager });
+    // @ts-expect-error the listener calls only `query` of the managers
+    settingsChangedEvent(change, { managers: { regional: manager, settings } });
   const flagChange = () => event({ tables: ['feature_flags'] });
 
   beforeEach(async () => {
     manager = { query: jest.fn().mockResolvedValue([]) };
+    settings = { query: jest.fn().mockResolvedValue([]) };
     resolver = { invalidateAll: jest.fn().mockResolvedValue(undefined) };
     notifications = { pushToAll: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
@@ -46,15 +48,23 @@ describe('FeatureFlagChangedListener', () => {
     });
 
     it('deletes the members of removed rules before it drops the cache', async () => {
+      manager.query.mockImplementation((sql: string) =>
+        Promise.resolve(sql.startsWith('SELECT') ? [{ id: 'rule-gone' }] : [])
+      );
+
       await listener.handleSettingsChanged(
         event({ tables: ['feature_flag_rules'] })
       );
 
-      expect(manager.query).toHaveBeenCalledTimes(1);
-      expect(manager.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM "feature_flag_rule_users"')
+      expect(settings.query).toHaveBeenCalledWith(
+        expect.stringContaining('FROM "feature_flag_rules"'),
+        [['rule-gone']]
       );
-      expect(manager.query.mock.invocationCallOrder[0]).toBeLessThan(
+      expect(manager.query).toHaveBeenLastCalledWith(
+        expect.stringContaining('DELETE FROM "feature_flag_rule_users"'),
+        [['rule-gone']]
+      );
+      expect(manager.query.mock.invocationCallOrder.at(-1)).toBeLessThan(
         resolver.invalidateAll.mock.invocationCallOrder[0]
       );
     });

@@ -79,12 +79,14 @@ function settingsChangeLogOfFlags() {
   };
 }
 
-/** A change of the flag rows; the apply manager runs only the orphan delete. */
+/** A change of the flag rows; the apply managers run only the orphan delete. */
 function flagsChanged() {
+  const noRows = { query: () => Promise.resolve([]) };
+
   return settingsChangedEvent(
     { tables: ['feature_flags'] },
-    // @ts-expect-error - partial manager: the listener calls only `query`
-    { manager: { query: () => Promise.resolve([]) } }
+    // @ts-expect-error - partial managers: the listener calls only `query`
+    { managers: { regional: noRows, settings: noRows } }
   );
 }
 

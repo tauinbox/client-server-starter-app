@@ -1,4 +1,5 @@
 import type { EntityManager } from 'typeorm';
+import type { SourceManagers } from '../../../../data-sources';
 import type {
   SettingsApplyScope,
   SettingsChange,
@@ -18,9 +19,12 @@ export function settingsChangedEvent(
     deletedRoleIds?: string[];
   } = {},
   {
-    manager = {} as EntityManager,
+    managers = {
+      regional: {} as EntityManager,
+      settings: {} as EntityManager
+    },
     scope = 'pool'
-  }: { manager?: EntityManager; scope?: SettingsApplyScope } = {}
+  }: { managers?: SourceManagers; scope?: SettingsApplyScope } = {}
 ): SettingsChangedEvent {
   const full: SettingsChange = {
     all: change.all ?? false,
@@ -29,5 +33,5 @@ export function settingsChangedEvent(
     deletedRoleIds: change.deletedRoleIds ?? []
   };
 
-  return new SettingsChangedEvent(full, manager, scope);
+  return new SettingsChangedEvent(full, managers, scope);
 }
