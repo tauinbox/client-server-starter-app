@@ -12,7 +12,8 @@ import {
 } from '../src/migration-sets';
 import { RegionalBaseline1795600000000 } from '../src/migrations/regional/1795600000000-regional-baseline';
 import { SettingsBaseline1795600000000 } from '../src/migrations/settings/1795600000000-settings-baseline';
-import { FROZEN_HISTORY_SCHEMA } from '../src/database-roles';
+import { FROZEN_HISTORY_SCHEMA, SETTINGS_SCHEMA } from '../src/database-roles';
+import { migrateAndReport } from '../src/run-boot-steps';
 import { postgresConfig } from '../src/postgres.config';
 import { catalogDigest, describeSchema } from './schema-catalog';
 
@@ -176,6 +177,26 @@ runWithInfra('the baselines of the two migration sets (e2e)', () => {
 
     return rows.map(({ name }) => name);
   }
+
+  it('stops the migration step before the first migration when a role password is missing', async () => {
+    await expect(
+      migrateAndReport(sources, HOME_DATA_REGION, {
+        DB_SETTINGS_PASSWORD: 'settings-password'
+      })
+    ).rejects.toThrow('DB_REGIONAL_PASSWORD must be set');
+
+    const [{ migrations, settings }] = await sources.regional.query<
+      Array<{ migrations: string | null; settings: string | null }>
+    >(
+      `SELECT to_regclass('"migrations"') AS "migrations",
+              to_regnamespace('${SETTINGS_SCHEMA}') AS "settings"`
+    );
+
+    expect({ migrations, settings }).toEqual({
+      migrations: null,
+      settings: null
+    });
+  });
 
   it('builds the schema and the rows of the frozen history', async () => {
     const migrate = async (

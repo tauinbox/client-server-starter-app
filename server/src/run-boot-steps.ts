@@ -9,7 +9,8 @@ import {
   grantSourceRole,
   SETTINGS_SCHEMA,
   sourceLogin,
-  sourceSchema
+  sourceSchema,
+  type SourceKind
 } from './database-roles';
 import {
   dataRegionFromEnv,
@@ -45,15 +46,19 @@ export async function runBootSteps(
 
 /**
  * The migration step of the boot, also run by `npm run migrations:run`: the
- * migrations, then the role of each data source.
+ * migrations, then the role of each data source. A missing role password
+ * stops the step before the first migration: a rollback to the previous
+ * build then finds the schema that it knows.
  */
 export async function migrateAndReport(
   sources: MigrationSources,
-  region: DataRegion
+  region: DataRegion,
+  env: Readonly<Record<string, string | undefined>> = process.env
 ): Promise<void> {
+  const passwords = sourcePasswords(env);
   const { applied, recorded } = await runMigrationSets(sources, region);
 
-  await grantSourceRoles(sources);
+  await grantSourceRoles(sources, passwords);
 
   if (recorded.length > 0) {
     console.log(
@@ -68,10 +73,22 @@ export async function migrateAndReport(
   );
 }
 
+/** The password of the role of each data source; a missing one throws. */
+export function sourcePasswords(
+  env: Readonly<Record<string, string | undefined>>
+): Record<SourceKind, string> {
+  const read = (key: string) => env[key];
+
+  return {
+    regional: sourceLogin('regional', read).password,
+    settings: sourceLogin('settings', read).password
+  };
+}
+
 /** Creates or updates the role of each data source on its database. */
 export async function grantSourceRoles(
   sources: MigrationSources,
-  env: Readonly<Record<string, string | undefined>> = process.env
+  passwords: Record<SourceKind, string>
 ): Promise<void> {
   const regionalSchema = sourceSchema(sources.regional);
 
@@ -93,7 +110,7 @@ export async function grantSourceRoles(
   ] as const) {
     await grantSourceRole(source, {
       kind,
-      password: sourceLogin(kind, (key) => env[key]).password,
+      password: passwords[kind],
       schema,
       otherSchema,
       migrationsTable
