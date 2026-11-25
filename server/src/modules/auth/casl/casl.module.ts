@@ -15,6 +15,7 @@ import { ResourceRegistryService } from '../services/resource-registry.service';
 import { MfaPolicyService } from '../services/mfa-policy.service';
 import { CryptoModule } from '../../../common/crypto/crypto.module';
 import { SettingsChangeLogModule } from '../../core/settings-change-log/settings-change-log.module';
+import { RegionModule } from '../../core/region/region.module';
 import { RbacSettingsChangedListener } from '../listeners/rbac-settings-changed.listener';
 
 /**
@@ -30,6 +31,7 @@ import { RbacSettingsChangedListener } from '../listeners/rbac-settings-changed.
   imports: [
     CryptoModule,
     DiscoveryModule,
+    RegionModule,
     SettingsChangeLogModule,
     TypeOrmModule.forFeature([User]),
     TypeOrmModule.forFeature(

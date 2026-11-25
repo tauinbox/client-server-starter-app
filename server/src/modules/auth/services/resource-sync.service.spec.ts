@@ -5,6 +5,7 @@ import { DiscoveryService, Reflector } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { poolLockDataSource } from '../../../common/testing/pool-lock.mock';
 import { SettingsChangeLogService } from '../../core/settings-change-log/settings-change-log.service';
+import { RegionService } from '../../core/region/region.service';
 import { ResourceSyncService } from './resource-sync.service';
 import { ResourceService } from './resource.service';
 import { ResourceRegistryService } from './resource-registry.service';
@@ -39,6 +40,8 @@ describe('ResourceSyncService', () => {
     save: jest.Mock;
   };
   let actionRepoMock: { find: jest.Mock; create: jest.Mock; save: jest.Mock };
+  let region: { writesSettings: boolean };
+  let poolLock: ReturnType<typeof poolLockDataSource>;
 
   const usersMeta = {
     name: 'users',
@@ -63,6 +66,8 @@ describe('ResourceSyncService', () => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation();
 
     discoveryServiceMock = { getControllers: jest.fn().mockReturnValue([]) };
+    region = { writesSettings: true };
+    poolLock = poolLockDataSource();
 
     reflectorMock = { get: jest.fn().mockReturnValue(undefined) };
 
@@ -119,8 +124,9 @@ describe('ResourceSyncService', () => {
           useValue: permissionRepoMock
         },
         { provide: repositoryToken(Action), useValue: actionRepoMock },
-        { provide: DataSource, useValue: poolLockDataSource() },
-        { provide: SettingsChangeLogService, useValue: settingsChangeLog }
+        { provide: DataSource, useValue: poolLock },
+        { provide: SettingsChangeLogService, useValue: settingsChangeLog },
+        { provide: RegionService, useValue: region }
       ]
     }).compile();
 
@@ -472,6 +478,29 @@ describe('ResourceSyncService', () => {
       await service.onApplicationBootstrap();
 
       expect(warnSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('on a pool that is not the home pool', () => {
+    it('registers the declared names, writes no settings row and takes no sync lock', async () => {
+      region.writesSettings = false;
+      discoveryServiceMock.getControllers.mockReturnValue([
+        makeController('UsersController')
+      ]);
+      reflectorMock.get.mockReturnValue(usersMeta);
+      resourceRepoMock.find.mockResolvedValue([
+        { id: 'old-res', name: 'legacy', isOrphaned: false }
+      ]);
+
+      await service.onApplicationBootstrap();
+
+      expect(resourceRegistryMock.register).toHaveBeenCalledWith(['users']);
+      expect(settingsChangeLog.applyPending).toHaveBeenCalledTimes(1);
+      expect(poolLock.transaction).not.toHaveBeenCalled();
+      expect(resourceServiceMock.upsertResource).not.toHaveBeenCalled();
+      expect(resourceRepoMock.update).not.toHaveBeenCalled();
+      expect(permissionRepoMock.save).not.toHaveBeenCalled();
+      expect(actionRepoMock.save).not.toHaveBeenCalled();
     });
   });
 

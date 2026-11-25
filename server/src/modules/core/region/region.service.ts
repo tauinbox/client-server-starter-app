@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ErrorKeys,
+  HOME_DATA_REGION,
   regionForCountry,
   type CountryCode,
   type DataRegion,
@@ -15,10 +16,16 @@ import { ApiError } from '../../../common/errors/api-error';
 export class RegionService {
   readonly region: DataRegion;
   readonly peers: PeerRegions;
+  /**
+   * True on the pool of the settings primary. A settings write that no
+   * request makes (the resource sync, the log retention) runs only there.
+   */
+  readonly writesSettings: boolean;
 
   constructor(configService: ConfigService) {
     this.region = configService.getOrThrow<DataRegion>('DATA_REGION');
     this.peers = configService.get<PeerRegions>('PEER_REGIONS') ?? {};
+    this.writesSettings = this.region === HOME_DATA_REGION;
   }
 
   config(): RegionConfigResponse {

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { SettingsChangeLogService } from './settings-change-log.service';
+import { RegionModule } from '../region/region.module';
 
 /**
  * The apply of the settings change log. Each module that writes settings
@@ -7,6 +8,7 @@ import { SettingsChangeLogService } from './settings-change-log.service';
  * instance of the module, so one poll runs in each process.
  */
 @Module({
+  imports: [RegionModule],
   providers: [SettingsChangeLogService],
   exports: [SettingsChangeLogService]
 })
