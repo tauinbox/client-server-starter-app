@@ -15,6 +15,15 @@ export type DataRegion = (typeof DATA_REGIONS)[number];
  */
 export const HOME_DATA_REGION: DataRegion = 'intl';
 
+/** True for the region whose pool writes the settings rows and schema. */
+export function writesSettings(region: DataRegion): boolean {
+  return region === HOME_DATA_REGION;
+}
+
+export function isDataRegion(value: unknown): value is DataRegion {
+  return DATA_REGIONS.some((region) => region === value);
+}
+
 /** The public URL of each other cell. A region with no entry is not served. */
 export type PeerRegions = Partial<Record<DataRegion, string>>;
 

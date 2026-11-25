@@ -6,6 +6,7 @@ import { Permission } from '../modules/auth/entities/permission.entity';
 import { RolePermission } from '../modules/auth/entities/role-permission.entity';
 import { Resource } from '../modules/auth/entities/resource.entity';
 import { Action } from '../modules/auth/entities/action.entity';
+import { assertSettingsWriter } from '../migration-sets';
 import {
   RESOURCE_METADATA_KEY,
   type ResourceMetadata
@@ -96,6 +97,7 @@ export default class RbacSeeder extends Seeder {
   // role-permission grants): a re-run inserts only what is missing instead of
   // hitting the unique constraints on resource/action/role name.
   async run(dataSource: DataSource) {
+    assertSettingsWriter();
     const roleRepo = dataSource.getRepository(Role);
     const permissionRepo = dataSource.getRepository(Permission);
     const rolePermissionRepo = dataSource.getRepository(RolePermission);

@@ -32,12 +32,15 @@ describe('postgresConfig', () => {
 
   it('loads the classes that the former glob strings loaded', async () => {
     const { entities, migrations } = postgresConfig();
-    const viaGlob = (pattern: string) =>
-      importClassesFromDirectories(silentLogger, [pattern]);
+    const viaGlob = (...patterns: string[]) =>
+      importClassesFromDirectories(
+        silentLogger,
+        patterns.map((pattern) => join(__dirname, pattern))
+      );
 
     const [globEntities, globMigrations] = await Promise.all([
-      viaGlob(join(__dirname, 'modules/**/*.entity{.ts,.js}')),
-      viaGlob(join(__dirname, 'migrations/*{ts,.js}'))
+      viaGlob('modules/**/*.entity{.ts,.js}'),
+      viaGlob('migrations/*{ts,.js}', 'migrations/regional/*{ts,.js}')
     ]);
 
     expect(classNames(entities as unknown[])).toEqual(classNames(globEntities));

@@ -53,10 +53,11 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Test watch | `npm run test:watch` |
 | Test coverage | `npm run test:cov` (`pretest:cov` deletes `coverage/` first, so the report holds only the current sources) |
 | E2E tests | `npm run test:e2e` |
-| Run migrations | `npm run migrations:run` (build first) |
-| Generate migration | `npm run migrations:gen -- ./src/migrations/<kebab-name>` (build first) |
-| Revert migration | `npm run migrations:revert` (build first) |
-| Run seeders | `npm run seed:run` (build first) |
+| Run migrations | `npm run migrations:run` (build first). It runs the regional set, then the settings set when `DATA_REGION` is the home region, then refuses a settings schema older than the build |
+| Generate migration | `npm run migrations:gen -- ./src/migrations/<settings\|regional>/<kebab-name>` (build first). `src/migrations/` itself is the frozen history of one database; a migration of settings tables goes into `settings/`, every other one into `regional/` |
+| Revert migration | `npm run migrations:revert` (regional set) or `npm run migrations:revert:settings` (settings set) (build first) |
+| Run seeders | `npm run seed:run` (build first). The seeders write settings rows, so they refuse to run when `DATA_REGION` is not the home region |
+| Check the migration sets | `npm run check:migration-sets` fails on a new file in the frozen `src/migrations/`, on a migration in `settings/` that names a regional table, on a migration in `regional/` that names a settings table, and on a seeder that does not call `assertSettingsWriter()`. `--self-test` runs planted cases. CI applies both in the `Repo - Checks` job |
 | Validate the controller layout | `npm run check:controllers` fails when a module keeps a controller outside its `controllers/` folder, when a sub-feature folder holds more than one controller, when a controller registers `ClassSerializerInterceptor` (`CoreModule` registers it for every route), or when a test app mounts a production controller without `CoreModule` and without `RESPONSE_SERIALIZER`. CI applies it in the `Repo - Checks` job |
 | Find read-then-write races | `npm run check:race` scans each service and listener method under `src/modules`. It fails on a read (`findOne*`, `exists*`, or a method of the same file that makes one), then a delete (`delete`, `remove`, `softDelete`, `softRemove`) that reads no `affected`, has no `where`, and takes no pessimistic lock in the method or in a method of the same file that it calls. It fails on an entity loaded by `find*` without a pessimistic lock and then given to `save`, in the method or through a parameter of a method of the same file: `save` writes back every column of the loaded copy, so write the changed columns with a keyed update (`keyedUpdate` in `src/common/utils/keyed-update.util.ts`). It also fails on a read check that refuses a duplicate (`*_EXISTS`, `ALREADY_*`) before a `save` or `insert`, when no unique violation is mapped to the same key. It fails on an instance check (`assertCan`, `assertCanWrite`, `assertCanRole`, `assertCanUpdate`, `assertCanWiden`, `assertNotSuperTarget`) that runs before the transaction of the write and not again inside it, on the row read `FOR UPDATE`; inside means in a callback of `transaction` or `withTransaction`, or of a method of the same file that runs one, or in a function that such a callback calls or receives. It fails on an entity loaded by `find*` without a pessimistic lock, a read of one of its columns, and then an `update` keyed only on the id that writes that column, in the method or through a parameter of a method of the same file: put the read value in the `where` of the update and decide from `affected`. A method with `// race-checked: <reason>` on the line above it is skipped. `--self-test` runs planted cases. CI applies both in the `Repo - Checks` job |
 | Find RegExp modifiers in shared code | `npm run check:regex-modifiers` (`scripts/check-regex-modifiers.ts`) scans `shared/src`. It fails on a modifier group such as `(?i:...)` in a regex literal or in the string argument of `RegExp(...)`. The client compiles `shared/src`, and Safari before 26 cannot parse a modifier. The client ESLint config refuses the same pattern in `client/`. `--self-test` runs planted cases. CI applies both in the `Repo - Checks` job |
@@ -2617,12 +2618,17 @@ The `Dockerfile` has more than one stage, for a production build.
 
 **`docker-entrypoint.sh`** runs at the start of the container:
 ```sh
-node dist/server/src/run-boot-steps.js   # Apply pending migrations, then create the admin user if ADMIN_EMAIL set
+node dist/server/src/run-boot-steps.js   # Apply pending migrations of both sets, check the settings schema, then create the admin user if ADMIN_EMAIL set
 exec node dist/server/src/main           # Start NestJS
 ```
 
-`src/run-boot-steps.ts` runs the two boot steps on one data source, under a Postgres advisory
-lock (`runSerializedInPool`, `src/common/utils/pool-lock.util.ts`). When several nodes of a pool
+`src/run-boot-steps.ts` runs the boot steps under a Postgres advisory lock (`runSerializedInPool`,
+`src/common/utils/pool-lock.util.ts`). The migration step (`runMigrationSets`,
+`src/migration-sets.ts`) runs the regional set, then the settings set, but only on the pool of the
+home region (`DATA_REGION`). Then every pool checks that each settings migration of its build is in
+`settings_migrations`; when one is missing, the step fails and the node does not start, because the
+home pool must deploy first. `npm run migrations:run` runs the same migration step with no admin
+seed. When several nodes of a pool
 start at the same time, they run the steps one at a time: a node that starts second waits, then
 finds no pending migration and an existing administrator. It does not skip the steps, because a
 node must not serve on an old schema.
@@ -2909,7 +2915,7 @@ repository.
   A `no-restricted-syntax` ESLint rule bans an `as unknown as T` double cast.
 
   The `no-console` ESLint rule applies to `src/`, except the spec files and the boot steps that
-  run outside Nest (`run-boot-steps.ts`, `seed-admin.ts`). Runtime code uses the logger.
+  run outside Nest (`run-boot-steps.ts`, `run-migrations.ts`, `seed-admin.ts`). Runtime code uses the logger.
 
   The reusable fakes for a context, a configuration and an Express object are in
   `src/common/testing/`. A test that needs a real `ConfigService` builds it with

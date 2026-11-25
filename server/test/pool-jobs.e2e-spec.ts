@@ -11,7 +11,9 @@ import {
 } from 'typeorm';
 import { CoreModule } from '../src/modules/core/core.module';
 import { postgresConfig } from '../src/postgres.config';
+import { HOME_DATA_REGION } from '@app/shared/constants';
 import { runBootSteps } from '../src/run-boot-steps';
+import { settingsMigrationOptions } from '../src/migration-sets';
 import { AuditCleanupService } from '../src/modules/audit/audit-cleanup.service';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { TokenCleanupService } from '../src/modules/auth/services/token-cleanup.service';
@@ -59,6 +61,7 @@ runWithInfra('jobs on many nodes of one pool (e2e)', () => {
 
     let holder: DataSource;
     let nodes: DataSource[];
+    let settingsNodes: DataSource[];
 
     beforeAll(async () => {
       process.env = {
@@ -73,13 +76,18 @@ runWithInfra('jobs on many nodes of one pool (e2e)', () => {
         `CREATE TABLE IF NOT EXISTS "${PROBE_TABLE}" (id int)`
       );
       nodes = [new DataSource(nodeOptions), new DataSource(nodeOptions)];
-      await Promise.all(nodes.map((node) => node.initialize()));
+      settingsNodes = nodes.map(
+        () => new DataSource({ ...settingsMigrationOptions(), logging: false })
+      );
+      await Promise.all(
+        [...nodes, ...settingsNodes].map((node) => node.initialize())
+      );
     }, 60000);
 
     afterAll(async () => {
       process.env = ENV;
       await Promise.all(
-        (nodes ?? [])
+        [...(nodes ?? []), ...(settingsNodes ?? [])]
           .filter((node) => node.isInitialized)
           .map((node) => node.destroy())
       );
@@ -105,7 +113,12 @@ runWithInfra('jobs on many nodes of one pool (e2e)', () => {
       await lock.startTransaction();
       await lock.query(`LOCK TABLE "${PROBE_TABLE}" IN ACCESS EXCLUSIVE MODE`);
 
-      const runs = nodes.map((node) => runBootSteps(node));
+      const runs = nodes.map((node, index) =>
+        runBootSteps(
+          { regional: node, settings: settingsNodes[index] },
+          HOME_DATA_REGION
+        )
+      );
 
       try {
         await waitUntil('both nodes wait on a lock', async () => {

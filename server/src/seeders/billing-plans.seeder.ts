@@ -8,6 +8,7 @@ import type {
   PlanPrice
 } from '@app/shared/types';
 import { Plan } from '../modules/billing/entities/plan.entity';
+import { assertSettingsWriter } from '../migration-sets';
 
 type SeedPlan = {
   key: string;
@@ -91,6 +92,7 @@ const PLANS: SeedPlan[] = [
 
 export default class BillingPlansSeeder extends Seeder {
   async run(dataSource: DataSource): Promise<void> {
+    assertSettingsWriter();
     const planRepo = dataSource.getRepository(Plan);
 
     const existingKeys = new Set(
