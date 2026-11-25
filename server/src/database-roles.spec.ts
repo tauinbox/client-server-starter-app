@@ -1,9 +1,38 @@
 import { getMetadataArgsStorage } from 'typeorm';
 import { SETTINGS_ENTITIES } from './data-sources';
-import { SETTINGS_SCHEMA, SOURCE_ROLES, sourceLogin } from './database-roles';
+import {
+  scramVerifier,
+  SETTINGS_SCHEMA,
+  SOURCE_ROLES,
+  sourceLogin
+} from './database-roles';
 import { loadEntities } from './postgres.config';
 
 describe('database roles', () => {
+  describe('scramVerifier', () => {
+    // Postgres 18 stored this verifier for `CREATE ROLE ... PASSWORD
+    // 'probe-password'`; the same salt gives the same verifier here.
+    const SALT = 'BOCsV5hlrp9Q+oiIXt0l7g==';
+    const POSTGRES_VERIFIER =
+      'SCRAM-SHA-256$4096:BOCsV5hlrp9Q+oiIXt0l7g==$W/xeut8/KbkrDqxH7yPtdsaDYiAedz42f9Qzm9S9aps=:d/mt96gx85n7samWy/HzOnAZFEXLJw35zugVwaVrepA=';
+
+    it('builds the verifier that Postgres stores for the password', () => {
+      expect(scramVerifier('probe-password', Buffer.from(SALT, 'base64'))).toBe(
+        POSTGRES_VERIFIER
+      );
+    });
+
+    it('takes a new salt each time and holds no password', () => {
+      const [first, second] = [
+        scramVerifier('probe-password'),
+        scramVerifier('probe-password')
+      ];
+
+      expect(first).not.toBe(second);
+      expect(first).not.toContain('probe-password');
+    });
+  });
+
   describe('sourceLogin', () => {
     it.each(['regional', 'settings'] as const)(
       'logs the %s data source in with its own role',

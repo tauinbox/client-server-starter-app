@@ -1,4 +1,27 @@
+import { createHash, createHmac, pbkdf2Sync, randomBytes } from 'node:crypto';
 import type { DataSource } from 'typeorm';
+
+/** The iteration count of Postgres (`scram_iterations`, default 4096). */
+const SCRAM_ITERATIONS = 4096;
+
+/**
+ * The SCRAM-SHA-256 verifier of `password` in the form that Postgres stores
+ * (RFC 5802, RFC 7677): `SCRAM-SHA-256$<iterations>:<salt>$<StoredKey>:<ServerKey>`.
+ * Postgres takes a verifier in `ALTER ROLE ... PASSWORD` as it is. The
+ * password is used as UTF-8 with no SASLprep, as Postgres does for a password
+ * that SASLprep leaves unchanged (any ASCII password).
+ */
+export function scramVerifier(
+  password: string,
+  salt: Buffer = randomBytes(16)
+): string {
+  const salted = pbkdf2Sync(password, salt, SCRAM_ITERATIONS, 32, 'sha256');
+  const clientKey = createHmac('sha256', salted).update('Client Key').digest();
+  const storedKey = createHash('sha256').update(clientKey).digest();
+  const serverKey = createHmac('sha256', salted).update('Server Key').digest();
+
+  return `SCRAM-SHA-256$${SCRAM_ITERATIONS}:${salt.toString('base64')}$${storedKey.toString('base64')}:${serverKey.toString('base64')}`;
+}
 
 /**
  * The schema of the settings tables. The regional tables stay in the schema
@@ -112,20 +135,20 @@ export async function grantSourceRole(
         END IF;
       END $$`
     );
-    // The password goes in as a parameter, never into the text of a statement.
-    await manager.query(`SELECT set_config('app.role_password', $1, true)`, [
-      password
+    // Only the SCRAM verifier leaves the process: a statement that a log
+    // writes with its parameters holds no password that signs in.
+    await manager.query(`SELECT set_config('app.role_verifier', $1, true)`, [
+      scramVerifier(password)
     ]);
     await manager.query(
       `DO $$ BEGIN
         EXECUTE format(
           'ALTER ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT PASSWORD %L',
-          '${role}', current_setting('app.role_password'));
+          '${role}', current_setting('app.role_verifier'));
         EXECUTE format('ALTER ROLE %I IN DATABASE %I SET search_path = %I',
           '${role}', current_database(), '${schema}');
       END $$`
     );
-    await manager.query(`SELECT set_config('app.role_password', '', true)`);
 
     for (const statement of [
       `REVOKE ALL ON ALL TABLES IN SCHEMA ${other} FROM "${role}"`,
