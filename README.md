@@ -2064,13 +2064,19 @@ commit. It applies auto-fix linting to the staged files only:
 | `client/{src,e2e}/**/*.ts` | Prettier + ESLint (angular-eslint) |
 | `client/src/**/*.html` | Prettier + ESLint (angular-eslint templates) |
 | `client/src/**/*.scss` | Prettier + Stylelint |
-| `server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
+| `server/{src,test}/**/*.ts`, `server/scripts/**/*.{ts,mjs}` | Prettier + ESLint (@typescript-eslint) |
+| `scripts/*.mjs` | Prettier + ESLint (the server config, as `npm run lint:scripts`) |
 | `mock-server/src/**/*.ts` | Prettier + ESLint (@typescript-eslint) |
 | `client/{*.{ts,mjs},scripts/*.mjs}` | Prettier |
-| `server/{*.ts,scripts/*.ts}` | Prettier |
+| `server/*.ts` | Prettier |
 | `mock-server/*.ts` | Prettier |
-| `shared/src/**/*.ts` | Prettier |
+| `shared/src/**/*.ts` | Prettier + ESLint (`server/eslint.shared.config.ts`) |
 | `{.lintstagedrc.mjs,eslint.base.config.mjs,eslint.base.config.d.mts}` | Prettier |
+
+`scripts/check-lint-staged.mjs` (CI) fails when a file that a lint or format gate reads matches no
+glob of this table with the same tool, or when ESLint gives it other rules from the repository root
+(where the hook runs) than from its workspace. A config block with a relative `files` or `ignores`
+pattern therefore has `basePath`.
 
 A commit-msg hook (`client/.husky/commit-msg`) also runs **commitlint**. It enforces the
 [Conventional Commits](https://www.conventionalcommits.org/) format. It also rejects a bare `@name`
@@ -2083,8 +2089,8 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3480 tests pass |
-| Server E2E tests | Jest | A separate configuration in `test/` | 1062 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 1024 pass and 38 skip. CI then runs the Redis suites and the mail suite with Redis: 58 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3484 tests pass |
+| Server E2E tests | Jest | A separate configuration in `test/` | 1063 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 1025 pass and 38 skip. CI then runs the Redis suites and the mail suite with Redis: 58 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1869 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 369 tests |
 | Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1536 tests pass |
