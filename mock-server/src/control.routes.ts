@@ -23,8 +23,8 @@ import type {
   State
 } from './types';
 import {
-  DATA_REGIONS,
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
+  isDataRegion,
   isLegalJurisdiction,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
   type PeerRegions
@@ -640,7 +640,7 @@ router.post('/region-peers', (req, res) => {
   const entries = Object.entries(peers);
   const refused = entries.find(
     ([region, url]) =>
-      !(DATA_REGIONS as readonly string[]).includes(region) ||
+      !isDataRegion(region) ||
       region === MOCK_DATA_REGION ||
       typeof url !== 'string' ||
       URL.parse(url)?.protocol !== 'https:'
