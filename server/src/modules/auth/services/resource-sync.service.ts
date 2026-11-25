@@ -18,6 +18,12 @@ import { ResourceService } from './resource.service';
 import { ResourceRegistryService } from './resource-registry.service';
 import { CASL_RESERVED_ACTION_NAMES } from '@app/shared/constants';
 import { SettingsChangeLogService } from '../../core/settings-change-log/settings-change-log.service';
+import { RegionService } from '../../core/region/region.service';
+
+interface DeclaredResource {
+  meta: ResourceMetadata;
+  controllerName: string;
+}
 
 @Injectable()
 export class ResourceSyncService implements OnApplicationBootstrap {
@@ -35,20 +41,26 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     @InjectRepository(Action, SETTINGS_DATA_SOURCE)
     private readonly actionRepository: Repository<Action>,
     private readonly dataSource: DataSource,
-    private readonly settingsChangeLog: SettingsChangeLogService
+    private readonly settingsChangeLog: SettingsChangeLogService,
+    private readonly region: RegionService
   ) {}
 
-  // Serialized, not skipped: a node that skipped would serve with an empty
-  // registry, and two concurrent syncs insert the same new action twice.
-  // The lock holds a regional connection: the sync writes through the small
-  // settings pool, which a held settings connection could empty.
+  // Serialized: two concurrent syncs insert one new action twice. The lock
+  // holds a regional connection, so the small settings pool stays free.
+  // Another pool reads the rows that the home pool wrote when it deployed.
   async onApplicationBootstrap(): Promise<void> {
     try {
-      await runSerializedInPool(
-        this.dataSource,
-        POOL_LOCK_KEYS.resourceSync,
-        () => this.syncResources()
-      );
+      const declared = this.discoverResources();
+
+      if (this.region.writesSettings) {
+        await runSerializedInPool(
+          this.dataSource,
+          POOL_LOCK_KEYS.resourceSync,
+          () => this.syncResources(declared)
+        );
+      }
+
+      this.resourceRegistry.register(declared.map(({ meta }) => meta.name));
       // After the sync lock is free: the apply takes a lock of its own.
       await this.settingsChangeLog.applyPending();
     } catch (error) {
@@ -59,10 +71,9 @@ export class ResourceSyncService implements OnApplicationBootstrap {
     }
   }
 
-  private async syncResources(): Promise<void> {
-    const registeredNames = new Set<string>();
+  private discoverResources(): DeclaredResource[] {
     const controllers = this.discoveryService.getControllers();
-    const declared: { meta: ResourceMetadata; controllerName: string }[] = [];
+    const declared: DeclaredResource[] = [];
 
     for (const wrapper of controllers) {
       const metatype = wrapper.metatype as
@@ -101,10 +112,14 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         continue;
       }
 
-      registeredNames.add(meta.name);
       declared.push({ meta, controllerName: metatype.name });
     }
 
+    return declared;
+  }
+
+  private async syncResources(declared: DeclaredResource[]): Promise<void> {
+    const registeredNames = new Set(declared.map(({ meta }) => meta.name));
     const actions = await this.ensureDeclaredActions(
       declared.flatMap(({ meta }) => meta.actions)
     );
@@ -191,8 +206,6 @@ export class ResourceSyncService implements OnApplicationBootstrap {
         `Resource "${resource.name}" is orphaned — no controller registered it. Permissions for this resource are disabled.`
       );
     }
-
-    this.resourceRegistry.register([...registeredNames]);
   }
 
   /**

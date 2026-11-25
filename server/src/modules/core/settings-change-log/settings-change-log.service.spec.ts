@@ -2,6 +2,7 @@ import type { Cache } from 'cache-manager';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { dataSourceDouble } from '../../../common/testing/data-source.double';
+import { poolLockDataSource } from '../../../common/testing/pool-lock.mock';
 import type { AuditLogParams } from '../../audit/audit.service';
 import {
   SettingsChangeLogService,
@@ -189,7 +190,8 @@ describe('SettingsChangeLogService with the memory cache (process scope)', () =>
       regional,
       settings,
       cache,
-      emitter
+      emitter,
+      { writesSettings: true }
     );
   }
 
@@ -273,5 +275,44 @@ describe('SettingsChangeLogService with the memory cache (process scope)', () =>
     await Promise.all([log.applyPending(), log.applyPending(), log.poll()]);
 
     expect(most).toBe(1);
+  });
+});
+
+describe('SettingsChangeLogService.removeOldEntries', () => {
+  function service(writesSettings: boolean) {
+    const regional = poolLockDataSource();
+    const settings = { query: jest.fn().mockResolvedValue([]) };
+    const emitter: Pick<EventEmitter2, 'emitAsync'> = { emitAsync: jest.fn() };
+    const log = new SettingsChangeLogService(
+      // @ts-expect-error partial mocks: the lock source, the settings `query` and the region
+      regional,
+      settings,
+      { stores: [] },
+      emitter,
+      { writesSettings }
+    );
+
+    return { log, regional, settings };
+  }
+
+  it('deletes the old entries on the home pool, once per pool', async () => {
+    const { log, regional, settings } = service(true);
+
+    await log.removeOldEntries();
+
+    expect(regional.transaction).toHaveBeenCalledTimes(1);
+    expect(settings.query).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM "settings_change_log"'),
+      [7]
+    );
+  });
+
+  it('deletes nothing and takes no lock on another pool', async () => {
+    const { log, regional, settings } = service(false);
+
+    await log.removeOldEntries();
+
+    expect(regional.transaction).not.toHaveBeenCalled();
+    expect(settings.query).not.toHaveBeenCalled();
   });
 });

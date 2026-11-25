@@ -7,6 +7,14 @@ export const DATA_REGIONS = ['intl', 'ru'] as const;
 
 export type DataRegion = (typeof DATA_REGIONS)[number];
 
+/**
+ * The region whose pool holds the settings primary. Only the cell of this
+ * region writes settings rows; the other cells read them. It is a constant of
+ * the code, so an edit of the env or of the settings cannot make another cell
+ * write the settings of every region.
+ */
+export const HOME_DATA_REGION: DataRegion = 'intl';
+
 /** The public URL of each other cell. A region with no entry is not served. */
 export type PeerRegions = Partial<Record<DataRegion, string>>;
 

@@ -26,6 +26,7 @@ import {
   type SettingsTable
 } from './settings-change.types';
 import { SettingsChangedEvent } from './settings-changed.event';
+import { RegionService } from '../region/region.service';
 
 /** The bound of the time a revoke on another pool waits (MR-20). */
 export const SETTINGS_POLL_INTERVAL_MS = 5_000;
@@ -239,7 +240,8 @@ export class SettingsChangeLogService {
     @InjectDataSource(SETTINGS_DATA_SOURCE)
     private readonly settingsDataSource: DataSource,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventEmitter: EventEmitter2,
+    private readonly region: RegionService
   ) {}
 
   /**
@@ -281,8 +283,11 @@ export class SettingsChangeLogService {
     }
   }
 
+  /** The log is a settings table: only the pool of the primary deletes from it. */
   @Cron(CronExpression.EVERY_DAY_AT_1AM, { timeZone: 'UTC' })
   async removeOldEntries(): Promise<void> {
+    if (!this.region.writesSettings) return;
+
     try {
       await runOncePerPool(
         this.dataSource,
