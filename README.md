@@ -1641,6 +1641,30 @@ Each job that opens an SSH session also has a `timeout-minutes` value. A person 
 connect timeout and the command timeout of the SSH action do not always end a session against a host
 that does not answer.
 
+#### Rollback over the move of the settings schema
+
+The release of 2026-11-25 moves the settings tables from `public` into the `settings` schema
+(`MoveSettingsToSchema1795700000000`). A build before it reads `"public"."roles"` and does not start
+on the moved schema. The boot steps check the two role passwords before the first migration, so a
+missing `DB_REGIONAL_PASSWORD` or `DB_SETTINGS_PASSWORD` stops the new build with the old schema in
+place, and the automatic rollback works. If the new build fails after the move, the automatic
+rollback starts an old build that cannot start. Then, on the host:
+
+1. With the image of the new build, move the tables back. The image has no `npm`, so the step calls
+   the TypeORM CLI directly:
+   `docker compose run --rm --entrypoint "" server node node_modules/typeorm/cli.js migration:revert -d dist/server/src/settings-data-source.js`.
+   Its `down()` moves the tables and the change log function back into `public`.
+2. Move the migrations table of the settings set back, because the old build reads it in `public`:
+   `docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER TABLE settings.settings_migrations SET SCHEMA public"'`.
+3. Run `rollback.yml` to the previous SHA.
+
+A local probe of 2026-11-25 ran steps 1 and 2 on a migrated database: every table, the
+`settings_migrations` row of the settings baseline and the change log function were in `public`
+after them, which is the layout of the previous build.
+
+Do this only when the rollback must go to a build before 2026-11-25. A rollback between two later
+builds needs no step.
+
 ### Production credentials and secrets
 
 **Model.** Each production secret is a **GitHub repository secret**, and that is the single source of
