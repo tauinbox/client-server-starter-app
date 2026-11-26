@@ -118,24 +118,34 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
     expect(await enabledFor(outsider.id, flag.key)).toBe(false);
   });
 
-  it('reads the members from their rows when the payload has none', async () => {
-    const member = await saveUser('rows-only');
-    const flag = await createFlag('rows-only', [userRule([member.id])]);
+  // The next release stores a user rule with no userIds key; this build must
+  // read that form during the rolling deploy and after a rollback to it.
+  it.each([
+    ['an empty member list', { type: 'user', userIds: [] }],
+    ['no member list key', { type: 'user' }]
+  ])(
+    'reads the members from their rows when the payload has %s',
+    async (name, payload) => {
+      const member = await saveUser(`rows-only-${name.replaceAll(' ', '-')}`);
+      const flag = await createFlag(`rows-only-${name.replaceAll(' ', '-')}`, [
+        userRule([member.id])
+      ]);
 
-    await settingsDataSource.query(
-      `UPDATE "feature_flag_rules" SET "payload" = '{"type":"user","userIds":[]}' WHERE "flag_id" = $1`,
-      [flag.id]
-    );
-    await settingsLog.applyPending();
+      await settingsDataSource.query(
+        `UPDATE "feature_flag_rules" SET "payload" = $2 WHERE "flag_id" = $1`,
+        [flag.id, payload]
+      );
+      await settingsLog.applyPending();
 
-    const read = await flags.findOne(flag.id, SYSTEM_ABILITY);
+      const read = await flags.findOne(flag.id, SYSTEM_ABILITY);
 
-    expect(read.rules[0].payload).toEqual({
-      type: 'user',
-      userIds: [member.id]
-    });
-    expect(await enabledFor(member.id, flag.key)).toBe(true);
-  });
+      expect(read.rules[0].payload).toEqual({
+        type: 'user',
+        userIds: [member.id]
+      });
+      expect(await enabledFor(member.id, flag.key)).toBe(true);
+    }
+  );
 
   it('stores no member id in the settings row of the rule', async () => {
     const member = await saveUser('stored');
