@@ -20,6 +20,7 @@ import { MAT_TOOLTIP_DEFAULT_OPTIONS } from '@angular/material/tooltip';
 import { MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer } from '@angular/platform-browser';
 import { jwtInterceptor } from '@features/auth/interceptors/jwt.interceptor';
+import { regionInterceptor } from '@features/auth/interceptors/region.interceptor';
 import { errorInterceptor } from '@core/interceptors/error.interceptor';
 import { reloadOnStaleChunk } from '@core/navigation/stale-chunk-reload';
 import { registerOAuthIcons } from '@features/auth/utils/register-oauth-icons';
@@ -38,8 +39,11 @@ export const appConfig: ApplicationConfig = {
       withNavigationErrorHandler(reloadOnStaleChunk)
     ),
     // Error interceptor must be registered before JWT interceptor:
-    // JWT handles 401s (refresh + retry), error interceptor handles everything else
-    provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
+    // JWT handles 401s (refresh + retry), error interceptor handles everything else.
+    // The region interceptor is last: the others see the relative URL.
+    provideHttpClient(
+      withInterceptors([errorInterceptor, jwtInterceptor, regionInterceptor])
+    ),
     provideNativeDateAdapter(),
     provideAppInitializer(() => {
       const iconRegistry = inject(MatIconRegistry);

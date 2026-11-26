@@ -16,6 +16,11 @@ import type {
   UserPermissionsResponse,
   UserResponse
 } from '@app/shared/types';
+import {
+  HOME_DATA_REGION,
+  isDataRegion,
+  type DataRegion
+} from '@app/shared/constants';
 import type { AuthResponse, CustomJwtPayload } from '../models/auth.types';
 import type { AppAbility, PermissionCheck } from '../casl/app-ability';
 import { ADMIN_PANEL_CHECKS } from '../casl/admin-panel-checks';
@@ -23,6 +28,10 @@ import { LocalStorageService } from '@core/services/local-storage.service';
 import { isPersistedUser } from './storage-guards';
 
 export const AUTH_USER_KEY = 'auth_user';
+// The region of the persisted session: the refresh after a reload goes to its
+// API host. It cannot come from `residenceCountry`, which staff and older
+// accounts do not have. A missing or unknown value is the home region.
+export const AUTH_REGION_KEY = 'auth_region';
 
 const SUPER_TARGET_DENY: RawRuleOf<AppAbility> = {
   action: ['update', 'delete'],
@@ -34,6 +43,8 @@ const SUPER_TARGET_DENY: RawRuleOf<AppAbility> = {
 type AuthState = {
   accessToken: string | null; // in-memory ONLY — lost on page reload
   user: UserResponse | null; // persisted to localStorage (for reload detection)
+  // The region whose API holds the session, persisted with the user.
+  region: DataRegion;
   ability: AppAbility | null;
   // Server policy, refreshed with the rules. Never persisted: a stale copy
   // would either gate a session the server admits or open one it refuses.
@@ -48,6 +59,8 @@ export const AuthStore = signalStore(
     return {
       accessToken: null,
       user: storage.getItem(AUTH_USER_KEY, isPersistedUser) ?? null,
+      region:
+        storage.getItem(AUTH_REGION_KEY, isDataRegion) ?? HOME_DATA_REGION,
       ability: null,
       mfaMandatory: false
     };
@@ -108,6 +121,8 @@ export const AuthStore = signalStore(
     }
 
     function saveAuthResponse(response: AuthResponse): void {
+      // The region first: another tab that sees the user reads both.
+      storage.setItem(AUTH_REGION_KEY, store.region());
       storage.setItem(AUTH_USER_KEY, response.user);
       patchState(store, {
         accessToken: response.tokens.access_token,
@@ -122,9 +137,11 @@ export const AuthStore = signalStore(
 
     function clearSession(): void {
       storage.removeItem(AUTH_USER_KEY);
+      storage.removeItem(AUTH_REGION_KEY);
       patchState(store, {
         accessToken: null,
         user: null,
+        region: HOME_DATA_REGION,
         ability: null,
         mfaMandatory: false
       });

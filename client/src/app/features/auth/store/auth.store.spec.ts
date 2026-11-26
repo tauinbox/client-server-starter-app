@@ -2,12 +2,20 @@ import { TestBed } from '@angular/core/testing';
 import { packRules } from '@casl/ability/extra';
 import { createMongoAbility } from '@casl/ability';
 import type { RawRuleOf } from '@casl/ability';
-import { AUTH_USER_KEY, AuthStore } from './auth.store';
+import { AUTH_REGION_KEY, AUTH_USER_KEY, AuthStore } from './auth.store';
 import type { AppAbility } from '../casl/app-ability';
 import { LocalStorageService } from '@core/services/local-storage.service';
 import type { AuthResponse } from '../models/auth.types';
 import type { RoleResponse, UserResponse } from '@app/shared/types';
-import { SYSTEM_ROLES } from '@app/shared/constants';
+import {
+  DATA_REGIONS,
+  HOME_DATA_REGION,
+  SYSTEM_ROLES
+} from '@app/shared/constants';
+
+const [OTHER_REGION] = DATA_REGIONS.filter(
+  (region) => region !== HOME_DATA_REGION
+);
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -74,9 +82,22 @@ describe('AuthStore', () => {
     removeItem: ReturnType<typeof vi.fn>;
   };
 
-  function createStore(savedUser: UserResponse | null = null) {
+  function createStore(
+    savedUser: UserResponse | null = null,
+    savedRegion: unknown = null
+  ) {
+    const saved: Record<string, unknown> = {
+      [AUTH_USER_KEY]: savedUser,
+      [AUTH_REGION_KEY]: savedRegion
+    };
+
     storageMock = {
-      getItem: vi.fn().mockReturnValue(savedUser),
+      // The guard runs as in LocalStorageService: a value it refuses is null.
+      getItem: vi.fn((key: string, isValid?: (value: unknown) => boolean) => {
+        const value = saved[key] ?? null;
+
+        return value !== null && isValid && !isValid(value) ? null : value;
+      }),
       setItem: vi.fn(),
       removeItem: vi.fn()
     };
@@ -181,7 +202,6 @@ describe('AuthStore', () => {
 
       store.saveAuthResponse(authResponse);
 
-      // Only user key written to localStorage
       expect(storageMock.setItem).toHaveBeenCalledWith(
         AUTH_USER_KEY,
         authResponse.user
@@ -209,6 +229,44 @@ describe('AuthStore', () => {
         AUTH_USER_KEY,
         updatedUser
       );
+    });
+  });
+
+  describe('region of the session', () => {
+    it('is the home region when storage holds none', () => {
+      expect(createStore(createMockUser()).region()).toBe(HOME_DATA_REGION);
+    });
+
+    it('restores the persisted region, so the refresh after a reload goes to its host', () => {
+      expect(createStore(createMockUser(), OTHER_REGION).region()).toBe(
+        OTHER_REGION
+      );
+    });
+
+    it('takes a region that the code does not know for the home region', () => {
+      expect(createStore(createMockUser(), 'xx').region()).toBe(
+        HOME_DATA_REGION
+      );
+    });
+
+    it('persists the region with the user of a new session', () => {
+      const store = createStore(null, OTHER_REGION);
+
+      store.saveAuthResponse(createMockAuthResponse());
+
+      expect(storageMock.setItem).toHaveBeenCalledWith(
+        AUTH_REGION_KEY,
+        OTHER_REGION
+      );
+    });
+
+    it('goes back to the home region when the session ends', () => {
+      const store = createStore(createMockUser(), OTHER_REGION);
+
+      store.clearSession();
+
+      expect(storageMock.removeItem).toHaveBeenCalledWith(AUTH_REGION_KEY);
+      expect(store.region()).toBe(HOME_DATA_REGION);
     });
   });
 

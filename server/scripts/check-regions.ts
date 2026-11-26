@@ -8,6 +8,9 @@
  *    a count of regions. The check reads the type, not the text, because
  *    `'ru'` is also a language, a billing region and a legal jurisdiction.
  * 2. No country is listed by two regions in `REGIONS`.
+ * 3. The CSP of `client/nginx.conf` allows in `connect-src` the API host of
+ *    each region with an `apiSubdomain` (`https://<subdomain>.$host`), so the
+ *    client can reach every host that the code routes to (pair I20).
  *
  * The program resolves only the files of the repository, never
  * `node_modules`: the CI job installs only `server/`, and the type comes from
@@ -30,6 +33,7 @@ const CONSTANTS_FILE = path.join(
   REPO,
   'shared/src/constants/data-region.constants.ts'
 );
+const NGINX_CONF = path.join(REPO, 'client/nginx.conf');
 const ROOTS = ['server/src', 'mock-server/src', 'client/src', 'shared/src'];
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -183,6 +187,32 @@ function duplicateCountries(
   return violations;
 }
 
+/** The API hosts of `subdomains` that a CSP of `conf` lacks in `connect-src`. */
+function missingApiHosts(
+  conf: string,
+  subdomains: readonly string[]
+): string[] {
+  const policies = [
+    ...conf.matchAll(/add_header\s+Content-Security-Policy\s+"([^"]*)"/g)
+  ].map(([, policy]) => policy);
+
+  if (policies.length === 0) return ['no Content-Security-Policy header'];
+
+  return policies.flatMap((policy, index) => {
+    const sources =
+      policy
+        .split(';')
+        .map((directive) => directive.trim().split(/\s+/))
+        .find(([name]) => name === 'connect-src')
+        ?.slice(1) ?? [];
+
+    return subdomains
+      .map((subdomain) => `https://${subdomain}.$host`)
+      .filter((source) => !sources.includes(source))
+      .map((source) => `policy ${index + 1}: connect-src lacks ${source}`);
+  });
+}
+
 function selfTest(): void {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'check-regions-'));
   const failures: string[] = [];
@@ -256,6 +286,33 @@ function selfTest(): void {
 
     if (dup.join(',') !== 'KZ: a and b')
       failures.push(`duplicate countries: got ${dup.join(', ') || 'none'}`);
+
+    const csp = (connect: string) =>
+      `add_header Content-Security-Policy "default-src 'self'; connect-src ${connect}; object-src 'none'" always;`;
+    const cspCases: { conf: string; expected: string }[] = [
+      {
+        conf: csp("'self' https://ru-api.$host"),
+        expected: ''
+      },
+      {
+        conf: csp("'self' wss:"),
+        expected: 'policy 1: connect-src lacks https://ru-api.$host'
+      },
+      {
+        conf: csp("'self' https://ru-api.example.com"),
+        expected: 'policy 1: connect-src lacks https://ru-api.$host'
+      },
+      { conf: 'server {}', expected: 'no Content-Security-Policy header' }
+    ];
+
+    for (const { conf, expected } of cspCases) {
+      const got = missingApiHosts(conf, ['ru-api']).join(',');
+
+      if (got !== expected)
+        failures.push(
+          `csp api hosts: expected "${expected}", got "${got}" for ${conf}`
+        );
+    }
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }
@@ -279,6 +336,10 @@ function main(): void {
     regions: DATA_REGIONS
   });
   const duplicates = duplicateCountries(REGIONS);
+  const cspGaps = missingApiHosts(
+    fs.readFileSync(NGINX_CONF, 'utf8'),
+    DATA_REGIONS.flatMap((region) => REGIONS[region].apiSubdomain ?? [])
+  );
   const errors: string[] = [];
 
   if (literals.length > 0)
@@ -293,13 +354,19 @@ function main(): void {
         duplicates.map((v) => `  ${v}`).join('\n')
     );
 
+  if (cspGaps.length > 0)
+    errors.push(
+      'client/nginx.conf does not allow the API host of a region (apiSubdomain of REGIONS) in its CSP connect-src:\n' +
+        cspGaps.map((v) => `  ${v}`).join('\n')
+    );
+
   if (errors.length > 0) {
     console.error(`ERROR: ${errors.join('\nERROR: ')}`);
     process.exit(1);
   }
 
   console.log(
-    `check-regions: ${files.length} files, no region literal outside the constants; each country has at most one region.`
+    `check-regions: ${files.length} files, no region literal outside the constants; each country has at most one region; the CSP allows the API host of each region.`
   );
 }
 
