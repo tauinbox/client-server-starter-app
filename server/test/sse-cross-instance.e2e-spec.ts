@@ -2,12 +2,15 @@ import { randomUUID } from 'crypto';
 import { get, type IncomingMessage, type Server } from 'http';
 import type { AddressInfo } from 'net';
 import { INestApplication, VersioningType } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import Redis from 'ioredis';
 import { DataSource, In } from 'typeorm';
 import { settingsDataSourceOf } from './settings-data-source';
 import type { NotificationEvent } from '@app/shared/types';
 import { CoreModule } from '../src/modules/core/core.module';
+import { SettingsChangedEvent } from '../src/modules/core/settings-change-log/settings-changed.event';
+import { settingsChangedEvent } from '../src/modules/core/settings-change-log/testing/settings-changed-event';
 import { AuthService } from '../src/modules/auth/services/auth.service';
 import { RoleService } from '../src/modules/auth/services/role.service';
 import { SYSTEM_ABILITY } from '../src/modules/auth/casl/app-ability';
@@ -292,11 +295,20 @@ runWithRedis('server pushes across instances (e2e)', () => {
     await listener.subscribe(`${namespace}:push:${redis.options.db ?? 0}`);
 
     try {
-      await first
-        .get(RoleService)
-        .setPermissionsForRole(role.id, [{ permissionId: searchUser.id }], {
-          ability: SYSTEM_ABILITY
-        });
+      // Not a settings write: an app of another suite, with a bus of its own
+      // process, could apply that log entry first and take the push.
+      await first.get(EventEmitter2).emitAsync(
+        SettingsChangedEvent.name,
+        settingsChangedEvent(
+          { roleIds: [role.id] },
+          {
+            managers: {
+              regional: first.get(DataSource).manager,
+              settings: settingsDataSourceOf(first).manager
+            }
+          }
+        )
+      );
 
       await settle();
       expect(viewerOnSecond()).toContainEqual({ type: 'permissions_updated' });
