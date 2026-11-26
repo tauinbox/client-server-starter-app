@@ -6,8 +6,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * taken from `pg_dump` of a database that the whole history migrated.
  * `server/test/migration-baseline.e2e-spec.ts` compares the schema and the
  * rows that this migration and the regional baseline build with those of that
- * history. A database that the frozen history migrated records this migration
- * with no run (`recordFrozenHistoryBaselines` of `src/migration-sets.ts`).
+ * history.
  *
  * The rows go in before the triggers, as in the history, where the settings
  * change log came after them: a new database starts with an empty log.

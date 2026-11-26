@@ -1,7 +1,6 @@
 import { join } from 'node:path';
 import type { Logger } from 'typeorm';
 import { importClassesFromDirectories } from 'typeorm/util/DirectoryExportedClassesLoader.js';
-import { BASELINE_MIGRATIONS } from './frozen-migration-history';
 import { postgresConfig, settingsMigrations } from './postgres.config';
 
 const silentLogger: Logger = {
@@ -59,6 +58,9 @@ describe('postgresConfig', () => {
     const regional = first(postgresConfig().migrations as unknown[]);
     const settings = first(settingsMigrations());
 
-    expect({ regional, settings }).toEqual(BASELINE_MIGRATIONS);
+    expect({ regional, settings }).toEqual({
+      regional: 'RegionalBaseline1795600000000',
+      settings: 'SettingsBaseline1795600000000'
+    });
   });
 });

@@ -6,8 +6,6 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * `pg_dump --schema-only` of a database that the whole history migrated.
  * `server/test/migration-baseline.e2e-spec.ts` compares the schema that this
  * migration and the settings baseline build with the schema of that history.
- * A database that the frozen history migrated records this migration with no
- * run (`recordFrozenHistoryBaselines` of `src/migration-sets.ts`).
  */
 const UP: readonly string[] = [
   `CREATE EXTENSION IF NOT EXISTS "pg_trgm"`,
