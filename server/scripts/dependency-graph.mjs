@@ -5,7 +5,9 @@
  * the workspaces and of the modules of the server, the client and the mock
  * server, and `architecture/docker-graph.md`: the Docker layout drawn by
  * `docker-graph.mjs`. `npm run graph:check` (CI, `Repo - Checks`) fails when
- * either file differs from what the current tree gives.
+ * either file differs from what the current tree gives. Both commands also
+ * fail when an entity imports an entity of the other data source as a value
+ * (`data-source-boundary.mjs`).
  *
  * `npm run graph -- --html` also writes an interactive page for each view, and
  * a page for each module (its files, and the modules that it imports or that
@@ -25,6 +27,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  dataSourceBoundarySelfTest,
+  dataSourceBoundaryViolations,
+  entitySources
+} from './data-source-boundary.mjs';
 import {
   DOCKER_GRAPH_FILE,
   dockerGraphMarkdown,
@@ -104,8 +111,9 @@ function trackedSources() {
 }
 
 async function cruiseRepo() {
+  const files = trackedSources();
   const result = await cruise(
-    trackedSources(),
+    files,
     {
       includeOnly: SOURCES,
       doNotFollow: { path: 'node_modules' },
@@ -145,6 +153,16 @@ async function cruiseRepo() {
   if (unlinked.length > 0) {
     console.error(
       `graph: no import from ${unlinked.join(', ')} resolves into shared/src. Check the @app/shared alias of ${TS_CONFIG}.`
+    );
+    process.exit(1);
+  }
+
+  const sources = entitySources(ROOT, files);
+  const crossings = dataSourceBoundaryViolations(local, sources);
+
+  if (crossings.length > 0) {
+    console.error(
+      `graph: the boundary between the data sources fails:\n  ${crossings.join('\n  ')}\nAn entity does not import an entity of the other data source as a value: keep a plain id column in place of the relation, or use \`import type\` for a projection that the code fills from the other source (scripts/data-source-boundary.mjs).`
     );
     process.exit(1);
   }
@@ -268,6 +286,15 @@ const selfTestFailures = dockerGraphSelfTest();
 if (selfTestFailures.length > 0) {
   console.error(
     `graph: the Docker graph parsers fail their self-test: ${JSON.stringify(selfTestFailures)}`
+  );
+  process.exit(1);
+}
+
+const boundaryFailures = dataSourceBoundarySelfTest();
+
+if (boundaryFailures.length > 0) {
+  console.error(
+    `graph: the data source boundary check fails its self-test: ${JSON.stringify(boundaryFailures)}`
   );
   process.exit(1);
 }
