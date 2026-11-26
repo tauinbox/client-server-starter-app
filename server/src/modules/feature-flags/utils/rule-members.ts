@@ -5,9 +5,8 @@ import type { FeatureFlagRule } from '../entities/feature-flag-rule.entity';
 import { FeatureFlagRuleUser } from '../entities/feature-flag-rule-user.entity';
 
 /**
- * Sets the members of each `user` rule from its member rows. The ids that the
- * payload still holds are kept too: a node of the previous build writes only
- * the payload during a rolling deploy.
+ * Sets the members of each `user` rule from its member rows. The rows are the
+ * only source: the stored payload holds no member ids.
  */
 export async function attachRuleMembers(
   manager: EntityManager,
@@ -31,14 +30,7 @@ export async function attachRuleMembers(
   }
 
   for (const rule of userRules) {
-    if (rule.payload.type !== 'user') continue;
-
-    rule.payload = {
-      type: 'user',
-      userIds: [
-        ...new Set([...rule.payload.userIds, ...(byRule.get(rule.id) ?? [])])
-      ]
-    };
+    rule.payload = { type: 'user', userIds: byRule.get(rule.id) ?? [] };
   }
 }
 

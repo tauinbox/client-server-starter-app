@@ -9,6 +9,7 @@ import {
 import type { FeatureFlagRuleEffect } from '@app/shared/constants';
 import type { FeatureFlagRulePayload } from '@app/shared/types';
 import { SETTINGS_SCHEMA } from '../../../database-roles';
+import { storedRulePayloadTransformer } from '../utils/stored-rule-payload.transformer';
 import { FeatureFlag } from './feature-flag.entity';
 
 @Entity({ name: 'feature_flag_rules', schema: SETTINGS_SCHEMA })
@@ -29,7 +30,8 @@ export class FeatureFlagRule {
   @Column({ type: 'varchar', length: 16 })
   effect: FeatureFlagRuleEffect;
 
-  @Column({ type: 'jsonb' })
+  // The members of a `user` rule come from `attachRuleMembers`.
+  @Column({ type: 'jsonb', transformer: storedRulePayloadTransformer })
   payload: FeatureFlagRulePayload;
 
   // Uses clock_timestamp() (not now()) so bulk inserts within one transaction
