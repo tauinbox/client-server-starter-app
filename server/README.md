@@ -53,7 +53,7 @@ npm run start:dev          # Starts in-memory Express API on port 3000 (watch mo
 | Test watch | `npm run test:watch` |
 | Test coverage | `npm run test:cov` (`pretest:cov` deletes `coverage/` first, so the report holds only the current sources) |
 | E2E tests | `npm run test:e2e` |
-| Run migrations | `npm run migrations:run` (build first). On a database that the 92 migrations of the old history built, it first records the baselines with no run. Then it runs the regional set, then the settings set when `DATA_REGION` is the home region, then refuses a settings schema older than the build |
+| Run migrations | `npm run migrations:run` (build first). It creates the settings schema, runs the regional set, then the settings set when `DATA_REGION` is the home region, then refuses a settings schema older than the build. A database of the old history with no baseline row is not supported |
 | Generate migration | `npm run migrations:gen -- ./src/migrations/<settings\|regional>/<kebab-name>` (build first). Each set starts with its baseline (`1795600000000-<set>-baseline.ts`), which is applied history: never edit it. A migration of settings tables goes into `settings/`, every other one into `regional/` |
 | Revert migration | `npm run migrations:revert` (regional set) or `npm run migrations:revert:settings` (settings set) (build first) |
 | Run seeders | `npm run seed:run` (build first). The seeders write settings rows, so they run on the settings database (`settings-data-source.ts`) and refuse to run when `DATA_REGION` is not the home region |
