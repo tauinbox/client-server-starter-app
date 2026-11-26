@@ -41,6 +41,7 @@
     "check:error-status": "ts-node -r tsconfig-paths/register scripts/check-error-status.ts",
     "check:race": "ts-node scripts/check-race.ts",
     "check:regex-modifiers": "ts-node scripts/check-regex-modifiers.ts",
+    "check:regions": "ts-node -r tsconfig-paths/register scripts/check-regions.ts",
     "check:duplicate-functions": "ts-node scripts/check-duplicate-functions.ts",
     "check:imports": "node ../scripts/check-imports.mjs",
     "check:versions": "node ../scripts/check-workspace-versions.mjs",

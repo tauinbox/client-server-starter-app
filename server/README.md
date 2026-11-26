@@ -2454,8 +2454,9 @@ If you see spam in `audit_logs` although the throttler runs, you have three opti
 
 - Add another provider, for example hCaptcha. A provider is one value in `CAPTCHA_PROVIDERS`
   (`shared/src/constants/auth.constants.ts`), one `CaptchaVerifier` class beside
-  `turnstile.verifier.ts`, its env keys in `CAPTCHA_PROVIDER_ENV_KEYS` and its regions in
-  `REGION_INTEGRATIONS`, and its widget script in the client `CaptchaService.loadScript()`. The
+  `turnstile.verifier.ts`, its env keys in `CAPTCHA_PROVIDER_ENV_KEYS`, its name in
+  `REGION_INTEGRATIONS` and in the `integrations` of each region of `REGIONS` where it may run,
+  and its widget script in the client `CaptchaService.loadScript()`. The
   hCaptcha protocol is the same as Turnstile: a form-encoded `secret` and `response` request, and a
   JSON `{ success: boolean }` answer. hCaptcha also needs an account.
 - Host a proof-of-work challenge yourself, with no CAPTCHA. mCaptcha and Friendly Captcha are two

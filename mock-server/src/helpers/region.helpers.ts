@@ -1,5 +1,6 @@
 import {
   ErrorKeys,
+  HOME_DATA_REGION,
   regionForCountry,
   type CountryCode,
   type DataRegion,
@@ -8,9 +9,9 @@ import {
 import type { RegionConfigResponse } from '@app/shared/types';
 import { getState } from '../state';
 
-// The mock is one cell of the `intl` region, as production. It has no peers
+// The mock is one cell of the home region, as production. It has no peers
 // until a test sets them through /__control/region-peers.
-export const MOCK_DATA_REGION: DataRegion = 'intl';
+export const MOCK_DATA_REGION: DataRegion = HOME_DATA_REGION;
 
 /** Mirrors `RegionService` of the server: this cell and its peers. */
 export function regionConfig(): RegionConfigResponse {

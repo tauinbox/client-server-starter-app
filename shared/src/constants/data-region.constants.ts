@@ -1,11 +1,80 @@
 /**
- * The data regions a deployment (a cell) can serve (the DATA_REGION variable).
- * Each cell keeps the personal data of its region in its own database, so a
- * region outside this list is a configuration error and refuses the boot.
+ * The data regions a pool can serve (the DATA_REGION variable). Each pool
+ * keeps the personal data of its region in its own database, so a region
+ * outside this list is a configuration error and refuses the boot.
+ *
+ * A new region is a member here and an entry of `REGIONS`; no other code
+ * names a region (`npm run check:regions`). The union is written out, not
+ * derived from a list: a derived union is the same type as every other union
+ * of the same strings, and the check finds a region literal by this name.
  */
-export const DATA_REGIONS = ['intl', 'ru'] as const;
+export type DataRegion = 'intl' | 'ru';
 
-export type DataRegion = (typeof DATA_REGIONS)[number];
+/** The integrations that receive personal data, so each region lists its own. */
+export const REGION_INTEGRATIONS = [
+  'paddle',
+  'yookassa',
+  'turnstile',
+  'googleOAuth',
+  'facebookOAuth',
+  'vkOAuth'
+] as const;
+
+export type RegionIntegration = (typeof REGION_INTEGRATIONS)[number];
+
+type RegionDefinition = {
+  /**
+   * The countries whose residents this region holds. A country that no region
+   * lists belongs to `UNLISTED_COUNTRY_REGION`.
+   */
+  readonly countries: readonly CountryCode[];
+  /**
+   * The integrations that may run in this region. A pool whose env enables
+   * another one refuses the boot.
+   */
+  readonly integrations: readonly RegionIntegration[];
+  /**
+   * The regions of an SMTP provider (the SMTP_REGION variable) that this
+   * region accepts. The mail of the ru region must not leave Russia (152-FZ
+   * Art. 18 p. 5).
+   */
+  readonly smtpProviderRegions: readonly DataRegion[];
+};
+
+/** The identity of each region (`doc/architecture.md` 12.8, MR-12). */
+export const REGIONS: Readonly<Record<DataRegion, RegionDefinition>> = {
+  intl: {
+    countries: [],
+    integrations: [
+      'paddle',
+      'turnstile',
+      'googleOAuth',
+      'facebookOAuth',
+      'vkOAuth'
+    ],
+    smtpProviderRegions: ['intl', 'ru']
+  },
+  ru: {
+    countries: ['RU'],
+    integrations: ['yookassa', 'vkOAuth'],
+    smtpProviderRegions: ['ru']
+  }
+};
+
+// The keys of a literal that the annotation above checks in both directions.
+export const DATA_REGIONS = Object.keys(REGIONS) as readonly DataRegion[];
+
+/** The region of a resident of a country that no region lists. */
+export const UNLISTED_COUNTRY_REGION: DataRegion = 'intl';
+
+/** The regions where `integration` may run, in the order of `DATA_REGIONS`. */
+export function integrationRegions(
+  integration: RegionIntegration
+): DataRegion[] {
+  return DATA_REGIONS.filter((region) =>
+    REGIONS[region].integrations.includes(integration)
+  );
+}
 
 /**
  * The region whose pool holds the settings primary. Only the cell of this
@@ -26,31 +95,6 @@ export function isDataRegion(value: unknown): value is DataRegion {
 
 /** The public URL of each other cell. A region with no entry is not served. */
 export type PeerRegions = Partial<Record<DataRegion, string>>;
-
-/**
- * The cell regions where each integration that receives personal data may
- * run. A cell whose env enables an integration outside its list refuses the
- * boot.
- */
-export const REGION_INTEGRATIONS = {
-  paddle: ['intl'],
-  yookassa: ['ru'],
-  turnstile: ['intl'],
-  googleOAuth: ['intl'],
-  facebookOAuth: ['intl'],
-  vkOAuth: ['intl', 'ru']
-} as const satisfies Record<string, readonly DataRegion[]>;
-
-export type RegionIntegration = keyof typeof REGION_INTEGRATIONS;
-
-/**
- * The regions of an SMTP provider (the SMTP_REGION variable) that each cell
- * accepts. The mail of a ru cell must not leave Russia (152-FZ Art. 18 p. 5).
- */
-export const SMTP_PROVIDER_REGIONS = {
-  intl: ['intl', 'ru'],
-  ru: ['ru']
-} as const satisfies Record<DataRegion, readonly DataRegion[]>;
 
 /** The officially assigned ISO 3166-1 alpha-2 codes. */
 export const COUNTRY_CODES = [
@@ -319,5 +363,9 @@ export function isCountryCode(value: unknown): value is CountryCode {
  * verified at registration.
  */
 export function regionForCountry(country: CountryCode): DataRegion {
-  return country === 'RU' ? 'ru' : 'intl';
+  return (
+    DATA_REGIONS.find((region) =>
+      REGIONS[region].countries.includes(country)
+    ) ?? UNLISTED_COUNTRY_REGION
+  );
 }
