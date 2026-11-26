@@ -4,7 +4,8 @@ import { settingsMigrationOptions } from './migration-sets';
 
 dotenv.config();
 
-// The TypeORM CLI data source of the settings set (`migrations:revert:settings`).
+// The CLI data source of the settings database: `migrations:revert:settings`
+// and `seed:run`, because the seeders write settings rows only.
 const settingsDataSource = new DataSource(settingsMigrationOptions());
 
 export default settingsDataSource;

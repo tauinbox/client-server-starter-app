@@ -11,6 +11,9 @@ import { FeatureFlagRule } from '../src/modules/feature-flags/entities/feature-f
 import { FeatureFlagService } from '../src/modules/feature-flags/services/feature-flag.service';
 import { flagAuditActor } from './flag-audit-actor';
 import { withAdminDataSource } from './admin-data-source';
+
+const SETTINGS_ADMIN = { source: 'settings' } as const;
+
 import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
 import type { IfMatchCondition } from '@app/shared/utils/if-match';
 
@@ -63,7 +66,7 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
         `DROP TRIGGER IF EXISTS ${trigger} ON feature_flag_rules`
       );
       await admin.query(`DROP FUNCTION IF EXISTS ${trigger}()`);
-    });
+    }, SETTINGS_ADMIN);
   });
 
   afterAll(async () => {
@@ -84,7 +87,10 @@ runWithInfra('Feature flag and rules save atomically (e2e)', () => {
   // The flag row written earlier in the same transaction is visible to the
   // trigger, so a create fails here as well as an update.
   async function failRuleInserts(): Promise<void> {
-    await withAdminDataSource((admin) => createFailingTrigger(admin));
+    await withAdminDataSource(
+      (admin) => createFailingTrigger(admin),
+      SETTINGS_ADMIN
+    );
   }
 
   async function createFailingTrigger(admin: DataSource): Promise<void> {

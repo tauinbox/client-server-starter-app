@@ -58,6 +58,32 @@ export const postgresConfig: () => PostgresConnectionOptions = () => ({
   applicationName: 'Starter Project'
 });
 
+/** The keys of the database of a data source: the server, the database and the administrator. */
+type ConnectionKeys = Pick<
+  PostgresConnectionOptions,
+  'host' | 'port' | 'database' | 'username' | 'password'
+>;
+
+/**
+ * The connection of the settings database, as the administrator. Each
+ * `SETTINGS_DB_*` value that is not set takes the `DB_*` value of the
+ * regional database, so with no `SETTINGS_DB_*` value both data sources use
+ * one database in two schemas.
+ */
+export function settingsConnection(): ConnectionKeys {
+  const regional = postgresConfig();
+  const read = (key: string) => process.env[`SETTINGS_DB_${key}`] || undefined;
+  const port = read('PORT');
+
+  return {
+    host: read('HOST') ?? regional.host,
+    port: port ? Number(port) : regional.port,
+    database: read('NAME') ?? regional.database,
+    username: read('USER') ?? regional.username,
+    password: read('PASSWORD') ?? regional.password
+  };
+}
+
 /** The migrations of the regional data source, `migrations/regional/`. */
 export function regionalMigrations(): NewableFunction[] {
   return loadMigrations('regional');

@@ -10,7 +10,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -50,6 +50,7 @@ const FIXED_PLAN = 'wp-fixed';
 
 runWithInfra('billing write paths (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let userId: string;
   let customerId: string;
@@ -71,8 +72,8 @@ runWithInfra('billing write paths (e2e)', () => {
   }
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
     provider = makeProvider();
     await seedTenant();
@@ -81,6 +82,7 @@ runWithInfra('billing write paths (e2e)', () => {
   afterAll(async () => {
     await purge();
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
@@ -101,8 +103,8 @@ runWithInfra('billing write paths (e2e)', () => {
     await ds
       .getRepository(WebhookEvent)
       .delete({ providerEventId: 'wp-webhook-1' });
-    await ds.getRepository(Plan).delete({ key: FIXED_PLAN });
-    await ds
+    await settingsDs.getRepository(Plan).delete({ key: FIXED_PLAN });
+    await settingsDs
       .getRepository(Product)
       .delete([{ key: 'wp-sku' }, { key: 'wp-credits' }]);
   }
@@ -133,8 +135,8 @@ runWithInfra('billing write paths (e2e)', () => {
 
     customerId = customer.id;
 
-    await ds.getRepository(Plan).save(
-      ds.getRepository(Plan).create({
+    await settingsDs.getRepository(Plan).save(
+      settingsDs.getRepository(Plan).create({
         key: FIXED_PLAN,
         name: FIXED_PLAN,
         description: null,
@@ -228,11 +230,11 @@ runWithInfra('billing write paths (e2e)', () => {
         },
         {
           provide: repositoryToken(Plan),
-          useValue: ds.getRepository(Plan)
+          useValue: settingsDs.getRepository(Plan)
         },
         {
           provide: repositoryToken(Product),
-          useValue: ds.getRepository(Product)
+          useValue: settingsDs.getRepository(Product)
         },
         {
           provide: repositoryToken(WebhookEvent),
@@ -294,8 +296,8 @@ runWithInfra('billing write paths (e2e)', () => {
     type: 'sku' | 'credits',
     grant: Product['grant']
   ): Promise<Product> {
-    await ds.getRepository(Product).save(
-      ds.getRepository(Product).create({
+    await settingsDs.getRepository(Product).save(
+      settingsDs.getRepository(Product).create({
         key,
         name: key,
         description: null,
@@ -306,7 +308,7 @@ runWithInfra('billing write paths (e2e)', () => {
       })
     );
 
-    return ds.getRepository(Product).findOneOrFail({ where: { key } });
+    return settingsDs.getRepository(Product).findOneOrFail({ where: { key } });
   }
 
   async function reduceOneTime(
@@ -476,10 +478,10 @@ runWithInfra('billing write paths (e2e)', () => {
     }, 30000);
 
     it('grants and credits exactly once when a delivery is replayed', async () => {
-      const sku = await ds
+      const sku = await settingsDs
         .getRepository(Product)
         .findOneOrFail({ where: { key: 'wp-sku' } });
-      const pack = await ds
+      const pack = await settingsDs
         .getRepository(Product)
         .findOneOrFail({ where: { key: 'wp-credits' } });
       const creditsBefore = await creditUnits();

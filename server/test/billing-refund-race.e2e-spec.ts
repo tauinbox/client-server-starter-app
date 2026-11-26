@@ -11,7 +11,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -32,14 +32,15 @@ type ConcurrentLeg = (invoiceId: string) => Promise<unknown>;
 
 runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let service: BillingAdminService;
   let refund: jest.Mock;
   let userId: string | undefined;
   let customerId: string | undefined;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
   }, 30000);
 
   afterEach(async () => {
@@ -56,6 +57,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
   });
 
   afterAll(async () => {
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
@@ -162,7 +164,7 @@ runWithInfra('Admin refund vs. a concurrent refund leg (e2e)', () => {
         },
         {
           provide: repositoryToken(Product),
-          useValue: ds.getRepository(Product)
+          useValue: settingsDs.getRepository(Product)
         },
         {
           provide: BillingService,

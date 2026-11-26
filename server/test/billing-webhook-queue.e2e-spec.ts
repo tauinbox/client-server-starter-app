@@ -13,7 +13,7 @@ import { EventName } from '@paddle/paddle-node-sdk';
 import type { Queue } from 'bullmq';
 import { DataSource, Like } from 'typeorm';
 import { parseRedisConnection } from '../src/common/utils/parse-redis-connection';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
@@ -59,6 +59,7 @@ const RETRY_WAIT_MS = 20_000;
 
 runWithRedis('billing webhook queue (real Redis)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let module: TestingModule;
   let ingestion: WebhookIngestionService;
   let reducer: BillingEventReducer;
@@ -68,9 +69,9 @@ runWithRedis('billing webhook queue (real Redis)', () => {
   let customerId: string;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
-    const plans = ds.getRepository(Plan);
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
+    const plans = settingsDs.getRepository(Plan);
 
     await plans.save(
       plans.create({
@@ -130,11 +131,11 @@ runWithRedis('billing webhook queue (real Redis)', () => {
         },
         {
           provide: repositoryToken(Plan),
-          useValue: ds.getRepository(Plan)
+          useValue: settingsDs.getRepository(Plan)
         },
         {
           provide: repositoryToken(Product),
-          useValue: ds.getRepository(Product)
+          useValue: settingsDs.getRepository(Product)
         },
         {
           provide: MetricsService,
@@ -198,7 +199,8 @@ runWithRedis('billing webhook queue (real Redis)', () => {
   afterAll(async () => {
     await queue?.obliterate({ force: true });
     await module?.close();
-    await ds?.getRepository(Plan).delete({ key: PLAN_KEY });
+    await settingsDs?.getRepository(Plan).delete({ key: PLAN_KEY });
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 

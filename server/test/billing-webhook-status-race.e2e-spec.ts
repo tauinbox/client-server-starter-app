@@ -10,7 +10,7 @@ import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource, In, type Repository } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { expectApiError } from '../src/common/testing/api-error.expect';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
 import { Product } from '../src/modules/billing/entities/product.entity';
@@ -49,12 +49,13 @@ function barrier(size: number): () => Promise<void> {
 
 runWithInfra('Webhook status writes vs. a concurrent writer (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let repo: Repository<WebhookEvent>;
   const seeded: string[] = [];
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     repo = ds.getRepository(WebhookEvent);
   }, 30000);
 
@@ -67,6 +68,7 @@ runWithInfra('Webhook status writes vs. a concurrent writer (e2e)', () => {
   });
 
   afterAll(async () => {
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
@@ -133,7 +135,7 @@ runWithInfra('Webhook status writes vs. a concurrent writer (e2e)', () => {
           { provide: repositoryToken(WebhookEvent), useValue: repo },
           {
             provide: repositoryToken(Product),
-            useValue: ds.getRepository(Product)
+            useValue: settingsDs.getRepository(Product)
           },
           { provide: BillingService, useValue: {} },
           { provide: CreditService, useValue: {} },

@@ -139,6 +139,10 @@ jobs:
       DB_SETTINGS_PASSWORD: ci-settings-only-not-a-real-secret
       DB_NAME: testdb
       DB_SCHEMA: public
+      # The settings in a database of their own, as after the split: a
+      # statement or a test that assumes one database fails here. The last
+      # step runs the role isolation again on one database, as production.
+      SETTINGS_DB_NAME: testdb_settings
       # Fallback literal keeps CI green on Dependabot/fork PRs, which don't receive
       # repo secrets. This is a throwaway HS256 test value (>=32 chars, the RFC 7518
       # floor the config schema enforces); production uses RS256
@@ -219,6 +223,9 @@ jobs:
       - run: npm run test:cov
       - run: npm run build
 
+      - name: Create the settings database
+        run: npm run db:create-settings
+
       - name: Run migrations
         run: npm run migrations:run
 
@@ -249,6 +256,15 @@ jobs:
             console.log(`Redis e2e: ${r.numPassedTests} passed, ${r.numPendingTests} skipped`);
             if (r.numTotalTests === 0 || r.numPendingTests > 0) process.exit(1);
           ' "$RUNNER_TEMP/redis-e2e.json"
+
+      # Production keeps both schemas in one database (stage 1), where only
+      # the two login roles keep the sources apart.
+      - name: E2E – role isolation in one database
+        env:
+          SETTINGS_DB_NAME: ''
+        run: |
+          npm run migrations:run
+          npm run test:e2e -- --testPathPatterns=database-roles
 
       - uses: actions/upload-artifact@v7
         if: always()

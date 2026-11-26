@@ -9,7 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { Money } from '@app/shared/utils/money';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -84,6 +84,7 @@ async function waitPast(moment: Date): Promise<void> {
 
 runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let userId: string | undefined;
   let customerId: string | undefined;
@@ -96,10 +97,10 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   let charges: Array<{ key: string; amount: number }>;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
-    const plans = ds.getRepository(Plan);
+    const plans = settingsDs.getRepository(Plan);
 
     await plans.save([
       plans.create({
@@ -146,9 +147,10 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
   });
 
   afterAll(async () => {
-    await ds?.getRepository(Plan).delete({ key: FIXED_KEY });
-    await ds?.getRepository(Plan).delete({ key: FROM_KEY });
+    await settingsDs?.getRepository(Plan).delete({ key: FIXED_KEY });
+    await settingsDs?.getRepository(Plan).delete({ key: FROM_KEY });
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
@@ -156,7 +158,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     provider = fakeProvider();
     charges = [];
     const repository = (entity: NewableFunction) =>
-      repositoryProvider(ds, entity);
+      repositoryProvider({ regional: ds, settings: settingsDs }, entity);
     const module = await Test.createTestingModule({
       providers: [
         PlanChangeService,
@@ -349,7 +351,7 @@ runWithInfra('Plan change vs. the renewal scan across the anchor (e2e)', () => {
     gateOn('', () => Promise.resolve());
     // The change passes its entry guard before the anchor, and the plan lookup
     // that follows it returns after the anchor: by the claim, the scan owns it.
-    const plans = ds.getRepository(Plan);
+    const plans = settingsDs.getRepository(Plan);
     const findPlan = plans.findOne.bind(plans);
 
     jest.spyOn(plans, 'findOne').mockImplementation(async (options) => {

@@ -9,7 +9,11 @@ import { buildCacheOptions } from './redis-cache.store';
 import { buildThrottlerOptions } from './throttler-options';
 import { buildLoggerOptions } from './logger-options';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { loadEntities, postgresConfig } from '../../postgres.config';
+import {
+  loadEntities,
+  postgresConfig,
+  settingsConnection
+} from '../../postgres.config';
 import {
   SETTINGS_DATA_SOURCE,
   SETTINGS_ENTITIES,
@@ -111,6 +115,7 @@ export class CoreModule implements NestModule {
           inject: [ConfigService],
           useFactory: (config: ConfigService) => ({
             ...postgresConfig(),
+            ...settingsConnection(),
             ...sourceLogin('settings', (key) => config.get<string>(key)),
             schema: SETTINGS_SCHEMA,
             entities: [...SETTINGS_ENTITIES],

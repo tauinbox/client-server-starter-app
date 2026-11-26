@@ -2,6 +2,7 @@ import type { DataSource } from 'typeorm';
 import { lookupBreachedPassword } from './modules/auth/breached-password/pwned-range-lookup';
 import { seedAdmin } from './seed-admin';
 import { User } from './modules/users/entities/user.entity';
+import { Role } from './modules/auth/entities/role.entity';
 import { addUserRole } from './modules/users/utils/user-roles';
 
 jest.mock('./modules/auth/breached-password/pwned-range-lookup', () => ({
@@ -33,8 +34,9 @@ describe('seedAdmin', () => {
     save: jest.Mock;
   };
   let roleRepo: { findOne: jest.Mock };
-  let getRepository: jest.Mock;
-  let dataSource: DataSource;
+  let regionalRepository: jest.Mock;
+  let settingsRepository: jest.Mock;
+  let sources: { regional: DataSource; settings: DataSource };
   let exitSpy: jest.SpyInstance;
   let warnSpy: jest.SpyInstance;
 
@@ -57,8 +59,9 @@ describe('seedAdmin', () => {
       findOne: jest.fn().mockResolvedValue({ id: 'role-1', name: 'admin' })
     };
 
-    getRepository = jest.fn((entity: unknown) =>
-      entity === User ? userRepo : roleRepo
+    regionalRepository = jest.fn(() => userRepo);
+    settingsRepository = jest.fn((entity: unknown) =>
+      entity === Role ? roleRepo : undefined
     );
     const manager = {
       findOne: (_entity: unknown, options: unknown): unknown =>
@@ -68,16 +71,20 @@ describe('seedAdmin', () => {
       save: (row: Partial<User>): unknown => userRepo.save(row)
     };
 
-    // A partial stub on purpose: the seeder touches only getRepository, the
+    // Partial stubs on purpose: the seeder touches only getRepository, the
     // manager and a transaction, and a full DataSource would be noise with no
     // coverage value.
-    dataSource = {
-      getRepository,
-      // @ts-expect-error - partial EntityManager stub, see the comment above
-      manager,
-      // @ts-expect-error - partial EntityManager stub, see the comment above
-      transaction: (run: (m: typeof manager) => Promise<unknown>) =>
-        run(manager)
+    sources = {
+      regional: {
+        getRepository: regionalRepository,
+        // @ts-expect-error - partial EntityManager stub, see the comment above
+        manager,
+        // @ts-expect-error - partial EntityManager stub, see the comment above
+        transaction: (run: (m: typeof manager) => Promise<unknown>) =>
+          run(manager)
+      },
+      // @ts-expect-error - partial DataSource stub, see the comment above
+      settings: { getRepository: settingsRepository, manager: {} }
     };
 
     mockedLookup.mockResolvedValue('clean');
@@ -96,7 +103,7 @@ describe('seedAdmin', () => {
   });
 
   it('creates the admin and never exits when the password is clean', async () => {
-    await seedAdmin(dataSource);
+    await seedAdmin(sources);
 
     expect(userRepo.save).toHaveBeenCalledTimes(1);
     expect(addUserRole).toHaveBeenCalledWith(expect.anything(), {
@@ -109,7 +116,7 @@ describe('seedAdmin', () => {
   it('adds the admin role to an existing user that lacks it', async () => {
     userRepo.findOne.mockResolvedValue({ id: 'user-1', roles: [] });
 
-    await seedAdmin(dataSource);
+    await seedAdmin(sources);
 
     expect(addUserRole).toHaveBeenCalledWith(expect.anything(), {
       userId: 'user-1',
@@ -121,7 +128,7 @@ describe('seedAdmin', () => {
   it('warns and still creates the admin when the password is breached', async () => {
     mockedLookup.mockResolvedValue('breached');
 
-    await seedAdmin(dataSource);
+    await seedAdmin(sources);
 
     expect(exitSpy).not.toHaveBeenCalled();
     expect(userRepo.save).toHaveBeenCalledTimes(1);
@@ -133,7 +140,7 @@ describe('seedAdmin', () => {
   it('warns and still creates the admin when the password contains the admin name', async () => {
     process.env['ADMIN_PASSWORD'] = 'Admin-Kettle-Sunrise-19';
 
-    await seedAdmin(dataSource);
+    await seedAdmin(sources);
 
     expect(exitSpy).not.toHaveBeenCalled();
     expect(userRepo.save).toHaveBeenCalledTimes(1);
@@ -145,7 +152,7 @@ describe('seedAdmin', () => {
   it('never exits when the blocklist is unreachable', async () => {
     mockedLookup.mockResolvedValue('unavailable');
 
-    await seedAdmin(dataSource);
+    await seedAdmin(sources);
 
     expect(exitSpy).not.toHaveBeenCalled();
     expect(userRepo.save).toHaveBeenCalledTimes(1);
@@ -157,7 +164,7 @@ describe('seedAdmin', () => {
       roles: [{ name: 'admin' }]
     });
 
-    await seedAdmin(dataSource);
+    await seedAdmin(sources);
 
     expect(mockedLookup).not.toHaveBeenCalled();
     expect(userRepo.save).not.toHaveBeenCalled();
@@ -167,9 +174,10 @@ describe('seedAdmin', () => {
   it('spends no lookup and reads nothing without ADMIN_PASSWORD', async () => {
     delete process.env['ADMIN_PASSWORD'];
 
-    await seedAdmin(dataSource);
+    await seedAdmin(sources);
 
-    expect(getRepository).not.toHaveBeenCalled();
+    expect(regionalRepository).not.toHaveBeenCalled();
+    expect(settingsRepository).not.toHaveBeenCalled();
     expect(mockedLookup).not.toHaveBeenCalled();
     expect(exitSpy).not.toHaveBeenCalled();
   });

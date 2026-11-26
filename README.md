@@ -1152,6 +1152,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `DB_PASSWORD` | `password` | The password of `DB_USER`. The container entrypoint starts the server without it |
 | `DB_REGIONAL_PASSWORD` | `regional-password` | Necessary. The password of the login role `app_regional` of the regional data source, which reads and writes only the regional schema. The boot steps create the role and set the password on each start |
 | `DB_SETTINGS_PASSWORD` | `settings-password` | Necessary. The password of the login role `app_settings` of the settings data source, which reads and writes only the `settings` schema |
+| `SETTINGS_DB_HOST`, `SETTINGS_DB_PORT`, `SETTINGS_DB_NAME`, `SETTINGS_DB_USER`, `SETTINGS_DB_PASSWORD` | - | Optional. The database of the settings data source and its administrator login. Each key that is not set takes the `DB_*` value, so with none of them both data sources use one database in two schemas, as production does. The CI server job sets `SETTINGS_DB_NAME` to a database of its own |
 | `DATA_REGION` | `intl` | Necessary. The data region of this deployment: `intl` or `ru`. Another value aborts the boot. It is part of the JWT issuer, so a deployment refuses a token of another region. A set key of an integration that may not run in the region also aborts the boot: Paddle, Turnstile, Google and Facebook only in `intl`, YooKassa only in `ru`, VK in both |
 | `PEER_REGIONS` | `{}` | JSON object of the other regions: region to public `https` URL. The own region aborts the boot |
 | `JWT_ALGORITHM` | `RS256` | Signing algorithm: `HS256` (symmetric) or `RS256` (asymmetric) |
@@ -2116,7 +2117,7 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3508 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3510 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 1075 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 1037 pass and 38 skip. CI then runs the Redis suites and the mail suite with Redis: 58 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
 | Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1869 tests pass |
 | Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 369 tests |

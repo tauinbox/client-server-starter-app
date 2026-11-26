@@ -130,12 +130,24 @@ export async function grantSourceRole(
       END $$`
     );
 
+    // The other schema is absent when the settings have a database of their
+    // own: then this database holds nothing of the other source to revoke.
+    const [{ found }] = await manager.query<Array<{ found: string | null }>>(
+      'SELECT to_regnamespace($1) AS "found"',
+      [otherSchema]
+    );
+    const revokes = found
+      ? [
+          `REVOKE ALL ON ALL TABLES IN SCHEMA ${other} FROM "${role}"`,
+          `REVOKE ALL ON ALL SEQUENCES IN SCHEMA ${other} FROM "${role}"`,
+          `REVOKE ALL ON SCHEMA ${other} FROM "${role}"`,
+          `ALTER DEFAULT PRIVILEGES IN SCHEMA ${other} REVOKE ALL ON TABLES FROM "${role}"`,
+          `ALTER DEFAULT PRIVILEGES IN SCHEMA ${other} REVOKE ALL ON SEQUENCES FROM "${role}"`
+        ]
+      : [];
+
     for (const statement of [
-      `REVOKE ALL ON ALL TABLES IN SCHEMA ${other} FROM "${role}"`,
-      `REVOKE ALL ON ALL SEQUENCES IN SCHEMA ${other} FROM "${role}"`,
-      `REVOKE ALL ON SCHEMA ${other} FROM "${role}"`,
-      `ALTER DEFAULT PRIVILEGES IN SCHEMA ${other} REVOKE ALL ON TABLES FROM "${role}"`,
-      `ALTER DEFAULT PRIVILEGES IN SCHEMA ${other} REVOKE ALL ON SEQUENCES FROM "${role}"`,
+      ...revokes,
       `GRANT USAGE ON SCHEMA ${own} TO "${role}"`,
       `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${own} TO "${role}"`,
       `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${own} TO "${role}"`,

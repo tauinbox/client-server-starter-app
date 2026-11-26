@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource, EntityManager } from 'typeorm';
 import { SETTINGS_ENTITIES } from '../src/data-sources';
-import { postgresConfig } from '../src/postgres.config';
+import { adminOptions } from './admin-data-source';
 import { settingsDataSourceOf } from './settings-data-source';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ErrorKeys } from '@app/shared/constants';
@@ -179,10 +179,8 @@ runWithInfra('Settings write audit row (e2e)', () => {
   it('a later write on the same connection carries no audit id', async () => {
     // A pool of one connection gives both writes the same Postgres session.
     const single = new DataSource({
-      ...postgresConfig(),
+      ...adminOptions('settings'),
       entities: [...SETTINGS_ENTITIES],
-      migrations: [],
-      logging: false,
       extra: { max: 1 }
     });
     const backendPid = async (em: EntityManager): Promise<number> => {

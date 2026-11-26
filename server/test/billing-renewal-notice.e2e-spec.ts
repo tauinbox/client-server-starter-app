@@ -6,7 +6,7 @@ import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Plan } from '../src/modules/billing/entities/plan.entity';
@@ -31,16 +31,17 @@ const PAID_PRICE = 99000;
 
 runWithInfra('Renewal notice scan (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let notices: RenewalNoticeService;
   let emit: jest.Mock;
   const userIds: string[] = [];
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
-    const plans = ds.getRepository(Plan);
+    const plans = settingsDs.getRepository(Plan);
 
     await plans.save(
       [
@@ -64,7 +65,7 @@ runWithInfra('Renewal notice scan (e2e)', () => {
 
     emit = jest.fn();
     const repository = (entity: NewableFunction) =>
-      repositoryProvider(ds, entity);
+      repositoryProvider({ regional: ds, settings: settingsDs }, entity);
     const module = await Test.createTestingModule({
       providers: [
         RenewalNoticeService,
@@ -90,9 +91,10 @@ runWithInfra('Renewal notice scan (e2e)', () => {
   });
 
   afterAll(async () => {
-    await ds?.getRepository(Plan).delete({ key: PAID_KEY });
-    await ds?.getRepository(Plan).delete({ key: FREE_KEY });
+    await settingsDs?.getRepository(Plan).delete({ key: PAID_KEY });
+    await settingsDs?.getRepository(Plan).delete({ key: FREE_KEY });
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
