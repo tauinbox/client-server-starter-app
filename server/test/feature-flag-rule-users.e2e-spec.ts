@@ -14,6 +14,7 @@ import { FeatureFlagResolverService } from '../src/modules/feature-flags/service
 import { SettingsChangeLogService } from '../src/modules/core/settings-change-log/settings-change-log.service';
 import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
 import { EmptyUserRulePayloadIds1795800000000 } from '../src/migrations/settings/1795800000000-empty-user-rule-payload-ids';
+import { DropUserRulePayloadIdsKey1795900000000 } from '../src/migrations/settings/1795900000000-drop-user-rule-payload-ids-key';
 import { flagAuditActor } from './flag-audit-actor';
 
 // The members of a `user` rule are rows of the user, not ids in the settings
@@ -118,8 +119,8 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
     expect(await enabledFor(outsider.id, flag.key)).toBe(false);
   });
 
-  // The next release stores a user rule with no userIds key; this build must
-  // read that form during the rolling deploy and after a rollback to it.
+  // The build before this one stores an empty member list; this build reads
+  // it during the rolling deploy and after a rollback.
   it.each([
     ['an empty member list', { type: 'user', userIds: [] }],
     ['no member list key', { type: 'user' }]
@@ -155,7 +156,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
       [flag.id]
     );
 
-    expect(stored).toEqual([{ payload: { type: 'user', userIds: [] } }]);
+    expect(stored).toEqual([{ payload: { type: 'user' } }]);
     expect(flag.rules[0].payload).toEqual({
       type: 'user',
       userIds: [member.id]
@@ -175,7 +176,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
     expect(await enabledFor(member.id, flag.key)).toBe(false);
   });
 
-  it('empties the member ids of the stored payloads in the contract migration', async () => {
+  it('removes the member ids of the stored payloads in the contract migrations', async () => {
     const member = await saveUser('migrated');
     const flag = await createFlag('migrated', [userRule([member.id])]);
 
@@ -187,6 +188,7 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
 
     try {
       await new EmptyUserRulePayloadIds1795800000000().up(runner);
+      await new DropUserRulePayloadIdsKey1795900000000().up(runner);
     } finally {
       await runner.release();
     }
@@ -198,8 +200,27 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
       [flag.id]
     );
 
-    expect(stored).toEqual([{ payload: { type: 'user', userIds: [] } }]);
+    expect(stored).toEqual([{ payload: { type: 'user' } }]);
     expect(await enabledFor(member.id, flag.key)).toBe(true);
+  });
+
+  it('puts back the empty member list when the key migration is reverted', async () => {
+    const member = await saveUser('reverted');
+    const flag = await createFlag('reverted', [userRule([member.id])]);
+    const runner = settingsDataSource.createQueryRunner();
+
+    try {
+      await new DropUserRulePayloadIdsKey1795900000000().down(runner);
+    } finally {
+      await runner.release();
+    }
+
+    const stored = await settingsDataSource.query<{ payload: unknown }[]>(
+      `SELECT "payload" FROM "feature_flag_rules" WHERE "flag_id" = $1`,
+      [flag.id]
+    );
+
+    expect(stored).toEqual([{ payload: { type: 'user', userIds: [] } }]);
   });
 
   it('refuses a user id with no user row and writes nothing', async () => {
