@@ -68,6 +68,7 @@ import {
   uuidErrors,
   type OptionalMode
 } from '../utils/validation';
+import { currentInstance } from '../instance';
 import { pushToAll } from '../sse-hub';
 import { getState, logAudit, toFeatureFlagResponse } from '../state';
 import type {
@@ -378,13 +379,14 @@ function readIfMatch(
 // Mirrors the real server's coalescing: a burst of flag changes collapses
 // into one delayed broadcast instead of one synchronized refetch per change.
 const FLAGS_BROADCAST_COALESCE_MS = 500;
-let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
 
 function broadcastFlagsUpdated(): void {
-  if (broadcastTimer) return;
+  const instance = currentInstance();
 
-  broadcastTimer = setTimeout(() => {
-    broadcastTimer = null;
+  if (instance.flagsBroadcastTimer) return;
+
+  instance.flagsBroadcastTimer = setTimeout(() => {
+    instance.flagsBroadcastTimer = null;
     pushToAll({ type: 'feature_flags_updated' });
   }, FLAGS_BROADCAST_COALESCE_MS);
 }

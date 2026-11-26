@@ -1050,6 +1050,7 @@ fullstack-starter-app/
     └── src/
         ├── index.ts        # Server entry point
         ├── app.ts          # Express app factory (createApp)
+        ├── instance.ts     # One mock server of one region: store, SSE connections, region
         ├── state.ts        # In-memory state management
         ├── seed.ts         # Faker-based seed data (70 users)
         ├── factories.ts    # createMockUser, createOAuthAccount

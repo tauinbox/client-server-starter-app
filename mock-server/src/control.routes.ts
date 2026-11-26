@@ -29,7 +29,7 @@ import {
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
   type PeerRegions
 } from '@app/shared/constants';
-import { MOCK_DATA_REGION } from './helpers/region.helpers';
+import { mockRegion } from './instance';
 import {
   OAUTH_DATA_MAX_AGE_MS,
   OAUTH_SIGNUP_MAX_AGE_MS,
@@ -641,7 +641,7 @@ router.post('/region-peers', (req, res) => {
   const refused = entries.find(
     ([region, url]) =>
       !isDataRegion(region) ||
-      region === MOCK_DATA_REGION ||
+      region === mockRegion() ||
       typeof url !== 'string' ||
       URL.parse(url)?.protocol !== 'https:'
   );

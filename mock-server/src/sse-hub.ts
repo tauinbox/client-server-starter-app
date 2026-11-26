@@ -1,14 +1,18 @@
 import type { Response } from 'express';
 import type { NotificationEvent } from '@app/shared/types';
+import { currentInstance } from './instance';
 
-// Map<userId, Map<connectionId, Response>>
-const connections = new Map<string, Map<string, Response>>();
+function connectionsOfInstance(): Map<string, Map<string, Response>> {
+  return currentInstance().sseConnections;
+}
 
 export function registerSseConnection(
   userId: string,
   connectionId: string,
   res: Response
 ): void {
+  const connections = connectionsOfInstance();
+
   if (!connections.has(userId)) {
     connections.set(userId, new Map());
   }
@@ -17,13 +21,14 @@ export function registerSseConnection(
 }
 
 export function countSseConnections(userId: string): number {
-  return connections.get(userId)?.size ?? 0;
+  return connectionsOfInstance().get(userId)?.size ?? 0;
 }
 
 export function removeSseConnection(
   userId: string,
   connectionId: string
 ): void {
+  const connections = connectionsOfInstance();
   const userConns = connections.get(userId);
 
   if (!userConns) return;
@@ -44,7 +49,7 @@ function sendEvent(res: Response, event: NotificationEvent): void {
 }
 
 export function pushToUser(userId: string, event: NotificationEvent): void {
-  const userConns = connections.get(userId);
+  const userConns = connectionsOfInstance().get(userId);
 
   if (!userConns) return;
 
@@ -58,7 +63,7 @@ export function pushToUsersMatching(
   predicate: (userId: string) => boolean,
   event: NotificationEvent
 ): void {
-  for (const [userId, userConns] of connections) {
+  for (const [userId, userConns] of connectionsOfInstance()) {
     if (!predicate(userId)) continue;
 
     for (const res of userConns.values()) {
