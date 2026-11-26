@@ -2142,7 +2142,8 @@ In the `Repo - Checks` job, `check:i18n` validates that each `ErrorKeys` value e
 i18n JSON file. `check:imports` runs repo-wide, after its own `--self-test`. `graph:check` fails when
 `architecture/dependency-graph.md` differs from the import graph of the tree, or
 `architecture/docker-graph.md` differs from the Docker files: run `npm run graph` from `server/` and
-commit the files.
+commit the files. Both commands also fail when an entity of the settings data source and an entity
+of the regional data source import each other as a value (`import type` is allowed).
 
 Concurrency groups cancel a stale run when the pushes are rapid. The tests need no database and no
 `.env` file, because each test runs against a mock.
