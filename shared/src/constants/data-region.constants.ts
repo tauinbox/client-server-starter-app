@@ -39,6 +39,16 @@ type RegionDefinition = {
    * Art. 18 p. 5).
    */
   readonly smtpProviderRegions: readonly DataRegion[];
+  /**
+   * The first label of the API host of this region, in front of the host of
+   * the SPA (`ru-api` gives `ru-api.<SPA host>`), or null when the API is on
+   * the origin of the SPA. The repository holds no production domain, and one
+   * client build serves every region, so the host is relative to the SPA.
+   * It is code, not a setting: an edit of the settings database cannot send
+   * the traffic of a region to another host. `client/nginx.conf` allows each
+   * such host in `connect-src` (`npm run check:regions`).
+   */
+  readonly apiSubdomain: string | null;
 };
 
 /** The identity of each region (`doc/architecture.md` 12.8, MR-12). */
@@ -52,12 +62,14 @@ export const REGIONS: Readonly<Record<DataRegion, RegionDefinition>> = {
       'facebookOAuth',
       'vkOAuth'
     ],
-    smtpProviderRegions: ['intl', 'ru']
+    smtpProviderRegions: ['intl', 'ru'],
+    apiSubdomain: null
   },
   ru: {
     countries: ['RU'],
     integrations: ['yookassa', 'vkOAuth'],
-    smtpProviderRegions: ['ru']
+    smtpProviderRegions: ['ru'],
+    apiSubdomain: 'ru-api'
   }
 };
 

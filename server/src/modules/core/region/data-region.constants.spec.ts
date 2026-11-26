@@ -38,6 +38,14 @@ describe('region constants', () => {
     });
   });
 
+  it('keeps the API of the home region on the SPA origin and gives each other region a host label', () => {
+    expect(
+      Object.fromEntries(
+        DATA_REGIONS.map((region) => [region, REGIONS[region].apiSubdomain])
+      )
+    ).toEqual({ intl: null, ru: 'ru-api' });
+  });
+
   it('keeps the mail of the ru region in Russia', () => {
     expect(REGIONS.ru.smtpProviderRegions).toEqual(['ru']);
     expect(REGIONS.intl.smtpProviderRegions).toEqual(['intl', 'ru']);

@@ -53,6 +53,7 @@ flowchart LR
     csp_buy_paddle_com["buy.paddle.com<br/>frame-src"]
     csp_cdn_paddle_com["cdn.paddle.com<br/>script-src, style-src, img-src"]
     csp_challenges_cloudflare_com["challenges.cloudflare.com<br/>script-src, frame-src"]
+    csp_ru_api__host["ru-api.$host<br/>connect-src"]
     csp_sandbox_buy_paddle_com["sandbox-buy.paddle.com<br/>frame-src"]
     csp_sandbox_cdn_paddle_com["sandbox-cdn.paddle.com<br/>style-src, img-src"]
   end

@@ -90,7 +90,8 @@ src/app/
 │   │   │                   # isSameOriginUrl, loginUrlTree (the value a guard returns),
 │   │   │                   # navigateToLogin (imperative, for the logout paths in a service),
 │   │   │                   # and the token-refresh predicates.
-│   │   ├── interceptors/   # jwtInterceptor
+│   │   ├── interceptors/   # jwtInterceptor; regionInterceptor (last: sends an /api/ call
+│   │   │                   # to the API host of the region of the session)
 │   │   ├── services/       # AuthService owns the HTTP calls, the refresh schedule and
 │   │   │                   # fetchPermissions(): Promise<void>.
 │   │   │                   # OAuthIntentService holds the proof that this tab started a
@@ -523,6 +524,14 @@ State:
   app reads the value back through the `isPersistedUser` guard in `store/storage-guards.ts`. Thus
   the app ignores a stale or malformed entry. It then starts in the logged-out state. It does not
   show a partial user.
+- `region` is the data region whose API holds the session. It goes to `localStorage` with the key
+  `auth_region`, beside `auth_user`, and a missing or unknown value is the home region. The
+  `regionInterceptor` sends each `/api/` call of a region with an `apiSubdomain` (the shared
+  region constants) to `<apiSubdomain>.<SPA host>` with `withCredentials`, so the refresh after a
+  reload reaches the host that holds the refresh cookie. `client/nginx.conf` allows each such host
+  in `connect-src`, and `npm run check:regions` refuses a missing one. The e2e fixture
+  `e2e/fixtures/regions.fixture.ts` runs the SPA on `nexus.localhost` and one mock instance for
+  each such region on its host.
 - `ability` is an `AppAbility` or `null`.
 - `mfaMandatory` is the server policy from `GET /auth/permissions`. It is true when the account
   holds a super role and the deployment demands a second factor from such an account. The app never
@@ -1272,8 +1281,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 369 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1869 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 370 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1877 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and
