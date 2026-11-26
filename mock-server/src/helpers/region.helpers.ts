@@ -1,21 +1,20 @@
 import {
   ErrorKeys,
-  HOME_DATA_REGION,
   regionForCountry,
   type CountryCode,
-  type DataRegion,
   type ErrorKey
 } from '@app/shared/constants';
 import type { RegionConfigResponse } from '@app/shared/types';
+import { mockRegion } from '../instance';
 import { getState } from '../state';
 
-// The mock is one cell of the home region, as production. It has no peers
-// until a test sets them through /__control/region-peers.
-export const MOCK_DATA_REGION: DataRegion = HOME_DATA_REGION;
-
-/** Mirrors `RegionService` of the server: this cell and its peers. */
+/**
+ * Mirrors `RegionService` of the server: the region of this instance and its
+ * peers. An instance has no peers until a test sets them through
+ * /__control/region-peers.
+ */
 export function regionConfig(): RegionConfigResponse {
-  return { region: MOCK_DATA_REGION, peers: getState().regionPeers };
+  return { region: mockRegion(), peers: getState().regionPeers };
 }
 
 /** Mirrors `RegionService.assertServesCountry`. */
@@ -24,7 +23,7 @@ export function residenceRefusal(
 ): { errorKey: ErrorKey; message: string } | null {
   const region = regionForCountry(country);
 
-  if (region === MOCK_DATA_REGION) return null;
+  if (region === mockRegion()) return null;
 
   if (getState().regionPeers[region]) {
     return {

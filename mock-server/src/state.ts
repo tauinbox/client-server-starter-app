@@ -52,94 +52,16 @@ import type {
   KnownActions,
   KnownSubjects
 } from '@app/shared/generated/casl-subjects';
-import {
-  seedOAuthAccounts,
-  seedUsers,
-  seedResources,
-  seedActions,
-  seedRoles,
-  seedPermissions,
-  seedRolePermissions,
-  seedFeatureFlags,
-  seedFeatureFlagRules,
-  seedPlans,
-  seedProducts,
-  seedBreachedPasswords
-} from './seed';
+import { currentInstance, freshState } from './instance';
 
-// Each Playwright worker imports this module in its own process,
-// so state is isolated per worker. Do NOT share a single process
-// across parallel test workers — state will collide.
-let state: State;
-
-export function resetState(): void {
-  state = {
-    // `roles` is copied too: assigning a role pushes into the array, so a
-    // shallow copy would let one test's assignment survive the next reset.
-    users: new Map(seedUsers.map((u) => [u.id, { ...u, roles: [...u.roles] }])),
-    oauthAccounts: new Map(
-      Array.from(seedOAuthAccounts.entries()).map(([k, v]) => [
-        k,
-        v.map((a) => ({ ...a }))
-      ])
-    ),
-    oauthDataTokens: new Map(),
-    oauthSignupTokens: new Map(),
-    reauthProofs: new Map(),
-    refreshTokens: new Map(),
-    refreshSessions: new Map(),
-    sessionStarts: new Map(),
-    sessionUserAgents: new Map(),
-    sessionIps: new Map(),
-    sessionLastActive: new Map(),
-    revokedRefreshTokens: new Map(),
-    rotatedTo: new Map(),
-    emailVerificationTokens: new Map(),
-    passwordResetTokens: new Map(),
-    pendingEmailTokens: new Map(),
-    resources: new Map(seedResources.map((r) => [r.id, { ...r }])),
-    actions: new Map(seedActions.map((a) => [a.id, { ...a }])),
-    roles: new Map(seedRoles.map((r) => [r.id, { ...r }])),
-    permissions: new Map(seedPermissions.map((p) => [p.id, { ...p }])),
-    rolePermissions: seedRolePermissions.map((rp) => ({ ...rp })),
-    auditLogs: [],
-    paddleClientConfig: { clientToken: null, environment: 'sandbox' },
-    captchaConfig: { enabled: false, provider: null, siteKey: null },
-    regionPeers: {},
-    captchaAttempts: new Map(),
-    mfaChallengeFailures: new Map(),
-    mfaStepUpFailures: new Map(),
-    stepUpPasswordFailures: new Map(),
-    breachedPasswords: new Set(seedBreachedPasswords),
-    featureFlags: new Map(seedFeatureFlags.map((f) => [f.id, { ...f }])),
-    featureFlagRules: seedFeatureFlagRules.map((r) => ({
-      ...r,
-      payload: { ...r.payload }
-    })),
-    // Deep copies: `prices` is nested, and a shallow copy lets an edit of it
-    // leak into the seed and survive the next reset.
-    plans: new Map(seedPlans.map((p) => [p.id, structuredClone(p)])),
-    billingProducts: new Map(
-      seedProducts.map((p) => [p.id, structuredClone(p)])
-    ),
-    billingCustomers: new Map(),
-    billingSubscriptions: new Map(),
-    billingUsageRecords: new Map(),
-    billingInvoices: new Map(),
-    billingPaymentMethods: new Map(),
-    billingCustomerGrants: new Map(),
-    billingPurchaseSessions: new Map(),
-    billingCheckoutSessions: new Map(),
-    billingCreditBalances: new Map(),
-    billingWebhookEvents: new Map(),
-    billingConsents: [],
-    legalTermsOverrides: {},
-    userNotifications: new Map()
-  };
+// Each Playwright worker imports this module in its own process, so the
+// instances of one worker are not shared with another worker.
+export function resetState(instance = currentInstance()): void {
+  instance.state = freshState();
 }
 
 export function getState(): State {
-  return state;
+  return currentInstance().state;
 }
 
 /**
@@ -155,21 +77,21 @@ export function registerSession(
     ipAddress = null
   }: { userAgent?: string | null; ipAddress?: string | null } = {}
 ): void {
-  state.refreshSessions.set(refreshToken, sessionId);
-  state.sessionLastActive.set(sessionId, Date.now());
+  getState().refreshSessions.set(refreshToken, sessionId);
+  getState().sessionLastActive.set(sessionId, Date.now());
 
   // Every row records the address it was issued to, so the list shows the
   // latest one. A refresh without an address keeps the previous one.
-  if (ipAddress !== null || !state.sessionIps.has(sessionId)) {
-    state.sessionIps.set(sessionId, ipAddress);
+  if (ipAddress !== null || !getState().sessionIps.has(sessionId)) {
+    getState().sessionIps.set(sessionId, ipAddress);
   }
 
   // Only a session that is new gets a start and a device. Rotation calls this
   // with the id it replaces a token inside, and re-stamping there would restore
   // the sliding expiry the absolute cap ends.
-  if (!state.sessionStarts.has(sessionId)) {
-    state.sessionStarts.set(sessionId, Date.now());
-    state.sessionUserAgents.set(sessionId, userAgent);
+  if (!getState().sessionStarts.has(sessionId)) {
+    getState().sessionStarts.set(sessionId, Date.now());
+    getState().sessionUserAgents.set(sessionId, userAgent);
   }
 }
 
@@ -179,11 +101,11 @@ export function registerSession(
  * refused for age.
  */
 export function sessionAgeMs(refreshToken: string): number {
-  const sessionId = state.refreshSessions.get(refreshToken);
+  const sessionId = getState().refreshSessions.get(refreshToken);
 
   if (sessionId === undefined) return 0;
 
-  const startedAt = state.sessionStarts.get(sessionId);
+  const startedAt = getState().sessionStarts.get(sessionId);
 
   if (startedAt === undefined) return 0;
 
@@ -197,8 +119,8 @@ export function sessionAgeMs(refreshToken: string): number {
  * the check keeps one rule on both sides.
  */
 export function sessionRevoked(sessionId: string, userId: string): boolean {
-  const startedAt = state.sessionStarts.get(sessionId);
-  const user = state.users.get(userId);
+  const startedAt = getState().sessionStarts.get(sessionId);
+  const user = getState().users.get(userId);
 
   if (startedAt === undefined || !user) return false;
 
@@ -212,9 +134,9 @@ export function sessionRevoked(sessionId: string, userId: string): boolean {
  * in the same session.
  */
 export function isSessionLive(sessionId: string): boolean {
-  for (const [token, userId] of state.refreshTokens.entries()) {
+  for (const [token, userId] of getState().refreshTokens.entries()) {
     if (
-      state.refreshSessions.get(token) === sessionId &&
+      getState().refreshSessions.get(token) === sessionId &&
       !sessionRevoked(sessionId, userId)
     ) {
       return true;
@@ -231,21 +153,22 @@ export function isSessionLive(sessionId: string): boolean {
 export function findLostResponseSuccessor(
   refreshToken: string
 ): { ageMs: number; ipAddress: string | null } | null {
-  const successor = state.rotatedTo.get(refreshToken);
+  const successor = getState().rotatedTo.get(refreshToken);
 
-  if (successor === undefined || !state.refreshTokens.has(successor)) {
+  if (successor === undefined || !getState().refreshTokens.has(successor)) {
     return null;
   }
 
-  const sessionId = state.refreshSessions.get(successor);
+  const sessionId = getState().refreshSessions.get(successor);
 
   if (sessionId === undefined) return null;
 
   // A live successor is the newest row of its session, so the last-active
   // stamp is its issue time and the session address is its address.
   return {
-    ageMs: Date.now() - (state.sessionLastActive.get(sessionId) ?? Date.now()),
-    ipAddress: state.sessionIps.get(sessionId) ?? null
+    ageMs:
+      Date.now() - (getState().sessionLastActive.get(sessionId) ?? Date.now()),
+    ipAddress: getState().sessionIps.get(sessionId) ?? null
   };
 }
 
@@ -254,7 +177,7 @@ export function findLostResponseSuccessor(
  * account alone. Mirrors `AuthService.logoutSession`.
  */
 export function endSessionOfToken(refreshToken: string): boolean {
-  const sessionId = state.refreshSessions.get(refreshToken);
+  const sessionId = getState().refreshSessions.get(refreshToken);
 
   if (sessionId === undefined) return false;
 
@@ -264,20 +187,20 @@ export function endSessionOfToken(refreshToken: string): boolean {
 function endSession(sessionId: string): boolean {
   let ended = false;
 
-  for (const [token, sid] of state.refreshSessions.entries()) {
+  for (const [token, sid] of getState().refreshSessions.entries()) {
     if (sid !== sessionId) continue;
 
-    if (state.refreshTokens.delete(token)) ended = true;
+    if (getState().refreshTokens.delete(token)) ended = true;
 
-    state.revokedRefreshTokens.delete(token);
-    state.rotatedTo.delete(token);
-    state.refreshSessions.delete(token);
+    getState().revokedRefreshTokens.delete(token);
+    getState().rotatedTo.delete(token);
+    getState().refreshSessions.delete(token);
   }
 
-  state.sessionStarts.delete(sessionId);
-  state.sessionUserAgents.delete(sessionId);
-  state.sessionIps.delete(sessionId);
-  state.sessionLastActive.delete(sessionId);
+  getState().sessionStarts.delete(sessionId);
+  getState().sessionUserAgents.delete(sessionId);
+  getState().sessionIps.delete(sessionId);
+  getState().sessionLastActive.delete(sessionId);
 
   return ended;
 }
@@ -286,18 +209,18 @@ function endSession(sessionId: string): boolean {
 export function liveSessionIdsOf(userId: string): string[] {
   const ids = new Set<string>();
 
-  for (const [token, uid] of state.refreshTokens.entries()) {
+  for (const [token, uid] of getState().refreshTokens.entries()) {
     if (uid !== userId) continue;
 
-    const sid = state.refreshSessions.get(token);
+    const sid = getState().refreshSessions.get(token);
 
     if (sid !== undefined && !sessionRevoked(sid, userId)) ids.add(sid);
   }
 
   return [...ids].toSorted(
     (a, b) =>
-      (state.sessionLastActive.get(b) ?? 0) -
-      (state.sessionLastActive.get(a) ?? 0)
+      (getState().sessionLastActive.get(b) ?? 0) -
+      (getState().sessionLastActive.get(a) ?? 0)
   );
 }
 
@@ -331,15 +254,15 @@ export function endOtherUserSessions(
  * refresh token working, and the delete alone leaves issued access tokens.
  */
 export function revokeUserSessions(userId: string): void {
-  for (const [token, uid] of state.refreshTokens.entries()) {
-    if (uid === userId) state.refreshTokens.delete(token);
+  for (const [token, uid] of getState().refreshTokens.entries()) {
+    if (uid === userId) getState().refreshTokens.delete(token);
   }
 
-  for (const [token, uid] of state.revokedRefreshTokens.entries()) {
-    if (uid === userId) state.revokedRefreshTokens.delete(token);
+  for (const [token, uid] of getState().revokedRefreshTokens.entries()) {
+    if (uid === userId) getState().revokedRefreshTokens.delete(token);
   }
 
-  const user = state.users.get(userId);
+  const user = getState().users.get(userId);
 
   if (user) user.tokenRevokedAt = new Date().toISOString();
 }
@@ -362,9 +285,10 @@ function moveKey<V>(map: Map<string, V>, from: string, to: string): void {
 export function rekeyUserSessions(userId: string): void {
   const renamed = new Map<string, string>();
 
-  for (const [token, sid] of state.refreshSessions.entries()) {
+  for (const [token, sid] of getState().refreshSessions.entries()) {
     const owner =
-      state.refreshTokens.get(token) ?? state.revokedRefreshTokens.get(token);
+      getState().refreshTokens.get(token) ??
+      getState().revokedRefreshTokens.get(token);
 
     if (owner !== userId) continue;
 
@@ -373,18 +297,18 @@ export function rekeyUserSessions(userId: string): void {
     if (next === undefined) {
       next = generateSessionId();
       renamed.set(sid, next);
-      moveKey(state.sessionStarts, sid, next);
-      moveKey(state.sessionUserAgents, sid, next);
-      moveKey(state.sessionIps, sid, next);
-      moveKey(state.sessionLastActive, sid, next);
+      moveKey(getState().sessionStarts, sid, next);
+      moveKey(getState().sessionUserAgents, sid, next);
+      moveKey(getState().sessionIps, sid, next);
+      moveKey(getState().sessionLastActive, sid, next);
     }
 
-    state.refreshSessions.set(token, next);
+    getState().refreshSessions.set(token, next);
   }
 }
 
 export function findUserByEmail(email: string): MockUser | undefined {
-  for (const user of state.users.values()) {
+  for (const user of getState().users.values()) {
     if (user.email === email && !user.deletedAt) return user;
   }
 
@@ -392,7 +316,7 @@ export function findUserByEmail(email: string): MockUser | undefined {
 }
 
 export function findUserByPendingEmail(email: string): MockUser | undefined {
-  for (const user of state.users.values()) {
+  for (const user of getState().users.values()) {
     if (user.pendingEmail === email && !user.deletedAt) return user;
   }
 
@@ -400,13 +324,13 @@ export function findUserByPendingEmail(email: string): MockUser | undefined {
 }
 
 export function findUserById(id: string): MockUser | undefined {
-  const user = state.users.get(id);
+  const user = getState().users.get(id);
 
   return user && !user.deletedAt ? user : undefined;
 }
 
 export function findUserByIdWithDeleted(id: string): MockUser | undefined {
-  return state.users.get(id);
+  return getState().users.get(id);
 }
 
 export function toResourceResponse(resource: {
@@ -454,8 +378,8 @@ export function toActionResponse(action: {
 export function toPermissionResponse(
   perm: MockPermission
 ): PermissionResponse | null {
-  const resource = state.resources.get(perm.resourceId);
-  const action = state.actions.get(perm.actionId);
+  const resource = getState().resources.get(perm.resourceId);
+  const action = getState().actions.get(perm.actionId);
 
   if (!resource || !action) return null;
 
@@ -518,7 +442,9 @@ export function toUserResponse(user: MockUser): UserResponse {
   } = user;
   // Sorted by name as the server sorts them (attachRoles).
   const roles = roleNames.toSorted().flatMap((name) => {
-    const role = state.roles.values().find((r) => r.name === name);
+    const role = getState()
+      .roles.values()
+      .find((r) => r.name === name);
 
     return role ? [toRolePublicResponse(role)] : [];
   });
@@ -548,7 +474,9 @@ export function toAdminUserResponse(user: MockUser): AdminUserResponse {
   } = user;
   // Sorted by name as the server sorts them (attachRoles).
   const roles = roleNames.toSorted().flatMap((name) => {
-    const role = state.roles.values().find((r) => r.name === name);
+    const role = getState()
+      .roles.values()
+      .find((r) => r.name === name);
 
     return role ? [toRoleAdminResponse(role)] : [];
   });
@@ -565,7 +493,7 @@ export function addOAuthAccounts(
   userId: string,
   accounts: OAuthAccount[]
 ): void {
-  const merged = [...(state.oauthAccounts.get(userId) || []), ...accounts];
+  const merged = [...(getState().oauthAccounts.get(userId) || []), ...accounts];
   const providers = new Set(merged.map((a) => a.provider));
 
   // The server's unique (user_id, provider) refuses the same state.
@@ -573,7 +501,7 @@ export function addOAuthAccounts(
     throw new Error(`User ${userId} would hold two accounts of one provider`);
   }
 
-  state.oauthAccounts.set(userId, merged);
+  getState().oauthAccounts.set(userId, merged);
 }
 
 /**
@@ -594,9 +522,9 @@ export function removeLinkedProviders(
     ip?: string;
   }
 ): void {
-  const removed = state.oauthAccounts.get(user.id) ?? [];
+  const removed = getState().oauthAccounts.get(user.id) ?? [];
 
-  state.oauthAccounts.delete(user.id);
+  getState().oauthAccounts.delete(user.id);
 
   for (const { provider } of removed) {
     logAudit('OAUTH_UNLINK', {
@@ -638,7 +566,7 @@ export function logAudit(
     createdAt: new Date().toISOString()
   };
 
-  state.auditLogs.push(entry);
+  getState().auditLogs.push(entry);
 }
 
 /** Generated from the server decorators, so the mock cannot fall behind. */
@@ -796,8 +724,8 @@ export function toFeatureFlagRuleResponse(
 export function toFeatureFlagResponse(
   flag: MockFeatureFlag
 ): FeatureFlagResponse {
-  const rules = state.featureFlagRules
-    .filter((r) => r.flagId === flag.id)
+  const rules = getState()
+    .featureFlagRules.filter((r) => r.flagId === flag.id)
     .toSorted((a, b) =>
       a.createdAt === b.createdAt
         ? a.id.localeCompare(b.id)
@@ -932,6 +860,3 @@ export function toPaymentMethodResponse(
     updatedAt: method.updatedAt
   };
 }
-
-// Initialize on import
-resetState();

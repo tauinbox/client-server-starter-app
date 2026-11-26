@@ -1,9 +1,18 @@
 import { randomUUID } from 'crypto';
 import {
+  JWT_AUDIENCE,
+  JWT_ISSUER,
   MFA_PENDING_TOKEN_EXPIRY_SECONDS,
   TOKEN_PURPOSE
 } from '@app/shared/constants';
+import { mockRegion } from './instance';
 import type { MockUser } from './types';
+
+// Mirrors `jwtModuleOptions` of the server: the region in the issuer makes an
+// instance refuse a token of another region.
+function issuerAudience(): { iss: string; aud: string } {
+  return { iss: `${JWT_ISSUER}@${mockRegion()}`, aud: JWT_AUDIENCE };
+}
 
 function base64url(obj: Record<string, unknown>): string {
   return Buffer.from(JSON.stringify(obj))
@@ -24,6 +33,7 @@ export function generateAccessToken(
     email: user.email,
     purpose: TOKEN_PURPOSE.ACCESS,
     sid: sessionId,
+    ...issuerAudience(),
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expiresInSeconds
   });
@@ -47,6 +57,7 @@ export function generateMfaPendingToken(
     email: user.email,
     purpose: TOKEN_PURPOSE.MFA_PENDING,
     ...(provider && { provider }),
+    ...issuerAudience(),
     iat: Math.floor(Date.now() / 1000),
     iatMs: Date.now(),
     exp: Math.floor(Date.now() / 1000) + MFA_PENDING_TOKEN_EXPIRY_SECONDS
@@ -86,12 +97,18 @@ export interface DecodedToken {
   purpose?: string;
   sid?: string;
   provider?: unknown;
+  iss?: unknown;
+  aud?: unknown;
   iat: number;
   /** The issue time in milliseconds that a purpose token carries. */
   iatMs?: unknown;
   exp: number;
 }
 
+/**
+ * Reads a token of this instance, or null. Mirrors the issuer and audience
+ * check of `jwtService.verify`; the mock does not sign its tokens.
+ */
 export function decodeToken(token: string): DecodedToken | null {
   try {
     const parts = token.split('.');
@@ -100,9 +117,12 @@ export function decodeToken(token: string): DecodedToken | null {
 
     const payload = JSON.parse(
       Buffer.from(parts[1], 'base64').toString('utf-8')
-    );
+    ) as DecodedToken;
+    const { iss, aud } = issuerAudience();
 
-    return payload as DecodedToken;
+    if (payload.iss !== iss || payload.aud !== aud) return null;
+
+    return payload;
   } catch {
     return null;
   }

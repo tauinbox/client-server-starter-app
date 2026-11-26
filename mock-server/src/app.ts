@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { redactSensitiveQuery } from '@app/shared/utils/redact-url';
+import { defaultInstance, runInInstance, type MockInstance } from './instance';
 import { registerRoutes } from './middleware';
 import controlRouter from './control.routes';
 import mockCheckoutRouter, { MOCK_CHECKOUT_PATH } from './routes/mock-checkout';
@@ -15,7 +16,9 @@ import {
   unhandledError
 } from './helpers/error-envelope.helpers';
 
-export function createApp() {
+export function createApp({
+  instance = defaultInstance
+}: { instance?: MockInstance } = {}) {
   const app = express();
 
   app.use(errorEnvelope);
@@ -36,6 +39,9 @@ export function createApp() {
     req.body ??= {};
     next();
   });
+  // After the body parser: it calls `next` from a stream event, which runs in
+  // the async context of the socket and not of this request.
+  app.use((_req, _res, next) => runInInstance(instance, next));
 
   // Request ID middleware (mirrors server's RequestIdMiddleware)
   const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
