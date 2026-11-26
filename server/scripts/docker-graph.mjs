@@ -29,7 +29,8 @@ import {
 // barrel imports its siblings without a file extension, which Node refuses.
 import {
   REGION_INTEGRATIONS,
-  SMTP_PROVIDER_REGIONS
+  REGIONS,
+  integrationRegions
 } from '../../shared/src/constants/data-region.constants.ts';
 
 const PROD_COMPOSE = 'docker-compose.yml';
@@ -542,7 +543,8 @@ function urlConstants() {
 
 function egressNodes() {
   const constants = urlConstants();
-  const nodes = Object.entries(REGION_INTEGRATIONS).map(([key, regions]) => {
+  const nodes = REGION_INTEGRATIONS.map((key) => {
+    const regions = integrationRegions(key);
     const prefix = key.replace(/OAuth$/, '').toUpperCase();
     const hosts = constants.filter(({ name }) => name.startsWith(`${prefix}_`));
 
@@ -562,8 +564,9 @@ function egressNodes() {
     id: nodeId('ext', 'smtp'),
     lines: [
       'SMTP provider (SMTP_HOST)',
-      ...Object.entries(SMTP_PROVIDER_REGIONS).map(
-        ([cell, regions]) => `${cell} cell accepts: ${regions.join(', ')}`
+      ...Object.entries(REGIONS).map(
+        ([cell, { smtpProviderRegions }]) =>
+          `${cell} cell accepts: ${smtpProviderRegions.join(', ')}`
       )
     ]
   });

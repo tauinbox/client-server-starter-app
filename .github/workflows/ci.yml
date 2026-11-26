@@ -82,6 +82,10 @@ jobs:
       - run: npm run check:race
       - run: npm run check:regex-modifiers -- --self-test
       - run: npm run check:regex-modifiers
+      # Reads the four source roots with the TypeScript of this install and
+      # resolves no package, so no other install is needed.
+      - run: npm run check:regions -- --self-test
+      - run: npm run check:regions
       - run: npm run check:status-comments -- --self-test
       - run: npm run check:status-comments
       # Reads client/src and mock-server/src as text only: no install needed.

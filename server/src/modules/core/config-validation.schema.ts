@@ -6,7 +6,7 @@ import {
   DEFAULT_SESSION_ABSOLUTE_MAX_MS,
   MIN_JWT_EXPIRATION_SECONDS,
   REGION_INTEGRATIONS,
-  SMTP_PROVIDER_REGIONS,
+  REGIONS,
   type CaptchaProvider,
   type DataRegion,
   type PeerRegions,
@@ -75,14 +75,14 @@ function egressRefusals(env: Record<string, unknown>): string[] {
 
   if (!region) return [];
 
-  const integrations = Object.keys(INTEGRATION_ENV_KEYS) as RegionIntegration[];
-  const refusals = integrations.flatMap((integration) => {
-    const allowed: readonly DataRegion[] = REGION_INTEGRATIONS[integration];
+  const { integrations: allowed, smtpProviderRegions: accepted } =
+    REGIONS[region];
+  const refusals = REGION_INTEGRATIONS.flatMap((integration) => {
     const setKeys = INTEGRATION_ENV_KEYS[integration].filter((key) =>
       isSet(env[key])
     );
 
-    return setKeys.length > 0 && !allowed.includes(region)
+    return setKeys.length > 0 && !allowed.includes(integration)
       ? [
           `${integration} may not run in DATA_REGION ${region} (${setKeys.join(', ')} set)`
         ]
@@ -91,7 +91,6 @@ function egressRefusals(env: Record<string, unknown>): string[] {
 
   if (isSet(env['SMTP_HOST'])) {
     const smtpRegion = env['SMTP_REGION'] as DataRegion | undefined;
-    const accepted: readonly DataRegion[] = SMTP_PROVIDER_REGIONS[region];
 
     if (!smtpRegion) {
       refusals.push('SMTP_REGION is required when SMTP_HOST is set');
