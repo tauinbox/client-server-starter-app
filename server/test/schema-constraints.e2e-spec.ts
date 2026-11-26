@@ -1,29 +1,37 @@
 import { DataSource } from 'typeorm';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 
 // Skips without DB_HOST (bare local run); CI provides a migrated Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 runWithInfra('schema hardening constraints (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
   }, 30000);
 
   afterAll(async () => {
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
   async function indexNames(table: string): Promise<string[]> {
-    const rows: Array<{ indexname: string }> = await ds.query(
-      // The search path of the administrator holds both schemas.
-      `SELECT indexname FROM pg_indexes WHERE schemaname = ANY(current_schemas(false)) AND tablename = $1`,
-      [table]
-    );
+    const names: string[] = [];
 
-    return rows.map((r) => r.indexname);
+    // The table is in one of the two databases, which may be one database.
+    for (const source of [ds, settingsDs]) {
+      const rows: Array<{ indexname: string }> = await source.query(
+        `SELECT indexname FROM pg_indexes WHERE schemaname = ANY(current_schemas(false)) AND tablename = $1`,
+        [table]
+      );
+
+      names.push(...rows.map((r) => r.indexname));
+    }
+
+    return names;
   }
 
   it.each([

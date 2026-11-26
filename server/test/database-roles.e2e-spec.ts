@@ -5,6 +5,7 @@ import { SETTINGS_SCHEMA, SOURCE_ROLES } from '../src/database-roles';
 import { CoreModule } from '../src/modules/core/core.module';
 import { stopSettingsPoll } from './settings-poll';
 import { settingsDataSourceOf } from './settings-data-source';
+import { settingsHaveOwnDatabase } from './admin-data-source';
 
 // Runs only when DB_HOST is set: CI provides Postgres.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
@@ -57,13 +58,34 @@ runWithInfra('the database role of each data source (e2e)', () => {
     });
   });
 
+  // In one database the role refuses the other schema. In two databases the
+  // other table is not there, unless a run on one database left its schema.
+  const refusalOf = (
+    schema: string,
+    table: string,
+    oneDatabase: string
+  ): string | RegExp =>
+    settingsHaveOwnDatabase()
+      ? new RegExp(
+          `relation "${schema}\\.${table}" does not exist|${oneDatabase}`
+        )
+      : oneDatabase;
+
   it('refuses a read of the other schema', async () => {
     await expect(
       regional.query(`SELECT 1 FROM "${SETTINGS_SCHEMA}"."roles" LIMIT 1`)
-    ).rejects.toThrow(`permission denied for schema ${SETTINGS_SCHEMA}`);
+    ).rejects.toThrow(
+      refusalOf(
+        SETTINGS_SCHEMA,
+        'roles',
+        `permission denied for schema ${SETTINGS_SCHEMA}`
+      )
+    );
     await expect(
       settings.query('SELECT 1 FROM "public"."users" LIMIT 1')
-    ).rejects.toThrow('permission denied for table users');
+    ).rejects.toThrow(
+      refusalOf('public', 'users', 'permission denied for table users')
+    );
   });
 
   it('refuses a statement that joins a regional table to a settings table', async () => {
@@ -71,12 +93,24 @@ runWithInfra('the database role of each data source (e2e)', () => {
       regional.query(
         `SELECT 1 FROM "user_roles" ur JOIN "${SETTINGS_SCHEMA}"."roles" r ON r."id" = ur."role_id" LIMIT 1`
       )
-    ).rejects.toThrow(`permission denied for schema ${SETTINGS_SCHEMA}`);
+    ).rejects.toThrow(
+      refusalOf(
+        SETTINGS_SCHEMA,
+        'roles',
+        `permission denied for schema ${SETTINGS_SCHEMA}`
+      )
+    );
     await expect(
       settings.query(
         'SELECT 1 FROM "roles" r JOIN "public"."user_roles" ur ON ur."role_id" = r."id" LIMIT 1'
       )
-    ).rejects.toThrow('permission denied for table user_roles');
+    ).rejects.toThrow(
+      refusalOf(
+        'public',
+        'user_roles',
+        'permission denied for table user_roles'
+      )
+    );
   });
 
   it('refuses a read of the migrations tables and any change of the schema', async () => {

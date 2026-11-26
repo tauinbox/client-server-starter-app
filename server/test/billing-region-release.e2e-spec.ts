@@ -9,7 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -41,6 +41,7 @@ const PLAN = 'region-release-pro';
 
 runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let service: BillingUserService;
   let reducer: BillingEventReducer;
@@ -49,11 +50,11 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
   let customerId: string | undefined;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
-    await ds.getRepository(Plan).save(
-      ds.getRepository(Plan).create({
+    await settingsDs.getRepository(Plan).save(
+      settingsDs.getRepository(Plan).create({
         key: PLAN,
         name: PLAN,
         description: null,
@@ -83,7 +84,7 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
         DRAFT_TERMS_CONSENTS,
         BillingEventReducer,
         { provide: getDataSourceToken(), useValue: ds },
-        ...repositoryProviders(ds, [
+        ...repositoryProviders({ regional: ds, settings: settingsDs }, [
           Customer,
           Subscription,
           Invoice,
@@ -160,8 +161,9 @@ runWithInfra('A region change releases an unpaid checkout (e2e)', () => {
   });
 
   afterAll(async () => {
-    await ds?.getRepository(Plan).delete({ key: PLAN });
+    await settingsDs?.getRepository(Plan).delete({ key: PLAN });
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 

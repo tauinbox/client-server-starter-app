@@ -10,7 +10,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ErrorKeys, LEGAL_DOCUMENTS } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -62,6 +62,7 @@ const DRAFT_RU: LegalDocumentVersions = {
 
 runWithInfra('Consent to the terms at checkout and purchase (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let startCheckout: jest.Mock;
   let createOneTimePayment: jest.Mock;
@@ -69,11 +70,11 @@ runWithInfra('Consent to the terms at checkout and purchase (e2e)', () => {
   let customerId: string | undefined;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
-    await ds.getRepository(Plan).save(
-      ds.getRepository(Plan).create({
+    await settingsDs.getRepository(Plan).save(
+      settingsDs.getRepository(Plan).create({
         key: PLAN,
         name: PLAN,
         description: null,
@@ -86,8 +87,8 @@ runWithInfra('Consent to the terms at checkout and purchase (e2e)', () => {
         prices: { yookassa: { currency: 'RUB', amountMinor: 99000 } }
       })
     );
-    await ds.getRepository(Product).save(
-      ds.getRepository(Product).create({
+    await settingsDs.getRepository(Product).save(
+      settingsDs.getRepository(Product).create({
         key: PRODUCT,
         name: PRODUCT,
         description: null,
@@ -151,9 +152,10 @@ runWithInfra('Consent to the terms at checkout and purchase (e2e)', () => {
   });
 
   afterAll(async () => {
-    await ds?.getRepository(Plan).delete({ key: PLAN });
-    await ds?.getRepository(Product).delete({ key: PRODUCT });
+    await settingsDs?.getRepository(Plan).delete({ key: PLAN });
+    await settingsDs?.getRepository(Product).delete({ key: PRODUCT });
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
@@ -172,7 +174,7 @@ runWithInfra('Consent to the terms at checkout and purchase (e2e)', () => {
         { provide: LEGAL_DOCUMENT_VERSIONS, useValue: documents },
         { provide: getDataSourceToken(), useValue: ds },
         { provide: DataSource, useValue: ds },
-        ...repositoryProviders(ds, [
+        ...repositoryProviders({ regional: ds, settings: settingsDs }, [
           AuditLog,
           Customer,
           Subscription,

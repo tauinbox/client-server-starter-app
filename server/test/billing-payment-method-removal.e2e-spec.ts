@@ -10,7 +10,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { AuditLog } from '../src/modules/audit/entities/audit-log.entity';
 import { AuditService } from '../src/modules/audit/audit.service';
@@ -48,6 +48,7 @@ const AUDIT = { actorEmail: 'removal@example.com', context: {} };
 
 runWithInfra('Removal of the saved card (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let module: TestingModule;
   let service: BillingUserService;
@@ -58,11 +59,11 @@ runWithInfra('Removal of the saved card (e2e)', () => {
   let customerId: string | undefined;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
-    await ds.getRepository(Plan).save(
-      ds.getRepository(Plan).create({
+    await settingsDs.getRepository(Plan).save(
+      settingsDs.getRepository(Plan).create({
         key: PLAN,
         name: PLAN,
         description: null,
@@ -89,7 +90,7 @@ runWithInfra('Removal of the saved card (e2e)', () => {
         AuditService,
         { provide: getDataSourceToken(), useValue: ds },
         { provide: DataSource, useValue: ds },
-        ...repositoryProviders(ds, [
+        ...repositoryProviders({ regional: ds, settings: settingsDs }, [
           Customer,
           Subscription,
           Invoice,
@@ -135,8 +136,9 @@ runWithInfra('Removal of the saved card (e2e)', () => {
   });
 
   afterAll(async () => {
-    await ds?.getRepository(Plan).delete({ key: PLAN });
+    await settingsDs?.getRepository(Plan).delete({ key: PLAN });
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 

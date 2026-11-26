@@ -189,6 +189,13 @@ export const configValidationSchema = Joi.object({
   // entrypoint starts the server without DB_PASSWORD.
   DB_REGIONAL_PASSWORD: Joi.string().required(),
   DB_SETTINGS_PASSWORD: Joi.string().required(),
+  // The settings database. Each key that is not set takes the DB_* value, so
+  // with none of them both data sources use one database (`settingsConnection`).
+  SETTINGS_DB_HOST: Joi.string().optional().allow(''),
+  SETTINGS_DB_PORT: Joi.number().optional().allow(''),
+  SETTINGS_DB_NAME: Joi.string().optional().allow(''),
+  SETTINGS_DB_USER: Joi.string().optional().allow(''),
+  SETTINGS_DB_PASSWORD: Joi.string().optional().allow(''),
   JWT_ALGORITHM: Joi.string().valid('HS256', 'RS256').default('HS256'),
   JWT_SECRET: Joi.string().when('JWT_ALGORITHM', {
     is: 'RS256',

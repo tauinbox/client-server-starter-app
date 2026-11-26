@@ -10,7 +10,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { repositoryToken } from '../src/common/testing/repository-token';
 import { EventName } from '@paddle/paddle-node-sdk';
 import { DataSource } from 'typeorm';
-import { postgresConfig } from '../src/postgres.config';
+import { adminOptions } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { CreditBalance } from '../src/modules/billing/entities/credit-balance.entity';
 import { CreditLedger } from '../src/modules/billing/entities/credit-ledger.entity';
@@ -38,6 +38,7 @@ runWithInfra(
   'Paddle webhooks trust the paid price, not custom data (e2e)',
   () => {
     let ds: DataSource;
+    let settingsDs: DataSource;
     let provider: PaddleProvider;
     let reducer: BillingEventReducer;
     let unmarshal: jest.Mock;
@@ -47,9 +48,11 @@ runWithInfra(
     let packLargeId: string;
 
     beforeAll(async () => {
-      ds = new DataSource({ ...postgresConfig(), logging: false });
+      ds = new DataSource(adminOptions('regional'));
+      settingsDs = new DataSource(adminOptions('settings'));
       await ds.initialize();
-      const plans = ds.getRepository(Plan);
+      await settingsDs.initialize();
+      const plans = settingsDs.getRepository(Plan);
 
       await plans.save(
         [PRO, BUSINESS].map((key) =>
@@ -73,7 +76,7 @@ runWithInfra(
           })
         )
       );
-      const products = ds.getRepository(Product);
+      const products = settingsDs.getRepository(Product);
       const [small, large] = await products.save(
         [
           [PACK_SMALL, 500],
@@ -115,11 +118,11 @@ runWithInfra(
           },
           {
             provide: repositoryToken(Plan),
-            useValue: ds.getRepository(Plan)
+            useValue: plans
           },
           {
             provide: repositoryToken(Product),
-            useValue: ds.getRepository(Product)
+            useValue: products
           },
           {
             provide: MetricsService,
@@ -172,10 +175,11 @@ runWithInfra(
     });
 
     afterAll(async () => {
-      await ds?.getRepository(Plan).delete({ key: PRO });
-      await ds?.getRepository(Plan).delete({ key: BUSINESS });
-      await ds?.getRepository(Product).delete({ key: PACK_SMALL });
-      await ds?.getRepository(Product).delete({ key: PACK_LARGE });
+      await settingsDs?.getRepository(Plan).delete({ key: PRO });
+      await settingsDs?.getRepository(Plan).delete({ key: BUSINESS });
+      await settingsDs?.getRepository(Product).delete({ key: PACK_SMALL });
+      await settingsDs?.getRepository(Product).delete({ key: PACK_LARGE });
+      await settingsDs?.destroy();
       await ds?.destroy();
     });
 

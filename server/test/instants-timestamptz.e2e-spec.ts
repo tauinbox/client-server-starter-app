@@ -8,7 +8,7 @@ import {
   ALLOWED_SUBSCRIPTION_SORT_COLUMNS,
   ALLOWED_USER_SORT_COLUMNS
 } from '@app/shared/constants';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { Resource } from '../src/modules/auth/entities/resource.entity';
 import { Role } from '../src/modules/auth/entities/role.entity';
 import { FeatureFlag } from '../src/modules/feature-flags/entities/feature-flag.entity';
@@ -38,28 +38,48 @@ const SORTABLE_COLUMNS: ReadonlyArray<
 
 runWithInfra('timestamptz instant columns (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
   }, 30000);
 
   afterAll(async () => {
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
+  interface TimestampColumn {
+    table_name: string;
+    column_name: string;
+    data_type: string;
+    datetime_precision: number | null;
+  }
+
+  /** The timestamp columns of both databases, once each when they are one database. */
+  async function timestampColumns(): Promise<TimestampColumn[]> {
+    const columns = new Map<string, TimestampColumn>();
+
+    for (const source of [ds, settingsDs]) {
+      const rows = await source.query<TimestampColumn[]>(
+        `SELECT table_name, column_name, data_type, datetime_precision
+           FROM information_schema.columns
+          WHERE table_schema = ANY(current_schemas(false))
+            AND data_type LIKE 'timestamp%'
+          ORDER BY table_name, column_name`
+      );
+
+      for (const row of rows) {
+        columns.set(`${row.table_name}.${row.column_name}`, row);
+      }
+    }
+
+    return [...columns.values()];
+  }
+
   it('declares every instant column as timestamp with time zone', async () => {
-    const rows: Array<{
-      table_name: string;
-      column_name: string;
-      data_type: string;
-    }> = await ds.query(
-      `SELECT table_name, column_name, data_type
-         FROM information_schema.columns
-        WHERE table_schema = ANY(current_schemas(false))
-          AND data_type LIKE 'timestamp%'
-        ORDER BY table_name, column_name`
-    );
+    const rows = await timestampColumns();
 
     const naive = rows.filter(
       (r) => r.data_type !== 'timestamp with time zone'
@@ -74,16 +94,7 @@ runWithInfra('timestamptz instant columns (e2e)', () => {
   });
 
   it('stores no keyset sort column finer than a millisecond', async () => {
-    const rows: Array<{
-      table_name: string;
-      column_name: string;
-      datetime_precision: number | null;
-    }> = await ds.query(
-      `SELECT table_name, column_name, datetime_precision
-         FROM information_schema.columns
-        WHERE table_schema = ANY(current_schemas(false))
-          AND data_type LIKE 'timestamp%'`
-    );
+    const rows = await timestampColumns();
 
     const precisionByColumn = new Map(
       rows.map((r) => [

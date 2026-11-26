@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { MetricsService } from '../src/modules/core/metrics/metrics.service';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
@@ -36,6 +36,7 @@ const PACK = 'event-key-pack';
 
 runWithInfra('YooKassa webhook dedup key (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let ingestion: WebhookIngestionService;
   let getPayment: jest.Mock;
@@ -45,8 +46,8 @@ runWithInfra('YooKassa webhook dedup key (e2e)', () => {
   let paymentId: string;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
 
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -74,8 +75,8 @@ runWithInfra('YooKassa webhook dedup key (e2e)', () => {
     );
 
     customerId = customer.id;
-    await ds.getRepository(Product).save(
-      ds.getRepository(Product).create({
+    await settingsDs.getRepository(Product).save(
+      settingsDs.getRepository(Product).create({
         key: PACK,
         name: PACK,
         description: null,
@@ -85,7 +86,7 @@ runWithInfra('YooKassa webhook dedup key (e2e)', () => {
         active: true
       })
     );
-    ({ id: productId } = await ds
+    ({ id: productId } = await settingsDs
       .getRepository(Product)
       .findOneOrFail({ where: { key: PACK } }));
 
@@ -108,7 +109,7 @@ runWithInfra('YooKassa webhook dedup key (e2e)', () => {
         { provide: YOOKASSA_CLIENT, useValue: { getPayment } },
         { provide: ConfigService, useValue: { get: () => '1' } },
         { provide: getDataSourceToken(), useValue: ds },
-        ...repositoryProviders(ds, [
+        ...repositoryProviders({ regional: ds, settings: settingsDs }, [
           User,
           PaymentMethod,
           WebhookEvent,
@@ -156,8 +157,9 @@ runWithInfra('YooKassa webhook dedup key (e2e)', () => {
 
     if (userId) await ds.getRepository(User).delete({ id: userId });
 
-    await ds?.getRepository(Product).delete({ key: PACK });
+    await settingsDs?.getRepository(Product).delete({ key: PACK });
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 

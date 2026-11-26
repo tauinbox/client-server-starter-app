@@ -7,7 +7,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -39,6 +39,7 @@ const BUSINESS = 'unclaimed-business';
 
 runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let module: TestingModule;
   let reducer: BillingEventReducer;
@@ -47,13 +48,13 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
   let customerId: string | undefined;
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
 
     for (const key of [PRO, BUSINESS]) {
-      await ds.getRepository(Plan).save(
-        ds.getRepository(Plan).create({
+      await settingsDs.getRepository(Plan).save(
+        settingsDs.getRepository(Plan).create({
           key,
           name: key,
           description: null,
@@ -80,7 +81,7 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
         BillingAdminService,
         FirstPaymentUnclaimedListener,
         { provide: getDataSourceToken(), useValue: ds },
-        ...repositoryProviders(ds, [
+        ...repositoryProviders({ regional: ds, settings: settingsDs }, [
           Subscription,
           Invoice,
           Customer,
@@ -126,8 +127,11 @@ runWithInfra('YooKassa first payment that activates nothing (e2e)', () => {
   });
 
   afterAll(async () => {
-    await ds?.getRepository(Plan).delete([{ key: PRO }, { key: BUSINESS }]);
+    await settingsDs
+      ?.getRepository(Plan)
+      .delete([{ key: PRO }, { key: BUSINESS }]);
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 

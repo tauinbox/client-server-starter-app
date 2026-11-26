@@ -16,7 +16,7 @@ import { DataSource } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import type { SubscriptionStatus } from '@app/shared/types';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -40,6 +40,7 @@ const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 runWithInfra('A repeated period-end cancel (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let app: INestApplication;
   let server: Server;
   let userId: string | undefined;
@@ -48,8 +49,8 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
   const audit = { log: jest.fn(), logFireAndForget: jest.fn() };
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
 
     const moduleRef = await Test.createTestingModule({
       controllers: [BillingAdminController],
@@ -57,7 +58,7 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
         RESPONSE_SERIALIZER,
         BillingAdminService,
         { provide: getDataSourceToken(), useValue: ds },
-        ...repositoryProviders(ds, [
+        ...repositoryProviders({ regional: ds, settings: settingsDs }, [
           Subscription,
           Invoice,
           Customer,
@@ -111,6 +112,7 @@ runWithInfra('A repeated period-end cancel (e2e)', () => {
 
   afterAll(async () => {
     await app?.close();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 

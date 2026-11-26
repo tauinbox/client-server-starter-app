@@ -24,6 +24,8 @@ import { isSharedCache } from '../src/common/utils/redis-client';
 import { SETTINGS_SCHEMA, sourceSchema } from '../src/database-roles';
 import { withAdminDataSource } from './admin-data-source';
 
+const SETTINGS_ADMIN = { source: 'settings' } as const;
+
 // The settings change log on real Postgres: the triggers, the order of the
 // versions, the apply after a write and after a direct SQL write, and the
 // rebase after a restore. Runs only when DB_HOST is set.
@@ -237,7 +239,7 @@ runWithInfra('Settings change log (e2e)', () => {
         await first.release();
         await second.release();
       }
-    }));
+    }, SETTINGS_ADMIN));
 
   async function heldRole(suffix: string): Promise<string> {
     const role = await roleService.create(
@@ -366,7 +368,7 @@ runWithInfra('Settings change log (e2e)', () => {
         ]);
       });
       await admin.query(RENEW_EPOCH_SQL);
-    });
+    }, SETTINGS_ADMIN);
 
     // Any node of the pool can take the rebase; the cache is shared.
     const names = await waitUntil(

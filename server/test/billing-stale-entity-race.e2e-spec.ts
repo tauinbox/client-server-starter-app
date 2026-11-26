@@ -15,7 +15,7 @@ import {
   type FindOneOptions,
   type ObjectLiteral
 } from 'typeorm';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -52,6 +52,7 @@ const PLAN_KEY = 'stale-race-pro';
 
 runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let userId: string | undefined;
   let customerId: string | undefined;
@@ -63,11 +64,11 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
   const periodEnd = new Date(Date.now() + 20 * DAY_MS);
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
-    await ds.getRepository(Plan).save(
-      ds.getRepository(Plan).create({
+    await settingsDs.getRepository(Plan).save(
+      settingsDs.getRepository(Plan).create({
         key: PLAN_KEY,
         name: PLAN_KEY,
         description: null,
@@ -117,8 +118,9 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
   });
 
   afterAll(async () => {
-    await ds?.getRepository(Plan).delete({ key: PLAN_KEY });
+    await settingsDs?.getRepository(Plan).delete({ key: PLAN_KEY });
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
@@ -242,11 +244,11 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         },
         {
           provide: repositoryToken(Plan),
-          useValue: ds.getRepository(Plan)
+          useValue: settingsDs.getRepository(Plan)
         },
         {
           provide: repositoryToken(Product),
-          useValue: ds.getRepository(Product)
+          useValue: settingsDs.getRepository(Product)
         },
         {
           provide: CreditService,
@@ -299,11 +301,11 @@ runWithInfra('Billing writes vs. concurrently committed columns (e2e)', () => {
         },
         {
           provide: repositoryToken(Plan),
-          useValue: ds.getRepository(Plan)
+          useValue: settingsDs.getRepository(Plan)
         },
         {
           provide: repositoryToken(Product),
-          useValue: ds.getRepository(Product)
+          useValue: settingsDs.getRepository(Product)
         },
         { provide: repositoryToken(User), useValue: ds.getRepository(User) },
         {

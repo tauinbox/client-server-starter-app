@@ -10,7 +10,12 @@ import {
   SETTINGS_SCHEMA,
   sourceSchema
 } from './database-roles';
-import { postgresConfig, settingsMigrations } from './postgres.config';
+import { SETTINGS_ENTITIES } from './data-sources';
+import {
+  postgresConfig,
+  settingsConnection,
+  settingsMigrations
+} from './postgres.config';
 
 /**
  * The migrations table of the settings set. It is a settings table, so the
@@ -27,17 +32,19 @@ export interface MigrationSources {
 
 /**
  * The options of the data source that runs the settings set, on the login of
- * the administrator. Both sets point at one database until the settings move
- * to their own database. A new settings table goes into the settings schema;
- * the regional schema stays on the path for the functions of the extensions.
+ * the administrator, on the settings database (`settingsConnection`). A new
+ * settings table goes into the settings schema; the regional schema stays on
+ * the path for the functions of the extensions. The seeders run on it too, so
+ * it registers the settings entities.
  */
 export function settingsMigrationOptions(): ReturnType<typeof postgresConfig> {
   const regional = postgresConfig();
 
   return {
     ...regional,
+    ...settingsConnection(),
     schema: SETTINGS_SCHEMA,
-    entities: [],
+    entities: [...SETTINGS_ENTITIES],
     migrations: settingsMigrations(),
     migrationsTableName: SETTINGS_MIGRATIONS_TABLE,
     extra: {

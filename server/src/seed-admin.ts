@@ -14,7 +14,13 @@ import {
  * under `set -e`, so an error here stops the API from starting; that contract
  * is what `seed-admin.spec.ts` pins.
  */
-export async function seedAdmin(dataSource: DataSource): Promise<void> {
+export async function seedAdmin({
+  regional,
+  settings
+}: {
+  regional: DataSource;
+  settings: DataSource;
+}): Promise<void> {
   const email = process.env['ADMIN_EMAIL'];
   const password = process.env['ADMIN_PASSWORD'];
   const name = process.env['ADMIN_NAME']?.trim() || 'Admin';
@@ -25,11 +31,9 @@ export async function seedAdmin(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  const roleRepo = dataSource.getRepository(Role);
-
-  // The boot steps run on one data source that holds every entity.
+  const roleRepo = settings.getRepository(Role);
   const existing = await findUserWithRoles(
-    { regional: dataSource.manager, settings: dataSource.manager },
+    { regional: regional.manager, settings: settings.manager },
     { where: { email } }
   );
 
@@ -45,7 +49,7 @@ export async function seedAdmin(dataSource: DataSource): Promise<void> {
     const adminRole = await roleRepo.findOne({ where: { name: 'admin' } });
 
     if (adminRole) {
-      await addUserRole(dataSource.manager, {
+      await addUserRole(regional.manager, {
         userId: existing.id,
         roleId: adminRole.id
       });
@@ -91,7 +95,7 @@ export async function seedAdmin(dataSource: DataSource): Promise<void> {
 
   const { hash, version } = await hashPassword(password);
 
-  await dataSource.transaction(async (manager) => {
+  await regional.transaction(async (manager) => {
     const admin = await manager.save(
       manager.create(User, {
         email,

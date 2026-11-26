@@ -39,7 +39,7 @@ export async function runBootSteps(
     POOL_LOCK_KEYS.bootSteps,
     async () => {
       await migrateAndReport(sources, region);
-      await seedAdmin(sources.regional);
+      await seedAdmin(sources);
     }
   );
 }

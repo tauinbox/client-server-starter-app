@@ -11,7 +11,7 @@ import { repositoryToken } from '../src/common/testing/repository-token';
 import { DataSource, EntityManager, Like } from 'typeorm';
 import { ErrorKeys } from '@app/shared/constants';
 import { Money } from '@app/shared/utils/money';
-import { postgresConfig } from '../src/postgres.config';
+import { openAdminDataSource } from './admin-data-source';
 import { User } from '../src/modules/users/entities/user.entity';
 import { Customer } from '../src/modules/billing/entities/customer.entity';
 import { Invoice } from '../src/modules/billing/entities/invoice.entity';
@@ -46,6 +46,7 @@ type ConcurrentWrite = (subscriptionId: string) => Promise<unknown>;
 
 runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   let ds: DataSource;
+  let settingsDs: DataSource;
   let releaseDbLock: (() => Promise<void>) | undefined;
   let service: PlanChangeService;
   let users: BillingUserService;
@@ -60,8 +61,8 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   const periodEnd = new Date(Date.now() + 20 * DAY_MS);
 
   beforeAll(async () => {
-    ds = new DataSource({ ...postgresConfig(), logging: false });
-    await ds.initialize();
+    ds = await openAdminDataSource('regional');
+    settingsDs = await openAdminDataSource('settings');
     releaseDbLock = await holdBillingDbLock(ds);
   }, BILLING_DB_LOCK_TIMEOUT_MS);
 
@@ -81,13 +82,16 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
     }
 
     if (planKeys.length > 0) {
-      await ds.getRepository(Plan).delete(planKeys.map((key) => ({ key })));
+      await settingsDs
+        .getRepository(Plan)
+        .delete(planKeys.map((key) => ({ key })));
       planKeys = [];
     }
   });
 
   afterAll(async () => {
     await releaseDbLock?.();
+    await settingsDs?.destroy();
     await ds?.destroy();
   });
 
@@ -106,8 +110,8 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
   async function seedPlan(key: string, amountMinor: number): Promise<Plan> {
     planKeys.push(key);
 
-    return ds.getRepository(Plan).save(
-      ds.getRepository(Plan).create({
+    return settingsDs.getRepository(Plan).save(
+      settingsDs.getRepository(Plan).create({
         key,
         name: key,
         description: null,
@@ -246,11 +250,11 @@ runWithInfra('Plan change vs. concurrent subscription writes (e2e)', () => {
         },
         {
           provide: repositoryToken(Plan),
-          useValue: ds.getRepository(Plan)
+          useValue: settingsDs.getRepository(Plan)
         },
         {
           provide: repositoryToken(Product),
-          useValue: ds.getRepository(Product)
+          useValue: settingsDs.getRepository(Product)
         },
         { provide: repositoryToken(User), useValue: ds.getRepository(User) },
         {
