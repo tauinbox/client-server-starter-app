@@ -13,11 +13,13 @@ import { FeatureFlagService } from '../src/modules/feature-flags/services/featur
 import { FeatureFlagResolverService } from '../src/modules/feature-flags/services/feature-flag-resolver.service';
 import { SettingsChangeLogService } from '../src/modules/core/settings-change-log/settings-change-log.service';
 import type { FeatureFlagRuleDto } from '../src/modules/feature-flags/dtos/feature-flag-rule.dto';
+import { EmptyUserRulePayloadIds1795800000000 } from '../src/migrations/settings/1795800000000-empty-user-rule-payload-ids';
 import { flagAuditActor } from './flag-audit-actor';
 
 // The members of a `user` rule are rows of the user, not ids in the settings
 // row of the rule. These cases run on the real schema: the foreign key to the
-// user, the delete of the members of a removed rule and the read of both forms.
+// user, the delete of the members of a removed rule and the stored payload with
+// no member ids.
 const runWithInfra = process.env['DB_HOST'] ? describe : describe.skip;
 
 const userRule = (userIds: string[]): FeatureFlagRuleDto => ({
@@ -135,16 +137,58 @@ runWithInfra('Feature flag user rule members (e2e)', () => {
     expect(await enabledFor(member.id, flag.key)).toBe(true);
   });
 
-  it('still reads the payload ids that a node of the previous build wrote', async () => {
-    const member = await saveUser('payload-only');
-    const flag = await createFlag('payload-only', [userRule([member.id])]);
-
-    await dataSource.query(
-      `DELETE FROM "feature_flag_rule_users" WHERE "rule_id" = $1`,
-      [flag.rules[0].id]
+  it('stores no member id in the settings row of the rule', async () => {
+    const member = await saveUser('stored');
+    const flag = await createFlag('stored', [userRule([member.id])]);
+    const stored = await settingsDataSource.query<{ payload: unknown }[]>(
+      `SELECT "payload" FROM "feature_flag_rules" WHERE "flag_id" = $1`,
+      [flag.id]
     );
-    await resolver.invalidateAll();
 
+    expect(stored).toEqual([{ payload: { type: 'user', userIds: [] } }]);
+    expect(flag.rules[0].payload).toEqual({
+      type: 'user',
+      userIds: [member.id]
+    });
+  });
+
+  it('ignores a member id in the payload that has no member row', async () => {
+    const member = await saveUser('payload-only');
+    const flag = await createFlag('payload-only', [userRule([])]);
+
+    await settingsDataSource.query(
+      `UPDATE "feature_flag_rules" SET "payload" = $2 WHERE "flag_id" = $1`,
+      [flag.id, { type: 'user', userIds: [member.id] }]
+    );
+    await settingsLog.applyPending();
+
+    expect(await enabledFor(member.id, flag.key)).toBe(false);
+  });
+
+  it('empties the member ids of the stored payloads in the contract migration', async () => {
+    const member = await saveUser('migrated');
+    const flag = await createFlag('migrated', [userRule([member.id])]);
+
+    await settingsDataSource.query(
+      `UPDATE "feature_flag_rules" SET "payload" = $2 WHERE "flag_id" = $1`,
+      [flag.id, { type: 'user', userIds: [member.id] }]
+    );
+    const runner = settingsDataSource.createQueryRunner();
+
+    try {
+      await new EmptyUserRulePayloadIds1795800000000().up(runner);
+    } finally {
+      await runner.release();
+    }
+
+    await settingsLog.applyPending();
+
+    const stored = await settingsDataSource.query<{ payload: unknown }[]>(
+      `SELECT "payload" FROM "feature_flag_rules" WHERE "flag_id" = $1`,
+      [flag.id]
+    );
+
+    expect(stored).toEqual([{ payload: { type: 'user', userIds: [] } }]);
     expect(await enabledFor(member.id, flag.key)).toBe(true);
   });
 
