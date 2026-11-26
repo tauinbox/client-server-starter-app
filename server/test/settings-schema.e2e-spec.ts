@@ -72,11 +72,10 @@ runWithInfra('settings schema version of a pool (e2e)', () => {
 
   it('applies the settings set on the home pool, then lets the other pool start', async () => {
     await expect(runMigrationSets(sources, HOME_DATA_REGION)).resolves.toEqual({
-      applied: ['SettingsSchemaProbe1999999999998'],
-      recorded: []
+      applied: ['SettingsSchemaProbe1999999999998']
     });
     await expect(
       runMigrationSets(sources, OTHER_REGION ?? HOME_DATA_REGION)
-    ).resolves.toEqual({ applied: [], recorded: [] });
+    ).resolves.toEqual({ applied: [] });
   });
 });

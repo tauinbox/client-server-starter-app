@@ -29,11 +29,8 @@ export function scramVerifier(
  */
 export const SETTINGS_SCHEMA = 'settings';
 
-/**
- * The schema of the frozen history of one database: the settings tables of a
- * database that it migrated are there until a settings migration moves them.
- */
-export const FROZEN_HISTORY_SCHEMA = 'public';
+/** The schema of the regional data source when `DB_SCHEMA` is not set. */
+export const DEFAULT_REGIONAL_SCHEMA = 'public';
 
 /**
  * The database role of each data source, and the variable that holds its
@@ -69,34 +66,17 @@ export function sourceLogin(
 export function sourceSchema(source: DataSource): string {
   const { options } = source;
 
-  return ('schema' in options && options.schema) || FROZEN_HISTORY_SCHEMA;
+  return ('schema' in options && options.schema) || DEFAULT_REGIONAL_SCHEMA;
 }
 
 /**
- * Creates the settings schema and moves the migrations table of the settings
- * set into it from the schema of the frozen history. It runs before the
- * migrations: TypeORM looks for that table in the schema of the data source,
- * and would run the baseline again on a database that holds it elsewhere.
+ * Creates the settings schema before the migrations: TypeORM creates the
+ * migrations table of the settings set in it, and creates no schema.
  */
-export async function prepareSettingsSchema(
-  settings: DataSource,
-  migrationsTable: string
+export async function createSettingsSchema(
+  settings: DataSource
 ): Promise<void> {
   await settings.query(`CREATE SCHEMA IF NOT EXISTS "${SETTINGS_SCHEMA}"`);
-
-  const [{ move }] = await settings.query<Array<{ move: boolean }>>(
-    'SELECT to_regclass($1) IS NOT NULL AND to_regclass($2) IS NULL AS "move"',
-    [
-      `"${FROZEN_HISTORY_SCHEMA}"."${migrationsTable}"`,
-      `"${SETTINGS_SCHEMA}"."${migrationsTable}"`
-    ]
-  );
-
-  if (move) {
-    await settings.query(
-      `ALTER TABLE "${FROZEN_HISTORY_SCHEMA}"."${migrationsTable}" SET SCHEMA "${SETTINGS_SCHEMA}"`
-    );
-  }
 }
 
 /**

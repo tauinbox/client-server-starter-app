@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { DataSourceOptions, LoggerOptions } from 'typeorm';
-import { SETTINGS_SCHEMA } from './database-roles';
+import { DEFAULT_REGIONAL_SCHEMA, SETTINGS_SCHEMA } from './database-roles';
 import { loadExportedClasses } from './load-exported-classes';
 
 const ENTITY_FILE = /\.entity\.(ts|js)$/;
@@ -20,7 +20,7 @@ const localConfig: Partial<PostgresConnectionOptions> = {
   database: '',
   logging: ['warn', 'error'] as LoggerOptions,
   logger: 'simple-console',
-  schema: 'public',
+  schema: DEFAULT_REGIONAL_SCHEMA,
   migrationsRun: false
 };
 

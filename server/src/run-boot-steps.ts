@@ -56,15 +56,9 @@ export async function migrateAndReport(
   env: Readonly<Record<string, string | undefined>> = process.env
 ): Promise<void> {
   const passwords = sourcePasswords(env);
-  const { applied, recorded } = await runMigrationSets(sources, region);
+  const { applied } = await runMigrationSets(sources, region);
 
   await grantSourceRoles(sources, passwords);
-
-  if (recorded.length > 0) {
-    console.log(
-      `Recorded the baselines of the frozen history with no run: ${recorded.join(', ')}`
-    );
-  }
 
   console.log(
     applied.length === 0
