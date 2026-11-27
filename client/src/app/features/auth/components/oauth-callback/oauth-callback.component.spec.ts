@@ -17,12 +17,16 @@ import { EMPTY, of, Subject, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
 import { OAuthCallbackComponent } from './oauth-callback.component';
-import { AuthStore } from '../../store/auth.store';
+import { AUTH_REGION_KEY, AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
 import { TokenService } from '../../services/token.service';
 import { permissionGuard } from '../../guards/permission.guard';
 import { AuthApiEnum } from '../../constants/auth-api.const';
-import { OAUTH_ERROR } from '@app/shared/constants';
+import {
+  DATA_REGIONS,
+  HOME_DATA_REGION,
+  OAUTH_ERROR
+} from '@app/shared/constants';
 import type { AppAbility } from '../../casl/app-ability';
 import { SessionStorageService } from '@core/services/session-storage.service';
 import { OAuthIntentService } from '../../services/oauth-intent.service';
@@ -31,6 +35,16 @@ import { NotificationsService } from '@core/services/notifications.service';
 import { FeatureFlagsStore } from '../../../feature-flags/store/feature-flags.store';
 import { EntitlementsStore } from '../../../billing/store/entitlements.store';
 import type { AuthResponse, RoleResponse } from '@app/shared/types';
+import type { OAuthIntent } from '../../services/oauth-intent.service';
+
+const [OTHER_REGION] = DATA_REGIONS.filter(
+  (region) => region !== HOME_DATA_REGION
+);
+
+const homeIntent = (returnUrl: string): OAuthIntent => ({
+  returnUrl,
+  region: HOME_DATA_REGION
+});
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -81,7 +95,7 @@ describe('OAuthCallbackComponent', () => {
       completeOAuthSignup: vi.fn().mockReturnValue(of(mockAuthResponse))
     };
 
-    oauthIntentMock = { take: vi.fn().mockReturnValue('/profile') };
+    oauthIntentMock = { take: vi.fn().mockReturnValue(homeIntent('/profile')) };
 
     await TestBed.configureTestingModule({
       imports: [OAuthCallbackComponent, TranslocoTestingModuleWithLangs],
@@ -114,7 +128,7 @@ describe('OAuthCallbackComponent', () => {
   });
 
   it('should navigate to the return url that this tab stored', async () => {
-    oauthIntentMock.take.mockReturnValue('/dashboard');
+    oauthIntentMock.take.mockReturnValue(homeIntent('/dashboard'));
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -205,7 +219,7 @@ describe('OAuthCallbackComponent', () => {
     });
 
     it('navigates to the return url once the code is accepted', async () => {
-      oauthIntentMock.take.mockReturnValue('/dashboard');
+      oauthIntentMock.take.mockReturnValue(homeIntent('/dashboard'));
       await reachChallenge();
 
       await submitCode('123456');
@@ -257,7 +271,7 @@ describe('OAuthCallbackComponent', () => {
     });
 
     it('navigates to the return url once the account is created', async () => {
-      oauthIntentMock.take.mockReturnValue('/dashboard');
+      oauthIntentMock.take.mockReturnValue(homeIntent('/dashboard'));
       await reachResidence();
 
       const residence: HTMLFormElement = fixture.nativeElement.querySelector(
@@ -319,7 +333,7 @@ describe('OAuthCallbackComponent', () => {
   });
 
   it('should reject a stored returnUrl that resolves off-origin', async () => {
-    oauthIntentMock.take.mockReturnValue('//evil.com');
+    oauthIntentMock.take.mockReturnValue(homeIntent('//evil.com'));
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -331,7 +345,7 @@ describe('OAuthCallbackComponent', () => {
   });
 
   it('should reject a stored returnUrl that forms an authority with a backslash', async () => {
-    oauthIntentMock.take.mockReturnValue('/\\evil.com');
+    oauthIntentMock.take.mockReturnValue(homeIntent('/\\evil.com'));
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -343,7 +357,7 @@ describe('OAuthCallbackComponent', () => {
   });
 
   it('should follow a stored returnUrl that carries a double slash in the query', async () => {
-    oauthIntentMock.take.mockReturnValue('/admin/users?q=a//b');
+    oauthIntentMock.take.mockReturnValue(homeIntent('/admin/users?q=a//b'));
 
     fixture = TestBed.createComponent(OAuthCallbackComponent);
     fixture.detectChanges();
@@ -362,6 +376,12 @@ describe('OAuthCallbackComponent', () => {
 describe('OAuthCallbackComponent - post-authentication routine', () => {
   let httpMock: HttpTestingController;
   let router: Router;
+  let intent: OAuthIntent;
+  let localStorageMock: {
+    getItem: ReturnType<typeof vi.fn>;
+    setItem: ReturnType<typeof vi.fn>;
+    removeItem: ReturnType<typeof vi.fn>;
+  };
   let notificationsMock: {
     connect: ReturnType<typeof vi.fn>;
     disconnect: ReturnType<typeof vi.fn>;
@@ -409,6 +429,12 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
   ) as unknown[][];
 
   beforeEach(async () => {
+    intent = homeIntent('/profile');
+    localStorageMock = {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+      removeItem: vi.fn()
+    };
     notificationsMock = {
       connect: vi.fn(),
       disconnect: vi.fn(),
@@ -436,14 +462,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
         provideNoopMaterialAnimations(),
         provideHttpClient(),
         provideHttpClientTesting(),
-        {
-          provide: LocalStorageService,
-          useValue: {
-            getItem: vi.fn().mockReturnValue(null),
-            setItem: vi.fn(),
-            removeItem: vi.fn()
-          }
-        },
+        { provide: LocalStorageService, useValue: localStorageMock },
         {
           provide: SessionStorageService,
           useValue: {
@@ -462,7 +481,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
             sessionCleared$: EMPTY
           }
         },
-        { provide: OAuthIntentService, useValue: { take: () => '/profile' } },
+        { provide: OAuthIntentService, useValue: { take: () => intent } },
         { provide: NotificationsService, useValue: notificationsMock },
         { provide: FeatureFlagsStore, useValue: featureFlagsStoreMock },
         { provide: EntitlementsStore, useValue: entitlementsStoreMock }
@@ -517,6 +536,40 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
     );
 
     expect(guardResult).toBe(true);
+  });
+
+  // The provider returned to the API host of the region that started the
+  // round trip, and the refresh cookie of the session is host-only there.
+  it('keeps the session in the region of the round trip', async () => {
+    intent = { returnUrl: '/profile', region: OTHER_REGION };
+
+    const fixture = await runCallback();
+
+    httpMock.expectOne(AuthApiEnum.Permissions).flush({ rules: packedRules });
+    await settle(fixture);
+
+    expect(TestBed.inject(AuthStore).region()).toBe(OTHER_REGION);
+    expect(localStorageMock.setItem).toHaveBeenCalledWith(
+      AUTH_REGION_KEY,
+      OTHER_REGION
+    );
+  });
+
+  it('starts the next sign-in in the home region after a failed round trip', async () => {
+    intent = { returnUrl: '/profile', region: OTHER_REGION };
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const fixture = TestBed.createComponent(OAuthCallbackComponent);
+
+    fixture.detectChanges();
+    expect(TestBed.inject(AuthStore).region()).toBe(OTHER_REGION);
+
+    httpMock
+      .expectOne(AuthApiEnum.OAuthExchange)
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+    await settle(fixture);
+
+    expect(TestBed.inject(AuthStore).region()).toBe(HOME_DATA_REGION);
   });
 
   it('opens the notification stream and refreshes the feature flags', async () => {

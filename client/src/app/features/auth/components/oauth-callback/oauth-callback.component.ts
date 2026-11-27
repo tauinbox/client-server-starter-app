@@ -22,7 +22,12 @@ import { MfaChallengeComponent } from '../mfa-challenge/mfa-challenge.component'
 import { OAuthResidenceComponent } from '../oauth-residence/oauth-residence.component';
 import type { MfaRequiredResponse } from '../../models/auth.types';
 import { TranslocoDirective } from '@jsverse/transloco';
-import { OAUTH_ERROR, type OAuthError } from '@app/shared/constants';
+import {
+  HOME_DATA_REGION,
+  OAUTH_ERROR,
+  type OAuthError
+} from '@app/shared/constants';
+import { AuthStore } from '../../store/auth.store';
 
 @Component({
   selector: 'nxs-oauth-callback',
@@ -44,6 +49,7 @@ export class OAuthCallbackComponent implements OnInit {
   readonly #router = inject(Router);
   readonly #authService = inject(AuthService);
   readonly #oauthIntent = inject(OAuthIntentService);
+  readonly #authStore = inject(AuthStore);
   readonly #window = inject(DOCUMENT).defaultView;
   #returnUrl: string | null = null;
 
@@ -58,14 +64,19 @@ export class OAuthCallbackComponent implements OnInit {
   protected readonly residenceRequired = signal(false);
 
   ngOnInit(): void {
-    this.#returnUrl = this.#oauthIntent.take();
+    const intent = this.#oauthIntent.take();
 
-    if (this.#returnUrl === null) {
+    if (intent === null) {
       // This tab did not start the round trip, so it signs nobody in.
       this.#redirectToLogin(OAUTH_ERROR.AUTH_FAILED);
 
       return;
     }
+
+    this.#returnUrl = intent.returnUrl;
+    // The provider returned to the API host of this region, which holds the
+    // result, and the code or the country of the next step goes there too.
+    this.#authStore.setSignInRegion(intent.region);
 
     this.#authService.exchangeOAuthData().subscribe({
       next: (response) => {
@@ -132,6 +143,8 @@ export class OAuthCallbackComponent implements OnInit {
   }
 
   #redirectToLogin(error: OAuthError): void {
+    // The sign-in of /login starts in the home region.
+    this.#authStore.setSignInRegion(HOME_DATA_REGION);
     void this.#router.navigate([`/${AppRouteSegmentEnum.Login}`], {
       queryParams: { oauth_error: error },
       replaceUrl: true

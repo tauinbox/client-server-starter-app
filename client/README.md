@@ -96,8 +96,8 @@ src/app/
 │   │   ├── services/       # AuthService owns the HTTP calls, the refresh schedule and
 │   │   │                   # fetchPermissions(): Promise<void>.
 │   │   │                   # OAuthIntentService holds the proof that this tab started a
-│   │   │                   # provider round trip, for one page load; the callback page
-│   │   │                   # exchanges nothing without it.
+│   │   │                   # provider round trip (return URL and region), for one page
+│   │   │                   # load; the callback page exchanges nothing without it.
 │   │   └── store/          # AuthStore is an NgRx Signal Store. Its state holds accessToken (in
 │   │                       # memory), user (in localStorage as auth_user),
 │   │                       # ability: AppAbility | null and mfaMandatory (the server policy, read
@@ -537,7 +537,12 @@ State:
   interceptor removes the bearer token. A registration goes the same way to the pool of the
   region of the declared country, but only while `publicRegions` of `GET /config/region` lists
   that region (`RegionConfigService.registrationRegion`); else, and when the read fails, it goes
-  to the home pool, which refuses a country of another region with its own key.
+  to the home pool, which refuses a country of another region with its own key. A provider round
+  trip stores the region of its start in the OAuth intent (`oauth_intent` in `sessionStorage`,
+  written by `AuthService.startOAuth`), and the callback page sets it with `setSignInRegion`
+  (no effect while a session exists), so the exchange, the second factor, the country form and
+  the new session use the host that holds the OAuth cookies. A failed callback sets the home region
+  again.
   `client/nginx.conf` allows each such host in `connect-src`, and `npm run check:regions` refuses a missing one. The e2e fixture
   `e2e/fixtures/regions.fixture.ts` runs the SPA on `nexus.localhost` and one mock instance for
   each such region on its host.
@@ -1293,8 +1298,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 377 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1906 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 379 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1915 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and

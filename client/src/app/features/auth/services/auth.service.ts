@@ -53,6 +53,7 @@ import {
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { silentContext } from '@core/context-tokens/error-notifications';
 import { API_REGION_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/api-region';
+import { OAuthIntentService } from './oauth-intent.service';
 import { TokenService } from './token.service';
 import { IdleTimeoutService } from './idle-timeout.service';
 import { LocalStorageService } from '@core/services/local-storage.service';
@@ -72,6 +73,8 @@ const LEGACY_RBAC_METADATA_KEY = 'rbac_metadata';
 const regionContext = (region: DataRegion) =>
   silentContext().set(API_REGION_HTTP_CONTEXT_TOKEN, region);
 
+type StartOAuth = { returnUrl?: string };
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly #http = inject(HttpClient);
@@ -87,6 +90,7 @@ export class AuthService {
   readonly #entitlementsStore = inject(EntitlementsStore);
   readonly #destroyRef = inject(DestroyRef);
   readonly #window = inject(DOCUMENT).defaultView;
+  readonly #oauthIntent = inject(OAuthIntentService);
 
   constructor() {
     this.#notificationsService.sessionInvalidated$
@@ -196,14 +200,22 @@ export class AuthService {
   /**
    * Leaves for the provider through the API host of the region of the
    * session, where `link-init` and `reauth-init` set their intent cookie.
+   * With `returnUrl`, the round trip ends on the callback, which reads the
+   * region of this start from the stored intent.
    */
-  startOAuth(provider: OAuthProvider): void {
+  startOAuth(provider: OAuthProvider, { returnUrl }: StartOAuth = {}): void {
     const win = this.#window;
 
     if (!win) return;
 
+    const region = this.#authStore.region();
+
+    if (returnUrl !== undefined) {
+      this.#oauthIntent.start({ returnUrl, region });
+    }
+
     win.location.href = oauthStartUrl(provider, {
-      region: this.#authStore.region(),
+      region,
       location: win.location
     });
   }

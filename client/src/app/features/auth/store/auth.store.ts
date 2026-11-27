@@ -130,6 +130,16 @@ export const AuthStore = signalStore(
       });
     }
 
+    /**
+     * The region whose API takes the sign-in that starts now. A session keeps
+     * its region until it ends, so a call with a session changes nothing.
+     */
+    function setSignInRegion(region: DataRegion): void {
+      if (store.accessToken() !== null) return;
+
+      patchState(store, { region });
+    }
+
     function updateCurrentUser(user: UserResponse): void {
       storage.setItem(AUTH_USER_KEY, user);
       patchState(store, { user });
@@ -201,6 +211,7 @@ export const AuthStore = signalStore(
       isAccessTokenExpired,
       getTokenExpiryTime,
       saveAuthResponse,
+      setSignInRegion,
       updateCurrentUser,
       clearSession,
       hasPersistedUser,

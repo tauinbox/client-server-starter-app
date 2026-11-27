@@ -1,6 +1,7 @@
 import type { Locator, Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import { HOME_DATA_REGION, type DataRegion } from '@app/shared/constants';
 import type { MockUser } from './mock-data';
 import {
   trackRoutedRequest,
@@ -58,11 +59,12 @@ export async function stubTurnstile(page: Page): Promise<void> {
  */
 export async function markOAuthRoundTripStarted(
   page: Page,
-  returnUrl = '/profile'
+  returnUrl = '/profile',
+  region: DataRegion = HOME_DATA_REGION
 ): Promise<void> {
   await page.evaluate(
-    (url) => sessionStorage.setItem('oauth_return_url', url),
-    returnUrl
+    (intent) => sessionStorage.setItem('oauth_intent', JSON.stringify(intent)),
+    { returnUrl, region }
   );
 }
 
