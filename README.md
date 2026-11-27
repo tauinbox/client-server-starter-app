@@ -1170,7 +1170,7 @@ Then edit `.env`. Put your database credentials and your settings there.
 | `FACEBOOK_CLIENT_SECRET` | - | Facebook OAuth client secret |
 | `VK_CLIENT_ID` | - | VK OAuth client ID |
 | `VK_CLIENT_SECRET` | - | VK OAuth client secret |
-| `CLIENT_URL` | `http://localhost:4200` | Client URL for the OAuth redirects |
+| `CLIENT_URL` | `http://localhost:4200` | Client URL for the OAuth redirects; on a pool whose region has an API host of its own, also the one `Origin` accepted on a request that can change state |
 | `SMTP_HOST` | - | SMTP server host. A value enables the email delivery |
 | `SMTP_REGION` | - | The data region of the SMTP provider: `intl` or `ru`. Necessary when `SMTP_HOST` is set. A `ru` deployment accepts only `ru`; an `intl` deployment accepts both |
 | `SMTP_PORT` | `587` | SMTP server port |

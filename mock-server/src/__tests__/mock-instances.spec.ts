@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import {
   DATA_REGIONS,
   HOME_DATA_REGION,
+  REGIONS,
   type DataRegion
 } from '@app/shared/constants';
 import { createApp } from '../app';
@@ -20,9 +21,13 @@ type Running = {
   baseUrl: string;
 };
 
+const SPA_ORIGIN = 'https://app.example.com';
+
 async function start(region: DataRegion): Promise<Running> {
   const instance = createMockInstance(region);
-  const server = await listenOnUnblockedPort(createApp({ instance }));
+  const server = await listenOnUnblockedPort(
+    createApp({ instance, clientUrl: `${SPA_ORIGIN}/` })
+  );
 
   return { instance, server, baseUrl: baseUrlOf(server) };
 }
@@ -128,5 +133,64 @@ describe('mock instances of two regions in one process', () => {
       runInInstance(home.instance, () => countSseConnections(userId))
     ).toBe(0);
     controller.abort();
+  });
+});
+
+describe('the Origin guard of an instance with an API host of its own', () => {
+  function login(baseUrl: string, origin?: string): Promise<Response> {
+    return fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(origin && { origin })
+      },
+      body: JSON.stringify({ email: USER_EMAIL, password: SEED_PASSWORD })
+    });
+  }
+
+  it('has a region with an API host of its own', () => {
+    expect(REGIONS[otherRegion].apiSubdomain).not.toBeNull();
+  });
+
+  it.each(['https://other.app.example.com', 'null'])(
+    'refuses a POST with the Origin %s, keyless as the server',
+    async (origin) => {
+      const res = await login(other.baseUrl, origin);
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toMatchObject({
+        statusCode: 403,
+        message: 'Origin not allowed'
+      });
+      expect(res.headers.get('access-control-allow-origin')).toBe(SPA_ORIGIN);
+    }
+  );
+
+  it('passes a POST from the SPA origin and a POST with no Origin', async () => {
+    expect((await login(other.baseUrl, SPA_ORIGIN)).status).toBe(200);
+    expect((await login(other.baseUrl)).status).toBe(200);
+  });
+
+  it('passes a GET with another Origin', async () => {
+    const res = await fetch(`${other.baseUrl}/api/v1/config/region`, {
+      headers: { origin: 'https://other.app.example.com' }
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('keeps the home instance open to any Origin', async () => {
+    const res = await login(home.baseUrl, 'https://other.app.example.com');
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBe(
+      'https://other.app.example.com'
+    );
+  });
+
+  it('refuses to start an instance with an API host of its own without CLIENT_URL', () => {
+    expect(() =>
+      createApp({ instance: createMockInstance(otherRegion) })
+    ).toThrow('CLIENT_URL');
   });
 });

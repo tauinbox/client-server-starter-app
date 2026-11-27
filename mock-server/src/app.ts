@@ -10,6 +10,7 @@ import mockCheckoutRouter, { MOCK_CHECKOUT_PATH } from './routes/mock-checkout';
 import mockBillingLabRouter, {
   MOCK_BILLING_LAB_PATH
 } from './routes/mock-billing-lab';
+import { originGuard, requiredOriginOf } from './helpers/origin-guard.helpers';
 import {
   errorEnvelope,
   routeNotFound,
@@ -17,12 +18,23 @@ import {
 } from './helpers/error-envelope.helpers';
 
 export function createApp({
-  instance = defaultInstance
-}: { instance?: MockInstance } = {}) {
+  instance = defaultInstance,
+  clientUrl
+}: {
+  instance?: MockInstance;
+  /** The URL of the SPA, as `CLIENT_URL` of the server. */
+  clientUrl?: string;
+} = {}) {
   const app = express();
+  const requiredOrigin = requiredOriginOf(instance.region, clientUrl);
 
   app.use(errorEnvelope);
-  app.use(cors({ origin: true, credentials: true }));
+  // A host of its own answers the SPA origin only, as the pool of a region
+  // with its `CORS_ORIGINS`.
+  app.use(cors({ origin: requiredOrigin ?? true, credentials: true }));
+
+  if (requiredOrigin !== null) app.use(originGuard(requiredOrigin));
+
   app.use(cookieParser());
   // Mirrors NoStoreMiddleware: no browser or shared cache keeps an API answer.
   app.use((_req, res, next) => {

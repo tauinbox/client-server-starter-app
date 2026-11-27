@@ -1,4 +1,6 @@
 import type { Server } from 'http';
+import type { Page } from '@playwright/test';
+import type { MockUser } from './mock-data';
 import { DATA_REGIONS, REGIONS, type DataRegion } from '@app/shared/constants';
 import { createApp } from '../../../mock-server/src/app';
 import {
@@ -22,6 +24,15 @@ import { trackRoutedRequest } from './pending-requests';
  * `SameSite=strict` cookie between them.
  */
 export const SPA_HOST = 'nexus.localhost';
+
+/** The origin of the SPA on `SPA_HOST`, with the port of `baseURL`. */
+function spaOrigin(baseURL: string | undefined): string {
+  const url = new URL(baseURL ?? 'http://localhost');
+
+  url.hostname = SPA_HOST;
+
+  return url.origin;
+}
 
 type RegionServer = {
   region: DataRegion;
@@ -59,8 +70,11 @@ type TestFixtures = {
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   _regionServers: [
     // eslint-disable-next-line no-empty-pattern
-    async ({}, use) => {
+    async ({}, use, { project }) => {
       const servers: RegionServer[] = [];
+      // The CORS answer and the Origin guard of a region host accept only
+      // the SPA, as the pool of the region with its CLIENT_URL.
+      const clientUrl = spaOrigin(project.use.baseURL);
 
       for (const region of DATA_REGIONS) {
         const { apiSubdomain } = REGIONS[region];
@@ -73,7 +87,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
           region,
           subdomain: apiSubdomain,
           instance,
-          server: await listenOnUnblockedPort(createApp({ instance }))
+          server: await listenOnUnblockedPort(
+            createApp({ instance, clientUrl })
+          )
         });
       }
 
@@ -102,10 +118,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   ],
 
   baseURL: async ({ baseURL }, use) => {
-    const url = new URL(baseURL ?? 'http://localhost');
-
-    url.hostname = SPA_HOST;
-    await use(url.origin);
+    await use(spaOrigin(baseURL));
   },
 
   // After `_mockServer`: a route registered later is matched first, so these
@@ -154,5 +167,57 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await use(mocks);
   }
 });
+
+/**
+ * Creates a resident of the region in its instance and signs in on the API
+ * host of the region from the SPA origin, so the browser keeps the host-only
+ * refresh cookie of that host, as after a sign-in in the app. Answers the
+ * user and the signed-in user of the answer.
+ */
+export async function signInOnRegionHost(
+  page: Page,
+  { region, url, apiOrigin }: RegionMock
+): Promise<{ user: Partial<MockUser>; signedIn: unknown }> {
+  const [residenceCountry] = REGIONS[region].countries;
+  // The control route stores a field that a test leaves out as null.
+  const user = {
+    id: `region-${region}`,
+    email: `resident-${region}@example.com`,
+    name: 'Regional Resident',
+    password: 'Password1',
+    isActive: true,
+    roles: ['user'],
+    isEmailVerified: true,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+    locale: 'en',
+    residenceCountry,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z'
+  } satisfies Partial<MockUser>;
+
+  await fetch(`${url}/__control/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([user])
+  });
+
+  await page.goto('/assets/i18n/en.json');
+  const signedIn = await page.evaluate(
+    async ({ origin, email, password }) => {
+      const response = await fetch(`${origin}/api/v1/auth/login`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      return ((await response.json()) as { user: unknown }).user;
+    },
+    { origin: apiOrigin, email: user.email, password: user.password }
+  );
+
+  return { user, signedIn };
+}
 
 export { expect } from './base.fixture';

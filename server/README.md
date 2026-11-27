@@ -135,7 +135,7 @@ Copy `.env.example` to `.env`, and then configure it:
 | `FACEBOOK_CLIENT_SECRET` | - | Facebook OAuth client secret |
 | `VK_CLIENT_ID` | - | VK OAuth client ID |
 | `VK_CLIENT_SECRET` | - | VK OAuth client secret |
-| `CLIENT_URL` | `http://localhost:4200` | Client URL for the OAuth callback redirects |
+| `CLIENT_URL` | `http://localhost:4200` | Client URL for the OAuth callback redirects; on a pool whose region has an API host of its own, also the one `Origin` accepted on a request other than GET, HEAD or OPTIONS (the pool refuses to start without it) |
 | `MFA_ENCRYPTION_KEY` | - | Base64 of 32 random bytes. It encrypts the two-factor secret column with AES-256-GCM, because a code check needs the original secret back and thus a hash is the wrong tool. While the value is empty, two-factor enrolment answers HTTP 501 and the rest of the application is unchanged. A value that decodes to any other length stops the boot |
 | `MFA_REQUIRED_FOR_ADMINS` | `false` | Set to `true` to make two-factor authentication mandatory for every account that holds a super role. Such an account signs in and reaches its profile as before, but no route behind an authorization check answers it until the enrolment is complete. The requirement stays off while `MFA_ENCRYPTION_KEY` is empty, because enrolment is unavailable in that state |
 | `ADMIN_EMAIL` | - | Email address of the initial administrator. The server makes the account at startup when it does not exist. It skips this step when the value is empty |
