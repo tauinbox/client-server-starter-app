@@ -27,7 +27,6 @@ import { MatDivider } from '@angular/material/divider';
 import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
-import { OAuthIntentService } from '../../services/oauth-intent.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { map, take } from 'rxjs/operators';
@@ -107,7 +106,6 @@ export class LoginComponent implements OnInit, OnDestroy {
   readonly #router = inject(Router);
   readonly #route = inject(ActivatedRoute);
   readonly #destroyRef = inject(DestroyRef);
-  readonly #oauthIntent = inject(OAuthIntentService);
   readonly #window = inject(DOCUMENT).defaultView;
   readonly #translocoService = inject(TranslocoService);
   readonly #flagsStore = inject(FeatureFlagsStore);
@@ -242,8 +240,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   onOAuthLogin(provider: string): void {
     if (!isOAuthProvider(provider)) return;
 
-    this.#oauthIntent.start(this.#returnUrl());
-    this.#authService.startOAuth(provider);
+    this.#authService.startOAuth(provider, { returnUrl: this.#returnUrl() });
   }
 
   onSubmit(): void {

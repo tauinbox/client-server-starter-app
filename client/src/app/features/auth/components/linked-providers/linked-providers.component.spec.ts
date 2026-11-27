@@ -171,7 +171,9 @@ describe('LinkedProvidersComponent', () => {
         currentPassword: 'Password1'
       });
       expect(component['stepUpPrompt']()).toBeNull();
-      expect(authServiceMock.startOAuth).toHaveBeenCalledWith('facebook');
+      expect(authServiceMock.startOAuth).toHaveBeenCalledWith('facebook', {
+        returnUrl: '/profile'
+      });
     });
 
     it('asks an account with an authenticator and no password for a code', async () => {

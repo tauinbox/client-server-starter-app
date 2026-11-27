@@ -1,7 +1,26 @@
 import { DOCUMENT, inject, Injectable } from '@angular/core';
+import { isDataRegion, type DataRegion } from '@app/shared/constants';
 import { SessionStorageService } from '@core/services/session-storage.service';
 
-const OAUTH_RETURN_URL_KEY = 'oauth_return_url';
+const OAUTH_INTENT_KEY = 'oauth_intent';
+
+/**
+ * Where the callback goes after the sign-in, and the region whose API host
+ * started the round trip: the provider returns to that host, which keeps the
+ * result in a host-only cookie, so the callback must exchange it there.
+ */
+export type OAuthIntent = { returnUrl: string; region: DataRegion };
+
+function isOAuthIntent(value: unknown): value is OAuthIntent {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'returnUrl' in value &&
+    typeof value.returnUrl === 'string' &&
+    'region' in value &&
+    isDataRegion(value.region)
+  );
+}
 
 /**
  * Proof that this tab started the provider round trip that ends on the OAuth
@@ -17,35 +36,35 @@ const OAUTH_RETURN_URL_KEY = 'oauth_return_url';
 @Injectable({ providedIn: 'root' })
 export class OAuthIntentService {
   readonly #sessionStorage = inject(SessionStorageService);
-  #returnUrl: string | null;
+  #intent: OAuthIntent | null;
 
   constructor() {
-    this.#returnUrl = this.#sessionStorage.getItem<string>(
-      OAUTH_RETURN_URL_KEY,
-      (value): value is string => typeof value === 'string'
+    this.#intent = this.#sessionStorage.getItem<OAuthIntent>(
+      OAUTH_INTENT_KEY,
+      isOAuthIntent
     );
-    this.#sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
+    this.#sessionStorage.removeItem(OAUTH_INTENT_KEY);
 
     // A Back from the provider restores this page from the back/forward cache
     // with no bootstrap, so the proof written before leaving is still stored.
     inject(DOCUMENT).defaultView?.addEventListener('pageshow', (event) => {
       if (event.persisted) {
-        this.#sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
+        this.#sessionStorage.removeItem(OAUTH_INTENT_KEY);
       }
     });
   }
 
   /** Call just before the browser leaves for the provider. */
-  start(returnUrl: string): void {
-    this.#sessionStorage.setItem(OAUTH_RETURN_URL_KEY, returnUrl);
+  start(intent: OAuthIntent): void {
+    this.#sessionStorage.setItem(OAUTH_INTENT_KEY, intent);
   }
 
-  /** The return URL when this tab started the round trip, else null. Once only. */
-  take(): string | null {
-    const returnUrl = this.#returnUrl;
+  /** The intent when this tab started the round trip, else null. Once only. */
+  take(): OAuthIntent | null {
+    const intent = this.#intent;
 
-    this.#returnUrl = null;
+    this.#intent = null;
 
-    return returnUrl;
+    return intent;
   }
 }

@@ -26,7 +26,6 @@ import { OAUTH_PROVIDER_FLAGS, STEP_UP_OPERATION } from '@app/shared/constants';
 import { NxsFormFieldComponent } from '@shared/forms/nxs-form-field/nxs-form-field.component';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { LocalizedDatePipe } from '@shared/pipes/localized-date.pipe';
-import { OAuthIntentService } from '../../services/oauth-intent.service';
 import { NotifyService } from '@core/services/notify.service';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { AuthService } from '../../services/auth.service';
@@ -79,7 +78,6 @@ export class LinkedProvidersComponent {
   readonly #authService = inject(AuthService);
   readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
-  readonly #oauthIntent = inject(OAuthIntentService);
   readonly #transloco = inject(TranslocoService);
   readonly #flagsStore = inject(FeatureFlagsStore);
 
@@ -259,8 +257,7 @@ export class LinkedProvidersComponent {
       .subscribe({
         next: () => {
           this.#closeStepUpPrompt();
-          this.#oauthIntent.start('/profile');
-          this.#authService.startOAuth(provider);
+          this.#authService.startOAuth(provider, { returnUrl: '/profile' });
         },
         error: (err: HttpErrorResponse) => {
           this.busy.set(false);

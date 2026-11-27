@@ -23,7 +23,6 @@ import type {
 import { ErrorKeys } from '@app/shared/constants';
 import { FeatureFlagsStore } from '@features/feature-flags/store/feature-flags.store';
 import { FeatureFlagService } from '@features/feature-flags/services/feature-flag.service';
-import { OAuthIntentService } from '../../services/oauth-intent.service';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -63,6 +62,7 @@ describe('LoginComponent', () => {
     verifyMfa: ReturnType<typeof vi.fn>;
     verifyMfaRecoveryCode: ReturnType<typeof vi.fn>;
     resendVerificationEmail: ReturnType<typeof vi.fn>;
+    startOAuth: ReturnType<typeof vi.fn>;
   };
   let featureFlagServiceMock: {
     getEvaluatedFlags: ReturnType<typeof vi.fn>;
@@ -78,7 +78,8 @@ describe('LoginComponent', () => {
       login: vi.fn(),
       verifyMfa: vi.fn(),
       verifyMfaRecoveryCode: vi.fn(),
-      resendVerificationEmail: vi.fn()
+      resendVerificationEmail: vi.fn(),
+      startOAuth: vi.fn()
     };
     featureFlagServiceMock = {
       getEvaluatedFlags: vi
@@ -814,12 +815,18 @@ describe('LoginComponent', () => {
     });
 
     it('ignores a provider that is not a known OAuth provider', () => {
-      const start = vi.spyOn(TestBed.inject(OAuthIntentService), 'start');
-
       component.onOAuthLogin('constructor');
       component.onOAuthLogin('twitter');
 
-      expect(start).not.toHaveBeenCalled();
+      expect(authServiceMock.startOAuth).not.toHaveBeenCalled();
+    });
+
+    it('starts the round trip with the return url of the page', () => {
+      component.onOAuthLogin('google');
+
+      expect(authServiceMock.startOAuth).toHaveBeenCalledWith('google', {
+        returnUrl: '/'
+      });
     });
   });
 

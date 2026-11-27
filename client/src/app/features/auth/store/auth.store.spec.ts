@@ -260,6 +260,28 @@ describe('AuthStore', () => {
       );
     });
 
+    it('takes the region of a sign-in that starts with no session', () => {
+      const store = createStore(null);
+
+      store.setSignInRegion(OTHER_REGION);
+      store.saveAuthResponse(createMockAuthResponse());
+
+      expect(store.region()).toBe(OTHER_REGION);
+      expect(storageMock.setItem).toHaveBeenCalledWith(
+        AUTH_REGION_KEY,
+        OTHER_REGION
+      );
+    });
+
+    it('keeps the region of a session until it ends', () => {
+      const store = createStore(null);
+
+      store.saveAuthResponse(createMockAuthResponse());
+      store.setSignInRegion(OTHER_REGION);
+
+      expect(store.region()).toBe(HOME_DATA_REGION);
+    });
+
     it('goes back to the home region when the session ends', () => {
       const store = createStore(createMockUser(), OTHER_REGION);
 
