@@ -8,6 +8,47 @@ import {
   untrackRequest
 } from './pending-requests';
 
+const TURNSTILE_SCRIPT_URL =
+  'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+
+/**
+ * Stubs the global `turnstile` API. The real script is never loaded; instead
+ * the route returns a tiny shim that mounts a button into the host container.
+ * Pressing the button fires the Turnstile callback with a deterministic token
+ * that the mock-server accepts.
+ */
+export async function stubTurnstile(page: Page): Promise<void> {
+  await page.route(`${TURNSTILE_SCRIPT_URL}*`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/javascript',
+      body: `
+        window.turnstile = {
+          render: function (container, options) {
+            const el = typeof container === 'string'
+              ? document.querySelector(container)
+              : container;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.dataset.testid = 'fake-turnstile';
+            btn.textContent = 'Solve CAPTCHA';
+            btn.addEventListener('click', function () {
+              if (options && typeof options.callback === 'function') {
+                options.callback('test-token');
+              }
+            });
+            el.appendChild(btn);
+            return 'widget-1';
+          },
+          reset: function () {},
+          remove: function () {},
+          getResponse: function () { return undefined; }
+        };
+      `
+    })
+  );
+}
+
 /**
  * Stores what a click on a provider button stores just before the browser
  * leaves for the provider. Call it on a page that has already bootstrapped:

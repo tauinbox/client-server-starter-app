@@ -4,6 +4,7 @@ import {
   Component,
   DestroyRef,
   inject,
+  input,
   output,
   signal,
   viewChild
@@ -13,6 +14,7 @@ import { TranslocoDirective } from '@jsverse/transloco';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { from, of } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
+import type { DataRegion } from '@app/shared/constants';
 import { CaptchaService } from '@features/auth/services/captcha.service';
 
 @Component({
@@ -26,6 +28,9 @@ export class CaptchaWidgetComponent implements OnInit {
   readonly #captchaService = inject(CaptchaService);
   readonly #destroyRef = inject(DestroyRef);
 
+  /** The region whose pool checks the token; the region of the session by default. */
+  readonly region = input<DataRegion | null>(null);
+
   readonly tokenChange = output<string | null>();
 
   protected readonly status = signal<
@@ -38,7 +43,7 @@ export class CaptchaWidgetComponent implements OnInit {
   private widgetId: string | null = null;
 
   ngOnInit(): void {
-    from(this.#captchaService.loadConfig())
+    from(this.#captchaService.loadConfig(this.region() ?? undefined))
       .pipe(
         switchMap((cfg) => {
           if (!cfg.enabled) {

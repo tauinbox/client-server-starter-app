@@ -67,7 +67,9 @@ const STREAM_RELOAD_JITTER_MS = 5000;
 
 const LEGACY_RBAC_METADATA_KEY = 'rbac_metadata';
 
-const mailedLinkContext = (region: DataRegion) =>
+// A request that the pool of another region than the session serves: a
+// mailed link, a registration.
+const regionContext = (region: DataRegion) =>
   silentContext().set(API_REGION_HTTP_CONTEXT_TOKEN, region);
 
 @Injectable({ providedIn: 'root' })
@@ -347,16 +349,23 @@ export class AuthService {
     ]);
   }
 
+  /**
+   * Creates the account in the pool of `region`: the pool of the region of
+   * the declared country holds its personal data.
+   */
   register(
     registerData: RegisterRequest,
-    captchaToken?: string | null
+    {
+      captchaToken,
+      region
+    }: { captchaToken: string | null; region: DataRegion }
   ): Observable<User> {
     const body = captchaToken
       ? { ...registerData, captchaToken }
       : registerData;
 
     return this.#http.post<User>(AuthApiEnum.Register, body, {
-      context: silentContext()
+      context: regionContext(region)
     });
   }
 
@@ -612,7 +621,7 @@ export class AuthService {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.ResetPassword,
       { token, password },
-      { context: mailedLinkContext(region) }
+      { context: regionContext(region) }
     );
   }
 
@@ -623,7 +632,7 @@ export class AuthService {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.VerifyEmail,
       { token },
-      { context: mailedLinkContext(region) }
+      { context: regionContext(region) }
     );
   }
 
@@ -660,7 +669,7 @@ export class AuthService {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.ConfirmEmailChange,
       { token },
-      { context: mailedLinkContext(region) }
+      { context: regionContext(region) }
     );
   }
 

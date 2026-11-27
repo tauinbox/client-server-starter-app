@@ -534,8 +534,11 @@ State:
   pages read it with `linkRegion` (no value is the home region, a value that is not a region of
   the code is refused) and send the call with `API_REGION_HTTP_CONTEXT_TOKEN`
   (`core/context-tokens/api-region.ts`). When that region is not the region of the session, the
-  interceptor removes the bearer token. `client/nginx.conf` allows each such host
-  in `connect-src`, and `npm run check:regions` refuses a missing one. The e2e fixture
+  interceptor removes the bearer token. A registration goes the same way to the pool of the
+  region of the declared country, but only while `publicRegions` of `GET /config/region` lists
+  that region (`RegionConfigService.registrationRegion`); else, and when the read fails, it goes
+  to the home pool, which refuses a country of another region with its own key.
+  `client/nginx.conf` allows each such host in `connect-src`, and `npm run check:regions` refuses a missing one. The e2e fixture
   `e2e/fixtures/regions.fixture.ts` runs the SPA on `nexus.localhost` and one mock instance for
   each such region on its host.
 - `ability` is an `AppAbility` or `null`.
@@ -569,8 +572,11 @@ a rare display-only label, use `SYSTEM_ROLES.ADMIN` from `@app/shared/constants`
 
 #### CaptchaService
 
-`CaptchaService` uses `providedIn: 'root'`. It reads `/api/v1/auth/captcha-config` one time in each
-session and keeps the result in a signal. It also injects the Cloudflare Turnstile script on demand
+`CaptchaService` uses `providedIn: 'root'`. It reads `/api/v1/auth/captcha-config` one time for
+each region and keeps the promise: `loadConfig(region)` asks the pool of that region, the region of
+the session by default, because each pool checks the tokens of its own keys. The registration page
+passes the region of the pool that asked for the captcha to `CaptchaWidgetComponent` (`region`
+input), and drops the token when the next attempt goes to another region. It also injects the Cloudflare Turnstile script on demand
 from `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit`. It supplies
 `loadConfig()` and `loadScript()` to `CaptchaWidgetComponent`.
 
@@ -1287,8 +1293,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 374 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1898 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 377 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1906 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and
