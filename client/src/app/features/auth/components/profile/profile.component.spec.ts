@@ -70,6 +70,7 @@ describe('ProfileComponent', () => {
     unlinkOAuthAccount: ReturnType<typeof vi.fn>;
     initOAuthLink: ReturnType<typeof vi.fn>;
     initOAuthReauth: ReturnType<typeof vi.fn>;
+    startOAuth: ReturnType<typeof vi.fn>;
     startMfaSetup: ReturnType<typeof vi.fn>;
     getSessions: ReturnType<typeof vi.fn>;
     revokeSession: ReturnType<typeof vi.fn>;
@@ -99,6 +100,7 @@ describe('ProfileComponent', () => {
       initOAuthReauth: vi
         .fn()
         .mockReturnValue(of({ message: 'Re-authentication initiated' })),
+      startOAuth: vi.fn(),
       startMfaSetup: vi.fn().mockReturnValue(
         of({
           secret: 'JBSWY3DPEHPK3PXP',
@@ -544,6 +546,7 @@ describe('ProfileComponent', () => {
       expect(authServiceMock.initOAuthReauth).toHaveBeenCalledWith(
         STEP_UP_OPERATION.PASSWORD_SET
       );
+      expect(authServiceMock.startOAuth).toHaveBeenCalledWith('google');
       // The password must never reach the server without the proof.
       expect(authServiceMock.updateProfile).not.toHaveBeenCalledWith(
         expect.objectContaining({ password: 'Sunrise-Kettle-19' })

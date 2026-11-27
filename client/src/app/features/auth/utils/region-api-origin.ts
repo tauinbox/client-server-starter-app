@@ -1,5 +1,7 @@
 import { REGIONS, type DataRegion } from '@app/shared/constants';
 
+export type RegionLocation = Pick<Location, 'protocol' | 'host'>;
+
 /**
  * The origin of the API of `region` for the SPA at `location`, or null when
  * that API is on the origin of the SPA. The host is the subdomain of the
@@ -9,7 +11,7 @@ import { REGIONS, type DataRegion } from '@app/shared/constants';
  */
 export function regionApiOrigin(
   region: DataRegion,
-  { protocol, host }: Pick<Location, 'protocol' | 'host'>
+  { protocol, host }: RegionLocation
 ): string | null {
   const { apiSubdomain } = REGIONS[region];
 

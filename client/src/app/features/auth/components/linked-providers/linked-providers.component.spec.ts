@@ -28,6 +28,7 @@ describe('LinkedProvidersComponent', () => {
   let authServiceMock: {
     initOAuthLink: ReturnType<typeof vi.fn>;
     unlinkOAuthAccount: ReturnType<typeof vi.fn>;
+    startOAuth: ReturnType<typeof vi.fn>;
   };
   let notifyMock: {
     success: ReturnType<typeof vi.fn>;
@@ -38,7 +39,8 @@ describe('LinkedProvidersComponent', () => {
   beforeEach(async () => {
     authServiceMock = {
       initOAuthLink: vi.fn().mockReturnValue(of({ message: 'Link initiated' })),
-      unlinkOAuthAccount: vi.fn().mockReturnValue(of({ message: 'Unlinked' }))
+      unlinkOAuthAccount: vi.fn().mockReturnValue(of({ message: 'Unlinked' })),
+      startOAuth: vi.fn()
     };
     notifyMock = { success: vi.fn(), error: vi.fn() };
     featureFlagServiceMock = {
@@ -169,6 +171,7 @@ describe('LinkedProvidersComponent', () => {
         currentPassword: 'Password1'
       });
       expect(component['stepUpPrompt']()).toBeNull();
+      expect(authServiceMock.startOAuth).toHaveBeenCalledWith('facebook');
     });
 
     it('asks an account with an authenticator and no password for a code', async () => {

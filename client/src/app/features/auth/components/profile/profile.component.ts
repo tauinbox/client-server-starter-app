@@ -28,7 +28,6 @@ import { AdaptiveDialogService } from '@shared/services/adaptive-dialog.service'
 import { MatButton } from '@angular/material/button';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatIcon } from '@angular/material/icon';
-import { DOCUMENT } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { AuthStore } from '../../store/auth.store';
 import { SessionStorageService } from '@core/services/session-storage.service';
@@ -65,7 +64,6 @@ import { concat, defer, EMPTY, tap } from 'rxjs';
 import {
   isOAuthProvider,
   OAUTH_PROVIDER_LABEL_KEYS,
-  OAUTH_URLS,
   type OAuthProvider
 } from '../../constants/auth-api.const';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
@@ -214,7 +212,6 @@ export class ProfileComponent implements OnInit {
   readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #sessionStorage = inject(SessionStorageService);
-  readonly #window = inject(DOCUMENT).defaultView;
   readonly #route = inject(ActivatedRoute);
   readonly #router = inject(Router);
   readonly #transloco = inject(TranslocoService);
@@ -590,10 +587,7 @@ export class ProfileComponent implements OnInit {
           this.#notify.info('auth.profile.reauthRedirecting', {
             provider: this.reauthProviderLabel()
           });
-
-          if (this.#window) {
-            this.#window.location.href = OAUTH_URLS[provider];
-          }
+          this.#authService.startOAuth(provider);
         }
       }),
       takeUntilDestroyed(this.#destroyRef)

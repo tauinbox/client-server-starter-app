@@ -35,7 +35,11 @@ import type {
   UpdateProfile
 } from '../models/auth.types';
 import { AuthStore, AUTH_USER_KEY } from '../store/auth.store';
-import { AuthApiEnum } from '../constants/auth-api.const';
+import {
+  AuthApiEnum,
+  oauthStartUrl,
+  type OAuthProvider
+} from '../constants/auth-api.const';
 import { currentReturnUrl, navigateToLogin } from '../utils/navigate-to-login';
 import type { SessionEndedValue } from '../constants/session-ended.const';
 import {
@@ -177,6 +181,21 @@ export class AuthService {
     // The other tab already revoked the session server-side, so this is exactly
     // the forceLogout case: full teardown, no HTTP call, land on /login.
     this.#tokenService.forceLogout(this.#returnUrl());
+  }
+
+  /**
+   * Leaves for the provider through the API host of the region of the
+   * session, where `link-init` and `reauth-init` set their intent cookie.
+   */
+  startOAuth(provider: OAuthProvider): void {
+    const win = this.#window;
+
+    if (!win) return;
+
+    win.location.href = oauthStartUrl(provider, {
+      region: this.#authStore.region(),
+      location: win.location
+    });
   }
 
   /**
