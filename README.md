@@ -1932,7 +1932,9 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 - **NgRx Signal Store** manages the state. `AuthStore` is global, and `UsersStore` is at route level.
 - **HTTP interceptors.** The JWT interceptor attaches the token and handles a 401 refresh. The error
   interceptor shows the snackbar notifications. The region interceptor runs last and sends an
-  `/api/` call to the API host of the region of the session when that region has its own host.
+  `/api/` call to the API host of its region when that region has its own host: the region of
+  the request context (a mailed link names one), else the region of the session. It removes the
+  bearer token from a call to a region that is not the region of the session.
 - **Guards.** `authGuard` checks the authentication and refreshes the token. `permissionGuard(action,
   subject)` does a typed CASL check for a route. `adminPanelGuard` does an OR check on search/User,
   read/Role and read/Permission. `guestGuard` sends an authenticated user away. On the server,

@@ -14,6 +14,8 @@ import {
 import { DEFAULT_LOCALE, normalizeLocale } from '@app/shared/constants';
 import type { SupportedLocale } from '@app/shared/constants';
 import type { UserNotificationContent } from '@app/shared/types';
+import { mailedLink, type MailedLinkPath } from '@app/shared/utils/mailed-link';
+import { RegionService } from '../core/region/region.service';
 import { billingNoticeMessage } from './billing-notice-content';
 import { maskEmail } from '../../common/utils/mask-email';
 import { EMAIL_TEMPLATE_SOURCE } from './email.template';
@@ -55,6 +57,7 @@ export class MailService {
 
   constructor(
     private configService: ConfigService,
+    private readonly region: RegionService,
     @Optional()
     @InjectQueue(MAIL_QUEUE)
     private readonly queue?: Queue<MailJobData>
@@ -121,7 +124,7 @@ export class MailService {
     locale: string = DEFAULT_LOCALE
   ): Promise<void> {
     const loc = normalizeLocale(locale);
-    const url = `${this.clientUrl}/verify-email?token=${rawToken}`;
+    const url = this.#tokenLink('verify-email', rawToken);
 
     await this.send(email, mailMessages(loc).verification(url), loc);
   }
@@ -132,7 +135,7 @@ export class MailService {
     locale: string = DEFAULT_LOCALE
   ): Promise<void> {
     const loc = normalizeLocale(locale);
-    const url = `${this.clientUrl}/reset-password?token=${rawToken}`;
+    const url = this.#tokenLink('reset-password', rawToken);
 
     await this.send(email, mailMessages(loc).passwordReset(url), loc);
   }
@@ -143,9 +146,17 @@ export class MailService {
     locale: string = DEFAULT_LOCALE
   ): Promise<void> {
     const loc = normalizeLocale(locale);
-    const url = `${this.clientUrl}/confirm-email-change?token=${rawToken}`;
+    const url = this.#tokenLink('confirm-email-change', rawToken);
 
     await this.send(newEmail, mailMessages(loc).emailChangeConfirm(url), loc);
+  }
+
+  #tokenLink(path: MailedLinkPath, token: string): string {
+    return mailedLink(this.clientUrl, {
+      path,
+      token,
+      region: this.region.region
+    });
   }
 
   /**

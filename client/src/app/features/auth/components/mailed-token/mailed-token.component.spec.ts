@@ -5,7 +5,11 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ErrorKeys } from '@app/shared/constants';
+import {
+  DATA_REGIONS,
+  ErrorKeys,
+  HOME_DATA_REGION
+} from '@app/shared/constants';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
@@ -46,7 +50,7 @@ describe.each<{
     let authServiceMock: Record<MailedTokenAction, ReturnType<typeof vi.fn>>;
     const call = (): ReturnType<typeof vi.fn> => authServiceMock[action];
 
-    function createComponent(token: string | undefined): void {
+    function createComponent(token: string | undefined, region?: string): void {
       TestBed.configureTestingModule({
         imports: [MailedTokenComponent, TranslocoTestingModuleWithLangs],
         providers: [
@@ -62,6 +66,7 @@ describe.each<{
       component = fixture.componentInstance;
       fixture.componentRef.setInput('action', action);
       fixture.componentRef.setInput('token', token);
+      fixture.componentRef.setInput('region', region);
       fixture.detectChanges();
     }
 
@@ -105,11 +110,31 @@ describe.each<{
         call().mockReturnValue(of({ message: 'ok' }));
         createComponent('my-token');
 
-        expect(call()).toHaveBeenCalledWith('my-token');
+        expect(call()).toHaveBeenCalledWith('my-token', HOME_DATA_REGION);
         const other: MailedTokenAction =
           action === 'verifyEmail' ? 'confirmEmailChange' : 'verifyEmail';
 
         expect(authServiceMock[other]).not.toHaveBeenCalled();
+      });
+
+      it.each(DATA_REGIONS)(
+        'sends the token to the pool of the region %s that the link names',
+        (region) => {
+          call().mockReturnValue(of({ message: 'ok' }));
+          createComponent('my-token', region);
+
+          expect(call()).toHaveBeenCalledWith('my-token', region);
+        }
+      );
+
+      it('refuses a link whose region is not a region of the code', () => {
+        createComponent('my-token', 'mars');
+
+        expect(call()).not.toHaveBeenCalled();
+        expect(component['loading']()).toBe(false);
+        expect(component['error']()).toBe(
+          'This link names a region that this application does not serve.'
+        );
       });
 
       it('should set success to true and loading to false on success', () => {

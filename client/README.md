@@ -91,7 +91,8 @@ src/app/
 │   │   │                   # navigateToLogin (imperative, for the logout paths in a service),
 │   │   │                   # and the token-refresh predicates.
 │   │   ├── interceptors/   # jwtInterceptor; regionInterceptor (last: sends an /api/ call
-│   │   │                   # to the API host of the region of the session)
+│   │   │                   # to the API host of the region of the request context,
+│   │   │                   # else of the session)
 │   │   ├── services/       # AuthService owns the HTTP calls, the refresh schedule and
 │   │   │                   # fetchPermissions(): Promise<void>.
 │   │   │                   # OAuthIntentService holds the proof that this tab started a
@@ -528,7 +529,12 @@ State:
   `auth_region`, beside `auth_user`, and a missing or unknown value is the home region. The
   `regionInterceptor` sends each `/api/` call of a region with an `apiSubdomain` (the shared
   region constants) to `<apiSubdomain>.<SPA host>` with `withCredentials`, so the refresh after a
-  reload reaches the host that holds the refresh cookie. `client/nginx.conf` allows each such host
+  reload reaches the host that holds the refresh cookie. A mailed link names the region of the
+  pool that holds its token (`?token=...&region=...`): the verification, email-change and reset
+  pages read it with `linkRegion` (no value is the home region, a value that is not a region of
+  the code is refused) and send the call with `API_REGION_HTTP_CONTEXT_TOKEN`
+  (`core/context-tokens/api-region.ts`). When that region is not the region of the session, the
+  interceptor removes the bearer token. `client/nginx.conf` allows each such host
   in `connect-src`, and `npm run check:regions` refuses a missing one. The e2e fixture
   `e2e/fixtures/regions.fixture.ts` runs the SPA on `nexus.localhost` and one mock instance for
   each such region on its host.

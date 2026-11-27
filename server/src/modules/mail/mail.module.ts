@@ -4,6 +4,7 @@ import { MailService } from './mail.service';
 import { MailProcessor } from './mail.processor';
 import { MAIL_QUEUE } from './mail-queue.constants';
 import { parseRedisConnection } from '../../common/utils/parse-redis-connection';
+import { RegionModule } from '../core/region/region.module';
 
 @Module({})
 export class MailModule {
@@ -21,6 +22,7 @@ export class MailModule {
       return {
         module: MailModule,
         global: true,
+        imports: [RegionModule],
         providers: [MailService],
         exports: [MailService]
       };
@@ -30,6 +32,7 @@ export class MailModule {
       module: MailModule,
       global: true,
       imports: [
+        RegionModule,
         BullModule.forRoot({ connection: parseRedisConnection(redisUrl) }),
         BullModule.registerQueue({ name: MAIL_QUEUE })
       ],

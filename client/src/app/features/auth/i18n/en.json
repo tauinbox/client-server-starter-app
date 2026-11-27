@@ -88,6 +88,7 @@
     "resetting": "Resetting...",
     "submit": "Reset password",
     "errorNoToken": "No reset token provided.",
+    "errorUnknownRegion": "This link names a region that this application does not serve.",
     "errorFailed": "Password reset failed. The token may be invalid or expired."
   },
   "verifyEmail": {
@@ -98,6 +99,7 @@
     "goToLogin": "Login",
     "failedTitle": "Verification failed",
     "errorNoToken": "No verification token provided.",
+    "errorUnknownRegion": "This link names a region that this application does not serve.",
     "errorFailed": "Email verification failed. The token may be invalid or expired."
   },
   "forbidden": {
@@ -177,6 +179,7 @@
     "goToLogin": "Login",
     "failedTitle": "Confirmation failed",
     "errorNoToken": "No confirmation token provided.",
+    "errorUnknownRegion": "This link names a region that this application does not serve.",
     "errorFailed": "Email change confirmation failed. The token may be invalid or expired."
   },
   "oauthCallback": {

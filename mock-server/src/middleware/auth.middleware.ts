@@ -81,6 +81,7 @@ import {
   sendValidationError
 } from '../helpers/validation-error.helpers';
 import { sendError } from '../helpers/error-envelope.helpers';
+import { mailedTokenLink } from '../helpers/mailed-link.helpers';
 import {
   AUTH_COOKIE_PATH,
   OAUTH_LINK_COOKIE,
@@ -233,7 +234,7 @@ router.post('/register', (req, res) => {
   });
   pushUserCrudEvent('created', user.id);
 
-  const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
+  const verifyUrl = mailedTokenLink('verify-email', verificationToken);
 
   console.log(
     `[EMAIL VERIFICATION] To: ${user.email}\n  Verify URL: ${verifyUrl}`
@@ -494,7 +495,7 @@ router.post('/resend-verification', (req, res) => {
     ip: req.ip
   });
 
-  const verifyUrl = `http://localhost:4200/verify-email?token=${verificationToken}`;
+  const verifyUrl = mailedTokenLink('verify-email', verificationToken);
 
   console.log(`[EMAIL VERIFICATION] To: ${email}\n  Verify URL: ${verifyUrl}`);
 
@@ -564,7 +565,7 @@ router.post('/forgot-password', (req, res) => {
     ip: req.ip
   });
 
-  const resetUrl = `http://localhost:4200/reset-password?token=${resetToken}`;
+  const resetUrl = mailedTokenLink('reset-password', resetToken);
 
   console.log(`[PASSWORD RESET] To: ${email}\n  Reset URL: ${resetUrl}`);
 
@@ -1261,7 +1262,7 @@ router.post(
     ).toISOString();
     state.pendingEmailTokens.set(token, user.id);
 
-    const confirmUrl = `http://localhost:4200/confirm-email-change?token=${token}`;
+    const confirmUrl = mailedTokenLink('confirm-email-change', token);
 
     console.log(
       `[EMAIL CHANGE CONFIRMATION] To: ${newEmail}\n  Confirm URL: ${confirmUrl}`

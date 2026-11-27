@@ -10,6 +10,12 @@ import {
   MAIL_SEND_JOB,
   MailJobData
 } from './mail-queue.constants';
+import { RegionService } from '../core/region/region.service';
+
+const regionProvider = {
+  provide: RegionService,
+  useValue: { region: 'ru' } satisfies Pick<RegionService, 'region'>
+};
 
 describe('MailService', () => {
   let service: MailService;
@@ -30,6 +36,7 @@ describe('MailService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MailService,
+        regionProvider,
         { provide: ConfigService, useValue: mockConfigService }
       ]
     }).compile();
@@ -88,6 +95,7 @@ describe('MailService', () => {
       const smtpModule: TestingModule = await Test.createTestingModule({
         providers: [
           MailService,
+          regionProvider,
           { provide: ConfigService, useValue: smtpConfigService }
         ]
       }).compile();
@@ -105,7 +113,11 @@ describe('MailService', () => {
         get: jest.fn((key: string) => overrides[key])
       };
       const moduleRef: TestingModule = await Test.createTestingModule({
-        providers: [MailService, { provide: ConfigService, useValue: config }]
+        providers: [
+          MailService,
+          regionProvider,
+          { provide: ConfigService, useValue: config }
+        ]
       }).compile();
 
       moduleRef.get<MailService>(MailService);
@@ -277,6 +289,7 @@ describe('MailService', () => {
       const moduleRef: TestingModule = await Test.createTestingModule({
         providers: [
           MailService,
+          regionProvider,
           { provide: ConfigService, useValue: mockConfigService },
           { provide: getQueueToken(MAIL_QUEUE), useValue: { add } }
         ]
@@ -353,5 +366,34 @@ describe('MailService', () => {
       expect(data.subject).toBe('Verify your email address');
       expect(data.html).toContain('tok-123');
     });
+
+    it.each([
+      {
+        send: (s: MailService) =>
+          s.sendEmailVerification('a@example.com', 't1'),
+        link: 'http://localhost:4200/verify-email?token=t1&region=ru'
+      },
+      {
+        send: (s: MailService) => s.sendPasswordReset('a@example.com', 't2'),
+        link: 'http://localhost:4200/reset-password?token=t2&region=ru'
+      },
+      {
+        send: (s: MailService) =>
+          s.sendEmailChangeConfirmation('a@example.com', 't3'),
+        link: 'http://localhost:4200/confirm-email-change?token=t3&region=ru'
+      }
+    ])(
+      'mails the link $link with the region of the pool',
+      async ({ send, link }) => {
+        await send(queuedService);
+
+        const [, data] = add.mock.calls[0] as [string, MailJobData];
+        const html = data.html
+          .replaceAll('&#x3D;', '=')
+          .replaceAll('&amp;', '&');
+
+        expect(html).toContain(`href="${link}"`);
+      }
+    );
   });
 });
