@@ -46,7 +46,7 @@ test.describe('A provider link in a region whose API has its own host', () => {
 
       // The provider half answers 501 in the mock, so the address is the
       // proof that the browser left for the start on the host of the region.
-      await page.waitForURL(`${apiOrigin}/api/v1/auth/oauth/google`);
+      await expect(page).toHaveURL(`${apiOrigin}/api/v1/auth/oauth/google`);
     }
   });
 });
