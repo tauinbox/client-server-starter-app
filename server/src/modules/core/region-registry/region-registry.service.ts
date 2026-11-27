@@ -2,13 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import {
-  DATA_REGIONS,
   ErrorKeys,
   HOME_DATA_REGION,
   isDataRegion,
   type DataRegion
 } from '@app/shared/constants';
 import type { RegionStatusResponse } from '@app/shared/types';
+import { publicRegions } from '@app/shared/utils/public-regions';
 import { AuditAction } from '@app/shared/enums/audit-action.enum';
 import { ApiError } from '../../../common/errors/api-error';
 import { SETTINGS_DATA_SOURCE } from '../../../data-sources';
@@ -51,9 +51,7 @@ export class RegionRegistryService {
     const rows = await this.entryRepo.find({ where: { public: true } });
     const open = new Set<string>(rows.map(({ region }) => region));
 
-    return DATA_REGIONS.filter(
-      (region) => region === HOME_DATA_REGION || open.has(region)
-    );
+    return publicRegions((region) => open.has(region));
   }
 
   /** Opens or closes a region for new accounts. A repeat changes nothing. */

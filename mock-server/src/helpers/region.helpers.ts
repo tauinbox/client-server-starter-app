@@ -1,12 +1,11 @@
 import {
-  DATA_REGIONS,
   ErrorKeys,
-  HOME_DATA_REGION,
   regionForCountry,
   type CountryCode,
   type ErrorKey
 } from '@app/shared/constants';
 import type { RegionConfigResponse } from '@app/shared/types';
+import { publicRegions } from '@app/shared/utils/public-regions';
 import { mockRegion } from '../instance';
 import { getState } from '../state';
 
@@ -21,9 +20,7 @@ export function regionConfig(): RegionConfigResponse {
   return {
     region: mockRegion(),
     peers: regionPeers,
-    publicRegions: DATA_REGIONS.filter(
-      (region) => region === HOME_DATA_REGION || regionRegistry[region] === true
-    )
+    publicRegions: publicRegions((region) => regionRegistry[region] === true)
   };
 }
 

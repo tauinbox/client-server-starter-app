@@ -98,18 +98,24 @@ runWithInfra('Region registry (e2e)', () => {
   });
 
   it('writes no audit row and no log entry for a repeat of the status', async () => {
-    const [{ max: before }] = await settingsDataSource.query<
-      Array<{ max: string | null }>
-    >(`SELECT max("version") AS "max" FROM "settings_change_log"`);
+    // Only this suite writes the registry, so the count of its entries is
+    // still while other suites write other settings tables.
+    const registryEntries = async () => {
+      const [{ count }] = await settingsDataSource.query<
+        Array<{ count: number }>
+      >(
+        `SELECT count(*)::int AS "count" FROM "settings_change_log"
+         WHERE "table_name" = 'region_registry'`
+      );
+
+      return count;
+    };
+    const before = await registryEntries();
 
     await registry.setPublic('ru', { isPublic: true, actor });
 
-    const [{ max: after }] = await settingsDataSource.query<
-      Array<{ max: string | null }>
-    >(`SELECT max("version") AS "max" FROM "settings_change_log"`);
-
     expect(await auditRows()).toHaveLength(1);
-    expect(after).toBe(before);
+    expect(await registryEntries()).toBe(before);
   });
 
   it('closes the region again', async () => {
