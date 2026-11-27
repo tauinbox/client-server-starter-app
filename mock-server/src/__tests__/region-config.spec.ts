@@ -44,7 +44,8 @@ describe('GET /api/v1/config/region', () => {
   it('answers the intl cell with no peers, as production', async () => {
     await expect(regionConfig()).resolves.toEqual({
       region: 'intl',
-      peers: {}
+      peers: {},
+      publicRegions: ['intl']
     });
   });
 
@@ -53,15 +54,47 @@ describe('GET /api/v1/config/region', () => {
 
     await expect(regionConfig()).resolves.toEqual({
       region: 'intl',
-      peers: { ru: 'https://ru.example.com' }
+      peers: { ru: 'https://ru.example.com' },
+      publicRegions: ['intl']
     });
 
     resetState();
 
     await expect(regionConfig()).resolves.toEqual({
       region: 'intl',
-      peers: {}
+      peers: {},
+      publicRegions: ['intl']
     });
+  });
+
+  // Mirrors RegionRegistryService of the server.
+  it('lists a region that an administrator opens, until it is closed', async () => {
+    const login = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'Password1'
+      })
+    });
+    const {
+      tokens: { access_token: token }
+    } = (await login.json()) as { tokens: { access_token: string } };
+    const setStatus = (isPublic: boolean) =>
+      fetch(`${baseUrl}/api/v1/admin/regions/ru`, {
+        method: 'PUT',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ public: isPublic })
+      });
+
+    expect((await setStatus(true)).status).toBe(200);
+    expect((await regionConfig()).publicRegions).toEqual(['intl', 'ru']);
+
+    expect((await setStatus(false)).status).toBe(200);
+    expect((await regionConfig()).publicRegions).toEqual(['intl']);
   });
 
   // The boot check of the server refuses the same values.
@@ -77,7 +110,8 @@ describe('GET /api/v1/config/region', () => {
 
     await expect(regionConfig()).resolves.toEqual({
       region: 'intl',
-      peers: {}
+      peers: {},
+      publicRegions: ['intl']
     });
   });
 });

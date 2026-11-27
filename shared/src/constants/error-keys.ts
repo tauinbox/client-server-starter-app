@@ -110,6 +110,10 @@ export const ErrorKeys = {
     INVALID_RULE: 'errors.featureFlags.invalidRule',
     UNKNOWN_RULE_USER: 'errors.featureFlags.unknownRuleUser'
   },
+  REGIONS: {
+    NOT_FOUND: 'errors.regions.notFound',
+    CANNOT_CLOSE_HOME: 'errors.regions.cannotCloseHome'
+  },
   BILLING: {
     REGION_UNAVAILABLE: 'errors.billing.regionUnavailable',
     REGION_CHANGE_BLOCKED: 'errors.billing.regionChangeBlocked',

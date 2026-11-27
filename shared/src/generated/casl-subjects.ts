@@ -7,6 +7,7 @@ export type KnownSubjects =
   | 'FeatureFlag'
   | 'Permission'
   | 'Profile'
+  | 'Region'
   | 'Role'
   | 'User';
 

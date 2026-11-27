@@ -93,6 +93,7 @@ end
 2-->B
 4-->C
 4-->D
+4-->E
 4-->H
 7-->2
 7-->3
@@ -137,11 +138,12 @@ D-->U
 D-->B
 D-->W
 D-->E
+E-->5
+E-->U
 E-->W
 E-->Z
-E-->C
 E-->2
-E-->U
+E-->C
 E-->4
 E-->B
 E-->10
@@ -261,6 +263,9 @@ end
 subgraph 11["health"]
 12["health.module.ts"]
 end
+subgraph 13["region-registry"]
+14["region-registry.module.ts"]
+end
 end
 subgraph 8["audit"]
 9["audit.module.ts"]
@@ -309,6 +314,7 @@ end
 7-->H
 7-->12
 7-->X
+7-->14
 7-->D
 B-->4
 B-->D
@@ -336,6 +342,9 @@ V-->H
 Z-->D
 10-->B
 10-->H
+14-->B
+14-->D
+14-->P
 ```
 
 ## Client modules

@@ -1,0 +1,17 @@
+{
+  "routes": [
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/regions/region",
+      "expectedStatus": 401,
+      "policy": {
+        "access": "update:Region",
+        "writes": "update:Region",
+        "stepUp": false,
+        "countFailuresOnlyWhenBody": false,
+        "skipMfaEnrolmentGate": false,
+        "throttle": null
+      }
+    }
+  ]
+}

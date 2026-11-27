@@ -9,6 +9,7 @@ import rbacRouter from './rbac.middleware';
 import healthRouter from '../routes/health';
 import configRouter from '../routes/config';
 import notificationsRouter from './notifications.middleware';
+import regionsAdminRouter from './regions.middleware';
 import {
   featureFlagsAdminRouter,
   featureFlagsRouter
@@ -29,6 +30,7 @@ export function registerRoutes(app: Express): void {
   app.use('/api/v1/roles', rolesRouter);
   app.use('/api/v1/rbac', rbacRouter);
   app.use('/api/v1/notifications', notificationsRouter);
+  app.use('/api/v1/admin/regions', regionsAdminRouter);
   app.use('/api/v1/admin/feature-flags', featureFlagsAdminRouter);
   app.use('/api/v1/feature-flags', featureFlagsRouter);
   app.use('/api/v1/admin/billing', billingAdminRouter);

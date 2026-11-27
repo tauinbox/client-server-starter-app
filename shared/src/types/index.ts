@@ -19,7 +19,10 @@ export type {
   CaptchaConfigResponse
 } from './auth.types';
 
-export type { RegionConfigResponse } from './region.types';
+export type {
+  RegionConfigResponse,
+  RegionStatusResponse
+} from './region.types';
 
 export type {
   CursorPaginationMeta,

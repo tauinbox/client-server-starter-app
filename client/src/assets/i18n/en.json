@@ -209,6 +209,10 @@
       "invalidRule": "One of the rules is not valid. Check the rules and try again.",
       "unknownRuleUser": "A user rule names a user that does not exist. Remove that user and try again."
     },
+    "regions": {
+      "notFound": "Region not found",
+      "cannotCloseHome": "The home region always takes new accounts and cannot be closed"
+    },
     "notifications": {
       "notFound": "Notification not found"
     },

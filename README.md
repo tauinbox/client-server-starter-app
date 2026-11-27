@@ -1784,7 +1784,7 @@ The base URL of the API is `/api/v1`.
 | POST | `/auth/resend-verification` | None | Send the verification email again. A deactivated account gets no token and no mail. A CAPTCHA token is necessary near the rate limit |
 | POST | `/auth/forgot-password` | None | Request a password reset email. A CAPTCHA token is necessary near the rate limit |
 | GET | `/auth/captcha-config` | None | Public CAPTCHA configuration: the site key and the enabled flag |
-| GET | `/config/region` | None | The data region of this deployment and the public URL of each other region |
+| GET | `/config/region` | None | The data region of this deployment, the public URL of each other region, and the regions that take new accounts (`publicRegions`) |
 | POST | `/auth/reset-password` | None | Reset the password with a token. Ends every session and removes every linked sign-in provider, with one `OAUTH_UNLINK` audit row each (`source: 'password_reset'`) |
 | POST | `/auth/oauth/reauth-init` | Bearer | Start a step-up re-authentication for an account that holds no password. The body names the operation the proof is for. Sets a short-lived cookie tied to the authorization flow that starts next. The callback mints a `reauth_proof` cookie for that operation, and only when the provider identity already belongs to the caller |
 | POST | `/auth/oauth/link-init` | Bearer + step-up | Start an OAuth account link. The body carries the current password, or the account proves itself with a `reauth_proof` minted for the operation `oauth_link`. A linked provider signs the account in and outlives every session, thus a stolen session must not plant one. Sets a cookie with a short life, thus the OAuth flow that starts next attaches the provider to the current user. The flow that starts next claims it, and no other flow can use it. A logout cancels it |
@@ -1822,6 +1822,7 @@ The base URL of the API is `/api/v1`.
 | GET | `/rbac/resources` | `permissions:read` | List each resource, ordered by name. The user permissions page reads the display names from it |
 | PATCH | `/rbac/resources/:id` | `permissions:update` | Update the display data and the offered actions of a resource. Answers 422 for an action that the code does not check |
 | POST | `/rbac/resources/:id/restore` | `permissions:update` | Restore an orphaned resource. Answers 409 when no controller registers it |
+| PUT | `/admin/regions/:region` | `regions:update` | Open or close a region for new accounts (`{ public }`). No role has the grant by default, so only a super administrator can call it. The home region answers 403 `errors.regions.cannotCloseHome`; a repeat of the current status writes nothing |
 | GET | `/feature-flags` | None (optional) | Evaluate the flag set for the caller. An authenticated caller gets the flags that resolve true plus the `public` flags. An anonymous caller gets the `public: true` flags only |
 | GET | `/admin/feature-flags/cursor` | `feature-flags:search` | List the feature flags, cursor paginated. Filters: `q` (key or description), `enabled`, `public`, `environment` (a flag with no environments applies in every one) |
 | GET | `/admin/feature-flags/:id` | `feature-flags:read` | Get a feature flag by ID |

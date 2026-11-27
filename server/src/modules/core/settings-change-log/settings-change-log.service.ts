@@ -121,11 +121,12 @@ export interface SettingsWriteAudit {
 /**
  * The body of a settings write. `settings` is the transaction that holds the
  * log lock; `regional` is a transaction of the regional rows of the same
- * write. `recordAudit` sets its final audit row.
+ * write. `recordAudit` sets its final audit row; `null` says that the write
+ * changed nothing, so it leaves no row.
  */
 export type SettingsWrite<T> = (
   managers: SourceManagers,
-  recordAudit: (params: AuditLogParams) => void
+  recordAudit: (params: AuditLogParams | null) => void
 ) => Promise<T>;
 
 /** Puts the id of the audit row into each change log entry of the write. */
@@ -155,7 +156,7 @@ export async function writeSettings<T>(
   const auditId = audit
     ? await audit.trail.openSettingsWrite(audit.draft)
     : null;
-  let recorded = audit?.draft;
+  let recorded: AuditLogParams | null | undefined = audit?.draft;
   let result: T;
 
   try {
@@ -208,7 +209,9 @@ export async function writeSettings<T>(
     throw error;
   }
 
-  if (audit && auditId && recorded) {
+  if (audit && auditId && recorded === null) {
+    await audit.trail.discardSettingsWrite(auditId);
+  } else if (audit && auditId && recorded) {
     await audit.trail.closeSettingsWrite(auditId, {
       outcome: 'applied',
       params: recorded

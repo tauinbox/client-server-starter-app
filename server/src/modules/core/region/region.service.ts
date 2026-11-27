@@ -41,7 +41,8 @@ export class RegionService {
             .origin;
   }
 
-  config(): RegionConfigResponse {
+  /** The settings registry adds the public regions (`RegionRegistryService`). */
+  config(): Omit<RegionConfigResponse, 'publicRegions'> {
     return { region: this.region, peers: { ...this.peers } };
   }
 

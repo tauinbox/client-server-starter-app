@@ -1,0 +1,66 @@
+{
+  "scenarios": [
+    {
+      "name": "a repeat of the status of a region writes nothing",
+      "route": "PUT /api/v1/admin/regions/region",
+      "path": "/api/v1/admin/regions/ru",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "public": false
+      },
+      "expect": {
+        "status": 200,
+        "errorKey": null,
+        "audit": []
+      }
+    },
+    {
+      "name": "a user with no grant on the regions may not change a region",
+      "route": "PUT /api/v1/admin/regions/region",
+      "path": "/api/v1/admin/regions/ru",
+      "actor": "user",
+      "auth": "bearer",
+      "body": {
+        "public": true
+      },
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.general.insufficientPermissions",
+        "audit": [
+          "PERMISSION_CHECK_FAILURE"
+        ]
+      }
+    },
+    {
+      "name": "the home region cannot be closed",
+      "route": "PUT /api/v1/admin/regions/region",
+      "path": "/api/v1/admin/regions/intl",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "public": false
+      },
+      "expect": {
+        "status": 403,
+        "errorKey": "errors.regions.cannotCloseHome",
+        "audit": []
+      }
+    },
+    {
+      "name": "a region that the code does not have is not found",
+      "route": "PUT /api/v1/admin/regions/region",
+      "path": "/api/v1/admin/regions/mars",
+      "actor": "admin",
+      "auth": "bearer",
+      "body": {
+        "public": true
+      },
+      "expect": {
+        "status": 404,
+        "errorKey": "errors.regions.notFound",
+        "audit": []
+      }
+    }
+  ]
+}
