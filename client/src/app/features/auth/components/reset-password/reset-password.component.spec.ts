@@ -1,7 +1,11 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { ErrorKeys } from '@app/shared/constants';
+import {
+  DATA_REGIONS,
+  ErrorKeys,
+  HOME_DATA_REGION
+} from '@app/shared/constants';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
@@ -19,7 +23,7 @@ describe('ResetPasswordComponent', () => {
   let authServiceMock: { resetPassword: ReturnType<typeof vi.fn> };
   let router: Router;
 
-  function createComponent(token: string | undefined): void {
+  function createComponent(token: string | undefined, region?: string): void {
     TestBed.configureTestingModule({
       imports: [ResetPasswordComponent, TranslocoTestingModuleWithLangs],
       providers: [
@@ -32,7 +36,10 @@ describe('ResetPasswordComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: {
-              queryParams: token ? { token } : {}
+              queryParams: {
+                ...(token ? { token } : {}),
+                ...(region === undefined ? {} : { region })
+              }
             }
           }
         }
@@ -73,17 +80,45 @@ describe('ResetPasswordComponent', () => {
   describe('ngOnInit — token handling', () => {
     it('should read token from query params', () => {
       createComponent('my-reset-token');
-      expect(component['invalidToken']()).toBe(false);
+      expect(component['invalidLink']()).toBeNull();
       expect(component['error']()).toBeNull();
     });
 
     it('should show the invalid-link message when no token provided', () => {
       createComponent(undefined);
-      expect(component['invalidToken']()).toBe(true);
+      expect(component['invalidLink']()).not.toBeNull();
       expect(fixture.nativeElement.textContent).toContain(
         'No reset token provided.'
       );
     });
+
+    it('shows the invalid-link message for a region that is not a region of the code', () => {
+      createComponent('my-reset-token', 'mars');
+      expect(fixture.nativeElement.textContent).toContain(
+        'This link names a region that this application does not serve.'
+      );
+      expect(fixture.nativeElement.querySelector('form')).toBeNull();
+    });
+
+    it.each(DATA_REGIONS)(
+      'sends the new password to the pool of the region %s that the link names',
+      async (region) => {
+        createComponent('my-reset-token', region);
+        authServiceMock.resetPassword.mockReturnValue(of(void 0));
+        component.resetPasswordModel.set({
+          password: 'NewPassword1',
+          confirmPassword: 'NewPassword1'
+        });
+        await fixture.whenStable();
+
+        component.onSubmit();
+
+        expect(authServiceMock.resetPassword).toHaveBeenCalledWith(
+          'my-reset-token',
+          { password: 'NewPassword1', region }
+        );
+      }
+    );
   });
 
   describe('form validation', () => {
@@ -198,7 +233,7 @@ describe('ResetPasswordComponent', () => {
 
       expect(authServiceMock.resetPassword).toHaveBeenCalledWith(
         'valid-token',
-        'NewPassword1'
+        { password: 'NewPassword1', region: HOME_DATA_REGION }
       );
     });
 

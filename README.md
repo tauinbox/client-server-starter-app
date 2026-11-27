@@ -1932,7 +1932,9 @@ npm run release            # Bump versions, generate CHANGELOG.md, create git ta
 - **NgRx Signal Store** manages the state. `AuthStore` is global, and `UsersStore` is at route level.
 - **HTTP interceptors.** The JWT interceptor attaches the token and handles a 401 refresh. The error
   interceptor shows the snackbar notifications. The region interceptor runs last and sends an
-  `/api/` call to the API host of the region of the session when that region has its own host.
+  `/api/` call to the API host of its region when that region has its own host: the region of
+  the request context (a mailed link names one), else the region of the session. It removes the
+  bearer token from a call to a region that is not the region of the session.
 - **Guards.** `authGuard` checks the authentication and refreshes the token. `permissionGuard(action,
   subject)` does a typed CASL check for a route. `adminPanelGuard` does an OR check on search/User,
   read/Role and read/Permission. `guestGuard` sends an authenticated user away. On the server,
@@ -2119,11 +2121,11 @@ activates the git hooks through the `prepare` script.
 
 | Type | Tool | Scope | Status |
 |------|------|-------|--------|
-| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3514 tests pass |
+| Server unit tests | Jest | A `*.spec.ts` file beside its source file | 3517 tests pass |
 | Server E2E tests | Jest | A separate configuration in `test/` | 1082 tests. The database settings and the mail settings come from the environment first, and from `.env` for the rest. The mail suite skips until `SMTP_HOST` points at a sink, the Redis suites skip without `REDIS_URL`, and the full-Redis suite skips without `REDIS_FULL_URL`. With Postgres and a mail sink and no Redis (the main CI run), 1044 pass and 38 skip. CI then runs the Redis suites and the mail suite with Redis: 58 pass and none skip. `production-boot.e2e-spec.ts` (main run) and `two-node.e2e-spec.ts` (Redis run) start processes of the built server, so `npm run build` comes first |
-| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1879 tests pass |
-| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 372 tests |
-| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1548 tests pass |
+| Client unit tests | Vitest | A `*.spec.ts` file beside its source file. The runner options are in `client/vitest-base.config.mjs` | 1898 tests pass |
+| Client E2E tests | Playwright | The `e2e/` directory. It uses the mock-server with 4 parallel workers | 374 tests |
+| Mock server | Express | The `mock-server/` directory. It gives a full API simulation with RBAC support. The parity specs in `src/__tests__/` assert that its answers agree with the server | 1550 tests pass |
 
 ## CI/CD
 

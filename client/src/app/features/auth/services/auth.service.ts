@@ -22,7 +22,11 @@ import type {
   OAuthExchangeResponse,
   UserPermissionsResponse
 } from '@app/shared/types';
-import type { CountryCode, StepUpOperation } from '@app/shared/constants';
+import type {
+  CountryCode,
+  DataRegion,
+  StepUpOperation
+} from '@app/shared/constants';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -48,6 +52,7 @@ import {
 } from '../constants/session-ended.const';
 import { AppRouteSegmentEnum } from '../../../app.route-segment.enum';
 import { silentContext } from '@core/context-tokens/error-notifications';
+import { API_REGION_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/api-region';
 import { TokenService } from './token.service';
 import { IdleTimeoutService } from './idle-timeout.service';
 import { LocalStorageService } from '@core/services/local-storage.service';
@@ -61,6 +66,9 @@ import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 const STREAM_RELOAD_JITTER_MS = 5000;
 
 const LEGACY_RBAC_METADATA_KEY = 'rbac_metadata';
+
+const mailedLinkContext = (region: DataRegion) =>
+  silentContext().set(API_REGION_HTTP_CONTEXT_TOKEN, region);
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -596,22 +604,26 @@ export class AuthService {
     );
   }
 
+  /** The token exists only in the pool of the region that the link names. */
   resetPassword(
     token: string,
-    password: string
+    { password, region }: { password: string; region: DataRegion }
   ): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.ResetPassword,
       { token, password },
-      { context: silentContext() }
+      { context: mailedLinkContext(region) }
     );
   }
 
-  verifyEmail(token: string): Observable<{ message: string }> {
+  verifyEmail(
+    token: string,
+    region: DataRegion
+  ): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.VerifyEmail,
       { token },
-      { context: silentContext() }
+      { context: mailedLinkContext(region) }
     );
   }
 
@@ -641,11 +653,14 @@ export class AuthService {
     );
   }
 
-  confirmEmailChange(token: string): Observable<{ message: string }> {
+  confirmEmailChange(
+    token: string,
+    region: DataRegion
+  ): Observable<{ message: string }> {
     return this.#http.post<{ message: string }>(
       AuthApiEnum.ConfirmEmailChange,
       { token },
-      { context: silentContext() }
+      { context: mailedLinkContext(region) }
     );
   }
 

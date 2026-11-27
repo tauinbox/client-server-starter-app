@@ -24,6 +24,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, of, take } from 'rxjs';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
+import { linkRegion } from '../../utils/link-region';
 
 export type MailedTokenAction = 'verifyEmail' | 'confirmEmailChange';
 
@@ -56,6 +57,7 @@ export class MailedTokenComponent implements OnInit {
 
   readonly action = input.required<MailedTokenAction>();
   readonly token = input<string>();
+  readonly region = input<string>();
 
   protected readonly keyPrefix = computed(() => KEY_PREFIX[this.action()]);
   protected readonly loading = signal(true);
@@ -77,19 +79,24 @@ export class MailedTokenComponent implements OnInit {
 
   #submit(): void {
     const token = this.token();
+    const region = linkRegion(this.region());
     const prefix = this.keyPrefix();
 
-    if (!token) {
+    if (!token || region === null) {
       this.loading.set(false);
-      this.error.set(this.#transloco.translate(prefix + 'errorNoToken'));
+      this.error.set(
+        this.#transloco.translate(
+          prefix + (token ? 'errorUnknownRegion' : 'errorNoToken')
+        )
+      );
 
       return;
     }
 
     const request$ =
       this.action() === 'verifyEmail'
-        ? this.#authService.verifyEmail(token)
-        : this.#authService.confirmEmailChange(token);
+        ? this.#authService.verifyEmail(token, region)
+        : this.#authService.confirmEmailChange(token, region);
 
     request$.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe({
       next: () => {

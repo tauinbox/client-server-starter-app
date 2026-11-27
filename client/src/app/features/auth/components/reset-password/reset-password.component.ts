@@ -38,8 +38,10 @@ import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import {
   MAX_PASSWORD_LENGTH,
-  MIN_PASSWORD_LENGTH
+  MIN_PASSWORD_LENGTH,
+  type DataRegion
 } from '@app/shared/constants';
+import { linkRegion } from '../../utils/link-region';
 
 type ResetPasswordData = {
   password: string;
@@ -75,9 +77,11 @@ export class ResetPasswordComponent implements OnInit {
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly invalidToken = signal(false);
+  /** The translation key of the reason the link cannot be used. */
+  protected readonly invalidLink = signal<string | null>(null);
 
   #token = '';
+  #region: DataRegion | null = null;
 
   readonly resetPasswordModel = signal<ResetPasswordData>({
     password: '',
@@ -113,21 +117,32 @@ export class ResetPasswordComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.#token = this.#route.snapshot.queryParams['token'] || '';
+    const { queryParams } = this.#route.snapshot;
+
+    this.#token = queryParams['token'] || '';
+    this.#region = linkRegion(queryParams['region']);
 
     if (!this.#token) {
-      this.invalidToken.set(true);
+      this.invalidLink.set('auth.resetPassword.errorNoToken');
+    } else if (this.#region === null) {
+      this.invalidLink.set('auth.resetPassword.errorUnknownRegion');
     }
   }
 
   onSubmit(): void {
-    if (this.resetPasswordForm().invalid() || !this.#token) return;
+    const region = this.#region;
+
+    if (this.resetPasswordForm().invalid() || !this.#token || region === null)
+      return;
 
     this.loading.set(true);
     this.error.set(null);
 
     this.#authService
-      .resetPassword(this.#token, this.resetPasswordModel().password)
+      .resetPassword(this.#token, {
+        password: this.resetPasswordModel().password,
+        region
+      })
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe({
         next: () => {

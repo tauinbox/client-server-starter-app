@@ -37,6 +37,7 @@ import {
   sendValidationError
 } from '../helpers/validation-error.helpers';
 import { sendError } from '../helpers/error-envelope.helpers';
+import { mailedTokenLink } from '../helpers/mailed-link.helpers';
 import {
   AUTH_COOKIE_PATH,
   OAUTH_DATA_COOKIE,
@@ -372,7 +373,7 @@ router.post('/signup', (req, res) => {
       ).toISOString()
     });
     console.log(
-      `[EMAIL VERIFICATION] To: ${user.email}\n  Verify URL: http://localhost:4200/verify-email?token=${verificationToken}`
+      `[EMAIL VERIFICATION] To: ${user.email}\n  Verify URL: ${mailedTokenLink('verify-email', verificationToken)}`
     );
   }
 
