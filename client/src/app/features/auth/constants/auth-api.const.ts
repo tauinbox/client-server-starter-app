@@ -1,3 +1,9 @@
+import type { DataRegion } from '@app/shared/constants';
+import {
+  regionApiOrigin,
+  type RegionLocation
+} from '../utils/region-api-origin';
+
 const AUTH_API_V1 = '/api/v1/auth';
 
 export enum AuthApiEnum {
@@ -29,15 +35,27 @@ export enum AuthApiEnum {
   Sessions = `${AUTH_API_V1}/sessions`
 }
 
-export const OAUTH_URLS = {
+// Not exported: the start is a top-level navigation that no HTTP interceptor
+// sees, so a relative path would go to the origin of the SPA and miss the
+// intent cookie that the API host of the region set. `oauthStartUrl` is the
+// only way to get a start URL.
+const OAUTH_PATHS = {
   google: `${AUTH_API_V1}/oauth/google`,
   facebook: `${AUTH_API_V1}/oauth/facebook`,
   vk: `${AUTH_API_V1}/oauth/vk`
 } as const;
 
-export type OAuthProvider = keyof typeof OAUTH_URLS;
+export type OAuthProvider = keyof typeof OAUTH_PATHS;
 
-/** Keyed by OAuthProvider so a new entry in OAUTH_URLS fails the build until it gets a label. */
+/** The start URL of `provider` on the API host of `region`. */
+export function oauthStartUrl(
+  provider: OAuthProvider,
+  { region, location }: { region: DataRegion; location: RegionLocation }
+): string {
+  return `${regionApiOrigin(region, location) ?? ''}${OAUTH_PATHS[provider]}`;
+}
+
+/** Keyed by OAuthProvider so a new entry in OAUTH_PATHS fails the build until it gets a label. */
 export const OAUTH_PROVIDER_LABEL_KEYS: Record<OAuthProvider, string> = {
   google: 'auth.providers.google',
   facebook: 'auth.providers.facebook',
@@ -46,10 +64,10 @@ export const OAUTH_PROVIDER_LABEL_KEYS: Record<OAuthProvider, string> = {
 
 /**
  * Providers arrive as plain strings (feature flags, route params), and an
- * unknown one would index OAUTH_URLS to `undefined` and navigate the window to
- * the literal "undefined". Own-property check only - `in` would accept
+ * unknown one would index OAUTH_PATHS to `undefined` and navigate the window
+ * to the literal "undefined". Own-property check only - `in` would accept
  * inherited keys such as "constructor".
  */
 export function isOAuthProvider(value: string): value is OAuthProvider {
-  return Object.hasOwn(OAUTH_URLS, value);
+  return Object.hasOwn(OAUTH_PATHS, value);
 }

@@ -31,7 +31,7 @@ import { OAuthIntentService } from '../../services/oauth-intent.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { map, take } from 'rxjs/operators';
-import { isOAuthProvider, OAUTH_URLS } from '../../constants/auth-api.const';
+import { isOAuthProvider } from '../../constants/auth-api.const';
 import {
   PASSWORD_CHANGED,
   PASSWORD_CHANGED_PARAM
@@ -130,7 +130,6 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly oauthUrls = OAUTH_URLS;
 
   // A provider button is shown only when its public feature flag resolves true,
   // which the server gates on the provider being configured. The whole OAuth
@@ -244,10 +243,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (!isOAuthProvider(provider)) return;
 
     this.#oauthIntent.start(this.#returnUrl());
-
-    if (this.#window) {
-      this.#window.location.href = this.oauthUrls[provider];
-    }
+    this.#authService.startOAuth(provider);
   }
 
   onSubmit(): void {

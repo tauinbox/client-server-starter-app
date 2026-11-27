@@ -10,7 +10,6 @@ import {
   output,
   signal
 } from '@angular/core';
-import { DOCUMENT } from '@angular/common';
 import {
   MatCard,
   MatCardContent,
@@ -39,7 +38,6 @@ import type { StepUpFactorsRequest } from '../../models/auth.types';
 import {
   isOAuthProvider,
   OAUTH_PROVIDER_LABEL_KEYS,
-  OAUTH_URLS,
   type OAuthProvider
 } from '../../constants/auth-api.const';
 
@@ -82,7 +80,6 @@ export class LinkedProvidersComponent {
   readonly #notify = inject(NotifyService);
   readonly #destroyRef = inject(DestroyRef);
   readonly #oauthIntent = inject(OAuthIntentService);
-  readonly #window = inject(DOCUMENT).defaultView;
   readonly #transloco = inject(TranslocoService);
   readonly #flagsStore = inject(FeatureFlagsStore);
 
@@ -263,10 +260,7 @@ export class LinkedProvidersComponent {
         next: () => {
           this.#closeStepUpPrompt();
           this.#oauthIntent.start('/profile');
-
-          if (this.#window) {
-            this.#window.location.href = OAUTH_URLS[provider];
-          }
+          this.#authService.startOAuth(provider);
         },
         error: (err: HttpErrorResponse) => {
           this.busy.set(false);
