@@ -19,8 +19,9 @@ import { EntitlementsStore } from '@features/billing/store/entitlements.store';
 import { AuthApiEnum } from '../constants/auth-api.const';
 import type { AuthResponse } from '../models/auth.types';
 import type { NotificationEvent, RoleResponse } from '@app/shared/types';
-import { STEP_UP_OPERATION } from '@app/shared/constants';
+import { HOME_DATA_REGION, STEP_UP_OPERATION } from '@app/shared/constants';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
+import { API_REGION_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/api-region';
 
 const mockUserRole: RoleResponse = {
   id: 'role-user',
@@ -421,7 +422,12 @@ describe('AuthService', () => {
       };
       const mockUser = createMockAuthResponse().user;
 
-      const registerPromise = firstValueFrom(service.register(registerData));
+      const registerPromise = firstValueFrom(
+        service.register(registerData, {
+          captchaToken: null,
+          region: HOME_DATA_REGION
+        })
+      );
 
       const req = httpMock.expectOne(AuthApiEnum.Register);
 
@@ -445,7 +451,10 @@ describe('AuthService', () => {
       const mockUser = createMockAuthResponse().user;
 
       const registerPromise = firstValueFrom(
-        service.register(registerData, 'turnstile-xyz')
+        service.register(registerData, {
+          captchaToken: 'turnstile-xyz',
+          region: HOME_DATA_REGION
+        })
       );
 
       const req = httpMock.expectOne(AuthApiEnum.Register);
@@ -455,6 +464,27 @@ describe('AuthService', () => {
         captchaToken: 'turnstile-xyz'
       });
       req.flush(mockUser);
+
+      await registerPromise;
+    });
+
+    it('sends the request to the pool of the given region', async () => {
+      const registerPromise = firstValueFrom(
+        service.register(
+          {
+            email: 'new@example.com',
+            name: 'New User',
+            password: 'password123',
+            residenceCountry: 'RU'
+          },
+          { captchaToken: null, region: 'ru' }
+        )
+      );
+
+      const req = httpMock.expectOne(AuthApiEnum.Register);
+
+      expect(req.request.context.get(API_REGION_HTTP_CONTEXT_TOKEN)).toBe('ru');
+      req.flush(createMockAuthResponse().user);
 
       await registerPromise;
     });

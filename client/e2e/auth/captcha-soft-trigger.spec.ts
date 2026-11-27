@@ -1,46 +1,7 @@
-import type { Page } from '@playwright/test';
 import { expect, test } from '../fixtures/base.fixture';
 import { createMockUser } from '../fixtures/mock-data';
 import { mockId } from '../fixtures/ids';
-
-const TURNSTILE_SCRIPT_URL =
-  'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-
-// Stubs the global `turnstile` API. The real script is never loaded; instead
-// the route below returns a tiny shim that mounts a button into the host
-// container. Pressing the button fires the Turnstile callback with a
-// deterministic token that the mock-server accepts.
-async function stubTurnstile(page: Page) {
-  await page.route(`${TURNSTILE_SCRIPT_URL}*`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/javascript',
-      body: `
-        window.turnstile = {
-          render: function (container, options) {
-            const el = typeof container === 'string'
-              ? document.querySelector(container)
-              : container;
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.dataset.testid = 'fake-turnstile';
-            btn.textContent = 'Solve CAPTCHA';
-            btn.addEventListener('click', function () {
-              if (options && typeof options.callback === 'function') {
-                options.callback('test-token');
-              }
-            });
-            el.appendChild(btn);
-            return 'widget-1';
-          },
-          reset: function () {},
-          remove: function () {},
-          getResponse: function () { return undefined; }
-        };
-      `
-    })
-  );
-}
+import { stubTurnstile } from '../fixtures/helpers';
 
 test.describe('CAPTCHA soft-trigger', () => {
   test('forgot-password: shows widget after CAPTCHA_REQUIRED, succeeds with token', async ({

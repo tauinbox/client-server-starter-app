@@ -10,7 +10,11 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
-import { ErrorKeys } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  HOME_DATA_REGION,
+  type DataRegion
+} from '@app/shared/constants';
 
 import { RegisterComponent } from './register.component';
 import { AuthService } from '../../services/auth.service';
@@ -49,6 +53,15 @@ describe('RegisterComponent', () => {
     httpTesting = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
   });
+
+  afterEach(() => httpTesting.verify());
+
+  /** Answers the registry read that a country of a non-home region makes first. */
+  function flushPublicRegions(publicRegions: DataRegion[]): void {
+    httpTesting
+      .expectOne(REGION_CONFIG_API_V1)
+      .flush({ region: 'intl', peers: {}, publicRegions });
+  }
 
   it('should create', () => {
     expect(component).toBeTruthy();
@@ -254,7 +267,25 @@ describe('RegisterComponent', () => {
       await fixture.whenStable();
       component.onSubmit();
 
-      expect(authServiceMock.register).toHaveBeenCalledWith(validForm, null);
+      expect(authServiceMock.register).toHaveBeenCalledWith(validForm, {
+        captchaToken: null,
+        region: HOME_DATA_REGION
+      });
+    });
+
+    it('registers in the pool of the region of the country while it is public', async () => {
+      authServiceMock.register.mockReturnValue(of(mockRegisterResponse));
+      vi.spyOn(router, 'navigate');
+
+      component.registerModel.set({ ...validForm, residenceCountry: 'RU' });
+      await fixture.whenStable();
+      component.onSubmit();
+      flushPublicRegions(['intl', 'ru']);
+
+      expect(authServiceMock.register).toHaveBeenCalledWith(
+        { ...validForm, residenceCountry: 'RU' },
+        { captchaToken: null, region: 'ru' }
+      );
     });
 
     it('should navigate to login with pending-verification on success', async () => {
@@ -304,7 +335,12 @@ describe('RegisterComponent', () => {
       component.registerModel.set({ ...validForm, residenceCountry: 'RU' });
       await fixture.whenStable();
       component.onSubmit();
+      flushPublicRegions(['intl']);
 
+      expect(authServiceMock.register).toHaveBeenCalledWith(
+        { ...validForm, residenceCountry: 'RU' },
+        { captchaToken: null, region: HOME_DATA_REGION }
+      );
       expect(component['error']()).toBe(
         'Accounts for this country are not available yet.'
       );
@@ -325,9 +361,10 @@ describe('RegisterComponent', () => {
         component.registerModel.set({ ...validForm, residenceCountry: 'RU' });
         await fixture.whenStable();
         component.onSubmit();
+        flushPublicRegions(['intl']);
         httpTesting
           .expectOne(REGION_CONFIG_API_V1)
-          .flush({ region: 'intl', peers });
+          .flush({ region: 'intl', peers, publicRegions: ['intl'] });
         fixture.detectChanges();
       }
 
@@ -485,11 +522,45 @@ describe('RegisterComponent', () => {
       expect(component['canSubmit']()).toBe(true);
 
       component.onSubmit();
-      expect(authServiceMock.register).toHaveBeenLastCalledWith(
-        validForm,
-        'turnstile-token'
-      );
+      expect(authServiceMock.register).toHaveBeenLastCalledWith(validForm, {
+        captchaToken: 'turnstile-token',
+        region: HOME_DATA_REGION
+      });
       expect(router.navigate).toHaveBeenCalled();
+    });
+
+    it('drops the token of one pool when the next attempt goes to another region', async () => {
+      const httpError = new HttpErrorResponse({
+        error: {
+          message: 'Captcha required',
+          errorKey: ErrorKeys.AUTH.CAPTCHA_REQUIRED
+        },
+        status: 400
+      });
+
+      authServiceMock.register
+        .mockReturnValueOnce(throwError(() => httpError))
+        .mockReturnValueOnce(of(mockRegisterResponse));
+      vi.spyOn(router, 'navigate');
+
+      component.registerModel.set(validForm);
+      await fixture.whenStable();
+      component.onSubmit();
+      component['onCaptchaToken']('home-token');
+
+      component.registerModel.set({ ...validForm, residenceCountry: 'RU' });
+      await fixture.whenStable();
+      component.onSubmit();
+      httpTesting
+        .expectOne(REGION_CONFIG_API_V1)
+        .flush({ region: 'intl', peers: {}, publicRegions: ['intl', 'ru'] });
+
+      expect(authServiceMock.register).toHaveBeenLastCalledWith(
+        { ...validForm, residenceCountry: 'RU' },
+        { captchaToken: null, region: 'ru' }
+      );
+      expect(component['captchaRequired']()).toBe(false);
+      expect(component['captchaRegion']()).toBe('ru');
     });
 
     it('clears the token and shows the same widget when CAPTCHA_INVALID is returned', async () => {

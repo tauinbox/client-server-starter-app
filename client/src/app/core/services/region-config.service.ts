@@ -5,6 +5,7 @@ import { catchError, map, of } from 'rxjs';
 import {
   DATA_REGIONS,
   ErrorKeys,
+  HOME_DATA_REGION,
   regionForCountry,
   type CountryCode,
   type DataRegion
@@ -31,6 +32,26 @@ export class RegionConfigService {
 
   get(): Observable<RegionConfigResponse> {
     return this.#http.get<RegionConfigResponse>(REGION_CONFIG_API_V1);
+  }
+
+  /**
+   * The region whose pool creates the account of a resident of `country`:
+   * the region of the country while the registry lists it as public, else
+   * the home region. A country of the home region needs no request. A failed
+   * load gives the home region, which refuses a country of another region
+   * with its own key.
+   */
+  registrationRegion(country: CountryCode): Observable<DataRegion> {
+    const region = regionForCountry(country);
+
+    if (region === HOME_DATA_REGION) return of(HOME_DATA_REGION);
+
+    return this.get().pipe(
+      map(({ publicRegions }) =>
+        publicRegions.includes(region) ? region : HOME_DATA_REGION
+      ),
+      catchError(() => of(HOME_DATA_REGION))
+    );
   }
 
   /**

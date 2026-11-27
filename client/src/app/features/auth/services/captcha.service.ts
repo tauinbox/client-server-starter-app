@@ -1,10 +1,13 @@
 import { DOCUMENT } from '@angular/common';
 import { HttpClient, HttpContext } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import type { CaptchaConfigResponse } from '@app/shared/types';
+import type { DataRegion } from '@app/shared/constants';
 import { firstValueFrom } from 'rxjs';
 import { AuthApiEnum } from '../constants/auth-api.const';
+import { AuthStore } from '../store/auth.store';
 import { DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/error-notifications';
+import { API_REGION_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/api-region';
 import { loadExternalScript } from '@shared/utils/external-script.utils';
 
 const TURNSTILE_SCRIPT_URL =
@@ -43,45 +46,43 @@ export class CaptchaService {
   readonly #http = inject(HttpClient);
   readonly #document = inject(DOCUMENT);
 
-  readonly #config = signal<CaptchaConfigResponse | null>(null);
+  readonly #authStore = inject(AuthStore);
 
-  #configRequest: Promise<CaptchaConfigResponse> | null = null;
+  readonly #configRequests = new Map<
+    DataRegion,
+    Promise<CaptchaConfigResponse>
+  >();
+
   #scriptLoad: Promise<TurnstileApi> | null = null;
 
   /**
-   * Fetches the public captcha configuration once per session. Subsequent
-   * calls return the cached value. A failure is never cached: caching one
-   * would latch the captcha off for the rest of the session.
+   * Fetches the public captcha configuration of the pool of `region`, the
+   * region of the session by default, once for each region: each pool checks
+   * the tokens of its own keys. A failure is never cached: caching one would
+   * latch the captcha off for the rest of the session.
    */
-  loadConfig(): Promise<CaptchaConfigResponse> {
-    const cached = this.#config();
+  loadConfig(
+    region: DataRegion = this.#authStore.region()
+  ): Promise<CaptchaConfigResponse> {
+    const cached = this.#configRequests.get(region);
 
-    if (cached) return Promise.resolve(cached);
+    if (cached) return cached;
 
-    if (this.#configRequest) return this.#configRequest;
-
-    const ctx = new HttpContext().set(
-      DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN,
-      true
-    );
+    const ctx = new HttpContext()
+      .set(DISABLE_ERROR_NOTIFICATIONS_HTTP_CONTEXT_TOKEN, true)
+      .set(API_REGION_HTTP_CONTEXT_TOKEN, region);
     const request = firstValueFrom(
       this.#http.get<CaptchaConfigResponse>(AuthApiEnum.CaptchaConfig, {
         context: ctx
       })
-    )
-      .then((cfg) => {
-        this.#config.set(cfg);
+    ).catch((err: unknown) => {
+      this.#configRequests.delete(region);
+      // Re-throw so subscribers can react if they care; default-handler
+      // suppression is set on the request context above.
+      throw err;
+    });
 
-        return cfg;
-      })
-      .catch((err: unknown) => {
-        this.#configRequest = null;
-        // Re-throw so subscribers can react if they care; default-handler
-        // suppression is set on the request context above.
-        throw err;
-      });
-
-    this.#configRequest = request;
+    this.#configRequests.set(region, request);
 
     return request;
   }

@@ -5,7 +5,11 @@ import {
   provideHttpClientTesting
 } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
-import { ErrorKeys } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  HOME_DATA_REGION,
+  type DataRegion
+} from '@app/shared/constants';
 import {
   REGION_CONFIG_API_V1,
   RegionConfigService
@@ -75,6 +79,46 @@ describe('RegionConfigService', () => {
         .flush(null, { status: 503, statusText: 'Unavailable' });
 
       await expect(result).resolves.toBe(null);
+    });
+  });
+
+  describe('registrationRegion', () => {
+    function flushPublic(publicRegions: DataRegion[]): void {
+      httpTesting
+        .expectOne(REGION_CONFIG_API_V1)
+        .flush({ region: 'intl', peers: {}, publicRegions });
+    }
+
+    it('gives the home region for a country of it, with no request', async () => {
+      await expect(
+        firstValueFrom(service.registrationRegion('DE'))
+      ).resolves.toBe(HOME_DATA_REGION);
+    });
+
+    it('gives the region of the country while it is public', async () => {
+      const result = firstValueFrom(service.registrationRegion('RU'));
+
+      flushPublic(['intl', 'ru']);
+
+      await expect(result).resolves.toBe('ru');
+    });
+
+    it('gives the home region while the region of the country is not public', async () => {
+      const result = firstValueFrom(service.registrationRegion('RU'));
+
+      flushPublic(['intl']);
+
+      await expect(result).resolves.toBe(HOME_DATA_REGION);
+    });
+
+    it('gives the home region when the config does not load', async () => {
+      const result = firstValueFrom(service.registrationRegion('RU'));
+
+      httpTesting
+        .expectOne(REGION_CONFIG_API_V1)
+        .flush(null, { status: 503, statusText: 'Unavailable' });
+
+      await expect(result).resolves.toBe(HOME_DATA_REGION);
     });
   });
 

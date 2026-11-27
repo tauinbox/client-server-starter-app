@@ -6,6 +6,8 @@ import {
 import { provideHttpClient } from '@angular/common/http';
 import { CaptchaService } from './captcha.service';
 import { AuthApiEnum } from '../constants/auth-api.const';
+import { HOME_DATA_REGION } from '@app/shared/constants';
+import { API_REGION_HTTP_CONTEXT_TOKEN } from '@core/context-tokens/api-region';
 
 describe('CaptchaService', () => {
   let service: CaptchaService;
@@ -92,6 +94,30 @@ describe('CaptchaService', () => {
       });
 
       await service.loadConfig();
+      httpMock.expectNone(AuthApiEnum.CaptchaConfig);
+    });
+
+    it('reads the config of each region from its own pool, once', async () => {
+      const home = service.loadConfig();
+      const homeReq = httpMock.expectOne(AuthApiEnum.CaptchaConfig);
+
+      expect(homeReq.request.context.get(API_REGION_HTTP_CONTEXT_TOKEN)).toBe(
+        HOME_DATA_REGION
+      );
+      homeReq.flush({ enabled: true, provider: 'turnstile', siteKey: 'home' });
+
+      const ru = service.loadConfig('ru');
+      const ruReq = httpMock.expectOne(AuthApiEnum.CaptchaConfig);
+
+      expect(ruReq.request.context.get(API_REGION_HTTP_CONTEXT_TOKEN)).toBe(
+        'ru'
+      );
+      ruReq.flush({ enabled: true, provider: 'turnstile', siteKey: 'ru' });
+
+      expect((await home).siteKey).toBe('home');
+      expect((await ru).siteKey).toBe('ru');
+
+      expect((await service.loadConfig('ru')).siteKey).toBe('ru');
       httpMock.expectNone(AuthApiEnum.CaptchaConfig);
     });
   });

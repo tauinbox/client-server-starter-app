@@ -28,6 +28,7 @@ import { AuthService } from '../../services/auth.service';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { switchMap } from 'rxjs';
 import { PasswordToggleComponent } from '@shared/components/password-toggle/password-toggle.component';
 import { PasswordStrengthComponent } from '@shared/components/password-strength/password-strength.component';
 import { CaptchaWidgetComponent } from '@shared/components/captcha-widget/captcha-widget.component';
@@ -36,7 +37,8 @@ import {
   ErrorKeys,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
-  type CountryCode
+  type CountryCode,
+  type DataRegion
 } from '@app/shared/constants';
 import { parseHttpErrorMessage } from '@shared/utils/http-error.utils';
 import { LegalLinksComponent } from '@features/legal/components/legal-links/legal-links.component';
@@ -85,6 +87,8 @@ export class RegisterComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly captchaRequired = signal(false);
   protected readonly captchaToken = signal<string | null>(null);
+  /** The region of the pool that asked for the captcha and checks its token. */
+  protected readonly captchaRegion = signal<DataRegion | null>(null);
 
   protected readonly appRouteSegmentEnum = AppRouteSegmentEnum;
   protected readonly legalKinds = ['terms', 'privacy'] as const;
@@ -140,9 +144,25 @@ export class RegisterComponent {
     this.error.set(null);
     this.peerUrl.set(null);
 
-    this.#authService
-      .register({ ...fields, residenceCountry }, this.captchaToken())
-      .pipe(takeUntilDestroyed(this.#destroyRef))
+    this.#regionConfig
+      .registrationRegion(residenceCountry)
+      .pipe(
+        switchMap((region) => {
+          // A token is good only for the pool that asked for it. A country of
+          // another region drops it, and that pool asks again if it must.
+          if (region !== this.captchaRegion()) {
+            this.captchaRegion.set(region);
+            this.captchaRequired.set(false);
+            this.captchaToken.set(null);
+          }
+
+          return this.#authService.register(
+            { ...fields, residenceCountry },
+            { captchaToken: this.captchaToken(), region }
+          );
+        }),
+        takeUntilDestroyed(this.#destroyRef)
+      )
       .subscribe({
         next: () => {
           this.loading.set(false);

@@ -36,7 +36,10 @@
         <nxs-password-strength [password]="registerModel().password" />
 
         @if (captchaRequired()) {
-          <nxs-captcha-widget (tokenChange)="onCaptchaToken($event)" />
+          <nxs-captcha-widget
+            [region]="captchaRegion()"
+            (tokenChange)="onCaptchaToken($event)"
+          />
         }
 
         @if (error()) {
