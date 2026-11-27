@@ -1,6 +1,7 @@
 import type { Request } from 'express';
 import type {
   CountryCode,
+  DataRegion,
   LegalDocumentVersion,
   LegalJurisdiction,
   PeerRegions,
@@ -523,6 +524,9 @@ export interface State {
   // /api/v1/config/region. Default: none, as production. E2E sets them via
   // /__control/region-peers.
   regionPeers: PeerRegions;
+  // The public status of each region (the settings registry of the server).
+  // A region with no value is not public; the home region is public in code.
+  regionRegistry: Partial<Record<DataRegion, boolean>>;
   // Per-route + per-IP attempt tracker for captcha soft-trigger. Keyed
   // `${routeName}:${ip}`.
   captchaAttempts: Map<string, CaptchaAttemptWindow>;

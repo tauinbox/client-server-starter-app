@@ -9,7 +9,8 @@ per server module:
 | File | Server module |
 |------|---------------|
 | `routes/health.json` | `core/health` |
-| `routes/config.json` | `core/region` |
+| `routes/config.json` | `core/region-registry` (region config controller) |
+| `routes/regions.json` | `core/region-registry` (regions admin controller) |
 | `routes/auth.json` | `auth` (auth controller + captcha) |
 | `routes/oauth.json` | `auth` (oauth controller) |
 | `routes/users.json` | `users` |

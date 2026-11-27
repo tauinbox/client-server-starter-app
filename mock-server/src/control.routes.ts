@@ -85,6 +85,7 @@ function buildStateSnapshot(state: State): StateSnapshot {
     paddleClientConfig: state.paddleClientConfig,
     captchaConfig: state.captchaConfig,
     regionPeers: state.regionPeers,
+    regionRegistry: state.regionRegistry,
     captchaAttempts: state.captchaAttempts.size,
     mfaChallengeFailures: state.mfaChallengeFailures.size,
     mfaStepUpFailures: state.mfaStepUpFailures.size,

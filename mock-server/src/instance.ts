@@ -65,6 +65,7 @@ export function freshState(): State {
     paddleClientConfig: { clientToken: null, environment: 'sandbox' },
     captchaConfig: { enabled: false, provider: null, siteKey: null },
     regionPeers: {},
+    regionRegistry: {},
     captchaAttempts: new Map(),
     mfaChallengeFailures: new Map(),
     mfaStepUpFailures: new Map(),

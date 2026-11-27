@@ -8,6 +8,7 @@ import { RolePermission } from './modules/auth/entities/role-permission.entity';
 import { Role } from './modules/auth/entities/role.entity';
 import { FeatureFlagRule } from './modules/feature-flags/entities/feature-flag-rule.entity';
 import { FeatureFlag } from './modules/feature-flags/entities/feature-flag.entity';
+import { RegionRegistryEntry } from './modules/core/region-registry/entities/region-registry-entry.entity';
 
 /**
  * The name of the TypeORM data source of the settings: the rows that every
@@ -31,7 +32,8 @@ export const SETTINGS_ENTITIES: readonly NewableFunction[] = [
   Resource,
   Action,
   FeatureFlag,
-  FeatureFlagRule
+  FeatureFlagRule,
+  RegionRegistryEntry
 ];
 
 /**

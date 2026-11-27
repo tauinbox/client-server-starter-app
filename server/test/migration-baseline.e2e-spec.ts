@@ -225,10 +225,15 @@ runWithInfra('the baselines of the two migration sets (e2e)', () => {
         [SETTINGS_MIGRATIONS_TABLE]
       );
 
-      expect(first.applied.slice(0, 2)).toEqual([
-        'RegionalBaseline1795600000000',
+      // Each baseline opens its set, and the regional set runs first.
+      const [{ count: regionalCount }] = await pair.regional.query<
+        Array<{ count: number }>
+      >(`SELECT count(*)::int AS "count" FROM "migrations"`);
+
+      expect(first.applied[0]).toBe('RegionalBaseline1795600000000');
+      expect(first.applied[regionalCount]).toBe(
         'SettingsBaseline1795600000000'
-      ]);
+      );
       expect(tables).toEqual([
         { schema: regionalOptions.schema, table: 'migrations' },
         { schema: SETTINGS_SCHEMA, table: 'roles' },

@@ -12,7 +12,8 @@ export const SETTINGS_TABLES = [
   'feature_flags',
   'feature_flag_rules',
   'plans',
-  'billing_products'
+  'billing_products',
+  'region_registry'
 ] as const;
 
 export type SettingsTable = (typeof SETTINGS_TABLES)[number];

@@ -17,6 +17,7 @@ import { Role } from './modules/auth/entities/role.entity';
 import { FeatureFlagRuleUser } from './modules/feature-flags/entities/feature-flag-rule-user.entity';
 import { FeatureFlagRule } from './modules/feature-flags/entities/feature-flag-rule.entity';
 import { FeatureFlag } from './modules/feature-flags/entities/feature-flag.entity';
+import { RegionRegistryEntry } from './modules/core/region-registry/entities/region-registry-entry.entity';
 import { UserRole } from './modules/users/entities/user-role.entity';
 import { loadEntities } from './postgres.config';
 
@@ -218,7 +219,8 @@ describe('data sources', () => {
         Resource,
         Action,
         FeatureFlag,
-        FeatureFlagRule
+        FeatureFlagRule,
+        RegionRegistryEntry
       ]);
       expect(regional.filter((e) => SETTINGS_ENTITIES.includes(e))).toEqual([]);
       expect(regional).toContain(UserRole);

@@ -7,7 +7,8 @@ import type { AuditLogParams } from '../../audit/audit.service';
 import {
   SettingsChangeLogService,
   summarizeSettingsChanges,
-  writeSettings
+  writeSettings,
+  type SettingsWrite
 } from './settings-change-log.service';
 import type { SettingsChangedEvent } from './settings-changed.event';
 
@@ -34,7 +35,10 @@ describe('writeSettings', () => {
     targetType: 'Role'
   };
 
-  function setup(regionalCommit: () => Promise<void>) {
+  function setup(
+    regionalCommit: () => Promise<void>,
+    write: SettingsWrite<string> = () => Promise.resolve('written')
+  ) {
     const settings = dataSourceDouble({ query: jest.fn() });
     const regional = {
       transaction: jest.fn(async (run: (em: object) => Promise<unknown>) => {
@@ -60,7 +64,7 @@ describe('writeSettings', () => {
           // @ts-expect-error - partial DataSource doubles: transaction and query runners only
           { regional, settings },
           { log, audit: { trail, draft } },
-          () => Promise.resolve('written')
+          write
         )
     };
   }
@@ -86,6 +90,21 @@ describe('writeSettings', () => {
       params: draft
     });
     expect(log.applyPending).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves no audit row when the write records that it changed nothing', async () => {
+    const { trail, run } = setup(
+      () => Promise.resolve(),
+      (_managers, recordAudit) => {
+        recordAudit(null);
+
+        return Promise.resolve('unchanged');
+      }
+    );
+
+    await expect(run()).resolves.toBe('unchanged');
+    expect(trail.discardSettingsWrite).toHaveBeenCalledWith('audit-1');
+    expect(trail.closeSettingsWrite).not.toHaveBeenCalled();
   });
 });
 

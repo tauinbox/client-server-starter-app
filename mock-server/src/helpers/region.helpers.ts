@@ -5,16 +5,23 @@ import {
   type ErrorKey
 } from '@app/shared/constants';
 import type { RegionConfigResponse } from '@app/shared/types';
+import { publicRegions } from '@app/shared/utils/public-regions';
 import { mockRegion } from '../instance';
 import { getState } from '../state';
 
 /**
- * Mirrors `RegionService` of the server: the region of this instance and its
- * peers. An instance has no peers until a test sets them through
- * /__control/region-peers.
+ * Mirrors `GET /config/region` of the server: the region of this instance,
+ * its peers and the public regions. An instance has no peers until a test
+ * sets them through /__control/region-peers.
  */
 export function regionConfig(): RegionConfigResponse {
-  return { region: mockRegion(), peers: getState().regionPeers };
+  const { regionPeers, regionRegistry } = getState();
+
+  return {
+    region: mockRegion(),
+    peers: regionPeers,
+    publicRegions: publicRegions((region) => regionRegistry[region] === true)
+  };
 }
 
 /** Mirrors `RegionService.assertServesCountry`. */
