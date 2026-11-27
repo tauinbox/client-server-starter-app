@@ -29,6 +29,33 @@ describe('RegionService', () => {
     expect(() => new RegionService(isolatedConfig())).toThrow('DATA_REGION');
   });
 
+  describe('requiredOrigin', () => {
+    it('is null when the API of the region is on the origin of the SPA', () => {
+      const service = new RegionService(
+        isolatedConfig({ DATA_REGION: 'intl' })
+      );
+
+      expect(service.requiredOrigin).toBeNull();
+    });
+
+    it('is the origin of CLIENT_URL when the region has an API host of its own', () => {
+      const service = new RegionService(
+        isolatedConfig({
+          DATA_REGION: 'ru',
+          CLIENT_URL: 'https://app.example.com/some/path'
+        })
+      );
+
+      expect(service.requiredOrigin).toBe('https://app.example.com');
+    });
+
+    it('refuses to start a pool with an API host of its own without CLIENT_URL', () => {
+      expect(
+        () => new RegionService(isolatedConfig({ DATA_REGION: 'ru' }))
+      ).toThrow('CLIENT_URL');
+    });
+  });
+
   describe('assertServesCountry', () => {
     const intl = (peers?: Record<string, string>) =>
       new RegionService(
@@ -59,6 +86,7 @@ describe('RegionService', () => {
       const ru = new RegionService(
         isolatedConfig({
           DATA_REGION: 'ru',
+          CLIENT_URL: 'https://app.example.com',
           PEER_REGIONS: { intl: 'https://app.example.com' }
         })
       );

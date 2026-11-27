@@ -37,6 +37,7 @@ import { AuditModule } from '../audit/audit.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { RequestLoggingMiddleware } from './middleware/request-logging.middleware';
 import { NoStoreMiddleware } from './middleware/no-store.middleware';
+import { OriginGuardMiddleware } from './middleware/origin-guard.middleware';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MetricsModule } from './metrics/metrics.module';
 import { HttpMetricsInterceptor } from './interceptors/http-metrics.interceptor';
@@ -65,6 +66,8 @@ export class CoreModule implements NestModule {
       .apply(RequestLoggingMiddleware)
       .forRoutes('{*path}')
       .apply(NoStoreMiddleware)
+      .forRoutes('{*path}')
+      .apply(OriginGuardMiddleware)
       .forRoutes('{*path}');
   }
 

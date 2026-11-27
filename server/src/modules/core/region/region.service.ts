@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ErrorKeys,
+  REGIONS,
   regionForCountry,
   writesSettings,
   type CountryCode,
@@ -10,6 +11,7 @@ import {
 } from '@app/shared/constants';
 import type { RegionConfigResponse } from '@app/shared/types';
 import { ApiError } from '../../../common/errors/api-error';
+import { validateClientUrl } from '../../auth/providers/client-url.provider';
 
 /** The data region of this cell and the public URLs of the other cells. */
 @Injectable()
@@ -21,11 +23,22 @@ export class RegionService {
    * request makes (the resource sync, the log retention) runs only there.
    */
   readonly writesSettings: boolean;
+  /**
+   * The one `Origin` that a request other than GET, HEAD or OPTIONS may carry,
+   * when the API of this pool has a host of its own (MR-16); null when the
+   * API is on the origin of the SPA.
+   */
+  readonly requiredOrigin: string | null;
 
   constructor(configService: ConfigService) {
     this.region = configService.getOrThrow<DataRegion>('DATA_REGION');
     this.peers = configService.get<PeerRegions>('PEER_REGIONS') ?? {};
     this.writesSettings = writesSettings(this.region);
+    this.requiredOrigin =
+      REGIONS[this.region].apiSubdomain === null
+        ? null
+        : new URL(validateClientUrl(configService.get<string>('CLIENT_URL')))
+            .origin;
   }
 
   config(): RegionConfigResponse {
