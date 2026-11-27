@@ -91,10 +91,20 @@ runWithInfra('Origin guard of a pool with an API host of its own (e2e)', () => {
     expect(res.status).toBe(401);
   });
 
-  it('passes a POST with no Origin, as a provider webhook sends it', async () => {
+  it('passes a POST with no Origin and no cookie, as a provider webhook sends it', async () => {
     const res = await request(http()).post(LOGIN).send(CREDENTIALS);
 
     expect(res.status).toBe(401);
+  });
+
+  // Firefox before 70 and Edge before 79 sent no Origin on a POST.
+  it('refuses a POST with a cookie and no Origin before the handler runs', async () => {
+    const res = await request(http())
+      .post('/api/v1/auth/refresh-token')
+      .set('Cookie', 'refresh_token=any');
+
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ message: 'Origin not allowed' });
   });
 
   it('passes a GET with another Origin', async () => {

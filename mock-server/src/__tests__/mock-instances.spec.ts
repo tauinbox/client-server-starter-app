@@ -166,9 +166,19 @@ describe('the Origin guard of an instance with an API host of its own', () => {
     }
   );
 
-  it('passes a POST from the SPA origin and a POST with no Origin', async () => {
+  it('passes a POST from the SPA origin and a POST with no Origin and no cookie', async () => {
     expect((await login(other.baseUrl, SPA_ORIGIN)).status).toBe(200);
     expect((await login(other.baseUrl)).status).toBe(200);
+  });
+
+  it('refuses a POST with a cookie and no Origin, as the server', async () => {
+    const res = await fetch(`${other.baseUrl}/api/v1/auth/refresh-token`, {
+      method: 'POST',
+      headers: { cookie: 'refresh_token=any' }
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ message: 'Origin not allowed' });
   });
 
   it('passes a GET with another Origin', async () => {

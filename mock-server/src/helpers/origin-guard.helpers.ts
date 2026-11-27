@@ -22,17 +22,17 @@ export function requiredOriginOf(
 
 /**
  * Mirrors `OriginGuardMiddleware` of the server (MR-16): a request other than
- * GET, HEAD or OPTIONS with an `Origin` other than the SPA origin is refused,
- * and a request with no `Origin` is not from a browser and passes.
+ * GET, HEAD or OPTIONS passes only with the SPA origin, or with no `Origin`
+ * and no cookie (not a browser session, such as a provider webhook).
  */
 export function originGuard(requiredOrigin: string): RequestHandler {
   return (req, res, next) => {
-    const { origin } = req.headers;
+    const { origin, cookie } = req.headers;
 
     if (
       SAFE_METHODS.has(req.method) ||
-      origin === undefined ||
-      origin === requiredOrigin
+      origin === requiredOrigin ||
+      (origin === undefined && cookie === undefined)
     ) {
       next();
 

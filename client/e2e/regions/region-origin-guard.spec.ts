@@ -43,6 +43,47 @@ test.describe('The API host of a region', () => {
       expect(headers['cookie']).toMatch(/refresh_token=/);
       expect(response.status()).toBe(403);
 
+      // With no referrer the Fetch standard gives `Origin: null` and Chromium
+      // sends the origin of the page: either is refused, and neither is a
+      // request with no Origin.
+      const [hidden] = await Promise.all([
+        page.waitForResponse(refreshUrl),
+        page.evaluate(
+          (url) =>
+            fetch(url, {
+              method: 'POST',
+              mode: 'no-cors',
+              credentials: 'include',
+              referrerPolicy: 'no-referrer'
+            }).then(() => undefined),
+          refreshUrl
+        )
+      ]);
+
+      expect((await hidden.request().allHeaders())['origin']).toMatch(
+        /^(null|http:\/\/other\.)/
+      );
+      expect(hidden.status()).toBe(403);
+
+      // A form post is a navigation and carries `Origin` too.
+      const [submitted] = await Promise.all([
+        page.waitForResponse(refreshUrl),
+        page.evaluate((url) => {
+          const form = document.createElement('form');
+
+          form.method = 'POST';
+          form.action = url;
+          document.body.append(form);
+          form.submit();
+        }, refreshUrl)
+      ]);
+      const formHeaders = await submitted.request().allHeaders();
+
+      expect(formHeaders['origin']).toBe(sibling.origin);
+      expect(formHeaders['cookie']).toMatch(/refresh_token=/);
+      expect(submitted.status()).toBe(403);
+      await page.waitForURL(refreshUrl);
+
       // The same request from the SPA is served.
       await page.goto('/assets/i18n/en.json');
       const status = await page.evaluate(
