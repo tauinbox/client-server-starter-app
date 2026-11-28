@@ -16,7 +16,9 @@ import { packRules } from '@casl/ability/extra';
 import { EMPTY, of, Subject, throwError } from 'rxjs';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 
+import { By } from '@angular/platform-browser';
 import { OAuthCallbackComponent } from './oauth-callback.component';
+import { OAuthResidenceComponent } from '../oauth-residence/oauth-residence.component';
 import { AUTH_REGION_KEY, AuthStore } from '../../store/auth.store';
 import { AuthService } from '../../services/auth.service';
 import { TokenService } from '../../services/token.service';
@@ -43,7 +45,8 @@ const [OTHER_REGION] = DATA_REGIONS.filter(
 
 const homeIntent = (returnUrl: string): OAuthIntent => ({
   returnUrl,
-  region: HOME_DATA_REGION
+  region: HOME_DATA_REGION,
+  provider: 'google'
 });
 
 const mockUserRole: RoleResponse = {
@@ -83,6 +86,7 @@ describe('OAuthCallbackComponent', () => {
     verifyMfa: ReturnType<typeof vi.fn>;
     verifyMfaRecoveryCode: ReturnType<typeof vi.fn>;
     completeOAuthSignup: ReturnType<typeof vi.fn>;
+    startOAuth: ReturnType<typeof vi.fn>;
   };
   let oauthIntentMock: { take: ReturnType<typeof vi.fn> };
   let router: Router;
@@ -92,7 +96,8 @@ describe('OAuthCallbackComponent', () => {
       exchangeOAuthData: vi.fn().mockReturnValue(of(mockAuthResponse)),
       verifyMfa: vi.fn().mockReturnValue(of(mockAuthResponse)),
       verifyMfaRecoveryCode: vi.fn().mockReturnValue(of(mockAuthResponse)),
-      completeOAuthSignup: vi.fn().mockReturnValue(of(mockAuthResponse))
+      completeOAuthSignup: vi.fn().mockReturnValue(of(mockAuthResponse)),
+      startOAuth: vi.fn()
     };
 
     oauthIntentMock = { take: vi.fn().mockReturnValue(homeIntent('/profile')) };
@@ -301,6 +306,42 @@ describe('OAuthCallbackComponent', () => {
         queryParams: { oauth_error: OAUTH_ERROR.CANCELLED },
         replaceUrl: true
       });
+    });
+
+    it('shows the country that the user declared before the restart', async () => {
+      oauthIntentMock.take.mockReturnValue({
+        ...homeIntent('/profile'),
+        residenceCountry: 'RU'
+      });
+      await reachResidence();
+
+      const residence = fixture.debugElement.query(
+        By.directive(OAuthResidenceComponent)
+      ).componentInstance as OAuthResidenceComponent;
+
+      expect(residence.residenceModel().residenceCountry).toBe('RU');
+    });
+
+    // The provider profile waits in a host-only cookie of this host.
+    it('starts the round trip again on the host of the region of the country', async () => {
+      oauthIntentMock.take.mockReturnValue({
+        returnUrl: '/dashboard',
+        region: HOME_DATA_REGION,
+        provider: 'vk'
+      });
+      await reachResidence();
+
+      fixture.componentInstance.onResidenceRegionMoved({
+        region: OTHER_REGION,
+        residenceCountry: 'RU'
+      });
+
+      expect(TestBed.inject(AuthStore).region()).toBe(OTHER_REGION);
+      expect(authServiceMock.startOAuth).toHaveBeenCalledWith('vk', {
+        returnUrl: '/dashboard',
+        residenceCountry: 'RU'
+      });
+      expect(router.navigate).not.toHaveBeenCalled();
     });
 
     it('gives /login the reason when the sign-up cannot go on', async () => {
@@ -541,7 +582,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
   // The provider returned to the API host of the region that started the
   // round trip, and the refresh cookie of the session is host-only there.
   it('keeps the session in the region of the round trip', async () => {
-    intent = { returnUrl: '/profile', region: OTHER_REGION };
+    intent = { ...homeIntent('/profile'), region: OTHER_REGION };
 
     const fixture = await runCallback();
 
@@ -556,7 +597,7 @@ describe('OAuthCallbackComponent - post-authentication routine', () => {
   });
 
   it('starts the next sign-in in the home region after a failed round trip', async () => {
-    intent = { returnUrl: '/profile', region: OTHER_REGION };
+    intent = { ...homeIntent('/profile'), region: OTHER_REGION };
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     const fixture = TestBed.createComponent(OAuthCallbackComponent);

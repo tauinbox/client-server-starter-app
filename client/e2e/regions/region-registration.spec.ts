@@ -3,38 +3,10 @@ import { REGIONS, type DataRegion } from '@app/shared/constants';
 import { chooseOption } from '../fixtures/base.fixture';
 import { stubTurnstile } from '../fixtures/helpers';
 import type { MockUser } from '../fixtures/mock-data';
-import { expect, test } from '../fixtures/regions.fixture';
+import { expect, setPublic, test } from '../fixtures/regions.fixture';
 
 const PASSWORD = 'Quartz-Meadow-77';
 const COUNTRY_NAMES = new Intl.DisplayNames(['en'], { type: 'region' });
-
-/** Opens or closes the region in the registry of the home instance. */
-async function setPublic(
-  homeUrl: string,
-  { region, isPublic }: { region: DataRegion; isPublic: boolean }
-): Promise<void> {
-  const login = await fetch(`${homeUrl}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: 'admin@example.com',
-      password: 'Password1'
-    })
-  });
-  const {
-    tokens: { access_token: token }
-  } = (await login.json()) as { tokens: { access_token: string } };
-  const res = await fetch(`${homeUrl}/api/v1/admin/regions/${region}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({ public: isPublic })
-  });
-
-  expect(res.status).toBe(200);
-}
 
 async function usersOf(url: string): Promise<Pick<MockUser, 'email'>[]> {
   const res = await fetch(`${url}/__control/state`);

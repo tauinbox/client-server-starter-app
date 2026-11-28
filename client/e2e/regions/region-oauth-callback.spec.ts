@@ -1,14 +1,19 @@
 import type { BrowserContext, Page } from '@playwright/test';
-import { REGIONS } from '@app/shared/constants';
+import { HOME_DATA_REGION, REGIONS } from '@app/shared/constants';
 import type { UserResponse } from '@app/shared/types';
 import { chooseOption, markOAuthRoundTripStarted } from '../fixtures/helpers';
 import type { MockUser } from '../fixtures/mock-data';
-import { expect, test, type RegionMock } from '../fixtures/regions.fixture';
+import {
+  expect,
+  setPublic,
+  test,
+  type RegionMock
+} from '../fixtures/regions.fixture';
 
 const COUNTRY_NAMES = new Intl.DisplayNames(['en'], { type: 'region' });
 
 async function control<T>(
-  { url }: RegionMock,
+  { url }: { url: string },
   { path, body }: { path: string; body: unknown }
 ): Promise<T> {
   const res = await fetch(`${url}/__control/${path}`, {
@@ -129,6 +134,9 @@ test.describe('An OAuth sign-in that a region host with its own API started', ()
 
     for (const mock of regions) {
       const { region, apiOrigin, url } = mock;
+
+      // A region that is not public takes no new account.
+      await setPublic(url, { region, isPublic: true });
       const [country] = REGIONS[region].countries;
       const email = `oauth-new-${region}@example.com`;
       const { token, signupToken } = await control<{
@@ -159,6 +167,99 @@ test.describe('An OAuth sign-in that a region host with its own API started', ()
       const { users } = (await state.json()) as { users: UserResponse[] };
 
       expect(users.map((user) => user.email)).toContain(email);
+
+      await page.evaluate(() => localStorage.clear());
+      await context.clearCookies();
+    }
+  });
+});
+
+async function emailsOf(url: string): Promise<string[]> {
+  const state = await fetch(`${url}/__control/state`);
+  const { users } = (await state.json()) as { users: UserResponse[] };
+
+  return users.map((user) => user.email);
+}
+
+// The provider profile of a sign-up waits in a host-only cookie of the API
+// host that started the round trip, and only the pool of the region of the
+// declared country may create the account. So a country of another public
+// region starts the round trip again on the host of that region.
+test.describe('An OAuth sign-up with a country of another region than the round trip', () => {
+  test('starts the round trip again on the host of that region and creates the account there', async ({
+    page,
+    context,
+    baseURL,
+    _mockServer,
+    regions
+  }) => {
+    const signups = recordOrigins(page, '/api/v1/auth/oauth/signup');
+
+    for (const mock of regions) {
+      const { region, apiOrigin, url } = mock;
+      const [country] = REGIONS[region].countries;
+      const countryName = COUNTRY_NAMES.of(country)!;
+      const email = `oauth-moved-${region}@example.com`;
+      const profile = { email, name: 'Moved Provider User' };
+
+      signups.length = 0;
+
+      for (const instanceUrl of [_mockServer.url, url]) {
+        await setPublic(instanceUrl, { region, isPublic: true });
+      }
+
+      // The round trip of /login starts on the home host.
+      const home = await control<{ token: string; signupToken: string }>(
+        { url: _mockServer.url },
+        { path: 'oauth-signup', body: profile }
+      );
+
+      await page.goto('/login');
+      await markOAuthRoundTripStarted(page, '/profile', HOME_DATA_REGION);
+      await context.addCookies(
+        Object.entries({
+          oauth_data: home.token,
+          oauth_signup: home.signupToken
+        }).map(([name, value]) => ({ name, value, url: `${baseURL}/` }))
+      );
+      await page.goto('/oauth/callback');
+
+      await chooseOption(page, 'Country of residence', countryName);
+      await page.getByRole('button', { name: 'Create account' }).click();
+
+      // The provider half answers 501 in the mock, so the address is the
+      // proof that the browser left for the start on the host of the region.
+      await expect(page).toHaveURL(`${apiOrigin}/api/v1/auth/oauth/google`);
+      expect(signups).toEqual([]);
+
+      // The provider returns to the host of the region, which holds the
+      // profile in its own cookies.
+      const moved = await control<{ token: string; signupToken: string }>(
+        mock,
+        { path: 'oauth-signup', body: profile }
+      );
+
+      await context.addCookies(
+        Object.entries({
+          oauth_data: moved.token,
+          oauth_signup: moved.signupToken
+        }).map(([name, value]) => ({ name, value, url: `${apiOrigin}/` }))
+      );
+      await page.goto('/oauth/callback');
+
+      // The country declared before the restart is chosen already.
+      await expect(
+        page.getByRole('combobox', { name: 'Country of residence' })
+      ).toContainText(countryName);
+      await page.getByRole('button', { name: 'Create account' }).click();
+
+      await expect(page).toHaveURL(/\/profile$/);
+      expect(signups).toEqual([apiOrigin]);
+      expect(await emailsOf(url)).toContain(email);
+      expect(await emailsOf(_mockServer.url)).not.toContain(email);
+      expect(
+        await page.evaluate(() => localStorage.getItem('auth_region'))
+      ).toBe(region);
 
       await page.evaluate(() => localStorage.clear());
       await context.clearCookies();

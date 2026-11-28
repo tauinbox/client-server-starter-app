@@ -542,7 +542,10 @@ State:
   written by `AuthService.startOAuth`), and the callback page sets it with `setSignInRegion`
   (no effect while a session exists), so the exchange, the second factor, the country form and
   the new session use the host that holds the OAuth cookies. A failed callback sets the home region
-  again.
+  again. The country form of a provider sign-up reads the region of the country as the
+  registration does; for another region than the round trip, the callback page sets that region
+  and starts the round trip again on its host (`startOAuth` with the provider of the intent and
+  the declared country, which the next form shows already).
   `client/nginx.conf` allows each such host in `connect-src`, and `npm run check:regions` refuses a missing one. The e2e fixture
   `e2e/fixtures/regions.fixture.ts` runs the SPA on `nexus.localhost` and one mock instance for
   each such region on its host.

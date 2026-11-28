@@ -22,6 +22,8 @@
 
       <mat-card-content>
         <nxs-oauth-residence
+          [declaredCountry]="declaredCountry()"
+          (regionMoved)="onResidenceRegionMoved($event)"
           (completed)="onSignedUp()"
           (cancelled)="onResidenceCancelled()"
           (failed)="onResidenceFailed($event)"

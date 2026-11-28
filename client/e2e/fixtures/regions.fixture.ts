@@ -12,7 +12,7 @@ import {
   listenOnUnblockedPort,
   portOf
 } from '../../../mock-server/src/utils/listen';
-import { test as base } from './base.fixture';
+import { expect, test as base } from './base.fixture';
 import { trackRoutedRequest } from './pending-requests';
 
 /**
@@ -220,4 +220,37 @@ export async function signInOnRegionHost(
   return { user, signedIn };
 }
 
-export { expect } from './base.fixture';
+/**
+ * Opens or closes the region in the registry of one instance. Each pool reads
+ * the one registry through its settings replica, but each mock instance keeps
+ * a store of its own: a test whose client reads the registry of a region host
+ * opens the region there too.
+ */
+export async function setPublic(
+  homeUrl: string,
+  { region, isPublic }: { region: DataRegion; isPublic: boolean }
+): Promise<void> {
+  const login = await fetch(`${homeUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'admin@example.com',
+      password: 'Password1'
+    })
+  });
+  const {
+    tokens: { access_token: token }
+  } = (await login.json()) as { tokens: { access_token: string } };
+  const res = await fetch(`${homeUrl}/api/v1/admin/regions/${region}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ public: isPublic })
+  });
+
+  expect(res.status).toBe(200);
+}
+
+export { expect };

@@ -1,6 +1,15 @@
 import { DOCUMENT, inject, Injectable } from '@angular/core';
-import { isDataRegion, type DataRegion } from '@app/shared/constants';
+import {
+  isCountryCode,
+  isDataRegion,
+  type CountryCode,
+  type DataRegion
+} from '@app/shared/constants';
 import { SessionStorageService } from '@core/services/session-storage.service';
+import {
+  isOAuthProvider,
+  type OAuthProvider
+} from '../constants/auth-api.const';
 
 const OAUTH_INTENT_KEY = 'oauth_intent';
 
@@ -8,8 +17,15 @@ const OAUTH_INTENT_KEY = 'oauth_intent';
  * Where the callback goes after the sign-in, and the region whose API host
  * started the round trip: the provider returns to that host, which keeps the
  * result in a host-only cookie, so the callback must exchange it there.
+ * `provider` lets a sign-up start the round trip again on the host of another
+ * region, and `residenceCountry` is the country declared before that restart.
  */
-export type OAuthIntent = { returnUrl: string; region: DataRegion };
+export type OAuthIntent = {
+  returnUrl: string;
+  region: DataRegion;
+  provider: OAuthProvider;
+  residenceCountry?: CountryCode;
+};
 
 function isOAuthIntent(value: unknown): value is OAuthIntent {
   return (
@@ -18,7 +34,11 @@ function isOAuthIntent(value: unknown): value is OAuthIntent {
     'returnUrl' in value &&
     typeof value.returnUrl === 'string' &&
     'region' in value &&
-    isDataRegion(value.region)
+    isDataRegion(value.region) &&
+    'provider' in value &&
+    typeof value.provider === 'string' &&
+    isOAuthProvider(value.provider) &&
+    (!('residenceCountry' in value) || isCountryCode(value.residenceCountry))
   );
 }
 
