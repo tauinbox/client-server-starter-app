@@ -73,7 +73,7 @@ const LEGACY_RBAC_METADATA_KEY = 'rbac_metadata';
 const regionContext = (region: DataRegion) =>
   silentContext().set(API_REGION_HTTP_CONTEXT_TOKEN, region);
 
-type StartOAuth = { returnUrl?: string };
+type StartOAuth = { returnUrl?: string; residenceCountry?: CountryCode };
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -201,9 +201,13 @@ export class AuthService {
    * Leaves for the provider through the API host of the region of the
    * session, where `link-init` and `reauth-init` set their intent cookie.
    * With `returnUrl`, the round trip ends on the callback, which reads the
-   * region of this start from the stored intent.
+   * region of this start from the stored intent. `residenceCountry` is a
+   * country that the user already declared for the sign-up of this round trip.
    */
-  startOAuth(provider: OAuthProvider, { returnUrl }: StartOAuth = {}): void {
+  startOAuth(
+    provider: OAuthProvider,
+    { returnUrl, residenceCountry }: StartOAuth = {}
+  ): void {
     const win = this.#window;
 
     if (!win) return;
@@ -211,7 +215,12 @@ export class AuthService {
     const region = this.#authStore.region();
 
     if (returnUrl !== undefined) {
-      this.#oauthIntent.start({ returnUrl, region });
+      this.#oauthIntent.start({
+        returnUrl,
+        region,
+        provider,
+        ...(residenceCountry && { residenceCountry })
+      });
     }
 
     win.location.href = oauthStartUrl(provider, {

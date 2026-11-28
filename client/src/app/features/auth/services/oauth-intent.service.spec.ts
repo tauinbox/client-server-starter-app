@@ -10,7 +10,8 @@ const [OTHER_REGION] = DATA_REGIONS.filter(
 
 const intent = (returnUrl: string): OAuthIntent => ({
   returnUrl,
-  region: OTHER_REGION
+  region: OTHER_REGION,
+  provider: 'google'
 });
 
 describe('OAuthIntentService', () => {
@@ -58,14 +59,42 @@ describe('OAuthIntentService', () => {
     );
   });
 
+  it('hands over the country that the user declared before a restart', () => {
+    const declared: OAuthIntent = {
+      ...intent('/profile'),
+      residenceCountry: 'RU'
+    };
+
+    bootstrap().start(declared);
+
+    expect(bootstrap().take()).toEqual(declared);
+  });
+
   it.each([
     ['a number', 42],
     ['a bare return url', '/profile'],
-    ['no region', { returnUrl: '/profile' }],
-    ['a region that the code does not know', { returnUrl: '/', region: 'xx' }],
+    ['no region', { returnUrl: '/profile', provider: 'google' }],
+    [
+      'a region that the code does not know',
+      { returnUrl: '/', region: 'xx', provider: 'google' }
+    ],
     [
       'a return url that is not a string',
-      { returnUrl: 1, region: HOME_DATA_REGION }
+      { returnUrl: 1, region: HOME_DATA_REGION, provider: 'google' }
+    ],
+    ['no provider', { returnUrl: '/', region: HOME_DATA_REGION }],
+    [
+      'a provider that the code does not know',
+      { returnUrl: '/', region: HOME_DATA_REGION, provider: 'toString' }
+    ],
+    [
+      'a country that the code does not know',
+      {
+        returnUrl: '/',
+        region: HOME_DATA_REGION,
+        provider: 'google',
+        residenceCountry: 'XX'
+      }
     ]
   ])('refuses a stored value with %s', (_case, value) => {
     sessionStorage.setItem(KEY, JSON.stringify(value));

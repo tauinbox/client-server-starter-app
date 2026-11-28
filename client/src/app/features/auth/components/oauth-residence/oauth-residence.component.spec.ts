@@ -7,13 +7,27 @@ import {
 } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { ErrorKeys, OAUTH_ERROR, type OAuthError } from '@app/shared/constants';
+import {
+  ErrorKeys,
+  HOME_DATA_REGION,
+  OAUTH_ERROR,
+  regionForCountry,
+  type DataRegion,
+  type OAuthError
+} from '@app/shared/constants';
+import type { RegionConfigResponse } from '@app/shared/types';
 import { REGION_CONFIG_API_V1 } from '@core/services/region-config.service';
 import { provideNoopMaterialAnimations } from '../../../../../test-utils/material-animations';
 import { TranslocoTestingModuleWithLangs } from '../../../../../test-utils/transloco-testing';
 import { AuthService } from '../../services/auth.service';
+import { AuthStore } from '../../store/auth.store';
 import { presetResidenceCountry } from '../../utils/residence-country';
-import { OAuthResidenceComponent } from './oauth-residence.component';
+import {
+  OAuthResidenceComponent,
+  type ResidenceRegionMove
+} from './oauth-residence.component';
+
+const RU_REGION = regionForCountry('RU');
 
 function refusal(errorKey: string, status = 409): HttpErrorResponse {
   return new HttpErrorResponse({
@@ -30,6 +44,19 @@ describe('OAuthResidenceComponent', () => {
   let completed: ReturnType<typeof vi.fn<() => void>>;
   let cancelled: ReturnType<typeof vi.fn<() => void>>;
   let failed: ReturnType<typeof vi.fn<(error: OAuthError) => void>>;
+  let regionMoved: ReturnType<
+    typeof vi.fn<(move: ResidenceRegionMove) => void>
+  >;
+
+  /** Answers the registry read of `registrationRegion`. */
+  function flushPublicRegions(publicRegions: DataRegion[]): void {
+    httpTesting.expectOne(REGION_CONFIG_API_V1).flush({
+      region: HOME_DATA_REGION,
+      peers: {},
+      publicRegions
+    } satisfies RegionConfigResponse);
+    fixture.detectChanges();
+  }
 
   beforeEach(async () => {
     authServiceMock = { completeOAuthSignup: vi.fn() };
@@ -51,9 +78,11 @@ describe('OAuthResidenceComponent', () => {
     completed = vi.fn();
     cancelled = vi.fn();
     failed = vi.fn();
+    regionMoved = vi.fn();
     component.completed.subscribe(completed);
     component.cancelled.subscribe(cancelled);
     component.failed.subscribe(failed);
+    component.regionMoved.subscribe(regionMoved);
     fixture.detectChanges();
   });
 
@@ -70,6 +99,52 @@ describe('OAuthResidenceComponent', () => {
     expect(component.residenceModel().residenceCountry).toBe(
       presetResidenceCountry(navigator.languages)
     );
+  });
+
+  it('presets the country that the user declared before the restart', async () => {
+    fixture.componentRef.setInput('declaredCountry', 'RU');
+    await fixture.whenStable();
+
+    expect(component.residenceModel().residenceCountry).toBe('RU');
+  });
+
+  // The provider profile waits in a host-only cookie of the host that
+  // started the round trip, and only the pool of the region of the country
+  // may create the account.
+  it('starts the round trip again on the host of the public region of the country', async () => {
+    await submit('RU');
+    flushPublicRegions([RU_REGION]);
+
+    expect(regionMoved).toHaveBeenCalledWith({
+      region: RU_REGION,
+      residenceCountry: 'RU'
+    });
+    expect(authServiceMock.completeOAuthSignup).not.toHaveBeenCalled();
+    expect(component['loading']()).toBe(true);
+  });
+
+  it('creates the account on the host of the round trip when it is the host of the country', async () => {
+    TestBed.inject(AuthStore).setSignInRegion(RU_REGION);
+    authServiceMock.completeOAuthSignup.mockReturnValue(of({}));
+
+    await submit('RU');
+    flushPublicRegions([RU_REGION]);
+
+    expect(authServiceMock.completeOAuthSignup).toHaveBeenCalledWith('RU');
+    expect(regionMoved).not.toHaveBeenCalled();
+    expect(completed).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the round trip again on the home host for a home country', async () => {
+    TestBed.inject(AuthStore).setSignInRegion(RU_REGION);
+
+    await submit('DE');
+
+    expect(regionMoved).toHaveBeenCalledWith({
+      region: HOME_DATA_REGION,
+      residenceCountry: 'DE'
+    });
+    expect(authServiceMock.completeOAuthSignup).not.toHaveBeenCalled();
   });
 
   it('sends nothing until a country is chosen', async () => {
@@ -94,6 +169,7 @@ describe('OAuthResidenceComponent', () => {
     );
 
     await submit('RU');
+    flushPublicRegions([]);
 
     expect(component['error']()).toBe(
       'Accounts for this country are not available yet.'
@@ -109,6 +185,7 @@ describe('OAuthResidenceComponent', () => {
     );
 
     await submit('RU');
+    flushPublicRegions([]);
     httpTesting
       .expectOne(REGION_CONFIG_API_V1)
       .flush({ region: 'intl', peers: { ru: 'https://ru.example.com' } });

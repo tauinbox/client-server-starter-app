@@ -542,7 +542,10 @@ State:
   written by `AuthService.startOAuth`), and the callback page sets it with `setSignInRegion`
   (no effect while a session exists), so the exchange, the second factor, the country form and
   the new session use the host that holds the OAuth cookies. A failed callback sets the home region
-  again.
+  again. The country form of a provider sign-up reads the region of the country as the
+  registration does; for another region than the round trip, the callback page sets that region
+  and starts the round trip again on its host (`startOAuth` with the provider of the intent and
+  the declared country, which the next form shows already).
   `client/nginx.conf` allows each such host in `connect-src`, and `npm run check:regions` refuses a missing one. The e2e fixture
   `e2e/fixtures/regions.fixture.ts` runs the SPA on `nexus.localhost` and one mock instance for
   each such region on its host.
@@ -1298,8 +1301,8 @@ resolves to `--mat-sys-error`. `e2e/visual/sidenav-width.spec.ts` asserts that t
 and the content offset resolve to the `--nav-width-*` custom properties. An undeclared token collapses
 the layout silently.
 
-**Coverage.** The suite has 379 Playwright tests. They cover auth, users, admin, billing, a11y,
-keyboard and visual. There are also 1915 Vitest unit tests. They cover login, register and profile.
+**Coverage.** The suite has 380 Playwright tests. They cover auth, users, admin, billing, a11y,
+keyboard and visual. There are also 1925 Vitest unit tests. They cover login, register and profile.
 The profile tests include the self-service email change, which shares one submit with the name edit
 and the password edit. An account created through a provider holds no password. When it carries an
 authenticator, the profile form, the providers card and the sessions card ask for a code instead, and

@@ -19,15 +19,20 @@ import { OAuthIntentService } from '../../services/oauth-intent.service';
 import { AppRouteSegmentEnum } from '../../../../app.route-segment.enum';
 import { safeReturnUrl } from '../../utils/safe-return-url';
 import { MfaChallengeComponent } from '../mfa-challenge/mfa-challenge.component';
-import { OAuthResidenceComponent } from '../oauth-residence/oauth-residence.component';
+import {
+  OAuthResidenceComponent,
+  type ResidenceRegionMove
+} from '../oauth-residence/oauth-residence.component';
 import type { MfaRequiredResponse } from '../../models/auth.types';
 import { TranslocoDirective } from '@jsverse/transloco';
 import {
   HOME_DATA_REGION,
   OAUTH_ERROR,
+  type CountryCode,
   type OAuthError
 } from '@app/shared/constants';
 import { AuthStore } from '../../store/auth.store';
+import type { OAuthIntent } from '../../services/oauth-intent.service';
 
 @Component({
   selector: 'nxs-oauth-callback',
@@ -51,7 +56,7 @@ export class OAuthCallbackComponent implements OnInit {
   readonly #oauthIntent = inject(OAuthIntentService);
   readonly #authStore = inject(AuthStore);
   readonly #window = inject(DOCUMENT).defaultView;
-  #returnUrl: string | null = null;
+  #intent: OAuthIntent | null = null;
 
   /**
    * The challenge the provider round trip bought on an account that carries a
@@ -62,6 +67,7 @@ export class OAuthCallbackComponent implements OnInit {
 
   /** No account holds the provider identity until the user declares a country. */
   protected readonly residenceRequired = signal(false);
+  protected readonly declaredCountry = signal<CountryCode | null>(null);
 
   ngOnInit(): void {
     const intent = this.#oauthIntent.take();
@@ -73,7 +79,8 @@ export class OAuthCallbackComponent implements OnInit {
       return;
     }
 
-    this.#returnUrl = intent.returnUrl;
+    this.#intent = intent;
+    this.declaredCountry.set(intent.residenceCountry ?? null);
     // The provider returned to the API host of this region, which holds the
     // result, and the code or the country of the next step goes there too.
     this.#authStore.setSignInRegion(intent.region);
@@ -134,10 +141,28 @@ export class OAuthCallbackComponent implements OnInit {
     this.#redirectToLogin(error);
   }
 
+  /**
+   * The provider profile waits in a host-only cookie of this host, so the
+   * account of another region starts the round trip again on its host.
+   */
+  onResidenceRegionMoved({
+    region,
+    residenceCountry
+  }: ResidenceRegionMove): void {
+    if (!this.#intent) return;
+
+    const { provider, returnUrl } = this.#intent;
+
+    this.#authStore.setSignInRegion(region);
+    this.#authService.startOAuth(provider, { returnUrl, residenceCountry });
+  }
+
   #navigateToReturnUrl(): void {
     const safeUrl =
-      safeReturnUrl(this.#returnUrl, this.#window?.location.origin) ??
-      `/${AppRouteSegmentEnum.Profile}`;
+      safeReturnUrl(
+        this.#intent?.returnUrl ?? null,
+        this.#window?.location.origin
+      ) ?? `/${AppRouteSegmentEnum.Profile}`;
 
     void this.#router.navigateByUrl(safeUrl, { replaceUrl: true });
   }

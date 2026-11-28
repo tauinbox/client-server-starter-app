@@ -64,7 +64,7 @@ export async function markOAuthRoundTripStarted(
 ): Promise<void> {
   await page.evaluate(
     (intent) => sessionStorage.setItem('oauth_intent', JSON.stringify(intent)),
-    { returnUrl, region }
+    { returnUrl, region, provider: 'google' }
   );
 }
 
